@@ -5,6 +5,14 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **A/B trial frictions (r8) and skill-writing practices.** `smithy stack` reports
+  `gofmt -l` as Go's lint. Skills: smelt's "Nobody to ask" and commit rules are one instruction
+  per bullet, property tests at `normal` are yours (no agent), intent-to-add entries are reset
+  before committing, docs-only commits are exempt from the rebase check, a test of existing
+  behaviour is seen failing once, a failed `smithy consult` falls back to your own decision,
+  only exported API gets doc comments, a refused to-do tool isn't retried; the longest
+  references open with a contents line.
+
 ## v0.12.0 — 2026-11-22
 
 - **Full audit fixes.** `warden.max` falls back to 5 in `smithy wait-turn`, matching the

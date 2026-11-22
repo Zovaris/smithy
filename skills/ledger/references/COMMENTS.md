@@ -1,5 +1,7 @@
 # Comment policy and enforcement
 
+Contents: policy · enforcing it · per language (TS/JS, Python, Go, Java, Rust, Kotlin) · everywhere.
+
 ## Policy
 
 Code carries no explanatory comments. Allowed:

@@ -36,7 +36,7 @@ Skip style, naming and structure here: Standards owns them.
    primitive obsession on domain values (money, ids, dates), boolean flag parameters, hidden
    temporal coupling, swallowed errors, mutable shared state, dead code, leaking abstractions
    across a seam, comments that restate code.
-3. Comments: only API doc comments, license headers, shebangs, usage blocks, tool directives
+3. Comments: only doc comments on exported API, license headers, shebangs, usage blocks, tool directives
    with a reason and `smithy:allow` markers (ledger's `references/COMMENTS.md` when installed). Explanatory comments, commented-out
    code and TODOs are findings. Run `<smithy> comments --diff $(git merge-base origin/<base> HEAD)`
    and report what it prints.
