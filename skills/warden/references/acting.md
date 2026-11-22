@@ -54,7 +54,7 @@ can from here, else propose it); bigger → a scope question for the user, with 
 Workers build at smelt `fast`, so the batch is reviewed once, as a whole. When the highest speed among
 the batch and its items is `fast`, or mode is `plain`, skip this. Otherwise, before the final message, run smelt's check phase at the
 batch's speed (read the SKILL.md `smithy skills smelt` prints: its speed table and
-`references/REVIEW.md`, `references/TESTING.md`) in one wave of parallel **subagents** on:
+`references/CHECK.md`) in one wave of parallel fresh-context agents on:
 - the diff `git diff <base_sha>..origin/<base>` (`base_sha` from `batch.json`), plus each `ready`
   item's `gh pr diff`;
 - the spec: the task dir's spec, else every item's intent.
@@ -63,7 +63,7 @@ or shell access, or secrets. Test agents work in a fresh worktree of `origin/<ba
 worker's.
 Findings follow smelt's receiving rules. The blocking ones become one new `fix` item: one worker
 (same brief, speed `fast`, intent = the findings verbatim, branch from `smithy names branch -
-"<batch> review" fix`), one PR, merged like the others; then the re-review of smelt's REVIEW.md step 6
+"<batch> review" fix`), one PR, merged like the others; then smelt's re-review (`references/RECEIVING.md`, step 5)
 at the fix's commit. A high security finding also goes to the user. Non-blocking ones
 go under **Followups**.
 

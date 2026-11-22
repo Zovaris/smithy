@@ -23,7 +23,10 @@ inside the repo). Then repeat:
      push: `--force-with-lease` only on branches of a warden batch you were given, or of a PR the
      user asked you to tend by name; on anyone else's branch, merge the base instead or stop
      with "needs you". Conflicts you can't resolve from both sides' intent → "needs you".
-   - **unresolved review threads** (`answer-review`, human or bot) → `references/RECEIVING.md`. At most 3 bot rounds
+   - **unresolved review threads** (`answer-review`, human or bot) → smelt's receiving rules (`smithy skills smelt` prints its
+     SKILL.md; read `references/RECEIVING.md` beside it). Without smelt: verify each claim, fix
+     real in-scope ones test-first and reply with the sha, decline scope creep with one line,
+     resolve only threads you fixed. At most 3 bot rounds
      per PR (a person you disagree with twice → "needs you"); the count lives in the card's `review_rounds` (`smithy cards set <batch> <id>
      review_rounds=<n>`); without a card, in `~/.smithy/tend/<owner>-<repo>-<n>.rounds`.
    - **checks pending** (`wait`) → `smithy wait pr:<pr-url>` in the background (foreground where the

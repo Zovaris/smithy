@@ -24,7 +24,7 @@ What workers are:
 | `<committed repo task file …>` | the line, with the file path | no task file, or it isn't committed (`docs/specs`) |
 | `<has prereqs or the batch is full: …>` | the wait-turn line | no prereqs and a free running slot |
 | `<relaunch: …>` | the relaunch line | first launch |
-| `<warden channel: …>` | desktop and any harness: "Put it in the card's note."; CLI: "Send it to the warden with SendMessage, to: <address>." (`references/harness.md`) | never |
+| `<warden channel: …>` | "Put it in the card's note.", or the message line `references/harness.md` gives for this harness | never |
 
 ```
 You are worker <id> in warden batch <batch>: <title>. Kind: <ship|scout>.
@@ -47,8 +47,8 @@ requirements from the intent and the code"; out of scope if the user named it>
 ## How
 - Read <hush-skill> once if the path is set.
 - Workflow: <mode smelt: "read <smelt-skill> and follow it yourself from the build phase to ship
-  at speed fast, every phase in order (build test-first, check the diff against its
-  agents/spec-check.md yourself, verify with `smithy receipt run`, `smithy scan --base <base>`, PR
+  at speed fast, every phase in order (build test-first, check the diff against the Spec-check
+  list in its agents/reviewer.md yourself, verify with `smithy receipt run`, `smithy scan --base <base>`, PR
   body with `smithy receipt list --md`). Launch no test or review agents: the warden runs one
   check wave on the whole batch after the merges. Skipping a phase is a failed task, not a
   shortcut; its references/, agents/ and scripts/ paths are relative to its folder.
@@ -63,8 +63,8 @@ requirements from the intent and the code"; out of scope if the user named it>
   `uv sync`) so the first red test fails for the right reason.
 <has prereqs or the batch is full: "- Then wait for your turn: run `<warden-dir>/scripts/smithy wait-turn
   <batch> <id> <50 for a session worker | 9 for a subagent worker>` <session worker: "in the
-  background" | subagent worker: "in the foreground with your shell tool's longest timeout (a
-  subagent can't be woken from the background)"> and wait for it to end (no tokens while it waits; never poll); exit 4 means run
+  background" | subagent worker: "in the foreground with your shell tool's longest timeout (an
+  in-session worker can't be woken from the background)"> and wait for it to end (no tokens while it waits; never poll); exit 4 means run
   it again, exit 0 means go. When it says go, set `state=working`,
   `git fetch origin && git merge origin/<base>` (or the prereq's branch when stacked) so you
   start from the merged prereqs.">
@@ -111,7 +111,7 @@ as the current step.
 - Decisions settled alone go in the PR body under "Decided without you".
 
 ## Closing line
-<warden channel: "Send it to the warden with SendMessage, to: <address>." | "Put it in the card's note.">
+<warden channel: "Put it in the card's note." | the harness's message line>
 End each turn with exactly one line and nothing else:
 "done: <id> PR <url>" | "done: <id> ready <url or branch>" | "done: <id> reported" |
 "done: <id> decide: <question>" | "done: <id> blocked: <why>".

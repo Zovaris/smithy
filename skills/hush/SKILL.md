@@ -1,6 +1,6 @@
 ---
 name: hush
-description: Runs the given task end to end with no narration or questions and ends with a short done line. Use when the user asks for no talk or no questions, and for every agent another skill launches; composes with other skills (hush + smelt build).
+description: Use when the user asks for no talk or no questions, and for every agent another skill launches; composes with other skills (hush + smelt build).
 argument-hint: "<task, or empty to run what was just agreed>"
 ---
 
