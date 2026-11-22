@@ -14,7 +14,7 @@ Work out what you were given, in this order, and say in the plan line which it w
    just planned"): `smithy tasks ready <dir>` gives what can start; blocked ones wait for their
    blockers. Id = `<slug>-NN`. Source = the file.
 2. **Board ids** (GitHub issues, Linear, Jira keys): read each with `gh` (when installed), the GitHub API when a token is set, or the harness's tracker
-   tools. Id = the key. Source = the board.
+   tools. Id = the key. Source = the key (`owner/repo#n` for GitHub).
 3. **Tasks inline**, one per line: id `task-<slug>`. Source = none (only `batch.json`). When
    tasks depend on each other, write a task dir instead (`smithy task-dir <slug>`, then
    `smithy tasks add <dir> "<title>" [--blocked-by 01,02]` per task) and continue at 1.
@@ -29,10 +29,18 @@ Work out what you were given, in this order, and say in the plan line which it w
    - "Run it as one task": continue at 3 with the idea as the only line.
    Under hush, don't ask: split when the idea clearly has independent parts, else one task.
 
+## Bugs and risk
+
+Per item: `route: debug` when it is a bug report (a bug label, or it describes broken behaviour):
+its worker reproduces red first (smelt's `references/DEBUG.md`). `risky: true` when it touches
+what smelt's SKILL.md Risky list names (untrusted input parsing included): its worker runs the
+security agent. Route board items with `smithy route --board <owner/repo#n>` so the issue's words count.
+
 ## Overlap
 
 Before launch, compare the items' `Files` lists (task files) or, for other inputs, the paths each
-item will likely touch (read the code to guess). Two items that share a file get a prereq on each
+item will likely touch (read the code to guess). Two items that share a file (and, when the code or the task's Interfaces show it, the same top-level
+function or type; different functions in one file don't count) get a prereq on each
 other in id order (the later one waits for the merge), unless the user said `stack`. Append-only
 shared files (CHANGELOG, API or export lists, index files) don't count: their conflicts follow `references/acting.md` (verify, `conflict`). The plan line
 says which items overlap, on what, and whether it chose wait or stack. An item that adds or

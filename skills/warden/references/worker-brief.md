@@ -2,21 +2,19 @@
 Contents: what workers are · how the brief is rendered · the template.
 
 Never by hand: `smithy brief <batch> <id> [--to <warden-name>] [--subagent]` fills the template
-from `batch.json`, the installed skills and `references/harness.md` into `<batch-dir>/<id>.brief.md`,
-checking the worktree is on the item's branch; exit 2 names what it can't fill. `--to`: your
-name, where the channel line needs one; `--subagent`: the fallback. What workers are:
+from `batch.json`, the installed skills and `references/harness.md` (`--to`: your name, where the
+channel line needs one; `--subagent`: the fallback), checking the worktree is on the item's branch; exit 2 names what it can't fill. Workers:
 - They read the hush and smelt SKILL.md files at the brief's absolute paths (no slash commands:
   harnesses differ). Silent: only the status card and one closing line, never the user.
 - Mode `smelt <speed>`: workers build at smelt `fast`; the speed sets the one check wave on the
-  merged batch (`references/acting.md`, batch check). Mode `plain`: the repo's instructions, else
-  just the brief.
+  merged batch (`references/acting.md`, batch check). Mode `plain`: the repo's instructions, else the brief.
 - Effort: `agent.effort` (cap medium); a harder item gets a stronger model, not more effort.
 
 Template: `{{x}}` is filled, `[if x]`…`[end]` kept only when x holds (`!x`: when not); `intent`
 is copied verbatim, never summarized or given added requirements, plans or criteria; rulings
 never go to reviewers; `rulings`: every line of the task dir's `rulings.md` when the source (or a path intent) is a
 committed task file, else its lines naming the id, plus `<batch-dir>/decisions.md` lines naming the id; `taskfile`: that committed file (its `Spec:` line goes into Spec); `wait`: prereqs, or past `max`
-among items without prereqs on a first launch; `relaunch`: `launches` > 0.
+among items without prereqs on a first launch; `relaunch`: `launches` > 0; `debug` / `risky`: the item's `route` / `risky`.
 
 ```
 You are worker {{id}} in warden batch {{batch}}: {{title}}. Kind: {{kind}}.
@@ -47,10 +45,12 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
   (plan and spec skipped at fast), every phase in order (build test-first, check the diff against
   the Spec-check list in its agents/reviewer.md yourself, verify with `smithy receipt run`,
   `smithy scan --base {{base}}`, PR body with `smithy receipt list --md`). No test or review agents
-  (a security agent only if the change is risky): the warden checks the merged batch once. Skipping a phase is a failed task, not a shortcut; its
-  references/, agents/ and scripts/ paths are relative to its folder. Not a slash command.
-[end]
-[if !smelt]- Workflow: the repo's agent instructions (AGENTS.md / CLAUDE.md), else just this brief: tests for what you change, typecheck and lint green.
+  (a security agent only if the change is risky): the warden checks the merged batch once. Skipping a phase is a failed task, not a shortcut; its references/, agents/ and scripts/ paths are relative to its folder. Not a slash command.
+[end][if debug]- Bug: smelt fast via the debug path (its references/DEBUG.md): commit the repro test alone, then on that
+  clean commit `'{{smithy}}' receipt run --claim repro -- <cmd>` (must exit non-zero); then the fix commit,
+  the same command green, `'{{smithy}}' receipt check-red` passing.
+[end][if risky]- Risky (smelt's SKILL.md Risky list): run its security agent on your diff before pr_open.
+[end][if !smelt]- Workflow: the repo's agent instructions (AGENTS.md / CLAUDE.md), else just this brief: tests for what you change, typecheck and lint green.
 [end][if taskfile]
 - In your branch, set the task file's `Status: done` and `PR: <url>`
   (`'{{smithy}}' tasks set {{source}} status=done pr=<url>`) once the PR exists, as a follow-up

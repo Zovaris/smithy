@@ -5,6 +5,19 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **R14 warden bug-fix frictions.** Intake marks bug reports `route: debug` and risky items
+  `risky: true` in `batch.json`; `smithy brief` then tells the worker to take smelt's debug path
+  (a failing `smithy receipt run --claim repro` committed before the fix) or run the security
+  agent. New `smithy receipt check-red` passes only when the `repro` receipt failed on an earlier
+  commit and passes on HEAD; `receipt list` shows that red receipt as `red before fix`. Board items
+  render as `Board item <owner/repo>#<n>: read it with gh issue view …` (no "Board item board").
+  `smithy route --board <owner/repo#n>` reads the issue so its words count, `--batch` floors the
+  batch check at mid (without gh, `--board` warns and routes on the text); its risky words follow smelt's
+  Risky list (specific injection kinds, personal data, untrusted input, file or shell access) and
+  `auth` no longer matches `author`. Overlap needs the same
+  top-level function, not just the same file. Under the subagent fallback, dependents launch only
+  after their prereq merges. `smithy wait batch:` ends with `relaunch: smithy wait batch:<b>`
+  while a card is open. `smithy cleanup` fast-forwards a clean local base branch.
 - **R13 warden + tend frictions.** `wait-turn` takes `--max <min>` (the positional still works) and
   a `--subagent` brief calls `wait-turn … --max 1` per foreground call, so no harness moves it to
   the background. `smithy brief` says the intent is the spec for source `none` (no "Board item

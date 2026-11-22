@@ -38,6 +38,9 @@ run each worker as a background subagent of this session with the prompt `Read
 Workers die with this session: doctor prints `workers: subagent fallback; they end with this
 session`; put it in the plan line. A launched session (no user turn, `start_session` refused) uses this fallback too. Such a worker can't be woken from the
 background, so render its brief with `smithy brief <batch> <id> --subagent` (wait-turn in the foreground).
+Unless `stack`, launch only items whose prereqs have merged; launch a dependent when `smithy wait` reports its
+prereq merged, never parked in a wait loop that burns tokens. Session and headless workers keep
+launch-all.
 
 ## Per-harness details
 

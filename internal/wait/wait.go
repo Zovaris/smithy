@@ -676,13 +676,35 @@ func (w *batchWatcher) poll() ([]string, error) {
 		}
 	}
 	out = append(out, w.prLines(rows, false)...)
-	if len(out) > 0 {
-		return out, nil
+	if len(out) == 0 {
+		if s := stuck(rows); s != "" && s != w.stuckBefore {
+			out = []string{fmt.Sprintf("batch %s stale: %s", w.name, s)}
+		}
 	}
-	if s := stuck(rows); s != "" && s != w.stuckBefore {
-		return []string{fmt.Sprintf("batch %s stale: %s", w.name, s)}, nil
+	return out, nil
+}
+
+// relaunchLines asks for a new wait on each batch that still has a non-final card.
+func relaunchLines(ws []watcher) []string {
+	var out []string
+	for _, w := range ws {
+		if b, ok := w.(*batchWatcher); ok {
+			if rows, err := cards.Rows(b.name); err == nil && open(rows) {
+				out = append(out, "relaunch: smithy wait batch:"+b.name)
+			}
+		}
 	}
-	return nil, nil
+	return out
+}
+
+// open reports whether any card is not final (merged, reported, dropped): the warden must wait again.
+func open(rows []cards.Row) bool {
+	for _, r := range rows {
+		if r.State != "merged" && r.State != "reported" && r.State != "dropped" {
+			return true
+		}
+	}
+	return false
 }
 
 const usage = `usage: smithy wait <target>... [--events a,b] [--all] [--every <sec>] [--max <min>]
@@ -697,7 +719,8 @@ Targets (any mix):
   batch:<name>        a warden card needs the warden (--all: any card change), or a card's PR
                       turned green/red, conflicts, merged or closed (already so at the start: only for
                       merge-auto cards not ready, else red/conflict only; events in the batch's .wait-seen are skipped);
-                      polls cards every 10 s, PRs every 30 s
+                      polls cards every 10 s, PRs every 30 s; while a card is not final the
+                      output ends with "relaunch: smithy wait batch:<name>"
   actions[:<branch>]  a workflow run on the branch (default: origin's default) finished red,
                       push, schedule or manual
   base[:<branch>]     the branch (default: origin's default) moved on origin
@@ -888,6 +911,7 @@ func Main(args []string) int {
 			out = append(out, lines...)
 		}
 		if len(out) > 0 {
+			out = append(out, relaunchLines(ws)...)
 			fmt.Println(strings.Join(out, "\n"))
 			return 0
 		}

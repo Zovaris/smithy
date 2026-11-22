@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -431,5 +432,55 @@ func TestRouteDomainNounsAreNotRisk(t *testing.T) {
 	}
 	if tier, _ := RouteDomain("Fix the auth check", "ship", "normal", "au"); tier != "strong" {
 		t.Errorf("short noun au must not drop auth: %s", tier)
+	}
+}
+
+func routeOut(t *testing.T, args ...string) (int, string) {
+	t.Helper()
+	r, w, _ := os.Pipe()
+	old := os.Stdout
+	os.Stdout = w
+	code := RouteMain(args)
+	w.Close()
+	os.Stdout = old
+	out, _ := io.ReadAll(r)
+	return code, string(out)
+}
+
+func TestRouteBoardAndBatchFloor(t *testing.T) {
+	old := issueText
+	defer func() { issueText = old }()
+	issueText = func(repo, n string) (string, error) {
+		if repo != "acme/invoicer" || n != "7" {
+			t.Errorf("read %s#%s", repo, n)
+		}
+		return "totals are off\nfloat money rounds wrong", nil
+	}
+	if c, out := routeOut(t, "--text", "fix totals", "--board", "acme/invoicer#7"); c != 0 || !strings.HasPrefix(out, "strong ") || !strings.Contains(out, "money") {
+		t.Errorf("--board = %d %q, want strong for money", c, out)
+	}
+	issueText = func(string, string) (string, error) { return "", fmt.Errorf("no gh") }
+	if c, out := routeOut(t, "--text", "fix a typo in README", "--board", "acme/invoicer#7"); c != 0 || !strings.HasPrefix(out, "cheap ") {
+		t.Errorf("--board without gh = %d %q, want fallback to text", c, out)
+	}
+	if c, _ := routeOut(t, "--board", "not-a-key"); c != 2 {
+		t.Errorf("bad --board exit %d", c)
+	}
+	if c, out := routeOut(t, "--agent", "reviewer", "--text", "fix a typo", "--speed", "fast", "--batch"); c != 0 || !strings.HasPrefix(out, "mid ") {
+		t.Errorf("--batch reviewer = %d %q, want mid", c, out)
+	}
+}
+
+func TestRouteRiskWordsAreSpecific(t *testing.T) {
+	for text, want := range map[string]string{
+		"show the author name on the list":      "mid",
+		"fix auth redirect":                     "strong",
+		"block formula injection in CSV export": "strong",
+		"handle personal data on export":        "strong",
+		"add dependency injection container":    "mid",
+	} {
+		if got, r := Route(text, "ship", "normal"); got != want {
+			t.Errorf("Route(%q) = %s %q, want %s", text, got, r, want)
+		}
 	}
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/Zovaris/smithy/internal/ghx"
 )
 
-const cleanupUsage = "usage: smithy cleanup <repo> <branch> [<worktree>] [--force]\n  removes <worktree> only when it is passed, and never the folder it runs in; a branch checked\n  out in another worktree is kept"
+const cleanupUsage = "usage: smithy cleanup <repo> <branch> [<worktree>] [--force]\n  removes <worktree> only when it is passed, and never the folder it runs in; a branch checked\n  out in another worktree is kept; a clean local base branch behind origin is fast-forwarded"
 
 // WorktreeOf finds the worktree path that has branch checked out in `git worktree list --porcelain` output.
 func WorktreeOf(porcelain, branch string) string {
@@ -75,6 +75,7 @@ func CleanupMain(args []string) int {
 	if base == "" {
 		base = "origin/main"
 	}
+	defer fastForward(base)
 	if quiet("git", "show-ref", "-q", "--verify", "refs/heads/"+branch) != nil {
 		if !removed {
 			fmt.Fprintln(os.Stderr, "smithy cleanup: no branch", branch)
@@ -106,6 +107,31 @@ func CleanupMain(args []string) int {
 	}
 	fmt.Printf("kept %s: has commits on no remote and no other branch; push it or pass --force\n", branch)
 	return 1
+}
+
+// fastForward moves the local copy of base (origin/main → main) up to origin after a merge, only
+// when it is a fast-forward and, where checked out here, the tree is clean; elsewhere it is kept.
+func fastForward(base string) {
+	local, ok := strings.CutPrefix(base, "origin/")
+	if !ok || quiet("git", "show-ref", "-q", "--verify", "refs/heads/"+local) != nil || git("rev-parse", local) == git("rev-parse", base) {
+		return
+	}
+	if quiet("git", "merge-base", "--is-ancestor", local, base) != nil {
+		return
+	}
+	switch other := WorktreeOf(git("worktree", "list", "--porcelain"), local); {
+	case other == "":
+		if quiet("git", "update-ref", "refs/heads/"+local, base) != nil {
+			return
+		}
+	case samePath(other, git("rev-parse", "--show-toplevel")):
+		if git("status", "--porcelain", "--untracked-files=no") != "" || quiet("git", "merge", "-q", "--ff-only", base) != nil {
+			return
+		}
+	default:
+		return
+	}
+	fmt.Println("fast-forwarded", local)
 }
 
 // dropRemote deletes origin's copy of branch once it has landed in base (merged, or rebased and

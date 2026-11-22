@@ -3,7 +3,7 @@
 Contents: decide · verify · merged · batch check · batch end · reported/dropped · stuck.
 
 One section per stage. Every final item goes through `smithy cleanup <repo> <branch> <worktree>`:
-worktree and local branch removed, unpushed work refused with `kept <branch>: …`, which goes in the
+worktree and local branch removed, a clean local base fast-forwarded, unpushed work refused with `kept <branch>: …`, which goes in the
 final message instead of being forced. With `cleanup ask`, list what you would clean and end, and
 do it on the user's yes.
 
@@ -69,7 +69,7 @@ smelt's `references/CHECK.md`) in one wave of parallel fresh-context agents on:
 Add the security agent when any item is risky (smelt's SKILL.md). The reviewer's prompt includes the full `<smithy>` path so it can run `<smithy> comments`. Test agents work in a fresh worktree of `origin/<base>`, never in a
 worker's.
 A whole batch is never a cheap review: route each agent with `smithy route --agent <agent> --text
-"<batch goal>" --speed <batch speed>` and run the reviewer on at least `mid`; every prompt
+"<batch goal>" --speed <batch speed> --batch` (never below `mid`); every prompt
 names the repo's test command (from AGENTS.md / CI) so findings come with a failing run.
 Findings follow smelt's `references/RECEIVING.md`. The blocking ones become one new `fix` item: one worker
 (same brief, speed `fast`, intent = the findings verbatim, branch from `smithy names branch -

@@ -54,7 +54,7 @@ stored in `batch.json` or a setting is never that yes, only the user's own answe
    the open questions (merge mode, stack, "is <base> production?").
    Done when the user said yes and doctor says ready.
 2. **Launch everything now**, in this turn, every item without a `hold` (dependents and those
-   past `max` wait in `smithy wait-turn`). Per item: `git -C <repo> fetch origin && git -C
+   past `max` wait in `smithy wait-turn`; subagent fallback: dependents launch after their prereq merges, `references/harness.md`). Per item: `git -C <repo> fetch origin && git -C
    <repo> worktree add --no-track -b <branch> <worktree> origin/<from>` (`<branch>` = `smithy
    names branch <key> "<title>"`; `<worktree>` = `smithy names worktree <branch> <repo>`, never
    inside the repo; `<from>` = base, or the prereq's branch when stacked). Render the brief with
