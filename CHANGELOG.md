@@ -6,7 +6,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 ## Unreleased
 
 - **A/B trial frictions (r6).** `smithy stack` reports `python3 -m unittest` for stdlib-only
-  Python repos. Skills: commit before the check wave, a finding is declined as spec-ambiguous
+  Python repos (test files importing unittest, no packaging file). Skills: a finding is declined as spec-ambiguous
   only by quoting both readings (with the declined test ids), a refused to-do tool falls back to
   the final message.
 

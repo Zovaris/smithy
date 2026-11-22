@@ -8,7 +8,7 @@
    uses the PR description and says so.
 
 ## 2 · Launch, all at once
-Commit first: agents review `git diff` of commits and miss untracked files. Each agent the speed lists (SKILL.md) runs as a fresh agent, in parallel, in one wave. Prompt =
+Each agent the speed lists (SKILL.md) runs as a fresh agent, in parallel, in one wave. Prompt =
 its `agents/<name>.md` text (or absolute path), a `## You get` block with exactly what that file
 lists, and the report contract below. Never your conversation, plan or opinion of the code
 (it would share your blind spots). Give every agent `<smithy>`, the
