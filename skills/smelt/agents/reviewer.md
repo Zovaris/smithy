@@ -73,4 +73,4 @@ Re-review: read the code at the commit sha in your prompt (`git show <sha>:<file
 older one. Check every spec-check row that was missing, partial or wrong and every blocking
 Standards finding; answer only whether each is resolved (file:line). A departure recorded in
 `rulings.md` as an open risk for the user closes as "deferred to user"; don't re-flag it.
-Don't re-list advisory, `should` or `nit` items.
+A new problem the fixes added is reported as `new problem: <what>`. Don't re-list advisory, `should` or `nit` items.

@@ -56,8 +56,8 @@ final tree: `smithy receipt run --claim holdout -- <single-file command from smi
 <zz file>`. Failing it is blocking, unless its finding was declined as spec-ambiguous: then
 one line in the PR's dispositions closes it, and its declined tests may be dropped. Copies of
 its cases are written only after that run (copy the rest as is, with type and lint fix-ups).
-Typecheck and lint receipts run with the `zz_` files moved to the system temp dir, never
-anywhere inside the repo (runners scan dot dirs too).
+During check, typecheck and lint receipts run with the `zz_` files moved to the system temp
+dir, never anywhere inside the repo (runners scan dot dirs too); before commit they are deleted.
 **Reviewing another ref** (not your tree): `git worktree add <tmp> <ref> --detach`, install
 deps there, and give the agents that path.
 

@@ -45,7 +45,7 @@ Say the speed and phases in one line first (a launched agent: in its report).
 | Build | TDD on the criteria | TDD on every behaviour | same |
 | Scripts | suite, typecheck, lint, `smithy scan` | + property tests you write if the repo has a PBT library | + the mutation tool |
 | Agents, one parallel wave | none, a security agent if risky (you run `agents/reviewer.md`, Spec-check section, yourself; its table goes in the PR body's agents section) | adversary (runtime logic; regression for a reported bug) + reviewer | adversary, property, reviewer, security, e2e if UI or served HTTP endpoints (not outbound calls); mutation as a second step, after fixes; hostile last if it runs |
-| Re-review | none | fixed blocking findings only, ≤ 2 rounds (`references/RECEIVING.md` step 5) | same |
+| Re-review | none | fixed blocking findings (spec rows missing/partial/wrong + Standards blocking) only, ≤ 2 rounds (`references/RECEIVING.md` step 5) | same |
 | Target | ~5 min | ~10–15 min, 2–3 agents | ~6 agents |
 | Docs | ADR only if forced | glossary/ADR when they apply | + retro |
 
@@ -75,7 +75,6 @@ need a tool `smithy stack` shows, else "not applicable".
   `.smelt/rulings.md`) and the PR's "Decided without you". Not for security, money, personal
   data, production, push/merge or `smithy:allow` on a real secret: stop with a `blocked:` line.
   Lessons: `references/SHIP.md`.
-- Check `smithy commit`'s exit code before running receipts.
 - Command shapes: `smithy receipt run --claim "<c>" -- <cmd> <args>`; commit with
   `smithy commit "<msg>" <path>...` (never `git add` first: it wants a clean index; subject
   under 72 characters; if it fails: `git restore --staged <paths>`, then retry); a fixture that

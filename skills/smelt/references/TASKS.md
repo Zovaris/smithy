@@ -53,7 +53,7 @@ spec stays in the repo or local dir and the issues link to it.
   4. Proportion: no task is a horizontal layer, none is bigger than a day, none is trivial
      enough to merge into its neighbour. A test of a stub never asserts the stub's output.
   5. Width: the longest `Blocked by` chain, and each task's speed (its `Speed:` line: fast
-     unless it holds logic that earns normal or full).
+     unless it holds logic; a task file defaults to fast, a smelt session to normal).
 - Show the list (number, title, one line, blocked by); wait for approval (else SKILL.md Always).
 
 ## Task file — `NN-<slug>.md`
@@ -100,7 +100,7 @@ smithy tasks next  [dir]          # first todo whose blockers are done
 smithy tasks ready [dir]          # every todo that can start now (what warden launches)
 smithy tasks set <file> status=doing|done pr=<url>
 smithy tasks where                # task dirs for this repo (repo and local)
-smithy tasks add [dir] "<title>" [--blocked-by 01] [--key K] [--speed normal]  # next NN file; Speed: fast by default
+smithy tasks add [dir] "<title>" [--blocked-by 01] [--key K] [--speed fast|normal|full]  # next NN file
 smithy tasks board [--all]        # one line per task list and batch: this repo, or every repo
 ```
 
