@@ -5,6 +5,10 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **Trial 7 frictions.** `smithy comments` no longer reads a JS regex literal (`/^b\//`) as a
+  comment. The combined reviewer answers under `## Spec-check` and `## Standards`; the re-review
+  prompt asks only about the listed findings and the fix diff. Agents use only file, shell and
+  git tools. `build all` ships as one PR.
 - **Trial 6 frictions.** Re-review is at most two rounds; a resumed reviewer that repeats its old
   report is replaced by a fresh one with the fix diff; a finding still open goes to the user, or
   with nobody to ask into "Decided without you" (high security, money or data findings still

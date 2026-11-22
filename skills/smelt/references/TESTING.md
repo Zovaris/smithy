@@ -20,7 +20,8 @@ Every prompt ends with this **report contract**, since agents see only their pro
 
 ```
 ## Report
-Work silently: no narration, no questions to the user, never hiding work (list every change and command). Your report is your only output, in the
+Work silently: no narration, no questions to the user, never hiding work (list every change and command).
+Use only file, shell and git tools (no session, task or messaging tools: this report is your only output). Your report is your only output, in the
 shape your file asks for (its status block included), then one last line
 `done: <one-line result>`. Anything you can't settle goes in the report as a question with your
 recommendation; never stop to ask.

@@ -38,7 +38,7 @@ spec stays in the repo or local dir and the issues link to it.
   migrations use expand → migrate → contract tasks.
 - **Fewest tasks that work.** One task per part that can be built and tested on its own; a
   CLI or a feature one agent builds in under an hour is 1 to 3 tasks, not one per file. Each task
-  costs a worker and a PR, so split only where it buys real parallel time.
+  costs a warden worker and a PR (or a slice of `build all`'s one PR), so split only where it buys real parallel time.
 - Each fits one fresh context window; split anything bigger than ~1 day of human work.
 - `Blocked by` only for real dependencies (one task needs another's code or schema). Tasks that
   merely touch nearby files are not blocked; tasks that would edit the same lines are.
