@@ -285,7 +285,7 @@ func RouteMain(args []string) int {
 	if speed == "" {
 		speed = "normal"
 	}
-	if strings.TrimSpace(text) == "" {
+	if _, isAgent := opt("--agent"); strings.TrimSpace(text) == "" && !isAgent {
 		fmt.Fprintln(os.Stderr, routeUsage)
 		return 2
 	}
