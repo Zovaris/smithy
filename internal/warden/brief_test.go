@@ -96,7 +96,7 @@ func TestBriefRenders(t *testing.T) {
 		"Worktree (already created; work only here): " + e.wt + ", branch feat/a.",
 		"PR target: main. Merge mode: auto.\n",
 		"make A work",
-		filepath.Join(e.repo, "docs", "specs", "01-a.md") + " (read it first",
+		filepath.Join(e.wt, "docs", "specs", "01-a.md") + " (in your worktree; read it first",
 		"## Rulings (settled; follow them)\n- a: keep the API\n- a uses JSON\n",
 		"skills/smelt/SKILL.md and follow it",
 		"tasks set docs/specs/01-a.md status=done",
@@ -133,6 +133,7 @@ func TestBriefWaitRelaunchStack(t *testing.T) {
 		"Merge mode: auto. Stacked on a: merge only after it has merged.",
 		"wait-turn b1 b 9` in the\n  foreground",
 		"git merge origin/feat/a`",
+		"git merge origin/main` (`origin/feat/a`\n  instead until a has merged)",
 		"Read requirements from the intent and the code.",
 		"to: boss.",
 	} {
@@ -175,5 +176,17 @@ func TestBriefRelaunch(t *testing.T) {
 	b, _ := os.ReadFile(o)
 	if c != 0 || !strings.Contains(string(b), "- This is a relaunch. Read ") || strings.Contains(string(b), "wait-turn") {
 		t.Errorf("%d %s\n%s", c, er, b)
+	}
+}
+
+func TestBriefUncommittedTaskFile(t *testing.T) {
+	e := newBrief(t, strings.Replace(oneItem, "docs/specs/01-a.md", "docs/specs/02-new.md", 1))
+	writeFile(t, filepath.Join(e.repo, "docs", "specs", "02-new.md"), "spec")
+	t.Setenv("WARDEN_HARNESS", "codex")
+	o, er, c := brief(t, "b1", "a")
+	b, _ := os.ReadFile(o)
+	got := string(b)
+	if c != 0 || !strings.Contains(got, filepath.Join(e.repo, "docs", "specs", "02-new.md")+" (read-only reference outside your worktree") || strings.Contains(got, "tasks set") {
+		t.Errorf("%d %s\n%s", c, er, got)
 	}
 }

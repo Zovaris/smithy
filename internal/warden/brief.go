@@ -152,6 +152,8 @@ func briefTemplate(md string) (string, error) {
 	return body[:end], nil
 }
 
+func isFile(p string) bool { st, err := os.Stat(p); return err == nil && !st.IsDir() }
+
 func gitOut(dir string, args ...string) string {
 	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output()
 	if err != nil {
@@ -310,6 +312,11 @@ func Brief(args []string) int {
 		spec = source + " (read it first: its acceptance criteria are the spec)"
 		if rel, err := filepath.Rel(realPath(bt.Repo), realPath(source)); err == nil && !strings.HasPrefix(rel, "..") {
 			taskfile = exec.Command("git", "-C", bt.Repo, "cat-file", "-e", "origin/"+it.Base+":"+filepath.ToSlash(rel)).Run() == nil
+			if inWT := filepath.Join(it.Worktree, rel); isFile(inWT) {
+				spec = inWT + " (in your worktree; read it first: its acceptance criteria are the spec)"
+			} else {
+				spec = source + " (read-only reference outside your worktree, not on your branch; read it first: its acceptance criteria are the spec)"
+			}
 			if taskfile {
 				source = rel
 			}
