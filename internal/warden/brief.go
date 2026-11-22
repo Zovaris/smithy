@@ -17,7 +17,7 @@ const briefUsage = `usage: smithy brief <batch> <id> [--to <warden-name>] [--sub
 Renders the worker brief of item <id> from batch.json and the template in warden's
 references/worker-brief.md, writes <batch-dir>/<id>.brief.md and prints its path.
 --to: the warden's name, for a harness whose channel line names it; --subagent: the worker
-runs as a subagent of this session (wait-turn --max 1 in the foreground, repeated).
+runs as a subagent of this session (wait-turn capped at one minute, in the foreground, repeated).
 Exit 2 names a field it can't fill (missing in batch.json, or the worktree isn't on the branch).`
 
 type briefItem struct {

@@ -390,3 +390,15 @@ func TestTaskDirDefault(t *testing.T) {
 		t.Errorf("ignore default is exclude: %q", ex)
 	}
 }
+
+func TestTaskDirDefaultKeepsConfigErrors(t *testing.T) {
+	dir := newRepo(t)
+	home := t.TempDir()
+	t.Setenv("SMITHY_CONFIG", filepath.Join(home, "config.json"))
+	t.Setenv("SMITHY_HOME", home)
+	t.Chdir(dir)
+	write(t, config.RepoFile(), "not json")
+	if _, _, err := taskDir("s1", true); err == nil {
+		t.Fatal("--default hid a malformed config")
+	}
+}

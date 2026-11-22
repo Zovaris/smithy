@@ -457,7 +457,9 @@ func TestWaitTurnMaxFlag(t *testing.T) {
 			t.Errorf("%v: code %d out %q after %v", args, code, o, el)
 		}
 	}
-	if _, e, c := capture(t, func() int { return WaitTurn([]string{"b1", "c", "--max", "x"}) }); c != 2 || !strings.Contains(e, "usage") {
-		t.Errorf("bad --max: %d %q", c, e)
+	for _, bad := range []string{"x", "NaN", "Inf", "-1"} {
+		if _, e, c := capture(t, func() int { return WaitTurn([]string{"b1", "c", "--max", bad}) }); c != 2 || !strings.Contains(e, "usage") {
+			t.Errorf("bad --max %s: %d %q", bad, c, e)
+		}
 	}
 }

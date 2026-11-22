@@ -34,7 +34,7 @@ Work out what you were given, in this order, and say in the plan line which it w
 Before launch, compare the items' `Files` lists (task files) or, for other inputs, the paths each
 item will likely touch (read the code to guess). Two items that share a file get a prereq on each
 other in id order (the later one waits for the merge), unless the user said `stack`. Append-only
-shared files (CHANGELOG, API or export lists, index files) don't count: their conflicts go to tend. The plan line
+shared files (CHANGELOG, API or export lists, index files) don't count: their conflicts follow `references/acting.md` (verify, `conflict`). The plan line
 says which items overlap, on what, and whether it chose wait or stack. An item that adds or
 changes CI is a prereq of the others when the repo has none yet: their PRs get no checks until it
 merges. Specs out of git (`.docs/specs`, `~/.smithy/plans`) aren't in worktrees: briefs give

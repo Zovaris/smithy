@@ -31,9 +31,8 @@ At the first PR: read `references/PR.md` (the loop every PR goes through).
 - PR urls, numbers or branches: one loop per PR, then stop.
 - `batch <name>`: each item of that warden batch as it reaches `pr_open` or `ready` (`smithy
   cards board <name> --json`; the PR is the card's `pr`, the repo its `origin`). Between PRs
-  `smithy wait batch:<name>`; stop when every item is merged, dropped or reported. Batch mode
-  stops each PR at green and never merges (the warden merges); update its card only with
-  `smithy cards set <batch> <id> note=<what you fixed>`.
+  `smithy wait batch:<name>`; stop when every item is merged, dropped or reported. A PR with
+  a warden card (batch input, a `watch prs` PR of a batch, or `--card`): `references/PR.md`, green.
 - `watch [<scopes>]`: tend matching PRs, then `smithy wait watch[:<scopes>]` and handle each
   event, until stopped or `--max-hours` (default 8). Scopes, comma list or `all` (default
   `smithy config get tend.watch`, else `prs`): `prs` (the user's, a batch's; `--label` adds

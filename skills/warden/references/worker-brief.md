@@ -64,7 +64,7 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
 [if wait]
 [if !subagent]- Then wait for your turn: run `'{{smithy}}' wait-turn {{batch}} {{id}} {{minutes}}` in the background and wait
   for it to end (no tokens while it waits; never poll); exit 4: run it again; 0: go.[end][if subagent]- Then wait for your turn: `'{{smithy}}' wait-turn {{batch}} {{id}} --max 1`, one run per shell call, in the
-  foreground (never background: nothing can wake you; one minute fits any foreground limit). Exit 4: run it again in a new call; 0: go.[end]
+  foreground (never background: nothing can wake you). Exit 4, or a call killed without an exit code: run it again in a new call; 0: go.[end]
   Exit 5 or any other: the card is blocked; end your turn. When it says go, set
   `state=working`, `git fetch origin && git merge origin/{{from}}` so you start from the merged prereqs.
 [end]
@@ -98,7 +98,7 @@ as the current step.
   your turn. The warden closes the question; later progress doesn't.
 - PR opened, local checks green and every blocking finding closed: state=pr_open pr=<url>
   tests_run=<commands actually run> risks=<or none>, then end your turn. Don't wait for CI and
-  never merge: the warden waits on every PR's CI at once, merges, and comes back to you only
+  never merge: the warden waits on every PR's CI at once, merges when merge is auto (otherwise the user does), and comes back to you only
   if CI goes red or the base moves. A draft or unfinished PR is state=blocked, never pr_open.
 - Work found after your PR merged: small and inside this task's intent (a missed case, a typo, a
   failing edge test) → fix it yourself in a follow-up PR from a new branch `'{{smithy}}' names branch <key> "<title>" fix`, same

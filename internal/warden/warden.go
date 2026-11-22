@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -94,7 +95,7 @@ func WaitTurn(args []string) int {
 			continue
 		}
 		v, err := strconv.ParseFloat(a, 64)
-		if err != nil || v < 0 {
+		if err != nil || v < 0 || math.IsNaN(v) || math.IsInf(v, 0) {
 			fmt.Fprintln(os.Stderr, waitUsage)
 			return 2
 		}

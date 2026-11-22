@@ -274,3 +274,21 @@ func TestCIPending(t *testing.T) {
 		t.Error("ci.yml: want true")
 	}
 }
+
+func TestVerifyConflictExit4(t *testing.T) {
+	for _, checks := range []string{"PENDING", "FAILURE", "SUCCESS"} {
+		dir := t.TempDir()
+		exec.Command("git", "-C", dir, "init", "-q").Run()
+		t.Chdir(dir)
+		bin := t.TempDir()
+		js := `{"url":"u","state":"OPEN","headRefOid":"abc","mergeable":"CONFLICTING","isDraft":false,"statusCheckRollup":[{"conclusion":"","state":"` + checks + `"}]}`
+		if checks != "PENDING" {
+			js = strings.Replace(js, `"conclusion":""`, `"conclusion":"`+checks+`"`, 1)
+		}
+		os.WriteFile(filepath.Join(bin, "gh"), []byte("#!/bin/sh\necho '"+js+"'\n"), 0o755)
+		t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+		if c := VerifyMain([]string{dir, "b", "5"}); c != 4 {
+			t.Errorf("%s + CONFLICTING: exit %d, want 4", checks, c)
+		}
+	}
+}

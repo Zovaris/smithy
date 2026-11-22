@@ -52,7 +52,7 @@ func TaskDir(slug string) (string, bool, error) { return taskDir(slug, false) }
 func taskDir(slug string, def bool) (dir string, board bool, err error) {
 	effective := func(key, dflt string) (string, error) {
 		v, _, err := config.Effective(key)
-		if err != nil && def {
+		if errors.Is(err, config.ErrUnset) && def {
 			fmt.Fprintf(os.Stderr, "default %s=%s (unset; not saved)\n", key, dflt)
 			return dflt, nil
 		}
@@ -70,6 +70,9 @@ func taskDir(slug string, def bool) (dir string, board bool, err error) {
 	}
 	commit, cerr := effective("tasks.commit", "true")
 	if cerr != nil {
+		if !errors.Is(cerr, config.ErrUnset) {
+			return "", false, cerr
+		}
 		return "", false, &AskError{"tasks.commit", askCommit, "true → " + filepath.Join(top, "docs", "specs", slug)}
 	}
 	if commit == "true" {
@@ -77,6 +80,9 @@ func taskDir(slug string, def bool) (dir string, board bool, err error) {
 	} else {
 		ignore, ierr := effective("tasks.ignore", "exclude")
 		if ierr != nil {
+			if !errors.Is(ierr, config.ErrUnset) {
+				return "", false, ierr
+			}
 			return "", false, &AskError{"tasks.ignore", askIgnore, "exclude → " + filepath.Join(top, ".docs", "specs", slug)}
 		}
 		f := filepath.Join(top, ".gitignore")

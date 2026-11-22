@@ -132,7 +132,7 @@ func TestBriefWaitRelaunchStack(t *testing.T) {
 	for _, want := range []string{
 		"Merge mode: auto. Stacked on a: merge only after it has merged.",
 		"`'" + filepath.Join(skillsDir(t), "warden", "scripts", "smithy") + "' wait-turn b1 b --max 1`, one run per shell call",
-		"Exit 4: run it again in a new call; 0: go.\n  Exit 5 or any other: the card is blocked; end your turn. When it says go",
+		"a call killed without an exit code: run it again in a new call; 0: go.\n  Exit 5 or any other: the card is blocked; end your turn. When it says go",
 		"git merge origin/feat/a`",
 		"git merge origin/main` (`origin/feat/a`\n  instead until a has merged)",
 		"The intent above is the spec; read the code it touches.",
