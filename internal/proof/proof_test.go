@@ -455,8 +455,10 @@ func TestCheckRedNeedsFailingReproBeforeTheFix(t *testing.T) {
 	if c := ReceiptMain([]string{"run", "--claim", "repro", "--", "true"}); c != 0 {
 		t.Fatalf("run exit %d", c)
 	}
-	if c := ReceiptMain([]string{"check-red"}); c != 1 {
-		t.Fatalf("a passing repro alone must fail check-red, got %d", c)
+	git(t, dir, "commit", "-q", "--allow-empty", "-m", "next")
+	rs, _ := Load(dir)
+	if miss := CheckRed(dir, rs, "repro"); !strings.Contains(miss, "passed on the unfixed code") {
+		t.Fatalf("a repro passing on old code must say so: %q", miss)
 	}
 	ReceiptMain([]string{"clear"})
 	// Repro committed alone, red; then the fix commit, green.
@@ -472,11 +474,14 @@ func TestCheckRedNeedsFailingReproBeforeTheFix(t *testing.T) {
 	if c := ReceiptMain([]string{"check-red"}); c != 1 {
 		t.Fatalf("no green on HEAD must fail, got %d", c)
 	}
+	if miss := CheckRed(dir, mustLoad(dir), "repro"); !strings.Contains(miss, "no clean green") {
+		t.Fatalf("missing green: %q", miss)
+	}
 	ReceiptMain([]string{"run", "--claim", "repro", "--", "test", "-f", "fixed"})
 	if c := ReceiptMain([]string{"check-red"}); c != 0 {
 		t.Fatalf("red then green must pass, got %d", c)
 	}
-	rs, _ := Load(dir)
+	rs, _ = Load(dir)
 	sha, _ := head(dir)
 	if miss := CheckRed(dir, rs, "repro"); miss != "" {
 		t.Fatal(miss)
@@ -487,3 +492,5 @@ func TestCheckRedNeedsFailingReproBeforeTheFix(t *testing.T) {
 		t.Fatalf("state %q", r.State(sha, false))
 	}
 }
+
+func mustLoad(dir string) []Receipt { rs, _ := Load(dir); return rs }
