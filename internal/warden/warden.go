@@ -259,6 +259,14 @@ func Doctor(args []string) int {
 	default:
 		r.warn("no headless agent CLI on PATH (only consult needs it here)", "optional: install one or set AGENT_CMD")
 	}
+	if (adapter == "any" && cli == "") || (adapter != "any" && !have("claude")) {
+		why := "no agent CLI to spawn them"
+		if adapter == "desktop" {
+			why = "no claude CLI; start_session if it loads"
+		}
+		r.warn("workers: subagent fallback; they end with this session ("+why+")",
+			"say it in the plan line; install a headless agent CLI for workers that outlive this session")
+	}
 	for _, s := range []string{"smelt", "hush", "scout", "tend", "use-smithy"} {
 		if p, ok := findSkill(s); ok {
 			r.ok(s + " skill: " + p)
