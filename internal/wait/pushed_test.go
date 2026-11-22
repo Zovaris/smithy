@@ -22,13 +22,22 @@ func TestPushedAhead(t *testing.T) {
 	git("init", "-q")
 	git("commit", "-q", "--allow-empty", "-m", "a")
 	sha := git("rev-parse", "HEAD")
-	git("update-ref", "refs/remotes/origin/feat", sha)
+	git("commit", "-q", "--allow-empty", "-m", "b")
+	next := git("rev-parse", "HEAD")
+	git("update-ref", "refs/remotes/origin/feat", next)
 	t.Chdir(dir)
-	if pushedAhead(&prState{branch: "feat", state: "OPEN", head: sha}) {
+	if pushedAhead(&prState{branch: "feat", state: "OPEN", head: next}) {
 		t.Error("same head reported as ahead")
 	}
-	if !pushedAhead(&prState{branch: "feat", state: "OPEN", head: "0000000000000000000000000000000000000000"}) {
+	if !pushedAhead(&prState{branch: "feat", state: "OPEN", head: sha}) {
 		t.Error("newer push not reported")
+	}
+	if pushedAhead(&prState{branch: "feat", state: "OPEN", head: "1111111111111111111111111111111111111111"}) {
+		t.Error("unknown head (fork, other repo) reported as ahead")
+	}
+	git("update-ref", "refs/remotes/origin/feat", sha)
+	if pushedAhead(&prState{branch: "feat", state: "OPEN", head: next}) {
+		t.Error("ref behind the head reported as ahead")
 	}
 	if pushedAhead(&prState{branch: "other", state: "OPEN", head: "0000"}) {
 		t.Error("missing ref reported as ahead")

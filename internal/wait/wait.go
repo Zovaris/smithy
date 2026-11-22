@@ -726,13 +726,18 @@ func Main(args []string) int {
 	return 4
 }
 
-// pushedAhead reports whether this checkout's origin/<branch> names a commit other than the PR's
-// head: a push GitHub hasn't processed yet.
+// pushedAhead reports whether this checkout's origin/<branch> is strictly ahead of the PR head
+// GitHub shows: a push it hasn't processed yet. A head this checkout doesn't have (a fork, another
+// repo) or a ref behind the head is never ahead.
 func pushedAhead(s *prState) bool {
 	if s.branch == "" || s.state != "OPEN" {
 		return false
 	}
 	sha, err := ghx.Run("git", "rev-parse", "--verify", "-q", "refs/remotes/origin/"+s.branch)
 	sha = strings.TrimSpace(sha)
-	return err == nil && sha != "" && s.head != "" && sha != s.head
+	if err != nil || sha == "" || s.head == "" || sha == s.head {
+		return false
+	}
+	_, err = ghx.Run("git", "merge-base", "--is-ancestor", s.head, sha)
+	return err == nil
 }

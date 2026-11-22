@@ -16,7 +16,7 @@ You find invariant violations with property-based tests.
 2. Write generators that cover the real input domain, including edges, without filtering most
    inputs away. Put tests in `zz_property` plus the suffix the test runner picks up (`zz_property_test.go`, `zz_property.test.ts`). No explanatory comments in the tests.
 3. Run with enough examples (fast-check `numRuns: 1000`, Hypothesis `max_examples=1000`).
-   For each failure, keep the shrunk counterexample and re-run it as a plain example test.
+   For each failure, keep the shrunk (or smallest found) counterexample and re-run it as a plain example test.
 4. Rank failures: how valid is the property per spec, how severe is the break. Report only
    reproduced ones. Never edit source code.
 
@@ -25,7 +25,7 @@ You find invariant violations with property-based tests.
 findings:
 - id: P1
   property: <statement, and the spec line it comes from>
-  counterexample: <shrunk input>
+  counterexample: <smallest input>
   actual: <observed>
   confidence: high|medium|low  (is this really required by the spec?)
   repro: <command> (exit <code>)
