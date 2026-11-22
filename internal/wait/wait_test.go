@@ -788,6 +788,15 @@ func TestBatchWatcherPRs(t *testing.T) {
 		t.Errorf("a PR read error must not end the wait: %q %v", got, err)
 	}
 	e.rm("fail-pr-view")
+	e.put(t, "pr.json", prFixture{rollup: green, mergeable: "CONFLICTING"}.json())
+	writeCard(t, "b1", "c", `{"state":"working","pr":"u7","updated":"`+stamp(0)+`"}`)
+	got, _ := w.poll()
+	if !reflect.DeepEqual(got, []string{"batch b1 a pr 5 checks=green u5", "batch b1 c pr 5 checks=green u5", "batch b1 c pr 5 conflict u5"}) {
+		t.Errorf("a PR first seen during the wait reports its state: %q", got)
+	}
+	if got, _ := w.poll(); got != nil {
+		t.Errorf("unchanged after the first sighting: %q", got)
+	}
 	e.put(t, "signedout", "")
 	off, _ := newBatch("b1", false)
 	if off.gh {

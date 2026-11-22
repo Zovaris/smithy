@@ -469,8 +469,9 @@ var prEvents = opts{events: map[string]bool{"checks": true, "conflict": true, "m
 
 var final = map[string]bool{"merged": true, "reported": true, "dropped": true}
 
-// prLines polls the PR of every non-final card. A PR seen for the first time is only recorded,
-// so the wake is a change, not the state it was already in.
+// prLines polls the PR of every non-final card. PRs already on the cards when the wait started
+// are a silent baseline (a green PR left for the user must not wake every new wait); a PR first
+// seen later is reported at once when it is already green, red, conflicting, merged or closed.
 func (w *batchWatcher) prLines(rows []cards.Row) []string {
 	if !w.gh || time.Now().Before(w.prNext) {
 		return nil
@@ -487,8 +488,11 @@ func (w *batchWatcher) prLines(rows []cards.Row) []string {
 			w.prs[r.PR] = pw
 		}
 		lines, err := pw.poll()
-		if err != nil || !known {
+		if err != nil {
 			continue
+		}
+		if !known && pw.last.mergeable == "CONFLICTING" && pw.last.state == "OPEN" {
+			lines = append(lines, fmt.Sprintf("pr %d conflict %s", pw.last.num, pw.last.url))
 		}
 		for _, l := range lines {
 			out = append(out, fmt.Sprintf("batch %s %s %s", w.name, r.ID, l))
@@ -529,8 +533,19 @@ func newBatch(name string, all bool) (*batchWatcher, error) {
 	for _, r := range rows {
 		seen[r.ID] = mark(r)
 	}
-	return &batchWatcher{name: name, since: time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), stuckBefore: stuck(rows), all: all, seen: seen,
-		gh: ghx.Ready() == nil, prs: map[string]*prWatcher{}}, nil
+	w := &batchWatcher{name: name, since: time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), stuckBefore: stuck(rows), all: all, seen: seen,
+		gh: ghx.Ready() == nil, prs: map[string]*prWatcher{}}
+	if w.gh {
+		for _, r := range rows {
+			if r.PR != "" && !final[r.State] {
+				pw := newPR(r.PR, prEvents)
+				if _, err := pw.poll(); err == nil {
+					w.prs[r.PR] = pw
+				}
+			}
+		}
+	}
+	return w, nil
 }
 
 func (w *batchWatcher) poll() ([]string, error) {
