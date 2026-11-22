@@ -9,7 +9,8 @@ updates it; never hand-edit status lines when the script can.
 ## Where it lives
 
 Run `smithy task-dir <slug>`: it reads the user's settings, creates the dir and prints it.
-When it exits 3 it prints `ask <key>: <question>`: ask the user that (your recommendation first),
+When it exits 3 it prints `ask <key>: <question>`: ask the user that (your recommendation first;
+with nobody to ask, under hush or in a launched session, pick `true` and say so at the end),
 save the answer for this repo with `smithy config set --repo <key> <value>`, run it again.
 It asks at most twice per repo, ever:
 
