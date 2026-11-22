@@ -49,6 +49,7 @@ a running worker.
 
 - `decisions.md` (yours): one line per decision settled without the user. Read at batch end and listed in the final message
   (`references/acting.md`, batch end), together with the cards' `followup:` notes.
-- `<id>.brief.md`, `<id>.inbox.md`, `<id>.log`: the worker's brief, messages for respawns, its log.
+- `<id>.brief.md` (rendered by `smithy brief`), `<id>.inbox.md`, `<id>.log`: the worker's brief,
+  messages for respawns, its log. `smithy wait batch:<batch>` watches the cards and their `pr`s.
 - `<id>/report.md`: scout reports. `followups/`: task files workers write after a merge when there
   is no task dir.

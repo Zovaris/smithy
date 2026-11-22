@@ -5,6 +5,15 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **warden trial frictions.** `smithy brief <batch> <id> [--to <name>] [--subagent]` renders a
+  worker brief from `batch.json` and the template block in `warden/references/worker-brief.md`
+  (the single source, read from the installed skill), filling every slot (stack, task file,
+  wait-turn, relaunch, rulings, the harness's channel line from `harness.md`, hush and smelt
+  paths) and refusing with exit 2 when a field is missing or the worktree isn't on the item's
+  branch; warden renders briefs instead of writing them. `smithy wait batch:<batch>` also wakes
+  when a card's PR turns green or red, conflicts, merges or closes (PRs polled every 30 s), so
+  one waiter covers a batch. `smithy doctor` warns when an installed smithy skill isn't in the
+  current harness's skills folder, with the link or `npx skills add` fix.
 - **A/B trial frictions (r10 warden, r11 smelt from a vague idea).** `smithy stack` reports
   `pytest -q` for Python only when pytest is a dependency or configured (`pytest.ini`,
   `conftest.py`, `[tool.pytest`), else `python3 -m unittest discover`; `smithy route` with
