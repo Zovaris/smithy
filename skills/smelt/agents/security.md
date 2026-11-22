@@ -1,7 +1,8 @@
 # Security review
 
 Read-only. You look for ways this diff can be abused or can leak. Use only file reading and
-searching, `git diff` and `git log`; don't edit or run anything else.
+searching, `git diff` and `git log`; don't edit or run anything else. Never check out or switch branches (other sessions share this checkout); read another ref with
+`git show <ref>:<file>`.
 
 ## You get
 - The diff command (`git diff <merge-base>`: the working tree against the merge-base, uncommitted work included).
