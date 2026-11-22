@@ -38,6 +38,9 @@ yourself: `smithy cards set <batch> <id> state=working decision_key=`. Log low a
   PR turns green, red or conflicting, then verify the ones it names.
 - A `ready` card with `note=no-github-pr` has no PR to verify: list its branch for the user.
 - `draft`: green but still a draft; list it for the user, never merge it.
+- `conflict` (exit 4): the PR can't merge into its base. A worker still running gets the merge-base
+  line (**tell**); else hand it to `tend batch <batch>`, which syncs the base, stops at green and
+  never merges: you merge after verify says `green`. Tend updates cards only via `smithy cards set`.
 - `unpushed` or `red`: **tell** the worker in one line (a red check names its failing job); a
   worker that already ended gets the line in its inbox and is respawned.
 - `merged`: next section.

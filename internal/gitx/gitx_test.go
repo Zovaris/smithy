@@ -108,7 +108,8 @@ func TestVerdict(t *testing.T) {
 		{"OPEN", "red", "MERGEABLE", true, "", no, "red"},
 		{"OPEN", "red", "MERGEABLE", false, "", no, "red"},
 		{"OPEN", "pending", "MERGEABLE", false, "", no, "pending"},
-		{"OPEN", "green", "CONFLICTING", false, "", no, "red"},
+		{"OPEN", "green", "CONFLICTING", false, "", no, "conflict"},
+		{"OPEN", "red", "CONFLICTING", false, "", no, "conflict"},
 		{"OPEN", "none", "MERGEABLE", false, "head", no, "green"},
 	}
 	for _, c := range cases {
