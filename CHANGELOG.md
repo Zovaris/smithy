@@ -12,7 +12,9 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   commit and passes on HEAD; `receipt list` shows that red receipt as `red before fix`. Board items
   render as `Board item <owner/repo>#<n>: read it with gh issue view …` (no "Board item board").
   `smithy route --board <owner/repo#n>` reads the issue so its words count, `--batch` floors the
-  batch check at mid, and `injection` / `untrusted` count as risky. Overlap needs the same
+  batch check at mid (without gh, `--board` warns and routes on the text); its risky words follow smelt's
+  Risky list (specific injection kinds, personal data, untrusted input, file or shell access) and
+  `auth` no longer matches `author`. Overlap needs the same
   top-level function, not just the same file. Under the subagent fallback, dependents launch only
   after their prereq merges. `smithy wait batch:` ends with `relaunch: smithy wait batch:<b>`
   while a card is open. `smithy cleanup` fast-forwards a clean local base branch.

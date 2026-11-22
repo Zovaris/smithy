@@ -3,7 +3,7 @@ Contents: what workers are · how the brief is rendered · the template.
 
 Never by hand: `smithy brief <batch> <id> [--to <warden-name>] [--subagent]` fills the template
 from `batch.json`, the installed skills and `references/harness.md` (`--to`: your name, where the
-channel line needs one; `--subagent`: the fallback); exit 2 names what it can't fill. Workers:
+channel line needs one; `--subagent`: the fallback), checking the worktree is on the item's branch; exit 2 names what it can't fill. Workers:
 - They read the hush and smelt SKILL.md files at the brief's absolute paths (no slash commands:
   harnesses differ). Silent: only the status card and one closing line, never the user.
 - Mode `smelt <speed>`: workers build at smelt `fast`; the speed sets the one check wave on the
@@ -46,9 +46,9 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
   the Spec-check list in its agents/reviewer.md yourself, verify with `smithy receipt run`,
   `smithy scan --base {{base}}`, PR body with `smithy receipt list --md`). No test or review agents
   (a security agent only if the change is risky): the warden checks the merged batch once. Skipping a phase is a failed task, not a shortcut; its references/, agents/ and scripts/ paths are relative to its folder. Not a slash command.
-[end][if debug]- Bug: smelt fast via the debug path (its references/DEBUG.md): first a failing reproduction recorded as
-  `'{{smithy}}' receipt run --claim repro -- <cmd>` that exits non-zero on the unfixed code, committed alone
-  before the fix; then the fix commit, the same command green, `'{{smithy}}' receipt check-red` passing.
+[end][if debug]- Bug: smelt fast via the debug path (its references/DEBUG.md): commit the repro test alone, then on that
+  clean commit `'{{smithy}}' receipt run --claim repro -- <cmd>` (must exit non-zero); then the fix commit,
+  the same command green, `'{{smithy}}' receipt check-red` passing.
 [end][if risky]- Risky (smelt's SKILL.md Risky list): run its security agent on your diff before pr_open.
 [end][if !smelt]- Workflow: the repo's agent instructions (AGENTS.md / CLAUDE.md), else just this brief: tests for what you change, typecheck and lint green.
 [end][if taskfile]
