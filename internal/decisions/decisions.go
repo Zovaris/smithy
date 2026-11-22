@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
 )
 
@@ -20,12 +21,16 @@ const Usage = `usage: smithy decisions add "<question>" "<choice>" --why "<reaso
        smithy decisions change <n> "<new choice>"
 The log of the user's decisions taken without them, one line each, in
 ~/.smithy/decisions/<repo>.md (the main checkout's folder name; shared by its worktrees).
-add appends one entry; pending lists the unconfirmed ones, list all, numbered; confirm marks
-them kept; change replaces the choice and marks it confirmed. Exit 0 = ok, 2 = bad usage.`
+add appends one entry; pending lists the unconfirmed ones; confirm marks them kept; change
+replaces the choice and marks it confirmed. Numbers are positions in the pending list only (as pending prints
+them); list shows every entry, unnumbered. Fields can't contain " · " or " → ".
+Exit 0 = ok, 1 = cannot read or write the log, 2 = bad usage.`
 
 const (
 	open = "- [ ] "
 	done = "- [x] "
+	sep  = " · "
+	arw  = " → "
 )
 
 // repoSlug names the log: the folder of the main checkout, so worktrees share one log.
@@ -42,78 +47,83 @@ func File() string { return filepath.Join(ghx.Home(), "decisions", repoSlug()+".
 
 func flat(s string) string { return strings.Join(strings.Fields(s), " ") }
 
-type entry struct {
-	line int
-	text string
+// clean flattens a field and rejects the separators the line format parses by position.
+func clean(name, s string) (string, error) {
+	s = flat(s)
+	if strings.Contains(s, strings.TrimSpace(sep)) || strings.Contains(s, strings.TrimSpace(arw)) {
+		return "", fmt.Errorf("%s can't contain %q or %q: %q", name, "·", "→", s)
+	}
+	return s, nil
 }
 
-func read() ([]string, []entry, error) {
+func read() ([]string, error) {
 	b, err := os.ReadFile(File())
 	if os.IsNotExist(err) {
-		return nil, nil, nil
+		return nil, nil
 	}
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	lines := strings.Split(strings.TrimRight(string(b), "\n"), "\n")
-	var es []entry
-	for i, l := range lines {
-		if strings.HasPrefix(l, open) || strings.HasPrefix(l, done) {
-			es = append(es, entry{i, l})
-		}
-	}
-	return lines, es, nil
+	return strings.Split(strings.TrimRight(string(b), "\n"), "\n"), nil
 }
 
+// write replaces the log through a temp file and a rename, so a reader never sees half a file.
 func write(lines []string) error {
-	return os.WriteFile(File(), []byte(strings.Join(lines, "\n")+"\n"), 0o600)
+	tmp, err := os.CreateTemp(filepath.Dir(File()), ".decisions-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.WriteString(strings.Join(lines, "\n") + "\n"); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), File())
 }
 
-func add(q, choice, why, by, ref string) error {
-	if by != "consult" && by != "timeout" {
-		return fmt.Errorf("--by must be consult or timeout, got %q", by)
-	}
-	l := fmt.Sprintf("%s%s · by %s · %s → %s · why: %s", open, time.Now().Format("2006-01-02"), by, flat(q), flat(choice), flat(why))
-	if ref != "" {
-		l += " · ref: " + flat(ref)
-	}
+// update runs f on the log's lines under the log's lock and writes the result.
+func update(f func([]string) ([]string, error)) error {
 	if err := os.MkdirAll(filepath.Dir(File()), 0o700); err != nil {
 		return err
 	}
-	f, err := os.OpenFile(File(), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = f.WriteString(l + "\n")
-	return err
+	return config.WithLock(File(), func() error {
+		lines, err := read()
+		if err != nil {
+			return err
+		}
+		if lines, err = f(lines); err != nil {
+			return err
+		}
+		return write(lines)
+	})
 }
 
-func show(es []entry, onlyOpen bool) {
-	n := 0
-	for i, e := range es {
-		if onlyOpen && !strings.HasPrefix(e.text, open) {
-			continue
-		}
-		n++
-		fmt.Printf("%d. %s\n", i+1, e.text[len(open):])
-		if !strings.HasPrefix(e.text, open) {
-			fmt.Printf("   (confirmed)\n")
+// pending is the line index of each unconfirmed entry, in order: pending number n is pending[n-1].
+func pending(lines []string) []int {
+	var p []int
+	for i, l := range lines {
+		if strings.HasPrefix(l, open) {
+			p = append(p, i)
 		}
 	}
-	if n == 0 && onlyOpen {
-		fmt.Println("none pending")
-	}
+	return p
 }
 
-// change swaps the choice in an entry: the text between the first " → " and the last " · why: ".
-func change(text, choice string) (string, error) {
-	a := strings.Index(text, " → ")
-	b := strings.LastIndex(text, " · why: ")
-	if a < 0 || b < a {
-		return "", fmt.Errorf("cannot find the choice in %q", text)
+// change swaps the choice: fields are date, by, "question → choice", why[, ref].
+func change(line, choice string) (string, error) {
+	f := strings.Split(strings.TrimPrefix(line, open), sep)
+	if len(f) < 4 {
+		return "", fmt.Errorf("malformed entry %q", line)
 	}
-	return done + text[len(open):a] + " → " + flat(choice) + " (changed from: " + text[a+len(" → "):b] + ")" + text[b:], nil
+	qc := strings.Split(f[2], arw)
+	if len(qc) != 2 {
+		return "", fmt.Errorf("malformed entry %q", line)
+	}
+	f[2] = qc[0] + arw + choice + " (changed from: " + qc[1] + ")"
+	return done + strings.Join(f, sep), nil
 }
 
 // Main runs `smithy decisions`.
@@ -153,83 +163,111 @@ func Main(args []string) int {
 		fmt.Fprintln(os.Stderr, Usage)
 		return 2
 	}
-	if len(pos) == 0 {
-		return bad("missing subcommand")
-	}
-	if pos[0] == "add" {
-		if len(pos) != 3 || strings.TrimSpace(pos[1]) == "" || strings.TrimSpace(pos[2]) == "" || strings.TrimSpace(why) == "" {
-			return bad(`add needs "<question>" "<choice>" --why "<reason>"`)
-		}
-		if err := add(pos[1], pos[2], why, by, ref); err != nil {
-			return bad(err.Error())
-		}
-		fmt.Println("recorded in", File())
-		return 0
-	}
-	lines, es, err := read()
-	if err != nil {
+	fail := func(err error) int {
 		fmt.Fprintln(os.Stderr, "smithy decisions:", err)
 		return 1
 	}
-	pick := func(s string) (int, bool) {
-		n, err := strconv.Atoi(s)
-		if err != nil || n < 1 || n > len(es) {
-			return 0, false
-		}
-		return n - 1, true
+	if len(pos) == 0 {
+		return bad("missing subcommand")
 	}
 	switch pos[0] {
+	case "add":
+		if len(pos) != 3 {
+			return bad(`add needs "<question>" "<choice>" --why "<reason>"`)
+		}
+		if by != "consult" && by != "timeout" {
+			return bad(fmt.Sprintf("--by must be consult or timeout, got %q", by))
+		}
+		fields := []string{time.Now().Format("2006-01-02"), "by " + by}
+		var vals [4]string
+		for i, kv := range [][2]string{{"question", pos[1]}, {"choice", pos[2]}, {"--why", why}, {"--ref", ref}} {
+			v, err := clean(kv[0], kv[1])
+			if err != nil {
+				return bad(err.Error())
+			}
+			if v == "" && i < 3 {
+				return bad(kv[0] + " is empty")
+			}
+			vals[i] = v
+		}
+		fields = append(fields, vals[0]+arw+vals[1], "why: "+vals[2])
+		if vals[3] != "" {
+			fields = append(fields, "ref: "+vals[3])
+		}
+		err := update(func(l []string) ([]string, error) { return append(l, open+strings.Join(fields, sep)), nil })
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Println("recorded in", File())
+		return 0
 	case "pending", "list":
 		if len(pos) != 1 {
 			return bad("unexpected argument " + pos[1])
 		}
-		show(es, pos[0] == "pending")
+		lines, err := read()
+		if err != nil {
+			return fail(err)
+		}
+		if pos[0] == "list" {
+			for _, l := range lines {
+				if strings.HasPrefix(l, open) || strings.HasPrefix(l, done) {
+					fmt.Println(l)
+				}
+			}
+			return 0
+		}
+		p := pending(lines)
+		if len(p) == 0 {
+			fmt.Println("none pending")
+		}
+		for n, i := range p {
+			fmt.Printf("%d. %s\n", n+1, strings.TrimPrefix(lines[i], open))
+		}
 		return 0
-	case "confirm":
-		var idx []int
-		switch {
-		case all && len(pos) == 1:
-			for i := range es {
-				idx = append(idx, i)
-			}
-		case !all && len(pos) == 2:
-			i, ok := pick(pos[1])
-			if !ok {
-				return bad("no decision " + pos[1])
-			}
-			idx = []int{i}
-		default:
+	case "confirm", "change":
+		if pos[0] == "confirm" && !(all && len(pos) == 1) && !(!all && len(pos) == 2) {
 			return bad("confirm takes <n> or --all")
 		}
-		for _, i := range idx {
-			lines[es[i].line] = done + strings.TrimPrefix(strings.TrimPrefix(es[i].text, open), done)
+		var choice string
+		if pos[0] == "change" {
+			if len(pos) != 3 || all {
+				return bad(`change takes <n> "<new choice>"`)
+			}
+			c, err := clean("choice", pos[2])
+			if err != nil || c == "" {
+				return bad(fmt.Sprintf("bad choice %q", pos[2]))
+			}
+			choice = c
 		}
-		if err := write(lines); err != nil {
-			fmt.Fprintln(os.Stderr, "smithy decisions:", err)
-			return 1
-		}
-		fmt.Printf("confirmed %d\n", len(idx))
-		return 0
-	case "change":
-		if len(pos) != 3 || strings.TrimSpace(pos[2]) == "" {
-			return bad(`change takes <n> "<new choice>"`)
-		}
-		i, ok := pick(pos[1])
-		if !ok {
-			return bad("no decision " + pos[1])
-		}
-		text := open + strings.TrimPrefix(strings.TrimPrefix(es[i].text, open), done)
-		nl, err := change(text, pos[2])
+		count := 0
+		err := update(func(lines []string) ([]string, error) {
+			p := pending(lines)
+			pick := p
+			if !all {
+				n, err := strconv.Atoi(pos[1])
+				if err != nil || n < 1 || n > len(p) {
+					return nil, fmt.Errorf("no pending decision %s (smithy decisions pending numbers them)", pos[1])
+				}
+				pick = []int{p[n-1]}
+			}
+			for _, i := range pick {
+				if choice == "" {
+					lines[i] = done + strings.TrimPrefix(lines[i], open)
+				} else {
+					l, err := change(lines[i], choice)
+					if err != nil {
+						return nil, err
+					}
+					lines[i] = l
+				}
+			}
+			count = len(pick)
+			return lines, nil
+		})
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "smithy decisions:", err)
-			return 1
+			return fail(err)
 		}
-		lines[es[i].line] = nl
-		if err := write(lines); err != nil {
-			fmt.Fprintln(os.Stderr, "smithy decisions:", err)
-			return 1
-		}
-		fmt.Printf("changed %d\n", i+1)
+		fmt.Printf("%sed %d\n", strings.TrimSuffix(pos[0], "e"), count)
 		return 0
 	}
 	return bad("unknown subcommand " + pos[0])

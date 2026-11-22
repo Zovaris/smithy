@@ -1,9 +1,11 @@
 package decisions
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -37,15 +39,15 @@ func TestAddPendingConfirmChange(t *testing.T) {
 		return Main([]string{"add", "Rename API?", "keep name", "--why", "public API", "--by", "timeout"})
 	})
 	out, _ := capture(t, func() int { return Main([]string{"pending"}) })
-	if !strings.Contains(out, "1. ") || !strings.Contains(out, "Token storage? → httpOnly cookie · why: safest · ref: PR 12") || !strings.Contains(out, "2. ") || !strings.Contains(out, "by timeout") {
+	if !strings.Contains(out, "1. ") || !strings.Contains(out, "Token storage? → httpOnly cookie · why: safest · ref: PR 12") || !strings.Contains(out, "2. ") || !strings.Contains(out, "by timeout · Rename API?") {
 		t.Fatalf("pending:\n%s", out)
 	}
 	capture(t, func() int { return Main([]string{"confirm", "1"}) })
 	out, _ = capture(t, func() int { return Main([]string{"pending"}) })
-	if strings.Contains(out, "Token") || !strings.Contains(out, "2. ") {
+	if strings.Contains(out, "Token") || !strings.Contains(out, "1. ") || !strings.Contains(out, "Rename API?") {
 		t.Fatalf("after confirm:\n%s", out)
 	}
-	if _, c := capture(t, func() int { return Main([]string{"change", "2", "rename to v2"}) }); c != 0 {
+	if _, c := capture(t, func() int { return Main([]string{"change", "1", "rename to v2"}) }); c != 0 {
 		t.Fatalf("change exit %d", c)
 	}
 	out, _ = capture(t, func() int { return Main([]string{"pending"}) })
@@ -75,7 +77,6 @@ func TestBadUsage(t *testing.T) {
 	for _, a := range [][]string{
 		{"add", "q", "c"},
 		{"add", "q", "c", "--why", "w", "--by", "me"},
-		{"confirm", "9"},
 		{"change", "1"},
 		{"nope"},
 		{},
@@ -83,5 +84,58 @@ func TestBadUsage(t *testing.T) {
 		if _, c := capture(t, func() int { return Main(a) }); c != 2 {
 			t.Errorf("%v: exit %d, want 2", a, c)
 		}
+	}
+}
+
+func TestNumbersArePendingPositions(t *testing.T) {
+	setup(t)
+	for _, q := range []string{"a", "b", "c"} {
+		capture(t, func() int { return Main([]string{"add", q, "x", "--why", "y"}) })
+	}
+	capture(t, func() int { return Main([]string{"confirm", "1"}) })
+	capture(t, func() int { return Main([]string{"confirm", "2"}) })
+	out, _ := capture(t, func() int { return Main([]string{"pending"}) })
+	if lines := strings.Split(strings.TrimSpace(out), "\n"); len(lines) != 1 || !strings.HasPrefix(lines[0], "1. ") || !strings.Contains(lines[0], "b → x") {
+		t.Fatalf("want only b pending as 1:\n%s", out)
+	}
+	if _, c := capture(t, func() int { return Main([]string{"confirm", "2"}) }); c != 1 {
+		t.Fatalf("confirm of a missing pending number: exit %d, want 1", c)
+	}
+}
+
+func TestSeparatorsRejected(t *testing.T) {
+	setup(t)
+	for _, a := range [][]string{
+		{"add", "a → b?", "x", "--why", "y"},
+		{"add", "q", "x · y", "--why", "y"},
+		{"add", "q", "x", "--why", "y → z"},
+	} {
+		if _, c := capture(t, func() int { return Main(a) }); c != 2 {
+			t.Errorf("%v: exit %d, want 2", a, c)
+		}
+	}
+	capture(t, func() int { return Main([]string{"add", "q", "x", "--why", "y"}) })
+	if _, c := capture(t, func() int { return Main([]string{"change", "1", "a → b"}) }); c != 2 {
+		t.Errorf("change with separator: exit %d", c)
+	}
+}
+
+func TestConcurrentAddAndConfirm(t *testing.T) {
+	setup(t)
+	devnull, _ := os.Open(os.DevNull)
+	old := os.Stdout
+	os.Stdout = devnull
+	defer func() { os.Stdout = old }()
+	Main([]string{"add", "seed", "x", "--why", "y"})
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(2)
+		go func(i int) { defer wg.Done(); Main([]string{"add", fmt.Sprintf("q%d", i), "x", "--why", "y"}) }(i)
+		go func() { defer wg.Done(); Main([]string{"confirm", "--all"}) }()
+	}
+	wg.Wait()
+	b, _ := os.ReadFile(File())
+	if n := strings.Count(string(b), "\n- ["); n+1 != 21 {
+		t.Fatalf("want 21 entries, got %d:\n%s", n+1, b)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -35,7 +36,7 @@ var Known = []Setting{
 	{"warden.worker_model", "route", "warden", "route: pick cheap/mid/strong per task; session: same model as the parent session; or one model name for every worker"},
 	{"route.domain", "", "smithy route", "comma list of the product's own nouns (secret for a secret scanner) that never count as risk"},
 	{"agent.effort", "medium", "smelt warden scout tend", "reasoning effort for every agent smithy starts: low or medium; anything higher is capped at medium"},
-	{"ask.timeout", "10", "use-smithy smelt warden", "minutes to wait for the user's answer to a decision before smithy consult picks (0 = wait for the answer)"},
+	{"ask.timeout", "10", "use-smithy smelt warden", "minutes to wait for the user's answer to a decision before smithy consult picks (0 = don't start the timer: wait for the answer)"},
 	{"agent.timeout", "90", "smelt warden", "minutes before smithy agent kills a headless agent (0 = no limit)"},
 	{"watch.events", "checks,merged,closed,conflict,review,comment,push,new,updated", "smithy wait", "which events wake an agent waiting on GitHub"},
 	{"watch.every", "30", "smithy wait", "seconds between GitHub polls"},
@@ -126,6 +127,9 @@ func ValidKey(key string) error {
 }
 
 const lockWait = 10 * time.Second
+
+// WithLock runs f holding the lock file next to file; see withLock.
+func WithLock(file string, f func() error) error { return withLock(file, f) }
 
 // withLock runs f holding an advisory lock file next to file (created with O_EXCL, removed after).
 func withLock(file string, f func() error) error {
@@ -369,6 +373,13 @@ func unset(file, key string) (bool, error) {
 
 // Normalize returns the value to save for key and a note for the user.
 func Normalize(key, value string) (string, string, error) {
+	if key == "ask.timeout" {
+		v := strings.TrimSpace(value)
+		if n, err := strconv.ParseFloat(v, 64); err != nil || n < 0 || math.IsNaN(n) || math.IsInf(n, 0) {
+			return "", "", fmt.Errorf("ask.timeout must be a non-negative number of minutes, got %q", value)
+		}
+		return v, "", nil
+	}
 	if key != "agent.effort" {
 		return value, "", nil
 	}

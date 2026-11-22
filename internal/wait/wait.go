@@ -5,6 +5,7 @@ package wait
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -783,8 +784,8 @@ func timer(targets []string) (int, bool) {
 			continue
 		}
 		m, err := strconv.ParseFloat(arg, 64)
-		if len(targets) > 1 || err != nil || m <= 0 {
-			fmt.Fprintf(os.Stderr, "smithy wait: timer takes positive minutes and no other target: %s\n", strings.Join(targets, " "))
+		if len(targets) > 1 || err != nil || math.IsNaN(m) || math.IsInf(m, 0) || m < 0.05 {
+			fmt.Fprintf(os.Stderr, "smithy wait: timer takes at least 0.05 minutes and no other target: %s\n", strings.Join(targets, " "))
 			return 2, true
 		}
 		sleep(time.Duration(m * float64(time.Minute)))

@@ -535,3 +535,16 @@ func TestAskTimeoutDefault(t *testing.T) {
 	}
 	t.Fatal("ask.timeout not a known setting")
 }
+
+func TestAskTimeoutValidated(t *testing.T) {
+	for _, v := range []string{"0", "10", "2.5"} {
+		if _, _, err := Normalize("ask.timeout", v); err != nil {
+			t.Errorf("%s: %v", v, err)
+		}
+	}
+	for _, v := range []string{"-1", "x", "NaN", "Inf", ""} {
+		if _, _, err := Normalize("ask.timeout", v); err == nil {
+			t.Errorf("%q accepted", v)
+		}
+	}
+}
