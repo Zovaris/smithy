@@ -1,6 +1,6 @@
 # Test agents
 
-Launch each as a fresh **subagent**: prompt = the agent file's text, a `## You get` block with
+Launch each as a fresh **subagent**: prompt = the agent file's text (or its absolute path, for the agent to read first), a `## You get` block with
 exactly what the file lists, and the report contract below. Agents that write tests work in
 your tree, in new files named `zz_<agent>` plus the suffix the repo's test runner picks up by
 default (`zz_<agent>_test.go`, `zz_<agent>_test.py`, `zz_<agent>.test.ts` for vitest or jest) next to the

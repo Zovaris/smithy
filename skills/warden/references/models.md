@@ -6,7 +6,8 @@ warden.worker_model` decides:
 - `route` (default): `smithy route --file <task file> | --text "<words>" --kind <ship|scout> --speed <speed>`
   per item; launch it on the model of the tier it picks (cheap: small or read-only, mid: most
   features, strong: risky, hard or large). Look at each pick and move it one tier when you know
-  better, saying why.
+  better, saying why. A domain noun is not risk: in a secret scanner or a crypto library,
+  "secret" or "crypto" in every task says what the product is, not that the task is risky.
 - `session`: every worker on the parent session's model.
 - Any other value: that model for every worker.
 

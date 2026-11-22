@@ -5,6 +5,12 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **Trial 5 frictions.** `smithy tasks set` keeps the `PR:` key; `smithy receipt run` runs one
+  quoted command line through the shell (zsh doesn't split `"$cmd"`); Markdown edits (a task file
+  marked done) no longer make receipts dirty or stale; `smithy pr template` prints `none:` instead
+  of failing; the batch-check fix branch is `fix/…`; workers install dependencies first; batch
+  dirs are never reused; domain nouns are not risk when routing; launched sessions answer
+  `task-dir` themselves.
 - **Small changes skip smithy.** use-smithy sends a typo, copy, config value or one-line fix straight
   to the change and its check, with no skill or agents.
 - **Shorter branch names.** `smithy names branch` drops filler words, single letters and words

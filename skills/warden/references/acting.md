@@ -62,8 +62,8 @@ Add the security agent when any item touches auth, money, personal data, input p
 or shell access, or secrets. Test agents work in a fresh worktree of `origin/<base>`, never in a
 worker's.
 Findings follow smelt's receiving rules. The blocking ones become one new `fix` item: one worker
-(same brief, speed `fast`, intent = the findings verbatim, branch from `smithy names branch fix
-"<batch> review"`), one PR, merged like the others; then **tell** the same reviewer, resumed, to
+(same brief, speed `fast`, intent = the findings verbatim, branch from `smithy names branch -
+"<batch> review" fix`), one PR, merged like the others; then **tell** the same reviewer, resumed, to
 confirm at the fix's commit. A high security finding also goes to the user. Non-blocking ones
 go under **Followups**.
 

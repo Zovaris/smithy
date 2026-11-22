@@ -12,7 +12,7 @@ alternative.
 Each implementer gets the model `smithy route --file <task file> --speed <speed>` picks
 (cheap, mid or strong, from the task's risk, difficulty and size); reviewers use
 `smithy route --kind review`; the last fix round uses strong. You may move a pick one tier with
-a reason; a model the user named always wins. A tier whose model is unset prints `-`: ask the
+a reason (a domain noun, like "secret" in a secret scanner, is not risk); a model the user named always wins. A tier whose model is unset prints `-`: ask the
 user once to name it and save it with `smithy config set-model <tier> <name>`; until then, or when
 you can't ask, use the session default.
 

@@ -58,11 +58,13 @@ requirements from the intent and the code"; out of scope if the user named it>
   (`<warden-dir>/scripts/smithy tasks set <file> status=done pr=<url>`) so it lands with the PR.">
 - First step: `cd <worktree>`. Your session may start in another folder and the shell may reset
   its folder between calls, so start every command with `cd <worktree> &&`. Then check `pwd -P` and `git rev-parse --show-toplevel` equal <worktree> and the branch
-  is <branch>. If not: state=blocked note=wrong-worktree, stop.
+  is <branch>. If not: state=blocked note=wrong-worktree, stop. A fresh worktree has no
+  dependencies: install them first with the repo's lockfile command (`npm ci`, `go mod download`,
+  `uv sync`) so the first red test fails for the right reason.
 <has prereqs or the batch is full: "- Then wait for your turn: run `<warden-dir>/scripts/smithy wait-turn
   <batch> <id> <50 for a session worker | 9 for a subagent worker>` <session worker: "in the
-  background" | subagent worker: "in the foreground (a subagent can't be woken from the
-  background)"> and wait for it to end (no tokens while it waits; never poll); exit 4 means run
+  background" | subagent worker: "in the foreground with your shell tool's longest timeout (a
+  subagent can't be woken from the background)"> and wait for it to end (no tokens while it waits; never poll); exit 4 means run
   it again, exit 0 means go. When it says go, set `state=working`,
   `git fetch origin && git merge origin/<base>` (or the prereq's branch when stacked) so you
   start from the merged prereqs.">
@@ -97,7 +99,7 @@ as the current step.
   never merge: the warden waits on every PR's CI at once, merges, and comes back to you only
   if CI goes red or the base moves. A draft or unfinished PR is state=blocked, never pr_open.
 - Work found after your PR merged: small and inside this task's intent (a missed case, a typo, a
-  failing edge test) → fix it yourself in a follow-up PR from a new branch `<branch>-fix`, same
+  failing edge test) → fix it yourself in a follow-up PR from a new branch `smithy names branch <key> "<title>" fix`, same
   rules. Anything bigger or outside the intent → write it as a new task file `NN-<slug>.md` in
   the task dir (or `<batch-dir>/followups/` without one), keep your card `merged`, and name it in
   the note: `followup: <file>`. The warden decides whether it becomes a task.

@@ -12,7 +12,7 @@ import (
 )
 
 const prUsage = `Pull requests that follow the repo's PR template.
-  smithy pr template                        print the template path(s); exit 1 when the repo has none
+  smithy pr template                        print the template path(s), or a line starting 'none:' when the repo has none
   smithy pr create --base <b> --title "<t>" --body-file <f> [--draft]
                                             open the PR for the current branch, or print the open one;
                                             without gh or GH_TOKEN, push and print the compare URL
@@ -90,8 +90,8 @@ func PRMain(args []string) int {
 	if args[0] == "template" {
 		t := Templates(top)
 		if len(t) == 0 {
-			fmt.Fprintln(os.Stderr, "smithy pr template: no PR template in this repo; write what and why, tests, commands run")
-			return 1
+			fmt.Println("none: no PR template in this repo; write what and why, tests, commands run")
+			return 0
 		}
 		fmt.Println(strings.Join(t, "\n"))
 		return 0

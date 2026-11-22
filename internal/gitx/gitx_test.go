@@ -204,7 +204,7 @@ func TestPRHelpAndMissingTemplate(t *testing.T) {
 	if c := PRMain([]string{"create", "--help"}); c != 0 {
 		t.Fatalf("create --help exit %d", c)
 	}
-	if c := PRMain([]string{"template"}); c != 1 {
+	if c := PRMain([]string{"template"}); c != 0 {
 		t.Fatalf("template without one exit %d", c)
 	}
 }

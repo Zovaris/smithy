@@ -135,7 +135,7 @@ listed; the rest are named as dropped.
   `smithy consult` call to the user's judge model (else strong); high → the user. Security, money and personal data are always high. Record each in the PR's
   "Decided without you".
 - Command shapes that trip agents: `smithy receipt run --claim "<c>" -- <cmd> <args>` (argv after
-  `--`, not one quoted string); `smithy commit` wants a clean index and a subject under 72
+  `--`; one quoted command line also works); `smithy commit` wants a clean index and a subject under 72
   characters; a test fixture that looks like a secret gets `smithy:allow` on its line for
   `smithy scan`.
 - No claim without fresh evidence (`references/VERIFY.md`): every "passes" names the command

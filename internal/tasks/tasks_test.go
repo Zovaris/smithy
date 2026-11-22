@@ -122,6 +122,9 @@ func TestSet(t *testing.T) {
 			if tk.Status != "doing" || tk.PR != "https://x/pull/2" {
 				t.Errorf("got %+v", tk)
 			}
+			if !strings.Contains(body, "\nPR: https://x/pull/2\n") {
+				t.Errorf("PR key respelled:\n%s", body)
+			}
 		}, ""},
 		{"add missing header", []string{"owner=ana"}, func(t *testing.T, tk Task, body string) {
 			if !strings.Contains(body, "PR: -\nOwner: ana\n\n## What") {

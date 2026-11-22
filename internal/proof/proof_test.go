@@ -402,3 +402,48 @@ func TestBareSeparatorNeedsAConflictStart(t *testing.T) {
 		t.Fatalf("all three markers of a real conflict: %v", fs)
 	}
 }
+
+func TestRunSplitsOneQuotedCommandLine(t *testing.T) {
+	dir := newRepo(t)
+	var out bytes.Buffer
+	r, err := Run(dir, "", []string{"echo one two"}, &out)
+	if err != nil || r.Exit != 0 || out.String() != "one two\n" {
+		t.Fatalf("err=%v r=%+v out=%q", err, r, out.String())
+	}
+}
+
+func TestMarkdownEditsNeitherDirtyNorStale(t *testing.T) {
+	dir := newRepo(t)
+	os.MkdirAll(filepath.Join(dir, "docs", "specs"), 0o755)
+	md := filepath.Join(dir, "docs", "specs", "01-task.md")
+	if err := os.WriteFile(md, []byte("Status: doing\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, _ := Run(dir, "x", []string{"true"}, &bytes.Buffer{})
+	if r.Dirty {
+		t.Fatalf("a Markdown edit made the receipt dirty: %+v", r)
+	}
+	git(t, dir, "add", "docs/specs/01-task.md")
+	git(t, dir, "commit", "-q", "-m", "done")
+	head := strings.TrimSpace(gitOut(t, dir, "rev-parse", "HEAD"))
+	if !docsOnlySince(dir, r.Commit, head) {
+		t.Fatal("docs-only commit should keep the receipt current")
+	}
+	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("c\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, dir, "commit", "-qam", "code")
+	head = strings.TrimSpace(gitOut(t, dir, "rev-parse", "HEAD"))
+	if docsOnlySince(dir, r.Commit, head) {
+		t.Fatal("a code commit must make the receipt stale")
+	}
+}
+
+func gitOut(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(out)
+}

@@ -14,7 +14,7 @@ Before saying something is done, fixed, passing or ready:
    `smithy receipt run --claim "<claim>" -- <command>` on a committed tree: it records the exit
    code, an output digest and the commit, so the PR can show the receipt instead of your word.
    Red-step evidence (a test failing before the code exists) may be taken on a dirty tree (an
-   untracked file counts as dirty): the receipt is recorded as `dirty` and is valid for the red
+   untracked file outside the task and spec dirs counts as dirty): the receipt is recorded as `dirty` and is valid for the red
    step only.
 4. **Read the result**: exit code, failures, skipped tests, warnings you'd otherwise ignore.
 5. **State the claim with its evidence** (command → result), or state what is still failing.

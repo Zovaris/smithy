@@ -75,7 +75,7 @@ t "requires paths" '! $S/smithy commit "feat(api): add a"'
 t "commits only given paths" '$S/smithy commit "feat(api): add a" a.txt && [ "$(git status --short)" = "?? b.txt" ]'
 
 # smithy pr
-t "no template → exit 1" '! $S/smithy pr template'
+t "no template → none" '$S/smithy pr template | grep -q "^none:"'
 mkdir -p .github; printf '## Summary\n\n## Testing\n' > .github/pull_request_template.md
 t "template found once" '[ "$($S/smithy pr template | wc -l | tr -d " ")" = 1 ]'
 
