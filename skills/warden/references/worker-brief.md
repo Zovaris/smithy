@@ -95,7 +95,7 @@ as the current step.
 - Decision needed: state=needs_decision with decision_key (short slug), question, options (JSON
   list, each with its trade-off and the code lines that matter, neutral), recommendation and
   impact (low, medium or high: smelt's `references/EXECUTE.md`, Rulings). End
-  your turn. The warden closes the question; later progress doesn't.
+  your turn: the warden decides or asks the user, never you. The warden closes the question; later progress doesn't.
 - PR opened, local checks green and every blocking finding closed: state=pr_open pr=<url>
   tests_run=<commands actually run> risks=<or none>, then end your turn. Don't wait for CI and
   never merge: the warden waits on every PR's CI at once, merges when merge is auto (otherwise the user does), and comes back to you only

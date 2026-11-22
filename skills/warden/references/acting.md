@@ -14,9 +14,11 @@ lower it; `impact_by=decide` means the decision model raised it:
 - **low**: decide on the merits.
 - **medium**: `smithy consult` with the worker's question and options verbatim, in neutral order (fails → decide yourself).
   `NEED-INFO` goes back to the worker; `ESCALATE` makes it high.
-- **high** (also: the same kind of finding recurring): the user decides. One
+- **high** (also: the same kind of finding recurring): the user's. One
   message with all of them; each gives the intent, the proposed change, the smallest alternative
-  that still meets the intent, and your recommendation. Wait.
+  that still meets the intent, and your recommendation. Then use-smithy's **Decisions**: wait up
+  to `ask.timeout` (timer), then consult and `smithy decisions add --ref <pr>`; the hard floor
+  waits for the user (nobody to ask: the item stays held).
 
 Relay answers with **tell**, quoting the user's words when they decided, and close the question
 yourself: `smithy cards set <batch> <id> state=working decision_key=`. Log low and medium ones in
@@ -81,7 +83,7 @@ go under **Followups**.
 
 ## batch end (final message)
 
-When every item is final, read `<batch-dir>/decisions.md` and every card's `followup:` note (cards
+When every item is final, read `<batch-dir>/decisions.md`, `smithy decisions pending` and every card's `followup:` note (cards
 set `followup:` in the note of a merged item), then end the final message with one section, one
 line each, grouped as **Decisions** and **Followups**, each with the PR it came from
 (`- <decision or followup> (PR <url>)`; no PR → the item id).
