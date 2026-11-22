@@ -51,6 +51,6 @@ a running worker.
   (`references/acting.md`, batch end), together with the cards' `followup:` notes.
 - `<id>.brief.md` (rendered by `smithy brief`), `<id>.inbox.md`, `<id>.log`: the worker's brief,
   messages for respawns, its log. `smithy wait batch:<batch>` watches the cards and their `pr`s;
-  `wait-seen.json` (its own) keeps the PR events it reported, so a relaunched wait skips them.
+  `.wait-seen` (its own, one key per line) keeps the PR events it reported, so a relaunched wait skips them.
 - `<id>/report.md`: scout reports. `followups/`: task files workers write after a merge when there
   is no task dir.

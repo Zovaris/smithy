@@ -7,9 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/cards"
 )
 
 func TestSummarize(t *testing.T) {
@@ -830,5 +833,31 @@ func TestBatchWatcherStartReports(t *testing.T) {
 	writeCard(t, "b1", "a", `{"state":"merged","pr":"u5","updated":"`+stamp(time.Minute)+`"}`)
 	if got, _ := again.poll(); got != nil {
 		t.Errorf("the warden's own merged card woke the wait: %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".wait-seen")); err != nil {
+		t.Errorf("seen file: %v", err)
+	}
+	if rows, _ := cards.Rows("b1"); len(rows) != 3 {
+		t.Errorf("the seen file became a card: %+v", rows)
+	}
+}
+
+func TestBatchWatcherStartRedOnReady(t *testing.T) {
+	e := sandbox(t)
+	prEvery = 0
+	t.Cleanup(func() { prEvery = 30 * time.Second })
+	e.put(t, "pr.json", prFixture{rollup: red}.json())
+	dir := filepath.Join(os.Getenv("WARDEN_HOME"), "b1")
+	writeCard(t, "b1", "r", `{"state":"ready","pr":"u6","updated":"`+stamp(0)+`"}`)
+	writeCard(t, "b1", "n", `{"state":"pr_open","pr":"u8","updated":"`+stamp(0)+`"}`)
+	if err := os.WriteFile(filepath.Join(dir, "batch.json"), []byte(`{"merge":"auto","items":[{"id":"r"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	w, _ := newBatch("b1", false)
+	got, _ := w.poll()
+	want := []string{"batch b1 n pr 5 checks=red failed=unit-tests u5", "batch b1 r pr 5 checks=red failed=unit-tests u5"}
+	sort.Strings(got)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("red on a ready card, and a card missing from batch.json on the batch default: %q", got)
 	}
 }

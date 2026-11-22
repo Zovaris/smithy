@@ -505,8 +505,16 @@ func (w *batchWatcher) prLines(rows []cards.Row, start bool) []string {
 
 // firstSight filters the lines of a PR's first read and adds a conflict it doesn't report itself.
 func (w *batchWatcher) firstSight(r cards.Row, pw *prWatcher, lines []string, start bool) []string {
-	if start && (r.State == "ready" || w.merge[r.ID] != "auto") {
-		return nil
+	quiet := start && (r.State == "ready" || w.mergeOf(r.ID) != "auto")
+	if quiet {
+		// Left for the user: a green, merged or closed PR is no news; red and conflicts are.
+		var keep []string
+		for _, l := range lines {
+			if strings.Contains(l, " checks=red") {
+				keep = append(keep, l)
+			}
+		}
+		lines = keep
 	}
 	if pw.last.mergeable == "CONFLICTING" && pw.last.state == "OPEN" {
 		lines = append(lines, fmt.Sprintf("pr %d conflict %s", pw.last.num, pw.last.url))
@@ -529,19 +537,65 @@ func (w *batchWatcher) record(id string, pw *prWatcher, lines []string) []string
 		out = append(out, fmt.Sprintf("batch %s %s %s", w.name, id, l))
 	}
 	if len(lines) > 0 {
-		keys := make([]string, 0, len(w.reported))
-		for k := range w.reported {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		if b, err := json.Marshal(keys); err == nil {
-			_ = os.WriteFile(filepath.Join(cards.Home(), w.name, "wait-seen.json"), b, 0o644)
+		if err := w.saveSeen(); err != nil {
+			fmt.Fprintf(os.Stderr, "smithy wait: %v\n", err)
 		}
 	}
 	return out
 }
 
-// mergeModes reads each item's merge mode (its own, else the batch's) from batch.json.
+// seenFile is not a .json file, so the card listing never takes it for a card.
+func seenFile(name string) string { return filepath.Join(cards.Home(), name, ".wait-seen") }
+
+// loadSeen reads the reported keys, one per line, into w.reported.
+func (w *batchWatcher) loadSeen() {
+	b, err := os.ReadFile(seenFile(w.name))
+	if err != nil {
+		return
+	}
+	for _, k := range strings.Split(string(b), "\n") {
+		if k != "" {
+			w.reported[k] = true
+		}
+	}
+}
+
+// saveSeen merges the keys on disk (another waiter may have written some) with this one's and
+// replaces the file atomically.
+func (w *batchWatcher) saveSeen() error {
+	w.loadSeen()
+	keys := make([]string, 0, len(w.reported))
+	for k := range w.reported {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	f := seenFile(w.name)
+	tmp, err := os.CreateTemp(filepath.Dir(f), ".wait-seen-*")
+	if err != nil {
+		return err
+	}
+	_, err = tmp.WriteString(strings.Join(keys, "\n") + "\n")
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Rename(tmp.Name(), f)
+	}
+	if err != nil {
+		os.Remove(tmp.Name())
+	}
+	return err
+}
+
+// mergeOf is the item's merge mode: its own, else the batch's (also for an item batch.json lacks).
+func (w *batchWatcher) mergeOf(id string) string {
+	if m, ok := w.merge[id]; ok && m != "" {
+		return m
+	}
+	return w.merge[""]
+}
+
+// mergeModes reads each item's merge mode from batch.json; key "" holds the batch default.
 func mergeModes(name string) map[string]string {
 	var bt struct {
 		Merge string
@@ -549,11 +603,9 @@ func mergeModes(name string) map[string]string {
 	}
 	out := map[string]string{}
 	if b, err := os.ReadFile(filepath.Join(cards.Home(), name, "batch.json")); err == nil && json.Unmarshal(b, &bt) == nil {
+		out[""] = bt.Merge
 		for _, it := range bt.Items {
 			out[it.ID] = it.Merge
-			if it.Merge == "" {
-				out[it.ID] = bt.Merge
-			}
 		}
 	}
 	return out
@@ -593,13 +645,7 @@ func newBatch(name string, all bool) (*batchWatcher, error) {
 	}
 	w := &batchWatcher{name: name, since: time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), stuckBefore: stuck(rows), all: all, seen: seen,
 		gh: ghx.Ready() == nil, prs: map[string]*prWatcher{}, merge: mergeModes(name), reported: map[string]bool{}}
-	if b, err := os.ReadFile(filepath.Join(cards.Home(), name, "wait-seen.json")); err == nil {
-		var ks []string
-		_ = json.Unmarshal(b, &ks)
-		for _, k := range ks {
-			w.reported[k] = true
-		}
-	}
+	w.loadSeen()
 	if w.gh {
 		w.pending = w.prLines(rows, true)
 		w.prNext = time.Time{}
@@ -641,7 +687,7 @@ Targets (any mix):
   issues[:<label>]    an issue opened or updated with the label (default agent)
   batch:<name>        a warden card needs the warden (--all: any card change), or a card's PR
                       turned green/red, conflicts, merged or closed (already so at the start: only for
-                      merge-auto cards not ready; events in the batch's wait-seen.json are skipped);
+                      merge-auto cards not ready, else red/conflict only; events in the batch's .wait-seen are skipped);
                       polls cards every 10 s, PRs every 30 s
   actions[:<branch>]  a workflow run on the branch (default: origin's default) finished red,
                       push, schedule or manual
