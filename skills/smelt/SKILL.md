@@ -58,7 +58,7 @@ need a tool `smithy stack` shows, else "not applicable".
 
 | Phase | Do | Done when |
 |---|---|---|
-| **0 context** (always) | Read AGENTS.md / CLAUDE.md, CONTRIBUTING.md, `docs/GLOSSARY.md`, ADR titles, `docs/agents/STANDARDS.md`, the spec (ledger's context rules if installed). Run `smithy stack` once and use its commands. Note if you're in a worktree. Run the suite once as baseline. | you can name the seams and the baseline result (pre-existing failures named) |
+| **0 context** (always) | Read AGENTS.md / CLAUDE.md, CONTRIBUTING.md, `docs/GLOSSARY.md`, ADR titles, `docs/agents/STANDARDS.md`, the spec (ledger's context rules if installed). Run `smithy stack` once and use its commands (new repo: run it again once the skeleton exists). Note if you're in a worktree. Run the suite once as baseline. | you can name the seams and the baseline result (pre-existing failures named) |
 | **plan** | At plan: read `references/BRAINSTORM.md`, then `references/GRILLING.md`. Why → 2–3 approaches the user picks → design → remaining decisions. Facts via scout; ADR candidates go to ledger's `adr` mode once the user confirms (else `references/DOCS.md`). | the user approved the design and decisions |
 | **spec** | At spec: read `references/SPEC.md`, then `references/TASKS.md`. Spec with agreed seams; > 8 criteria or open questions → `agents/builder.md`. Tracer-bullet tasks; ask: here all, here one at a time, warden, or later. | spec + tasks written, each fits one fresh context; the user chose |
 | **build** | At build: read `references/TDD.md`. From a task file: `smithy tasks set <file> status=doing`. One test at a time; single files while working, full suite at the end. | VERIFY: suite, typecheck, lint green; every criterion has a test |
@@ -70,9 +70,12 @@ need a tool `smithy stack` shows, else "not applicable".
 - Keep a task list of your phases (the harness's to-do tool if any) and tick it.
 - An agent's open question comes back in its report; answer it by the shared rule (a warden
   worker asks warden) and record it in the PR's "Decided without you".
-- Command shapes: `smithy receipt run --claim "<c>" -- <cmd> <args>`; `smithy commit` wants a
-  clean index and a subject under 72 characters; a fixture that looks like a secret gets
-  `smithy:allow` on its line.
+- **Nobody to ask** (hush, or a launched session): an approval, a choice (how to run a task
+  list) or a lesson's yes → take your recommendation and record it in the task dir's
+  `rulings.md` and the PR's "Decided without you".
+- Command shapes: `smithy receipt run --claim "<c>" -- <cmd> <args>`; commit with
+  `smithy commit "<msg>" <path>...` (never `git add` first: it wants a clean index; subject
+  under 72 characters); a fixture that looks like a secret gets `smithy:allow` on its line.
 
 ## Red flags
 | Thought | Reality |

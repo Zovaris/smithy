@@ -54,7 +54,7 @@ spec stays in the repo or local dir and the issues link to it.
      enough to merge into its neighbour.
   5. Width: the longest `Blocked by` chain, and each task's speed (its `Speed:` line: fast
      unless it holds logic that earns normal or full).
-- Show the list (number, title, one line, blocked by) and wait for approval before writing.
+- Show the list (number, title, one line, blocked by); wait for approval (else SKILL.md Always).
 
 ## Task file — `NN-<slug>.md`
 
@@ -106,15 +106,15 @@ smithy tasks board [--all]        # one line per task list and batch: this repo,
 
 ## After the list is written
 
-Ask how to run it, recommendation first, only offering what is installed. Recommend **here**
-unless at least two independent tasks are each big (more than ~15 minutes of agent work): for a
-small list or a long chain, one session building in order is faster and several times cheaper
-than parallel workers (trial 4, `docs/trials`).
+Ask how to run it (nobody to ask: SKILL.md Always), recommendation first, only offering what is
+installed. Recommend **here** unless at least two independent tasks are each big (more than ~15
+minutes of agent work): for a small list or a long chain, one session building in order is
+faster and several times cheaper than parallel workers (trial 4, `docs/trials`).
 - **Here, all of it:** smelt `build all`: built in order, one check wave on the whole branch at
   the end.
 - **Here, one at a time:** smelt `build next` (e.g. `/smelt build next`; repeat until `smithy tasks next` says all done).
-- **In parallel:** warden on the task dir (workers build at `fast`; warden checks the batch once at its speed) (read the SKILL.md `smithy skills warden` prints) when
-  it is installed (it is listed among
-  your skills, or `<skill-dir>/../warden/SKILL.md` exists). Mixing is fine: build some here,
+- **In parallel:** warden on the task dir (workers build at `fast`; warden checks the batch once
+  at its speed; read the SKILL.md `smithy skills warden` prints) when it is installed (listed
+  among your skills, or `<skill-dir>/../warden/SKILL.md` exists). Mixing is fine: build some here,
   hand the rest over; both read and write the same status lines.
 - **Later:** stop here; the list waits.
