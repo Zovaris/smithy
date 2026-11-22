@@ -31,7 +31,7 @@ Tiers: cheap (mechanical, read-only, small), mid (most feature work), strong (ri
 cross-cutting, or the last fix round).`
 
 var (
-	risky   = []string{"auth", "login", "password", "secret", "access token", "auth token", "api token", "api key", "permission", "security", "payment", "billing", "money", "invoice", "migration", "schema", "database", "concurren", "race condition", "lock contention", "deadlock", "mutex", "crypto", "encrypt", "data loss", "delete user", "production", "public api", "sql injection", "command injection", "prompt injection", "formula injection", "untrusted", "personal data", "pii", "input parsing", "file access", "file upload", "path traversal", "shell access", "shell command", "backfill", "stored data"}
+	risky   = []string{"auth", "login", "password", "secret", "access token", "auth token", "api token", "api key", "permission", "security", "payment", "billing", "money", "invoice", "migration", "schema", "database", "concurren", "race condition", "lock contention", "deadlock", "mutex", "crypto", "encrypt", "data loss", "delete user", "production", "public api", "sql injection", "command injection", "prompt injection", "formula injection", "untrusted", "personal data", "pii", "input parsing", "file access", "file upload", "path traversal", "shell access", "shell command", "backfill", "stored data", "stored records", "in place", "in-place"}
 	hard    = []string{"architecture", "redesign", "refactor", "performance", "investigate", "root cause", "why does", "ambiguous", "trade-off", "cross-cutting", "rewrite", "remake", "protocol", "parser", "compiler", "algorithm"}
 	prose   = []string{"doc", "docs", "documentation", "readme", "contributing", "changelog", "guide", "adr", "wording"}
 	trivial = []string{"typo", "copy change", "wording", "rename", "bump", "version", "color", "colour", "style tweak", "readme", "comment", "lint", "format"}
@@ -47,7 +47,7 @@ var (
 var Tiers = []string{"cheap", "mid", "strong"}
 
 // whole are risky words that must not match longer words (auth, not author).
-var whole = map[string]string{"auth": `(?:n|z|entication|enticate|orization|orize)?\b`, "pii": `\b`}
+var whole = map[string]string{"auth": `(?:n|z|entication|enticate|orization|orize)?\b`, "pii": `\b`, "in place": `\b`, "in-place": `\b`}
 
 func suffix(w string) string {
 	if t, ok := whole[w]; ok {
