@@ -90,7 +90,7 @@ func Route(text, kind, speed string) (string, []string) {
 	return RouteDomain(text, kind, speed, "")
 }
 
-// riskyWithout is the risky list minus the words a domain noun covers (secret, secrets).
+// riskyWithout is the risky list minus the words a domain noun names as a whole word (secret or secrets).
 func riskyWithout(domain string) []string {
 	var nouns []string
 	for _, d := range strings.Split(strings.ToLower(domain), ",") {
@@ -102,7 +102,7 @@ func riskyWithout(domain string) []string {
 	for _, w := range risky {
 		keep := true
 		for _, d := range nouns {
-			if strings.HasPrefix(d, w) || strings.HasPrefix(w, d) {
+			if d == w || d == w+"s" || d+"s" == w {
 				keep = false
 			}
 		}

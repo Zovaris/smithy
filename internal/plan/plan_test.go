@@ -235,7 +235,7 @@ func TestTaskDir(t *testing.T) {
 				if !errors.As(err, &ask) || ask.Key != c.ask || !strings.HasPrefix(ask.Error(), "ask "+c.ask+": ") {
 					t.Fatalf("err = %v, want ask %s", err, c.ask)
 				}
-				if !strings.Contains(ask.Error(), "(default with nobody to ask: ") || !strings.Contains(ask.Error(), filepath.Join("specs", "s1")+")") {
+				if !strings.Contains(ask.Error(), "(default: "+map[string]string{"tasks.commit": "true", "tasks.ignore": "exclude"}[c.ask]+" → ") || !strings.Contains(ask.Error(), filepath.Join("specs", "s1")+")") {
 					t.Errorf("ask line lacks the default dir: %s", ask.Error())
 				}
 				if ex, _ := os.ReadFile(filepath.Join(dir, ".git", "info", "exclude")); !strings.Contains(string(ex), ".smithy/config.json\n") {

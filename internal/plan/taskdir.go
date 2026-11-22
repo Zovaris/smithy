@@ -29,7 +29,7 @@ type AskError struct{ Key, Question, Default string }
 func (e *AskError) Error() string {
 	line := "ask " + e.Key + ": " + e.Question
 	if e.Default != "" {
-		line += " (default with nobody to ask: " + e.Default + ")"
+		line += " (default: " + e.Default + ")"
 	}
 	return line
 }

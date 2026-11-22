@@ -411,4 +411,7 @@ func TestRouteDomainNounsAreNotRisk(t *testing.T) {
 	if tier, _ := RouteDomain(text+" behind auth", "ship", "normal", "secret"); tier != "strong" {
 		t.Errorf("other risk still counts: %s", tier)
 	}
+	if tier, _ := RouteDomain("Fix the auth check", "ship", "normal", "au"); tier != "strong" {
+		t.Errorf("short noun au must not drop auth: %s", tier)
+	}
 }
