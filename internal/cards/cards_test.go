@@ -581,3 +581,23 @@ func TestPROpenNeedsAPR(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGate(t *testing.T) {
+	h := setup(t)
+	os.MkdirAll(filepath.Join(h, "g"), 0o755)
+	os.WriteFile(filepath.Join(h, "g", "batch.json"), []byte(`{"items":[{"id":"r","risky":true},{"id":"p"}]}`), 0o644)
+	if err := Gate("g", "p"); err != nil {
+		t.Errorf("plain item: %v", err)
+	}
+	if err := Gate("g", "r"); err == nil || !strings.Contains(err.Error(), "security=unset") {
+		t.Errorf("risky without card: %v", err)
+	}
+	Set("g", "r", []string{"security=not-run:no agent"})
+	if err := Gate("g", "r"); err == nil || !strings.Contains(err.Error(), "not-run:no agent") {
+		t.Errorf("not-run: %v", err)
+	}
+	Set("g", "r", []string{"security=ran"})
+	if err := Gate("g", "r"); err != nil {
+		t.Errorf("ran: %v", err)
+	}
+}

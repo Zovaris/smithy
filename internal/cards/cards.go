@@ -353,6 +353,8 @@ const usage = `usage: smithy cards <command>
   board [batch] [--changed-since <iso>] [--json]   one line per item with its stage; newest batch by default
                                          (--changed-since exits 3 when nothing changed)
   live [batch] [--every 5]               redraws the board in a terminal for humans
+  gate <batch> <id>                      exit 1 when batch.json marks the item risky and its card
+                                         lacks security=ran (never merge it); 0 otherwise
 Cards live in $WARDEN_HOME (default ~/.smithy/warden)/<batch>/.`
 
 // Main runs `smithy cards`.
@@ -398,6 +400,16 @@ func Main(args []string) int {
 		}
 		b, _ := json.MarshalIndent(read(f), "", "  ")
 		fmt.Println(string(b))
+	case "gate":
+		if len(args) != 2 {
+			fmt.Fprintln(os.Stderr, usage)
+			return 2
+		}
+		if err := Gate(args[0], args[1]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		fmt.Println("ok")
 	case "board", "live":
 		asJSON := false
 		for i, a := range args {
@@ -462,6 +474,33 @@ func Main(args []string) int {
 		return 2
 	}
 	return 0
+}
+
+// Gate refuses a risky item (batch.json) whose card lacks security=ran.
+func Gate(batch, id string) error {
+	bt := read(filepath.Join(Home(), batch, "batch.json"))
+	if bt == nil {
+		return fmt.Errorf("no batch.json in batch %s", batch)
+	}
+	items, _ := bt["items"].([]any)
+	for _, x := range items {
+		it, _ := x.(map[string]any)
+		if s(it, "id") != id {
+			continue
+		}
+		if it["risky"] != true {
+			return nil
+		}
+		sec := s(read(filepath.Join(Home(), batch, id+".json")), "security")
+		if sec == "ran" {
+			return nil
+		}
+		if sec == "" {
+			sec = "unset"
+		}
+		return fmt.Errorf("risky item %s: security=%s; never merge it (run the security agent, or list a not-run reason for the user)", id, sec)
+	}
+	return fmt.Errorf("no item %s in batch %s", id, batch)
 }
 
 func hasKey(pairs []string, k string) bool {
