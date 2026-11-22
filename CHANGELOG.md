@@ -5,6 +5,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.11.0 — 2026-11-21
+
 - **Trial 7 frictions.** `smithy comments` no longer reads a JS regex literal (`/^b\//`) as a
   comment. The combined reviewer answers under `## Spec-check` and `## Standards`; the re-review
   prompt asks only about the listed findings and the fix diff. Agents use only file, shell and
