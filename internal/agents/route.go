@@ -8,11 +8,14 @@ import (
 	"strings"
 
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/ghx"
 )
 
 const routeUsage = `Model router: picks the cheapest model tier that can do a task well, from the task itself.
-  smithy route [--file <task.md>] [--text "<task words>"] [--kind ship|scout|review|fix|tend|test]
+  smithy route [--file <task.md>] [--text "<task words>"] [--board <owner/repo#n>] [--batch] [--kind ship|scout|review|fix|tend|test]
                [--agent <agent file or name>] [--speed fast|normal|full] [--domain "<nouns>"] [--json]
+--board reads the issue's title and body with gh, so its own words (money, auth) count; --batch
+is the warden's batch check: never below mid.
 --domain is a comma list of the product's own nouns (secret for a secret scanner) that never
 count as risk; config key route.domain (smithy config set --repo route.domain "...") is the default.
 --agent picks the kind from a smelt agent (adversary and security run on at least mid): reviewer, security and builder are review;
@@ -26,7 +29,7 @@ Tiers: cheap (mechanical, read-only, small), mid (most feature work), strong (ri
 cross-cutting, or the last fix round).`
 
 var (
-	risky   = []string{"auth", "login", "password", "secret", "access token", "auth token", "api token", "api key", "permission", "security", "payment", "billing", "money", "invoice", "migration", "schema", "database", "concurren", "race condition", "lock contention", "deadlock", "mutex", "crypto", "encrypt", "data loss", "delete user", "production", "public api"}
+	risky   = []string{"auth", "login", "password", "secret", "access token", "auth token", "api token", "api key", "permission", "security", "payment", "billing", "money", "invoice", "migration", "schema", "database", "concurren", "race condition", "lock contention", "deadlock", "mutex", "crypto", "encrypt", "data loss", "delete user", "production", "public api", "injection", "untrusted"}
 	hard    = []string{"architecture", "redesign", "refactor", "performance", "investigate", "root cause", "why does", "ambiguous", "trade-off", "cross-cutting", "rewrite", "remake", "protocol", "parser", "compiler", "algorithm"}
 	prose   = []string{"doc", "docs", "documentation", "readme", "contributing", "changelog", "guide", "adr", "wording"}
 	trivial = []string{"typo", "copy change", "wording", "rename", "bump", "version", "color", "colour", "style tweak", "readme", "comment", "lint", "format"}
@@ -198,6 +201,13 @@ func AgentFloor(agent string) string {
 	return ""
 }
 
+// issueText reads a GitHub issue's title and body; a var so tests can stub gh.
+var issueText = func(repo, n string) (string, error) {
+	return ghx.Run("gh", "issue", "view", n, "-R", repo, "--json", "title,body", "-q", `.title + "\n" + .body`)
+}
+
+var boardRe = regexp.MustCompile(`^([\w.-]+/[\w.-]+)#(\d+)$`)
+
 func tierIndex(t string) int {
 	for i, x := range Tiers {
 		if x == t {
@@ -243,7 +253,7 @@ func RouteMain(args []string) int {
 	}
 	for i, a := range args {
 		switch a {
-		case "--file", "--text", "--kind", "--agent", "--speed", "--domain":
+		case "--file", "--text", "--kind", "--agent", "--speed", "--domain", "--board":
 			if i+1 >= len(args) || strings.HasPrefix(args[i+1], "--") {
 				fmt.Fprintf(os.Stderr, "smithy route: %s needs a value\n", a)
 				return 2
@@ -267,8 +277,24 @@ func RouteMain(args []string) int {
 		}
 		text += "\n" + string(b)
 	}
+	if b, ok := opt("--board"); ok {
+		m := boardRe.FindStringSubmatch(b)
+		if m == nil {
+			fmt.Fprintf(os.Stderr, "smithy route: --board %q is not owner/repo#n\n", b)
+			return 2
+		}
+		body, err := issueText(m[1], m[2])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "smithy route: cannot read", b+":", err)
+			return 1
+		}
+		text += "\n" + body
+	}
 	kind, _ := opt("--kind")
 	floor := ""
+	if has("--batch") {
+		floor = "mid"
+	}
 	if a, ok := opt("--agent"); ok {
 		k, known := AgentKind(a)
 		if !known {
@@ -276,7 +302,9 @@ func RouteMain(args []string) int {
 			return 2
 		}
 		kind = k
-		floor = AgentFloor(a)
+		if f := AgentFloor(a); f != "" {
+			floor = f
+		}
 	}
 	if kind == "" {
 		kind = "ship"
@@ -296,7 +324,7 @@ func RouteMain(args []string) int {
 	tier, reasons := RouteDomain(text, kind, speed, domain)
 	if floor != "" && tierIndex(tier) < tierIndex(floor) {
 		tier = floor
-		reasons = append(reasons, "this agent needs at least "+floor)
+		reasons = append(reasons, "needs at least "+floor+" (agent or batch check)")
 	}
 	model, _ := config.Model(tier)
 	if has("--json") {

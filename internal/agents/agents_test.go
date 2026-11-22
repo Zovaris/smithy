@@ -433,3 +433,35 @@ func TestRouteDomainNounsAreNotRisk(t *testing.T) {
 		t.Errorf("short noun au must not drop auth: %s", tier)
 	}
 }
+
+func routeOut(t *testing.T, args ...string) (int, string) {
+	t.Helper()
+	r, w, _ := os.Pipe()
+	old := os.Stdout
+	os.Stdout = w
+	code := RouteMain(args)
+	w.Close()
+	os.Stdout = old
+	out, _ := io.ReadAll(r)
+	return code, string(out)
+}
+
+func TestRouteBoardAndBatchFloor(t *testing.T) {
+	old := issueText
+	defer func() { issueText = old }()
+	issueText = func(repo, n string) (string, error) {
+		if repo != "acme/invoicer" || n != "7" {
+			t.Errorf("read %s#%s", repo, n)
+		}
+		return "totals are off\nfloat money rounds wrong", nil
+	}
+	if c, out := routeOut(t, "--text", "fix totals", "--board", "acme/invoicer#7"); c != 0 || !strings.HasPrefix(out, "strong ") || !strings.Contains(out, "money") {
+		t.Errorf("--board = %d %q, want strong for money", c, out)
+	}
+	if c, _ := routeOut(t, "--board", "not-a-key"); c != 2 {
+		t.Errorf("bad --board exit %d", c)
+	}
+	if c, out := routeOut(t, "--agent", "reviewer", "--text", "fix a typo", "--speed", "fast", "--batch"); c != 0 || !strings.HasPrefix(out, "mid ") {
+		t.Errorf("--batch reviewer = %d %q, want mid", c, out)
+	}
+}
