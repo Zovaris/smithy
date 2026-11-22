@@ -5,6 +5,17 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **Ask, with a timeout.** The user's decisions (use-smithy's stop list) are asked and waited on
+  for at most `ask.timeout` minutes (new setting, default 10; 0 = don't start the timer) through a background
+  `smithy wait timer:<min>` (new target, exit 0 when it fires). No answer in time, or nobody to
+  ask (hush, launched sessions, warden workers through warden): one `smithy consult` with neutral
+  options, safest first for security, and the pick is logged with the new `smithy decisions add`
+  (`~/.smithy/decisions/<repo>.md`; `pending` numbers the unconfirmed ones and `confirm <n>|--all` / `change <n>` take that
+  number; `list` shows all; locked, atomic writes; fields can't contain `·` or `→`). A hard
+  floor is never auto-decided: merging or deploying to the production branch, deleting or irreversibly rewriting user data, credentials, secrets or logins, money. use-smithy owns the rule and shows pending
+  decisions at the start of each reply (simple too, as a statement under hush); hush, smelt (Always, EXECUTE rulings) and
+  warden (decide stage, batch end, worker brief) point to it.
+
 - **R15 warden risky-task-list frictions.** New `smithy batch init <tasks_dir> --repo <dir>
   [--base b] [--merge auto|manual] [--max n]` writes `batch.json` from a task dir (ids, titles,
   paths as intent, speed, prereqs from unfinished blockers, branch and worktree names, risky and

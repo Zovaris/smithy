@@ -14,9 +14,12 @@ lower it; `impact_by=decide` means the decision model raised it:
 - **low**: decide on the merits.
 - **medium**: `smithy consult` with the worker's question and options verbatim, in neutral order (fails → decide yourself).
   `NEED-INFO` goes back to the worker; `ESCALATE` makes it high.
-- **high** (also: the same kind of finding recurring): the user decides. One
+- **high** (also: the same kind of finding recurring): the user's. One
   message with all of them; each gives the intent, the proposed change, the smallest alternative
-  that still meets the intent, and your recommendation. Wait.
+  that still meets the intent, and your recommendation. Then use-smithy's **Decisions**:
+  `smithy wait timer:<ask.timeout>` in the background (0: none); an answer first → kill the timer;
+  it fires → `smithy consult`, then `smithy decisions add "<q>" "<choice>" --why "<r>" --by timeout --ref <pr>`
+  (nobody to ask: `--by consult`, no timer). Hard floor: the item is held until the user answers.
 
 Relay answers with **tell**, quoting the user's words when they decided, and close the question
 yourself: `smithy cards set <batch> <id> state=working decision_key=`. Log low and medium ones in
@@ -54,7 +57,7 @@ Before merging a risky item, `smithy cards gate <batch> <id>` (exit 1 without `s
 Only after `smithy verify` says `merged` (never chain merge, cleanup and `cards set merged` without that check): `smithy cleanup`, **end** the worker, update the source. Its
 dependents are already waiting and start on their own. A `followup: <file>` in the note is work
 found after the merge: small and inside the intent → add it as an item (spawn it if this harness
-can from here, else propose it); bigger → a scope question for the user, with the other decisions.
+can from here, else propose it); bigger → a scope question for the user, with the other decisions (decide stage).
 
 ## batch check (every ship item `merged` or `ready`)
 
@@ -76,12 +79,12 @@ Findings follow smelt's `references/RECEIVING.md`. The blocking ones become one 
 "<batch> review" fix`), one PR, merged like the others; then smelt's re-review (smelt's `references/RECEIVING.md`, step 5)
 at the fix's commit. Before merging the fix PR, run any `zz_` holdout test in a fresh
 worktree of `origin/<fix-branch>`. You write the fix PR's dispositions (every finding, including declined
-ones and why) in its body. A high security finding also goes to the user. Non-blocking ones
+ones and why) in its body. A high security finding also goes to the user (decide stage). Non-blocking ones
 go under **Followups**.
 
 ## batch end (final message)
 
-When every item is final, read `<batch-dir>/decisions.md` and every card's `followup:` note (cards
+When every item is final, read `<batch-dir>/decisions.md`, `smithy decisions pending` and every card's `followup:` note (cards
 set `followup:` in the note of a merged item), then end the final message with one section, one
 line each, grouped as **Decisions** and **Followups**, each with the PR it came from
 (`- <decision or followup> (PR <url>)`; no PR → the item id).
