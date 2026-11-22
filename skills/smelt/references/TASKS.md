@@ -1,10 +1,8 @@
 # Tasks
 
 Contents: Where it lives · Splitting · Task file — `NN-<slug>.md` · Commands · After the list is written
-
-The task list is the hand-off between planning and building, and between smelt and warden.
-Whoever wrote it, either skill (or you, by hand) can pick it up. `smithy tasks` reads and
-updates it; never hand-edit status lines when the script can.
+The task list is the hand-off between planning and building, smelt and warden. `smithy tasks`
+reads and updates it; use it instead of hand-editing status lines.
 
 ## Where it lives
 

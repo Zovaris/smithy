@@ -7,7 +7,7 @@ Files are created only when there is something to write in them.
 | Domain terms | `docs/GLOSSARY.md` | everyone, phase 0 |
 | Hard decisions | `docs/adr/NNNN-<slug>.md` | phase 0 when relevant |
 | Specs and tasks | `docs/specs/<slug>/`, `.docs/specs/<slug>/` (out of git) or `~/.smithy/plans/<repo>/<slug>/` (`smithy task-dir` decides) | build, review |
-| Judgement rules for agents | `docs/agents/STANDARDS.md` | standards reviewer |
+| Judgement rules for agents | `docs/agents/STANDARDS.md` | reviewer (Standards) |
 | Mechanical rules | lint rules, hooks, scripts | CI, hooks |
 | Facts about the user, their preferences | the harness's memory | every session |
 
