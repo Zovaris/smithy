@@ -16,9 +16,9 @@ files above.
 
 ## init
 
-Create `docs/adr/` with `0000-record-decisions.md` (status accepted: we use ADRs), an empty
-`docs/GLOSSARY.md` header, and a pointer block in the repo's agent instructions file (AGENTS.md
-if none exists). Run `smithy stack` and offer to add its commands there.
+Create `docs/adr/` with `0000-record-architecture-decisions.md` (status accepted: we use ADRs), an empty
+`docs/GLOSSARY.md` header, and a pointer block in the repo's agent instructions file (where ledger's
+`init` puts it). Run `smithy stack` and offer to add its commands there.
 
 ## Glossary
 

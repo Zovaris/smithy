@@ -14,7 +14,7 @@ const commentsUsage = `smithy comments: checks the comment policy and prints ` +
   smithy comments [paths...]         files or folders (default: the repo)
   smithy comments --diff <base>      only lines added against <base> (and staged ones)
 Allowed: public API doc comments, license/SPDX headers, shebangs, a shell script's header block,
-tool directives with a reason, go:build/generate, Rust /// //! and SAFETY. Everything else is
+tool directives with a reason, smithy:allow markers, go:build/generate, Rust /// //! and SAFETY. Everything else is
 reported. Heuristic: languages ts tsx js jsx mjs cjs py go rs java kt sh. Exit 1 on findings.`
 
 var (
@@ -71,12 +71,66 @@ func stripStrings(line []rune) []rune {
 		} else if c == '"' || c == '\'' || c == '`' {
 			quote = c
 			out = append(out, ' ')
+		} else if c == '/' && regexStart(line, i) {
+			j := regexEnd(line, i)
+			for ; i < j; i++ {
+				out = append(out, ' ')
+			}
+			continue
 		} else {
 			out = append(out, c)
 		}
 		i++
 	}
 	return out
+}
+
+// regexStart reports whether the / at i opens a JS regex literal: not a comment, and after an
+// operator or bracket rather than a value.
+func regexStart(line []rune, i int) bool {
+	if i+1 >= len(line) || line[i+1] == '/' || line[i+1] == '*' {
+		return false
+	}
+	if i > 0 && line[i-1] == '<' {
+		return false
+	}
+	j := i - 1
+	for j >= 0 && (line[j] == ' ' || line[j] == '\t') {
+		j--
+	}
+	if j < 0 {
+		return true
+	}
+	if strings.ContainsRune("(,=:[!&|?{};+-*%<>~^", line[j]) {
+		return true
+	}
+	k := j
+	for k >= 0 && (line[k] >= 'a' && line[k] <= 'z') {
+		k--
+	}
+	switch string(line[k+1 : j+1]) {
+	case "return", "typeof", "case", "in", "of", "await", "yield", "throw", "void", "delete":
+		return true
+	}
+	return false
+}
+
+// regexEnd is the index just past the regex literal that opens at i, or i+1 if it never closes.
+func regexEnd(line []rune, i int) int {
+	class := false
+	for j := i + 1; j < len(line); j++ {
+		switch c := line[j]; {
+		case c == '\\':
+			j++
+		case c == '[':
+			class = true
+		case c == ']':
+			class = false
+		case c == '/' && !class:
+			return j + 1
+		}
+	}
+	return i + 1
 }
 
 func indexRunes(s []rune, sub string) int {
@@ -127,6 +181,8 @@ func slashDirective(body, ext string) string {
 		}
 		return msgReason
 	case ext == ".go" && goDirectRx.MatchString(b):
+		return "ok"
+	case strings.HasPrefix(b, "smithy:allow"):
 		return "ok"
 	case strings.HasPrefix(b, "prettier-ignore") || strings.HasPrefix(b, "biome-ignore") ||
 		strings.HasPrefix(b, "istanbul ignore") || strings.HasPrefix(b, "c8 ignore"):
@@ -264,7 +320,7 @@ func CheckHash(lines []string, ext string) []Finding {
 				continue
 			}
 		}
-		if shell && shellckRx.MatchString(b) {
+		if shell && shellckRx.MatchString(b) || strings.HasPrefix(strings.TrimSpace(b), "smithy:allow") {
 			continue
 		}
 		if strings.TrimFunc(before, isPySpace) != "" {

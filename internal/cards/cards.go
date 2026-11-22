@@ -16,6 +16,9 @@ import (
 	"github.com/Zovaris/smithy/internal/ghx"
 )
 
+// RaiseImpact, when set, may raise a new question's impact (never lower it); it reports whether it did.
+var RaiseImpact func(question, impact string) (string, bool)
+
 // States a worker may report.
 var States = []string{"waiting", "working", "needs_decision", "blocked", "failed", "pr_open", "ready", "merged", "dropped", "reported"}
 
@@ -118,6 +121,9 @@ func Set(batch, id string, pairs []string) (map[string]any, error) {
 			delete(cur, k)
 		}
 	}
+	if state == "pr_open" && s(cur, "pr") == "" {
+		return nil, fmt.Errorf("pr_open requires pr=<url>")
+	}
 	if state == "needs_decision" {
 		for _, k := range []string{"decision_key", "question", "impact"} {
 			if s(cur, k) == "" {
@@ -126,6 +132,12 @@ func Set(batch, id string, pairs []string) (map[string]any, error) {
 		}
 		if !has([]string{"low", "medium", "high"}, s(cur, "impact")) {
 			return nil, fmt.Errorf("impact must be low, medium or high")
+		}
+		if RaiseImpact != nil && (hasKey(pairs, "question") || hasKey(pairs, "impact")) {
+			if v, ok := RaiseImpact(s(cur, "question"), s(cur, "impact")); ok {
+				cur["impact"] = v
+				cur["impact_by"] = "decide"
+			}
 		}
 	}
 	cur["updated"] = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
@@ -260,6 +272,9 @@ func Rows(batch string) ([]Row, error) {
 			PR: or(s(card, "pr")), CI: or(s(card, "ci")), Age: "-", Text: s(card, "question")}
 		if r.Text == "" {
 			r.Text = s(card, "note")
+			if rs := []rune(r.Text); len(rs) > 160 {
+				r.Text = string(rs[:157]) + "..."
+			}
 		}
 		if held(item) {
 			r.Text = "hold"
@@ -447,4 +462,13 @@ func Main(args []string) int {
 		return 2
 	}
 	return 0
+}
+
+func hasKey(pairs []string, k string) bool {
+	for _, p := range pairs {
+		if strings.HasPrefix(p, k+"=") {
+			return true
+		}
+	}
+	return false
 }

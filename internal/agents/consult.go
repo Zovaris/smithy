@@ -16,7 +16,8 @@ const consultUsage = `One cheap, tool-less call to the user's strongest model to
   smithy consult "<question>" "<options, verbatim and in neutral order>" [--context <file>]
 Prints the answer (≤5 lines). It may start with NEED-INFO: <what> (send the question back with
 that) or ESCALATE: <why> (the user decides). Callers log what they decided and why.
-Model: $CONSULT_MODEL, else ` + "`smithy config model strong`" + `, else the CLI default.
+Model: $CONSULT_MODEL, else the judge tier (the smartest model you have, optional), else strong,
+else the CLI default.
 CLI: $CONSULT_CMD (prompt on stdin) if set; else the CLI of the harness you're in (smithy harness),
 else the first installed one. Claude runs with no tools, MCP, settings or session (~1k tokens);
 the others run read-only through smithy agent. Nothing here assumes a vendor.`
@@ -89,6 +90,9 @@ func ConsultMain(args []string) int {
 		}
 	}
 	model := os.Getenv("CONSULT_MODEL")
+	if model == "" {
+		model, _ = config.Model("judge")
+	}
 	if model == "" {
 		model, _ = config.Model("strong")
 	}

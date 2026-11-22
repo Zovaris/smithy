@@ -433,3 +433,14 @@ func TestDashRefRejected(t *testing.T) {
 		t.Fatalf("merge: %v", err)
 	}
 }
+
+func TestOriginIsGitHub(t *testing.T) {
+	old := originURL
+	t.Cleanup(func() { originURL = old })
+	for u, want := range map[string]bool{"git@github.com:o/r.git": true, "/tmp/bare.git": false, "https://gitlab.com/o/r.git": false} {
+		originURL = func() string { return u }
+		if got, _ := OriginIsGitHub(); got != want {
+			t.Errorf("%s → %v", u, got)
+		}
+	}
+}

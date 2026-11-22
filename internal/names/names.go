@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
@@ -52,12 +53,22 @@ func Type(title string) string {
 		}
 		return false
 	}
+	word := func(words ...string) bool {
+		for _, f := range strings.FieldsFunc(t, func(r rune) bool { return !unicode.IsLetter(r) }) {
+			for _, w := range words {
+				if f == w {
+					return true
+				}
+			}
+		}
+		return false
+	}
 	switch {
 	case pre("fix") || has("bug", "crash", "broken", "error", "regression"):
 		return "fix"
-	case pre("doc") || has("readme", "adr"):
+	case pre("doc ", "docs") || word("readme", "adr", "contributing", "changelog", "documentation", "docs", "doc", "guide", "report"):
 		return "docs"
-	case pre("refactor", "rename", "extract", "move", "split"):
+	case pre("refactor", "rename", "extract", "move"):
 		return "refactor"
 	case pre("test") || has("coverage"):
 		return "test"
@@ -73,6 +84,28 @@ var cleanup = []struct {
 	rep string
 }{{regexp.MustCompile(`/-`), "/"}, {regexp.MustCompile(`--+`), "-"}, {regexp.MustCompile(`-+$`), ""}}
 
+var filler = map[string]bool{"a": true, "an": true, "the": true, "and": true, "or": true, "of": true, "for": true, "from": true, "to": true, "with": true, "in": true, "on": true, "by": true, "into": true}
+
+// branchSlug keeps a branch short: filler words dropped, words already in key dropped, at most
+// four words, none a single letter.
+func branchSlug(s, key string) string {
+	inKey := map[string]bool{}
+	for _, w := range strings.Split(strings.ToLower(key), "-") {
+		inKey[w] = true
+	}
+	var kept []string
+	for _, w := range strings.Split(s, "-") {
+		if len(w) < 2 || filler[w] || inKey[w] {
+			continue
+		}
+		kept = append(kept, w)
+		if len(kept) == 4 {
+			break
+		}
+	}
+	return strings.Join(kept, "-")
+}
+
 // Branch builds a branch from the git.branch template. key is a ticket or task id ("-" or "" for none).
 func Branch(key, title, typ string) string {
 	if key == "-" {
@@ -82,7 +115,7 @@ func Branch(key, title, typ string) string {
 	if typ == "" {
 		typ = Type(title)
 	}
-	s := strings.TrimPrefix(Slug(title), typ+"-")
+	s := branchSlug(strings.TrimPrefix(Slug(title), typ+"-"), key)
 	b := config.Get("git.branch", "{type}/{key}-{slug}")
 	b = strings.NewReplacer("{type}", typ, "{key}", key, "{slug}", s).Replace(b)
 	for _, c := range cleanup {

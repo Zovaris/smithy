@@ -1,7 +1,7 @@
 ---
 name: scout
 description: Read-only investigation that answers one question with cited sources and changes nothing. Use when asked "can we do X", "what does library Z do", "how does this code work" or "compare A vs B" before deciding or building. Not for past project decisions (ledger).
-argument-hint: <question> [--out <report path>]
+argument-hint: "<question> [--out <report path>]"
 ---
 
 # scout

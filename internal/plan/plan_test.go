@@ -276,3 +276,34 @@ func TestTaskDirOutsideRepo(t *testing.T) {
 		t.Errorf("err = %v, want ErrNotRepo", err)
 	}
 }
+
+func TestStackRepoOverride(t *testing.T) {
+	d := t.TempDir()
+	os.MkdirAll(filepath.Join(d, ".smithy"), 0o755)
+	os.WriteFile(filepath.Join(d, ".smithy", "config.json"), []byte(`{"stack":{"test":"claude plugin test mods/*"}}`), 0o644)
+	for _, l := range Stack(d) {
+		if l.Key == "test" && l.Value != "claude plugin test mods/*" {
+			t.Fatalf("test = %q", l.Value)
+		}
+	}
+}
+
+func TestStackIgnoresABranchsOwnOverride(t *testing.T) {
+	d := t.TempDir()
+	run := func(args ...string) {
+		c := exec.Command("git", append([]string{"-C", d, "-c", "user.email=a@b", "-c", "user.name=a"}, args...)...)
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("%v %s", err, out)
+		}
+	}
+	run("init", "-q")
+	os.MkdirAll(filepath.Join(d, ".smithy"), 0o755)
+	os.WriteFile(filepath.Join(d, ".smithy", "config.json"), []byte(`{"stack":{"test":"true"}}`), 0o644)
+	run("add", ".")
+	run("commit", "-q", "-m", "x")
+	for _, l := range Stack(d) {
+		if l.Key == "test" && l.Value == "true" {
+			t.Fatal("a committed branch override set the test command")
+		}
+	}
+}

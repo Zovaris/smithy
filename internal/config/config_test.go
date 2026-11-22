@@ -75,7 +75,7 @@ func TestEffectivePrecedence(t *testing.T) {
 	gitInit(t, e.repo)
 
 	v, src, err := Effective("warden.max")
-	if v != "3" || src != "default" || err != nil {
+	if v != "5" || src != "default" || err != nil {
 		t.Fatalf("default: %q %q %v", v, src, err)
 	}
 	write(t, e.user, `{"warden":{"max":5}}`)
@@ -432,7 +432,7 @@ func TestMainListSources(t *testing.T) {
 			t.Fatalf("missing %q in %q", want, so)
 		}
 	}
-	if n := strings.Count(so, "\n"); n != 3+len(Known) {
+	if n := strings.Count(so, "\n"); n != 4+len(Known) {
 		t.Fatalf("lines = %d", n)
 	}
 }
@@ -499,5 +499,27 @@ func TestSetRefusesUnreadableFile(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(e.user); string(b) != "not json" {
 		t.Fatalf("file changed: %q", b)
+	}
+}
+
+func TestRepoFileInWorktreeIsTheMainCheckouts(t *testing.T) {
+	main := t.TempDir()
+	run := func(dir string, args ...string) {
+		t.Helper()
+		c := exec.Command("git", args...)
+		c.Dir = dir
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	run(main, "init", "-q")
+	run(main, "-c", "user.email=a@b", "-c", "user.name=a", "commit", "-q", "--allow-empty", "-m", "x")
+	wt := filepath.Join(t.TempDir(), "wt")
+	run(main, "worktree", "add", "-q", wt)
+	t.Chdir(wt)
+	got, _ := filepath.EvalSymlinks(filepath.Dir(filepath.Dir(RepoFile())))
+	want, _ := filepath.EvalSymlinks(main)
+	if got != want {
+		t.Fatalf("RepoFile in worktree = %s, want under %s", RepoFile(), main)
 	}
 }

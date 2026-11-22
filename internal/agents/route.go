@@ -24,8 +24,9 @@ Tiers: cheap (mechanical, read-only, small), mid (most feature work), strong (ri
 cross-cutting, or the last fix round).`
 
 var (
-	risky   = []string{"auth", "login", "password", "secret", "token", "permission", "security", "payment", "billing", "money", "invoice", "migration", "schema", "database", "concurren", "race condition", "lock", "crypto", "encrypt", "data loss", "delete user", "production", "public api"}
+	risky   = []string{"auth", "login", "password", "secret", "access token", "auth token", "api token", "api key", "permission", "security", "payment", "billing", "money", "invoice", "migration", "schema", "database", "concurren", "race condition", "lock contention", "deadlock", "mutex", "crypto", "encrypt", "data loss", "delete user", "production", "public api"}
 	hard    = []string{"architecture", "redesign", "refactor", "performance", "investigate", "root cause", "why does", "ambiguous", "trade-off", "cross-cutting", "rewrite", "remake", "protocol", "parser", "compiler", "algorithm"}
+	prose   = []string{"doc", "docs", "documentation", "readme", "contributing", "changelog", "guide", "adr", "wording"}
 	trivial = []string{"typo", "copy change", "wording", "rename", "bump", "version", "color", "colour", "style tweak", "readme", "comment", "lint", "format"}
 
 	criteriaRe  = regexp.MustCompile(`(?m)^\s*- \[[ x]\]`)
@@ -38,11 +39,29 @@ var (
 // Tiers are the model tiers, cheapest first.
 var Tiers = []string{"cheap", "mid", "strong"}
 
+func suffix(w string) string {
+	for _, p := range prose {
+		if p == w {
+			return `s?\b`
+		}
+	}
+	return ""
+}
+
+var negated = regexp.MustCompile(`(?i)\b(no|without|never|zero)\s+(\w+\s+){0,1}$`)
+
+// matches returns the words of the list found in low as they appear there, skipping any that a
+// "no", "without", "never" or "zero" just before negates ("no secrets needed").
 func matches(low string, words []string) []string {
 	var out []string
 	for _, w := range words {
-		if regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(w)).MatchString(low) {
-			out = append(out, w)
+		re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(w) + suffix(w) + `\w*`)
+		for _, loc := range re.FindAllStringIndex(low, -1) {
+			if negated.MatchString(low[:loc[0]]) {
+				continue
+			}
+			out = append(out, low[loc[0]:loc[1]])
+			break
 		}
 	}
 	return out
@@ -71,7 +90,11 @@ func Route(text, kind, speed string) (string, []string) {
 	files := section(filesRe, text, pathRe)
 	interfaces := section(interfaceRe, text, bulletRe)
 	score, reasons := 1, []string{}
-	risk, hrd, triv := matches(low, risky), matches(low, hard), matches(low, trivial)
+	title := strings.ToLower(strings.SplitN(strings.TrimSpace(text), "\n", 2)[0])
+	risk, hrd, triv := matches(low, risky), matches(low, hard), matches(title, trivial)
+	if len(matches(title, prose)) > 0 && len(matches(title, risky)) == 0 {
+		return Tiers[0], []string{"prose only: " + strings.Join(first(matches(title, prose), 2), ", ")}
+	}
 	if kind == "scout" || kind == "review" || kind == "tend" {
 		score = 0
 		reasons = append(reasons, kind+" work")

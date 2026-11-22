@@ -64,7 +64,21 @@ func idOf(ref, pattern string) string {
 func dash(s string) string { return strings.Join(strings.Fields(s), "-") }
 
 type check struct {
-	Name, Context, Status, Conclusion, State string
+	Name, Context, Status, Conclusion, State, StartedAt, CompletedAt string
+}
+
+// fingerprint identifies a rollup by its timestamps; "" when it has none.
+func fingerprint(rollup []check) string {
+	var b strings.Builder
+	stamped := false
+	for _, c := range rollup {
+		stamped = stamped || c.StartedAt != "" || c.CompletedAt != ""
+		fmt.Fprintf(&b, "%s|%s|%s|%s|%s|%s|%s;", c.Name, c.Context, c.Status, c.Conclusion, c.State, c.StartedAt, c.CompletedAt)
+	}
+	if !stamped {
+		return ""
+	}
+	return b.String()
 }
 
 type checks struct {
@@ -110,12 +124,14 @@ type prState struct {
 	url, state, mergeable, review, head string
 	num, comments, reviews              int
 	checks                              checks
+	fp                                  string
 }
 
 type prWatcher struct {
-	ref  string
-	last *prState
-	o    opts
+	ref   string
+	last  *prState
+	stale string
+	o     opts
 }
 
 func newPR(ref string, o opts) *prWatcher {
@@ -138,7 +154,7 @@ func (w *prWatcher) read() (*prState, error) {
 		return nil, err
 	}
 	return &prState{url: p.URL, num: p.Number, state: p.State, mergeable: p.Mergeable, review: p.ReviewDecision, head: p.HeadRefOid,
-		comments: len(p.Comments), reviews: len(p.Reviews), checks: summarize(p.StatusCheckRollup)}, nil
+		comments: len(p.Comments), reviews: len(p.Reviews), checks: summarize(p.StatusCheckRollup), fp: fingerprint(p.StatusCheckRollup)}, nil
 }
 
 func checksLine(s *prState) string {
@@ -158,6 +174,16 @@ func (w *prWatcher) poll() ([]string, error) {
 	}
 	var out []string
 	o, last := w.o, w.last
+	if last != nil && s.head != last.head && last.fp != "" {
+		w.stale = last.fp
+	}
+	if w.stale != "" {
+		if s.fp == w.stale {
+			s.checks = checks{state: "pending"}
+		} else if s.fp != "" {
+			w.stale = ""
+		}
+	}
 	w.last = s
 	if last == nil {
 		switch {
@@ -425,7 +451,12 @@ func (w *listWatcher) poll() ([]string, error) {
 type batchWatcher struct {
 	name, since, stuckBefore string
 	all                      bool
+	seen                     map[string]string
 }
+
+// mark is what makes a card worth a wake: its stage, state, CI verdict and PR. Other field
+// updates (phase, progress, notes, tend mirroring the same state) don't wake the warden twice.
+func mark(r cards.Row) string { return r.Stage + "|" + r.State + "|" + r.CI + "|" + r.PR }
 
 var act = map[string]bool{"decide": true, "stuck": true, "verify": true, "merged": true, "reported": true, "dropped": true}
 
@@ -451,7 +482,11 @@ func newBatch(name string, all bool) (*batchWatcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &batchWatcher{name: name, since: time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), stuckBefore: stuck(rows), all: all}, nil
+	seen := map[string]string{}
+	for _, r := range rows {
+		seen[r.ID] = mark(r)
+	}
+	return &batchWatcher{name: name, since: time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), stuckBefore: stuck(rows), all: all, seen: seen}, nil
 }
 
 func (w *batchWatcher) poll() ([]string, error) {
@@ -461,7 +496,7 @@ func (w *batchWatcher) poll() ([]string, error) {
 	}
 	var out []string
 	for _, r := range rows {
-		if r.Updated != nil && *r.Updated > w.since && (w.all || act[r.Stage]) {
+		if r.Updated != nil && *r.Updated > w.since && (w.all || (act[r.Stage] && w.seen[r.ID] != mark(r))) {
 			out = append(out, fmt.Sprintf("batch %s %s  %s  %s  %s  %s", w.name, r.ID, r.Stage, r.Phase, r.Progress, r.Text))
 		}
 	}
@@ -484,13 +519,18 @@ Targets (any mix):
   prs[:<label>]       a PR opened or updated: yours, a warden batch's, or with the label
   issues[:<label>]    an issue opened or updated with the label (default agent)
   batch:<name>        a warden card needs the warden (--all: any card change); polls every 10 s
-  watch[:prs|issues|all]  tend's watch mode: new or updated PRs and/or labeled issues
-                      (scope from tend.watch, label from tend.label)
+  actions[:<branch>]  a workflow run on the branch (default: origin's default) finished red,
+                      push, schedule or manual
+  base[:<branch>]     the branch (default: origin's default) moved on origin
+  alerts              a new open Dependabot alert (skipped, with a note, without read access)
+                      actions and alerts already there on the first run are recorded, not reported
+  watch[:<scopes>]    tend's watch mode; scopes is a comma list of prs, issues, actions, base,
+                      alerts, or all (default tend.watch; issue label from tend.label)
 Finished checks are reported at once. Exit 0 = events, 4 = heartbeat, 2 = bad target, 3 = no GitHub access (gh missing or signed out and no GH_TOKEN).
 Defaults: settings watch.events, watch.every (30 s), watch.max (50 min).`
 
-// expandWatch turns `watch[:prs|issues|all]` into prs and issues targets, the scope and label
-// coming from tend.watch and tend.label when not given.
+// expandWatch turns `watch[:<scopes>]` into targets, the scopes and issue label coming from
+// tend.watch and tend.label when not given.
 func expandWatch(targets []string) ([]string, bool) {
 	var out []string
 	watch := false
@@ -504,12 +544,17 @@ func expandWatch(targets []string) ([]string, bool) {
 		if scope == "" {
 			scope = config.Get("tend.watch", "prs")
 		}
-		label := config.Get("tend.label", "agent")
-		if scope != "issues" {
-			out = append(out, "prs")
+		if scope == "all" {
+			scope = "prs,issues,actions,base,alerts"
 		}
-		if scope != "prs" {
-			out = append(out, "issues:"+label)
+		for _, s := range strings.Split(scope, ",") {
+			switch s = strings.TrimSpace(s); s {
+			case "issues":
+				out = append(out, "issues:"+config.Get("tend.label", "agent"))
+			case "":
+			default:
+				out = append(out, s)
+			}
 		}
 	}
 	return out, watch
@@ -571,7 +616,7 @@ func Main(args []string) int {
 			if arg != "" {
 				continue
 			}
-		case "prs", "issues":
+		case "prs", "issues", "actions", "base", "alerts":
 			continue
 		}
 		fmt.Fprintf(os.Stderr, "smithy wait: unknown target %s\n", t)
@@ -627,6 +672,12 @@ func Main(args []string) int {
 			w, err = newList("issue", arg, o)
 		case "batch":
 			w, err = newBatch(arg, all)
+		case "actions":
+			w = newActions(arg)
+		case "base":
+			w = newBase(arg)
+		case "alerts":
+			w = &alertsWatcher{seen: newSeen("alerts")}
 		default:
 			err = fmt.Errorf("unknown target %s", t)
 		}

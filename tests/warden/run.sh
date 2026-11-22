@@ -25,7 +25,7 @@ t "pr_open wakes the watcher" '$F/smithy wait batch:b1 --max 1 | grep -q "b  ver
 wait
 
 WB="$F/../references/worker-brief.md"
-t "brief: run id is not the item slot" '! grep -q "run:<id>" "$WB" && grep -q "run:<run-id>" "$WB"'
+t "brief: workers don't wait on CI" '! grep -q "wait pr:" "$WB" && grep -q "Don.t wait for CI" "$WB"'
 t "brief: branch wait is not a slot" '! grep -q "branch:<name>" "$WB"'
 t "brief: PR body file stays out of the worktrees folder" 'grep -q "body file.*\.smelt/" "$WB"'
 t "ship: PR body file stays out of the worktrees folder" 'grep -q "body file.*\.smelt/" "$F/../../smelt/references/SHIP.md"'

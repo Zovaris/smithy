@@ -1,7 +1,8 @@
 # tend
 
-Keeps pull requests mergeable: fixes red CI, rebases or merges the base after sibling merges,
-answers review threads, and stops at merged, closed or "needs you". It never adds scope.
+Keeps pull requests mergeable (fixes red CI, rebases after sibling merges, answers review
+threads) and, in watch mode, watches the repo: red workflow runs on the default branch, labeled
+issues, base branch moves and Dependabot alerts. It never adds scope.
 
 Started by you (by name, the way your harness starts skills), or by smelt and warden for their own PRs.
 
@@ -11,7 +12,8 @@ Started by you (by name, the way your harness starts skills), or by smelt and wa
 |---|---|
 | `/tend 42 57` | Tend those PRs (numbers, URLs or branches) until each is green or merged |
 | `/tend batch <batch>` | Every PR of a warden batch as it opens |
-| `/tend watch [prs\|issues\|all]` | Keep going: adopt new PRs; queue accepted labeled issues as task files |
+| `/tend watch [<scopes>\|all]` | Keep going over `prs`, `issues`, `actions`, `base`, `alerts`: adopt new PRs, queue accepted labeled issues, report red runs and alerts, sync PRs when the base moves |
+| `/tend watch all --fix` | Same, and also open fix PRs for red runs and patch/minor alerts |
 
 ## How it works
 
@@ -24,4 +26,4 @@ Started by you (by name, the way your harness starts skills), or by smelt and wa
   for that PR.
 
 Ends with one line per PR: `merged`, `green`, `closed` or `needs you`, plus
-`queued <issue-url> → <task file>` per queued issue; as a subagent, a last `done: <result>` line.
+`queued <issue-url> → <task file>` per queued issue, `actions red`, `flaky`, `alert` lines; as a subagent, a last `done: <result>` line.

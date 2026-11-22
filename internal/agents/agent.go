@@ -6,18 +6,23 @@ package agents
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
 )
 
 const agentUsage = `Harness-agnostic agent runner: runs one headless coding agent on a prompt file.
-  smithy agent [--bg] [--cwd <dir>] [--log <file>] [--model <m>] [--effort low|medium] [--readonly] <prompt-file>
+  smithy agent [--bg] [--cwd <dir>] [--log <file>] [--model <m>] [--effort low|medium] [--timeout <min>]
+               [--readonly] <prompt-file>
 Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list below.
   AGENT_CMD   any shell command; gets the prompt on stdin and in $AGENT_PROMPT_FILE, the model
               in $AGENT_MODEL, and $AGENT_READONLY=1 for read-only runs
@@ -32,6 +37,9 @@ Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list be
 Effort: --effort, else $AGENT_EFFORT, else the agent.effort setting (default medium). Anything
 above medium is capped at medium. Passed as --effort (claude) or -c model_reasoning_effort
 (codex), and as $AGENT_EFFORT to every CLI; the others keep their own default and say so.
+Timeout: --timeout, else the agent.timeout setting (minutes, default 90; 0 = none). When it
+passes, the agent's whole process group is killed (Unix; on Windows only the agent process), "timed out after Nm" goes to the log and
+smithy agent exits 124; --bg runs are watched by a detached smithy that does the same.
 Extra flags for the chosen CLI: $AGENT_ARGS. Workers get WARDEN_HARNESS set to the CLI and the
 parent harness's variables removed, so their own scripts detect the right harness.
 --bg prints ` + "`<pid> <log>`" + ` and returns at once; otherwise prints the agent's output when it ends
@@ -56,6 +64,43 @@ type Options struct {
 	Effort     string
 	ReadOnly   bool
 	PromptFile string
+	Timeout    time.Duration
+}
+
+// DefaultTimeout is the agent.timeout setting when unset, in minutes.
+const DefaultTimeout = "90"
+
+// ParseTimeout reads a timeout in minutes (fractions allowed); 0 → none. Anything else that is
+// not a finite positive number warns and falls back to DefaultTimeout, so a typo keeps the cap.
+func ParseTimeout(min string) time.Duration {
+	f, err := strconv.ParseFloat(strings.TrimSpace(min), 64)
+	if err == nil && f == 0 {
+		return 0
+	}
+	if err != nil || f < 0 || math.IsInf(f, 0) || math.IsNaN(f) {
+		fmt.Fprintf(os.Stderr, "smithy agent: timeout %q is not a number of minutes; using %sm\n", min, DefaultTimeout)
+		f, _ = strconv.ParseFloat(DefaultTimeout, 64)
+	}
+	return time.Duration(f * float64(time.Minute))
+}
+
+func minutes(d time.Duration) string { return strconv.FormatFloat(d.Minutes(), 'g', -1, 64) }
+
+func supervisor(o Options, log string) (*exec.Cmd, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	a := []string{"agent", "--timeout", minutes(o.Timeout), "--cwd", o.Cwd, "--log", log, "--effort", o.Effort}
+	if o.Model != "" {
+		a = append(a, "--model", o.Model)
+	}
+	if o.ReadOnly {
+		a = append(a, "--readonly")
+	}
+	cmd := exec.Command(exe, append(a, o.PromptFile)...)
+	cmd.Dir = o.Cwd
+	return cmd, nil
 }
 
 // Spec is what to execute for one run: the argv, whether stdin is the prompt file (else the null
@@ -372,6 +417,12 @@ func Run(o Options) int {
 	cmd.Dir, cmd.Env = o.Cwd, Env(os.Environ(), s, o)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, out, out
 	if o.Bg {
+		if o.Timeout > 0 {
+			if cmd, err = supervisor(o, out.Name()); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				return 1
+			}
+		}
 		detach(cmd)
 		err = cmd.Start()
 		out.Close()
@@ -379,14 +430,21 @@ func Run(o Options) int {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
+		done := make(chan error, 1)
+		go func() { done <- cmd.Wait() }()
+		select {
+		case err := <-done:
+			var ee *exec.ExitError
+			if err != nil && !(errors.As(err, &ee) && ee.ExitCode() == 124) {
+				fmt.Fprintf(os.Stderr, "smithy agent: %s exited right after starting (%v): %s\n", s.Argv[0], err, lastLine(log))
+				return 1
+			}
+		case <-time.After(startCheck):
+		}
 		fmt.Println(strconv.Itoa(cmd.Process.Pid), log)
-		_ = cmd.Process.Release()
 		return 0
 	}
-	rc := 0
-	if err := cmd.Run(); err != nil {
-		rc = exitCode(err)
-	}
+	rc := wait(cmd, o.Timeout, out)
 	out.Close()
 	if b, err := os.ReadFile(out.Name()); err == nil {
 		os.Stdout.Write(b)
@@ -397,9 +455,63 @@ func Run(o Options) int {
 	return rc
 }
 
+// startCheck is how long --bg watches a new agent for an immediate failure (bad login, bad flag).
+var startCheck = 3 * time.Second
+
+func lastLine(file string) string {
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	l := lines[len(lines)-1]
+	if len(l) > 300 {
+		l = l[:300]
+	}
+	return l
+}
+
+func wait(cmd *exec.Cmd, timeout time.Duration, out *os.File) int {
+	ownGroup(cmd)
+	if err := cmd.Start(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sig)
+	var expired <-chan time.Time
+	if timeout > 0 {
+		t := time.NewTimer(timeout)
+		defer t.Stop()
+		expired = t.C
+	}
+	timedOut := false
+	for {
+		select {
+		case err := <-done:
+			if timedOut {
+				return 124
+			}
+			if err != nil {
+				return exitCode(err)
+			}
+			return 0
+		case s := <-sig:
+			forward(cmd, s)
+		case <-expired:
+			timedOut = true
+			forward(cmd, syscall.SIGKILL)
+			fmt.Fprintf(out, "smithy agent: timed out after %sm\n", minutes(timeout))
+		}
+	}
+}
+
 // AgentMain runs `smithy agent` and returns the exit code.
 func AgentMain(args []string) int {
-	o := Options{Model: os.Getenv("AGENT_MODEL"), Effort: os.Getenv("AGENT_EFFORT")}
+	o := Options{Model: os.Getenv("AGENT_MODEL"), Effort: os.Getenv("AGENT_EFFORT"), Timeout: ParseTimeout(config.Get("agent.timeout", DefaultTimeout))}
 	if o.Effort == "" {
 		o.Effort = config.Get("agent.effort", MaxEffort)
 	}
@@ -420,6 +532,8 @@ loop:
 			o.Model = args[1]
 		case "--effort":
 			o.Effort = args[1]
+		case "--timeout":
+			o.Timeout = ParseTimeout(args[1])
 		default:
 			break loop
 		}

@@ -1,7 +1,9 @@
 # Execute a task list here
 
-`/smelt build all [dir]` works every task of a task list in this session, one fresh implementer
-**subagent** per task, so your own context only holds briefs, diffs and rulings. For tasks that
+`/smelt build all [dir]` works every task of a task list in this session. Three tasks or fewer,
+or under ~1 hour of work in all: build them yourself in order, no implementer subagents. More:
+one fresh implementer **subagent** per task, so your own context only holds briefs, diffs and
+rulings. For tasks that
 can run at the same time in separate worktrees and PRs, warden on `<dir>` (read the SKILL.md `smithy skills warden` prints) is the parallel
 alternative.
 
@@ -9,8 +11,8 @@ alternative.
 
 Each implementer gets the model `smithy route --file <task file> --speed <speed>` picks
 (cheap, mid or strong, from the task's risk, difficulty and size); reviewers use
-`smithy route --kind review`; the last fix round goes one tier up. You may move a pick one tier with
-a reason; a model the user named always wins. A tier whose model is unset prints `-`: ask the
+`smithy route --kind review`; the last fix round uses strong. You may move a pick one tier with
+a reason (a domain noun, like "secret" in a secret scanner, is not risk); a model the user named always wins. A tier whose model is unset prints `-`: ask the
 user once to name it and save it with `smithy config set-model <tier> <name>`; until then, or when
 you can't ask, use the session default.
 
@@ -28,24 +30,29 @@ For each task:
    - `DONE` → step 4.
    - `DONE_WITH_CONCERNS` → read the concerns, decide each (ruling), then step 4.
    - `NEEDS_CONTEXT` → answer from the spec or code (ruling) and send it back; if only the user
-     can answer, ask (under hush, decide and rule).
+     can answer, ask (under hush, stop with a `blocked:` line).
    - `BLOCKED` → `smithy tasks set <file> status=todo`, note why, move to the next unblocked task.
-4. **Verify** (the verify gate): read the diff, run the task's tests and the suite.
-5. **Review** the diff with a fresh `agents/spec-check.md` (task file as the spec) and, at
-   `normal`/`full`, `agents/standards.md`. Handle findings with the receiving-review rules.
+4. **Verify** (the verify gate): read the diff, run the task's tests (the full suite only at the end when `fast`).
+5. **Check** the task's diff against the task file with the spec-check checklist yourself, at
+   every speed. The speed's agents run once, on the whole branch, after the last task.
 6. **Fix loop**: send the reproduced findings back to a fresh implementer with the diff. At most
    3 rounds; round 3 uses the strong model. Still failing → `BLOCKED` with the findings.
-7. Commit the task atomically (`smithy commit`). Its `status=done pr=<url>` is set at ship, once
+7. Commit the task atomically (`smithy commit`); every commit builds and passes its tests, so a
+   file a later task fills in starts as a stub here. Its `status=done pr=<url>` is set at ship, once
    the PR exists.
 
-After the last task: one whole-branch review (the review phase), one fix wave, then ship.
+The branch ships as one PR.
+
+After the last task, at the highest `Speed:` among the tasks: `fast` → ship; `normal` or `full` →
+one check wave on the whole branch (SKILL.md's table, its agents in parallel), one fix wave,
+the re-review of REVIEW.md step 6, then ship.
 
 ## Rulings
 
 Decisions that come up without the user, by impact:
 - **low** (local, cheap to undo): decide yourself.
 - **medium** (shapes a module or an internal contract): `smithy consult "<question>"
-  "<options, neutral order>" [--context <file>]`, one tool-less call to the user's strong model
+  "<options, neutral order>" [--context <file>]`, one tool-less call to the user's judge model (else strong)
   in whatever harness you're in. Follow its pick; `NEED-INFO` → find that out and ask again;
   `ESCALATE` → it's high.
 - **high** (scope, customer-visible behaviour, money, data, security, public API, production,

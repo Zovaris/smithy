@@ -4,6 +4,7 @@ package agents
 
 import (
 	"errors"
+	"os"
 	"os/exec"
 	"syscall"
 )
@@ -18,4 +19,12 @@ func exitCode(err error) int {
 		return 1
 	}
 	return ee.ExitCode()
+}
+
+func ownGroup(cmd *exec.Cmd) {}
+
+func forward(cmd *exec.Cmd, s os.Signal) {
+	if cmd.Process != nil {
+		cmd.Process.Kill()
+	}
 }

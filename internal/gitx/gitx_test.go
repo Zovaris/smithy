@@ -2,6 +2,7 @@ package gitx
 
 import (
 	"encoding/json"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -154,7 +155,7 @@ func TestSummarize(t *testing.T) {
 	}
 	s, _ := Summarize([]byte(`{"url":"u","state":"OPEN"}`), []byte(`{}`), []byte(`{}`))
 	b, _ := json.Marshal(s)
-	if string(b) != `{"url":"u","state":"OPEN","checks":"none","mergeable":"UNKNOWN","review":"none","unresolved":0,"behind":0,"head":null,"base":null}` {
+	if string(b) != `{"url":"u","state":"OPEN","checks":"none","mergeable":"UNKNOWN","review":"none","unresolved":0,"behind":0,"head":null,"base":null,"action":"wait"}` {
 		t.Errorf("defaults: %s", b)
 	}
 }
@@ -203,7 +204,27 @@ func TestPRHelpAndMissingTemplate(t *testing.T) {
 	if c := PRMain([]string{"create", "--help"}); c != 0 {
 		t.Fatalf("create --help exit %d", c)
 	}
-	if c := PRMain([]string{"template"}); c != 1 {
+	if c := PRMain([]string{"template"}); c != 0 {
 		t.Fatalf("template without one exit %d", c)
+	}
+}
+
+func TestCommitStylePrintsSubjectLimit(t *testing.T) {
+	dir := t.TempDir()
+	exec.Command("git", "-C", dir, "init", "-q").Run()
+	t.Chdir(dir)
+	old := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Stdout = w
+	t.Cleanup(func() { os.Stdout = old })
+	code := CommitMain([]string{"style"})
+	os.Stdout = old
+	w.Close()
+	b, _ := io.ReadAll(r)
+	if code != 0 || !strings.Contains(string(b), "subject limit: 72 chars") {
+		t.Fatalf("exit %d, output %q", code, b)
 	}
 }

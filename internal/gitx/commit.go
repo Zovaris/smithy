@@ -25,6 +25,8 @@ var (
 	scopeRe      = regexp.MustCompile(`^[a-z]+\(([a-z0-9._/-]+)\)`)
 )
 
+const subjectLimit = 72
+
 func subjects() []string {
 	return lines(git("log", "-n", "30", "--no-merges", "--format=%s"))
 }
@@ -79,8 +81,8 @@ func Check(msg, style string) error {
 	if subject == "" {
 		return fmt.Errorf("empty message")
 	}
-	if n := utf8.RuneCountInString(subject); n > 72 {
-		return fmt.Errorf("subject is %d chars; keep it ≤ 72", n)
+	if n := utf8.RuneCountInString(subject); n > subjectLimit {
+		return fmt.Errorf("subject is %d chars; keep it ≤ %d", n, subjectLimit)
 	}
 	if strings.HasSuffix(subject, ".") {
 		return fmt.Errorf("subject ends with a period")
@@ -136,6 +138,7 @@ func CommitMain(args []string) int {
 	case "style":
 		st := detect()
 		fmt.Println("style:", st)
+		fmt.Printf("subject limit: %d chars (smithy commit rejects longer)\n", subjectLimit)
 		switch st {
 		case "conventional":
 			fmt.Println("format: <type>(<scope>): <imperative summary, lowercase, no period, ≤72>")

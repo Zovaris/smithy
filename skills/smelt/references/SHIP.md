@@ -9,7 +9,7 @@ else update the docs the change touched (`references/DOCS.md`). Then:
 - **Integrate:** full suite on the tree you're about to ship (after rebasing or merging the
   base), VERIFY gate. Red → back to build.
 - **Atomic commits** with `smithy commit` (review read the working tree, so this comes after it;
-  a WIP commit made for test-agent worktrees is undone first with `git reset --soft <base>`): `smithy commit style` once, then one commit per
+  the agents' `zz_` files are deleted first): `smithy commit style` once, then one commit per
   concern (`smithy commit "<msg>" <paths>`), each building and passing on its own. Never
   `git add -A`, never `--no-verify`.
 - **Scan** with `smithy scan --base <base>` (a branch name resolves to `origin/<base>`) before
@@ -21,31 +21,30 @@ else update the docs the change touched (`references/DOCS.md`). Then:
   they found, agents not run and why, "Decided without you" (from `rulings.md` if any), ADRs
   added. Title in the commit style: `smithy pr create --base <b> --title "<t>" --body-file <f>`;
   write the PR body file inside the worktree's `.smelt/` or the system temp dir, never next to
-  the worktree. From a task file: `smithy tasks set <file> status=done pr=<url>`. Then hand the
-  PR to **tend** when it is installed (`smithy skills tend` prints its path): one silent
-  **subagent** on the tier `smithy route --agent tend` gives, prompt "Read <tend-skill> and follow it for <pr-url>; never merge;
-  stay until merged or closed; on merge, clean up <branch> [<worktree>]" (name the worktree only
-  when smelt created it; a harness-made one belongs to the harness) plus the report
-  contract (`references/TESTING.md`); it keeps CI green, rebases and answers review until the PR
-  is mergeable or needs the user, then waits for the merge so it can clean up. Without tend, wait
-  with `smithy wait pr:<pr-url>`, in the background where the harness wakes on exit, else in the
-  foreground; never sleep loops; on merge, clean up yourself.
+  the worktree. From a task file: `smithy tasks set <file> status=done pr=<url>`. A warden worker ends
+  here (its brief). Alone, wait
+  with `smithy wait pr:<pr-url>` (no tokens while it waits), in the background where the harness
+  wakes on exit, else in the foreground; never sleep loops. Only when it reports red CI, a
+  conflict or a review comment, hand that PR to **tend** (`smithy skills tend` prints its path)
+  as one silent **subagent**: "Read <tend-skill> and follow it for <pr-url>; never merge" plus the
+  report contract; it fixes that and ends. Waiting never needs an agent. On merge, clean up.
   GitHub modes, one line each: with `gh`, `smithy pr create` opens the PR (best experience);
   without `gh` but with `GH_TOKEN`/`GITHUB_TOKEN`, it uses the GitHub API; with neither, it
   pushes the branch and prints the compare URL: end there, report the branch and URL, and skip
-  tend and the wait (the user opens the PR by hand). Merge with `smithy pr merge <pr>`, never
+  the wait (the user opens the PR by hand). Merge with `smithy pr merge <pr>`, never
   `gh pr merge`.
-  (2) **Merge** the PR or locally into the base only when the user asks or the session that
-  launched you said `merge auto` (a warden worker); into the production
+  (2) **Merge** the PR or locally into the base only when the user asks (warden merges its
+  workers' PRs; workers never do); into the production
   branch only on their explicit yes for this change. (3) **Keep** the branch for later. Discard
   work only when the user explicitly says to.
-- **No remote** (`git remote` prints nothing): commit, branch, receipts and scan as above, then
-  skip the PR, tend and the wait, and say so in the final message.
+- **No remote, or not GitHub** (`git remote` prints nothing, or `smithy pr create` exits 3:
+  origin is another forge or a local repo): commit, branch, receipts and scan as above, then
+  skip the PR and the wait, and say so in the final
+  message (a warden worker: `state=ready note=no-github-pr`).
 - **Clean up** once merged or discarded: `smithy cleanup <repo> <branch> [<worktree>]`,
-  only for worktrees and branches smelt created. It refuses to drop unpushed work; never force it.
-  The merge usually comes later, from the user: give tend the branch, and the worktree only
-  when smelt created it ("on merge, clean up <branch> [<worktree>]"); `smithy cleanup` never
-  removes a worktree it isn't given; end the test and review agents as soon as their
+  only for worktrees and branches smelt created. It keeps work that is on no remote and no other branch; never force it.
+  The merge usually comes later, from the user: `smithy cleanup` then, and it never removes a
+  worktree it isn't given (only the ones smelt created); end the test and review agents as soon as their
   reports are in, and if this session was started for the task, say in the final message that it
   can be archived once the PR merges.
 - **Lesson.** Read the task dir's `rulings.md` (when present) and the review findings, then

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func env(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
@@ -122,6 +123,7 @@ func TestSplitArgs(t *testing.T) {
 func TestRoute(t *testing.T) {
 	cases := []struct{ text, kind, speed, want string }{
 		{"fix typo in README", "ship", "normal", "cheap"},
+		{"regenerate the lockfile after the upgrade", "ship", "normal", "mid"},
 		{"add OAuth login with tokens", "ship", "normal", "strong"},
 		{"add CSV export to reports", "ship", "normal", "mid"},
 		{"add CSV export", "ship", "full", "strong"},
@@ -242,5 +244,129 @@ func TestAgentKind(t *testing.T) {
 	}
 	if tier, _ := Route("", "test", "normal"); tier != "mid" {
 		t.Errorf("test agent tier %s, want mid", tier)
+	}
+}
+
+func TestParseTimeout(t *testing.T) {
+	for in, want := range map[string]time.Duration{"90": 90 * time.Minute, "0": 0, "0.5": 30 * time.Second, "": 90 * time.Minute, "x": 90 * time.Minute, "Inf": 90 * time.Minute} {
+		if got := ParseTimeout(in); got != want {
+			t.Errorf("ParseTimeout(%q) = %v, want %v", in, got, want)
+		}
+	}
+}
+
+func timeoutPrompt(t *testing.T) (string, string) {
+	t.Helper()
+	d := t.TempDir()
+	p := filepath.Join(d, "prompt.md")
+	os.WriteFile(p, []byte("x"), 0o644)
+	t.Setenv("AGENT_CMD", "sleep 30 & echo started; wait")
+	return p, filepath.Join(d, "agent.log")
+}
+
+func TestAgentTimeout(t *testing.T) {
+	p, log := timeoutPrompt(t)
+	start := time.Now()
+	rc := AgentMain([]string{"--timeout", "0.02", "--log", log, p})
+	if rc != 124 {
+		t.Fatalf("timed-out run exited %d, want 124", rc)
+	}
+	if el := time.Since(start); el > 10*time.Second {
+		t.Fatalf("timeout not enforced: ran %v", el)
+	}
+	b, _ := os.ReadFile(log)
+	if !strings.Contains(string(b), "timed out after 0.02m") || !strings.Contains(string(b), "started") {
+		t.Errorf("log = %q", b)
+	}
+}
+
+func TestAgentNoTimeoutWhenZero(t *testing.T) {
+	p, log := timeoutPrompt(t)
+	t.Setenv("AGENT_CMD", "echo ok")
+	if rc := AgentMain([]string{"--timeout", "0", "--log", log, p}); rc != 0 {
+		t.Fatalf("rc = %d", rc)
+	}
+}
+
+func TestAgentTimeoutBackground(t *testing.T) {
+	p, log := timeoutPrompt(t)
+	t.Setenv("SMITHY_TEST_AGENT_MAIN", "1")
+	start := time.Now()
+	if rc := AgentMain([]string{"--bg", "--timeout", "0.02", "--log", log, p}); rc != 0 {
+		t.Fatalf("bg rc = %d", rc)
+	}
+	for time.Since(start) < 15*time.Second {
+		if b, _ := os.ReadFile(log); strings.Contains(string(b), "timed out after 0.02m") {
+			return
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	b, _ := os.ReadFile(log)
+	t.Fatalf("background run not timed out; log = %q", b)
+}
+
+func advPrompt(t *testing.T) (string, string, string) {
+	t.Helper()
+	d := t.TempDir()
+	p := filepath.Join(d, "prompt.md")
+	os.WriteFile(p, []byte("x"), 0o644)
+	return d, p, filepath.Join(d, "agent.log")
+}
+
+func TestConsultPrefersJudgeTier(t *testing.T) {
+	if !strings.Contains(consultUsage, "judge tier") {
+		t.Fatal("consult usage must name the judge tier")
+	}
+}
+
+func TestRouteProseTaskIsCheapEvenWhenItMentionsMoney(t *testing.T) {
+	tier, why := Route("Write CONTRIBUTING doc\nExplain that money is integer cents.", "ship", "fast")
+	if tier != "cheap" {
+		t.Fatalf("tier = %s (%v)", tier, why)
+	}
+	if tier, _ := Route("Add payment retries", "ship", "normal"); tier != "strong" {
+		t.Fatalf("risky title routed %s", tier)
+	}
+}
+
+func TestAgentBackgroundReportsAnImmediateFailure(t *testing.T) {
+	p, log := timeoutPrompt(t)
+	t.Setenv("AGENT_CMD", "sh -c 'echo Not logged in; exit 1'")
+	old := startCheck
+	startCheck = 3 * time.Second
+	defer func() { startCheck = old }()
+	if rc := AgentMain([]string{"--bg", "--timeout", "0", "--log", log, p}); rc != 1 {
+		t.Fatalf("rc = %d, want 1", rc)
+	}
+}
+
+func TestRouteDocWordsAreWholeWords(t *testing.T) {
+	if tier, why := Route("Fix doctor exit code on docker hosts", "ship", "normal"); tier == "cheap" {
+		t.Fatalf("doctor/docker routed cheap: %v", why)
+	}
+}
+
+func TestRouteReadsNegationAndTokenMeaning(t *testing.T) {
+	for text, want := range map[string]string{
+		"Add a CI workflow. No secrets needed.":           "mid",
+		"Context meter shows stale context tokens":        "mid",
+		"Rotate the API token used for deploys":           "strong",
+		"Fix race condition in the queue worker shutdown": "strong",
+	} {
+		if tier, why := Route(text, "ship", "normal"); tier != want {
+			t.Errorf("%q → %s %v, want %s", text, tier, why, want)
+		}
+	}
+	_, why := Route("handle concurrent writes", "ship", "normal")
+	if !strings.Contains(strings.Join(why, " "), "concurrent") {
+		t.Errorf("reason cut off: %v", why)
+	}
+}
+
+func TestRouteNotDoesNotNegateRisk(t *testing.T) {
+	for _, text := range []string{"Do not store the secret in logs", "Ensure the change does not break auth"} {
+		if tier, why := Route(text, "ship", "normal"); tier != "strong" {
+			t.Errorf("%q → %s %v", text, tier, why)
+		}
 	}
 }

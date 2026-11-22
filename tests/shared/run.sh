@@ -21,7 +21,7 @@ git commit -q --allow-empty -m "feat(core): init"; git commit -q --allow-empty -
 git push -q origin HEAD:main 2>/dev/null; git remote set-head origin main >/dev/null 2>&1
 
 # smithy names
-t "branch from ticket" '[ "$($S/smithy names branch PROJ-123 "Add login with Google")" = feat/PROJ-123-add-login-with-google ]'
+t "branch from ticket" '[ "$($S/smithy names branch PROJ-123 "Add login with Google")" = feat/PROJ-123-add-login-google ]'
 t "branch from issue, type from title" '[ "$($S/smithy names branch "#42" "Fix null crash")" = fix/42-null-crash ]'
 t "branch without key" '[ "$($S/smithy names branch - "Update README")" = docs/update-readme ]'
 t "branch slug capped at 40" 'b="$($S/smithy names branch 03 "a very long title that keeps going and going past forty chars")" && [ ${#b} -le 52 ]'
@@ -29,7 +29,7 @@ t "worktree is a sibling" '[ "$($S/smithy names worktree feat/x)" = "$(cd "$T" &
 git worktree add -q -b nw "$T/repo/.claude/wt-nw" HEAD 2>/dev/null
 t "worktree name from inside a worktree uses the main checkout" '[ "$(cd "$T/repo/.claude/wt-nw" && $S/smithy names worktree feat/y)" = "$(cd "$T" && pwd -P)/worktrees/repo-feat-y" ]'
 git worktree remove --force "$T/repo/.claude/wt-nw"; git branch -q -D nw; rm -rf "$T/repo/.claude"
-t "branch template setting" '$S/smithy config set git.branch "agent/{key}-{slug}" && [ "$($S/smithy names branch 7 "Add x")" = agent/7-add-x ] && $S/smithy config set git.branch "{type}/{key}-{slug}"'
+t "branch template setting" '$S/smithy config set git.branch "agent/{key}-{slug}" && [ "$($S/smithy names branch 7 "Add box")" = agent/7-add-box ] && $S/smithy config set git.branch "{type}/{key}-{slug}"'
 
 # smithy wait with a fake gh
 mkdir -p "$T/bin"
@@ -75,7 +75,7 @@ t "requires paths" '! $S/smithy commit "feat(api): add a"'
 t "commits only given paths" '$S/smithy commit "feat(api): add a" a.txt && [ "$(git status --short)" = "?? b.txt" ]'
 
 # smithy pr
-t "no template → exit 1" '! $S/smithy pr template'
+t "no template → none" '$S/smithy pr template | grep -q "^none:"'
 mkdir -p .github; printf '## Summary\n\n## Testing\n' > .github/pull_request_template.md
 t "template found once" '[ "$($S/smithy pr template | wc -l | tr -d " ")" = 1 ]'
 

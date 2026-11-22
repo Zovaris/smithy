@@ -15,6 +15,13 @@
   text, run `bash tests/skills.sh` before pushing: it checks cross-skill references CI would reject.
 - `scripts/drill.sh` pressure-tests skills against a real agent CLI (`tests/drill/*.md`); it
   costs tokens, so run it by hand per harness.
+- `scripts/eval.sh [-k N] [-a none,fast,normal] [task...]` measures outcomes: for each
+  `tests/eval/<task>/` it copies `fixture/` (a tiny Go package with a bug) to a temp dir, runs the
+  agent in write mode on `prompt.md`, copies the hidden regression test in and runs `check`. It
+  prints pass@1 and pass^k per arm and the folder holding the transcripts. Every trial is a real
+  agent run, so it costs tokens: run it by hand, never in CI. The `none` arm only tells the agent
+  not to use skills; use a profile without the skills installed for a clean baseline.
+  `tests/eval/run.sh` is its offline dry run with fake agents.
 
 - `main` is protected: changes land through a pull request with green `check` and
   `windows-launcher`; no direct pushes, force-pushes or deletion. A release is a PR that bumps

@@ -19,7 +19,10 @@ One rule per line, nothing else but the header:
 
 ## Budget and retiring
 
-- Budget: about 30 rules. Adding past it means merging two rules or retiring one in the same change.
+- Budget: 30 rules (`- ` lines); `smithy drift` flags a file over it. Adding past it means merging
+  two rules or retiring one in the same change.
+- At each sync, a rule whose covered files changed a lot since it was written, or that no review
+  has cited in a long time, is a retire candidate: judge it, propose retiring it (no tooling).
 - A rule now enforced by a lint, test or type check is retired: code owns it.
 - Retiring is deleting the line; git keeps the history. No "retired" section.
 - A rule whose covered path is gone is retired or its `covers` updated.

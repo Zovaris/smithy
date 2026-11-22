@@ -378,3 +378,21 @@ func TestPRCreatePrintsCompareURLWithoutGitHub(t *testing.T) {
 		t.Errorf("pr create: exit %d, out %q, err %q", code, out, e)
 	}
 }
+
+func TestCleanupRemovesABranchWhoseCommitsAnotherBranchHas(t *testing.T) {
+	repo, env := sandbox(t)
+	g := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", append([]string{"-C", repo, "-c", "user.email=a@b", "-c", "user.name=a"}, args...)...)
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	g("checkout", "-q", "-b", "work")
+	g("commit", "-q", "--allow-empty", "-m", "wip: test agents")
+	g("branch", "work-adversary")
+	out, e, code := run(t, repo, env, "cleanup", repo, "work-adversary")
+	if code != 0 || !strings.Contains(out, "cleaned work-adversary") {
+		t.Fatalf("exit %d, out %q, err %q", code, out, e)
+	}
+}

@@ -13,7 +13,7 @@ For each behaviour in the acceptance criteria, in order of the tracer bullet:
 Run typecheck every few cycles; the full suite at the end of the task.
 
 Docs-only changes (skill text, references) have no behaviour to drive: their seam is the repo's
-doc lint (here `bash tests/skills.sh`) or a grep-style check that the required line exists. Such a
+doc lint (if the repo has one) or a grep-style check that the required line exists. Such a
 check only proves the words are there; review reads the meaning.
 
 ## Good tests

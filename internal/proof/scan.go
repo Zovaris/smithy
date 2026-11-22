@@ -17,8 +17,11 @@ import (
 const scanUsage = `usage: smithy scan [--base <branch|ref>]
 Checks the lines a change adds since the merge-base with the base (a branch name means
 origin/<branch> when it exists; default origin's default branch), uncommitted edits
-included, and the files it adds, for secrets and private keys.
-Prints file:line, the rule and a masked match; exit 1 on any finding, 0 when clean.
+included, and the files it adds, for secrets and private keys, git conflict markers (fenced
+code in docs exempt; a bare ======= only next to a <<<<<<< or |||||||), and binary or archive
+files, printed as warnings for a human look.
+Prints file:line, the rule and a masked match; exit 1 on any finding (warnings don't count),
+0 when clean.
 A line that is a known false positive can carry "smithy:allow" to be skipped.`
 
 type rule struct {
@@ -91,11 +94,12 @@ func AllowNote(allowed []string) string {
 func scanDiff(diff string) ([]Finding, []string) {
 	var out []Finding
 	var allowed []string
-	file, line, header := "", 0, false
+	file, line, header, fenced := "", 0, false, false
+	opened := strings.Contains(diff, "\n+<<<<<<< ") || strings.Contains(diff, "\n+||||||| ")
 	for _, l := range strings.Split(diff, "\n") {
 		switch {
 		case strings.HasPrefix(l, "diff --git "):
-			header = true
+			header, fenced = true, false
 		case header && strings.HasPrefix(l, "+++ "):
 			file = strings.TrimPrefix(strings.TrimPrefix(l, "+++ "), "b/")
 		case header && !strings.HasPrefix(l, "@@"):
@@ -106,9 +110,15 @@ func scanDiff(diff string) ([]Finding, []string) {
 			}
 		case strings.HasPrefix(l, "+"):
 			text := l[1:]
+			if t := strings.TrimSpace(text); isDoc(file) && (strings.HasPrefix(t, "```") || strings.HasPrefix(t, "~~~")) {
+				fenced = !fenced
+			}
 			if strings.Contains(text, "smithy:allow") {
 				allowed = append(allowed, fmt.Sprintf("%s:%d", file, line))
 			} else {
+				if !fenced && isConflictMarker(text) && (opened || strings.TrimSuffix(text, "\r") != "=======") {
+					out = append(out, Finding{file, line, "conflict marker", strings.TrimSpace(text)})
+				}
 				for _, r := range rules {
 					if m := r.re.FindString(text); m != "" {
 						out = append(out, Finding{file, line, r.name, mask(m)})
@@ -119,6 +129,55 @@ func scanDiff(diff string) ([]Finding, []string) {
 		}
 	}
 	return out, allowed
+}
+
+func isDoc(name string) bool {
+	switch strings.ToLower(path.Ext(name)) {
+	case ".md", ".mdx", ".markdown":
+		return true
+	}
+	return false
+}
+
+func isConflictMarker(text string) bool {
+	text = strings.TrimSuffix(text, "\r")
+	return text == "=======" || strings.HasPrefix(text, "<<<<<<< ") ||
+		strings.HasPrefix(text, "||||||| ") || strings.HasPrefix(text, ">>>>>>> ")
+}
+
+var binaryExts = map[string]bool{".pyc": true, ".so": true, ".dylib": true, ".dll": true, ".exe": true,
+	".wasm": true, ".jar": true, ".zip": true, ".tar": true, ".gz": true, ".docx": true, ".xlsx": true, ".pptx": true}
+
+func numstatBinaries(numstat string) map[string]bool {
+	out := map[string]bool{}
+	f := strings.Split(numstat, "\x00")
+	for i := 0; i < len(f); i++ {
+		parts := strings.SplitN(f[i], "\t", 3)
+		if len(parts) < 3 {
+			continue
+		}
+		name := parts[2]
+		if name == "" && i+2 < len(f) {
+			name = f[i+2]
+			i += 2
+		}
+		if parts[0] == "-" && parts[1] == "-" {
+			out[name] = true
+		}
+	}
+	return out
+}
+
+// ScanBinaries flags changed files that are binary (binary lists them) or have a binary or
+// archive extension: scanners that read only text lines cannot see inside them.
+func ScanBinaries(names []string, binary map[string]bool) []Finding {
+	var out []Finding
+	for _, n := range names {
+		if n != "" && (binary[n] || binaryExts[strings.ToLower(path.Ext(n))]) {
+			out = append(out, Finding{File: n, Rule: "needs a human look: binary or archive file"})
+		}
+	}
+	return out
 }
 
 // scanUntracked checks the content of new files git doesn't track yet.
@@ -188,20 +247,31 @@ func ScanMain(args []string) int {
 		return 2
 	}
 	added, _ := ghx.Run("git", "-C", root, "diff", "-z", "-M", "--name-only", "--diff-filter=AR", base, "--")
+	changed, _ := ghx.Run("git", "-C", root, "diff", "-z", "-M", "--name-only", "--diff-filter=ACMR", base, "--")
+	numstat, _ := ghx.Run("git", "-C", root, "diff", "-z", "-M", "--numstat", base, "--")
 	untracked, _ := ghx.Run("git", "-C", root, "ls-files", "-z", "--others", "--exclude-standard")
 	news := strings.Split(strings.Trim(untracked, "\x00"), "\x00")
 	dfs, allowed := scanDiff(diff)
 	ufs, uallowed := scanUntracked(root, news)
 	fs := append(ScanFiles(append(strings.Split(added, "\x00"), news...)), dfs...)
 	fs = append(fs, ufs...)
+	binary := numstatBinaries(numstat)
+	for _, n := range news {
+		if b, err := os.ReadFile(filepath.Join(root, n)); err == nil && bytes.IndexByte(b, 0) >= 0 {
+			binary[n] = true
+		}
+	}
 	for _, f := range fs {
 		fmt.Println(f)
+	}
+	for _, w := range ScanBinaries(append(strings.Split(changed, "\x00"), news...), binary) {
+		fmt.Println("warning:", w)
 	}
 	if allowed = append(allowed, uallowed...); len(allowed) > 0 {
 		fmt.Fprintln(os.Stderr, AllowNote(allowed))
 	}
 	if len(fs) > 0 {
-		fmt.Fprintf(os.Stderr, "scan: %d possible secret(s); remove them, or mark a false positive with smithy:allow\n", len(fs))
+		fmt.Fprintf(os.Stderr, "scan: %d finding(s); fix them, or mark a false positive with smithy:allow\n", len(fs))
 		return 1
 	}
 	fmt.Fprintf(os.Stderr, "scan: clean against %s\n", label)

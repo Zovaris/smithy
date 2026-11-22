@@ -11,6 +11,8 @@ point. Assume it is wrong somewhere.
 
 Do not open the implementation bodies of the code under test until you have written your first
 round of tests from the spec alone. After that, you may read them to aim a second round.
+If your brief includes a diff, skip its bodies in round one and read only the signatures and types;
+the bodies come in round two.
 
 ## Do
 1. List the spec's claims and, for each, the ways it could break: boundaries (0, 1, max, max+1,
@@ -19,11 +21,13 @@ round of tests from the spec alone. After that, you may read them to aim a secon
    concurrency and re-entrancy, idempotence, partial failure of a dependency, permissions,
    malformed input, error paths and their messages.
 2. Write tests for the most likely breaks in a new file next to the existing tests
-   (`*.adversary.test.*` or `test_adversary_*.py`). Literal expected values derived from the
+   (`zz_adversary` plus the suffix the test runner picks up: `zz_adversary_test.go`, `zz_adversary.test.ts`). Literal expected values derived from the
    spec, never from running the code.
 3. Run them. Keep failing tests; re-run each failing one to rule out flakiness.
 4. Never edit source code or existing tests. Never loosen your own assertion to make it pass;
    if the spec is ambiguous, say so instead.
+
+Your tests are a holdout: the implementer never sees them, so the report must stand alone.
 
 ## Report (≤400 words)
 ```

@@ -67,7 +67,7 @@ Pick every skill (at least `use-smithy`) and the agents to install to. Then, in 
 | [use-smithy](skills/use-smithy/README.md) | the agent | Routes work to the installed skills and holds the shared rules. **Install it.** |
 | [smelt](skills/smelt/README.md) | you or the agent · `/smelt` | One task, step by step: brainstorm, spec, TDD, test agents, review, receipts, secret scan, PR. `fast`, `normal` or `full` (adds a hostile run of the built system). |
 | [warden](skills/warden/README.md) | you or the agent, after your yes · `/warden` | Many tasks in parallel: one silent worker and worktree per task, each to its own PR. |
-| [tend](skills/tend/README.md) | you · `/tend`, or smelt and warden | Keeps PRs mergeable: CI, rebases, review comments; can watch for new PRs and issues. |
+| [tend](skills/tend/README.md) | you · `/tend`, or smelt and warden | Keeps PRs mergeable: CI, rebases, review comments; can watch the repo: new PRs, labeled issues, red workflow runs, base moves, Dependabot alerts. |
 | [ledger](skills/ledger/README.md) | the agent or you | ADRs, glossary, standards, scripts index, module READMEs, codebase map, doc drift, comment policy. |
 | [scout](skills/scout/README.md) | the agent or you | Read-only answers with sources, on your cheap model. |
 | [hush](skills/hush/README.md) | you or the agent · `/hush` | Does the task with no talk; ends with one `done:` line. |
@@ -111,7 +111,7 @@ spending tokens:
 ```bash
 smithy wait pr:42                 # checks finished (with failed names), merged, closed, conflict, review
 smithy wait run:123 branch:main   # a workflow run, or every run on the branch's latest commit
-smithy wait watch                 # new or updated PRs and labeled issues
+smithy wait watch:all             # PRs, issues, red runs, base moves, alerts
 smithy status                     # every task list and warden batch on this machine
 smithy receipt run -- go test ./... # record a verify run (exit, output digest, commit) for the PR
 smithy scan                       # keys, tokens and secret files in what the change adds

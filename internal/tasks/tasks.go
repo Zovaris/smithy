@@ -248,7 +248,11 @@ func Set(file string, pairs []string) (Task, error) {
 			return Task{}, fmt.Errorf("not key=value: %s", p)
 		}
 		key := strings.TrimSpace(p[:i])
-		key = strings.ToUpper(key[:1]) + key[1:]
+		if strings.EqualFold(key, "pr") {
+			key = "PR"
+		} else {
+			key = strings.ToUpper(key[:1]) + key[1:]
+		}
 		val := strings.TrimSpace(p[i+1:])
 		if key == "Status" && !contains(Statuses, val) {
 			return Task{}, fmt.Errorf("Status must be one of %s", strings.Join(Statuses, ", "))
@@ -264,7 +268,7 @@ func Set(file string, pairs []string) (Task, error) {
 			}
 		}
 		if at >= 0 {
-			lines[at] = key + ": " + val
+			lines[at] = lines[at][:len(key)] + ": " + val // keep the file's own spelling (PR, not Pr)
 		} else {
 			lines = append(lines[:end], append([]string{key + ": " + val}, lines[end:]...)...)
 		}

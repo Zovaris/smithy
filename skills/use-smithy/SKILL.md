@@ -5,10 +5,10 @@ description: Routes code work to the installed skill that fits (smelt, warden, l
 
 # use-smithy
 
-<SUBAGENT-STOP>
+## If another skill or agent launched you
+
 If you were launched with a task brief (a smelt test agent, a warden worker, a scout or tend
 run), skip this skill: your brief already says what to follow.
-</SUBAGENT-STOP>
 
 These skills share one way of working. This file says which one fits the moment and how to use
 it. User instructions win over this file, and the repo's AGENTS.md / CLAUDE.md win over it too.
@@ -26,11 +26,12 @@ by name (a slash command, `$name`, `@name` or plain words); never assume one.
 
 | The user wants… | Use | How |
 |---|---|---|
-| to build, change or fix code | **smelt** | Announce "Using smelt `<route>` `<speed>`" in one line, read smelt's SKILL.md and follow it: no plan → `plan`, a plan, spec or task → `build`, a bug → `debug`. Trivial work is `fast`. Its approval gates still apply. |
+| a small change: a typo, copy, a config value, a one-line fix, a rename in one file | **none** | Do it directly: make the change, run the check that covers it (its test, lint or build), commit. No skill, no plan, no agents. |
+| to build, change or fix code | **smelt** | Announce "Using smelt `<route>` `<speed>`" in one line, read smelt's SKILL.md and follow it: no plan → `plan`, a plan, spec or task → `build`, a bug → `debug`. Its approval gates still apply. |
 | several tasks done at once, or a task list run in parallel | **warden** | Spawns sessions and costs tokens: propose it with the task list and wait for a yes, then run it. |
 | a fact, a comparison, "why does X", "can we Y" (not past project decisions: ledger search) | **scout** | Model-invoked; read-only; answers with sources. |
 | a decision recorded, docs, module READMEs, comment policy, a codebase map, to search past decisions | **ledger** | Model-invoked. Search past decisions with its `search` mode before re-deciding anything. |
-| open PRs kept green, rebased, review comments handled; new PRs or labeled issues watched | **tend** | Run it on the PR URLs, or in watch mode when asked; smelt and warden launch it for their own PRs. Issues it accepts become task files in `~/.smithy/plans/<repo>/inbox/` for warden. |
+| open PRs kept green, rebased, review comments handled; new PRs or labeled issues watched | **tend** | Run it on the PR URLs, or in watch mode when asked; smelt and warden launch it for their own PRs. Issues it accepts become task files in the task inbox (`smithy task-dir`) for warden. |
 | the work done without conversation | **hush** | When the user asks for no talk or no questions; every launched agent follows it too. |
 | — every reply | **simple** | If installed, write every reply its way unless the user says "normal mode". |
 
@@ -52,8 +53,8 @@ Not installed? Do the work the plain way and, once, mention the skill that would
   warden and tend ship it), never sleep-then-check turns: it
   costs no tokens and returns one line when something happens.
 - **Merges.** Only the session that talks to the user decides them: warden for its batch, else
-  the session running smelt. Tend and workers merge only when the one that launched them says
-  `merge auto`. A PR into the production branch merges only on the user's explicit yes, given
+  the session running smelt. Tend merges only when the one that launched it says `merge auto`;
+  warden workers never merge (warden does). A PR into the production branch merges only on the user's explicit yes, given
   up front ("merge to production when done") or asked once the PR is green; never from a
   setting, a default or another agent. Without that yes, stop at green and ask.
 - Agents work silently (`hush` rules): a subagent or worker reports once, ending in `done:`, and
@@ -63,9 +64,10 @@ Not installed? Do the work the plain way and, once, mention the skill that would
   branches are removed (the `smithy commit`, `smithy pr`, `smithy cleanup` commands).
 - Decisions that pass ledger's ADR test (hard to reverse, surprising, a real trade-off) go to an ADR. No explanatory code comments: API doc
   comments only, the "why" lives in docs.
-- Models come in three tiers per harness (cheap, mid, strong); `smithy route` picks the tier per job
+- Models come in three tiers per harness (cheap, mid, strong), plus an optional `judge`: the
+  smartest model the user has, used only by `smithy consult`. `smithy route` picks the tier per job
   and `smithy config model <tier>` gives the model. When a tier is unset (exit 3, or `-` from
-  smithy route), ask the user in one message to name each unset tier for this harness (smithy
+  smithy route), ask the user in one message to name each unset tier (cheap, mid, strong; judge is optional) for this harness (smithy
   ships no model names) and save them with `smithy config set-model <tier> <name>`; they live in
   the user's `~/.smithy/config.json`, never in a repo. Ask once per harness; until then use the
   session's model.
@@ -73,7 +75,7 @@ Not installed? Do the work the plain way and, once, mention the skill that would
   model and say so at the end. `smithy route --agent <file>` routes a smelt agent.
 - Ask only for decisions that are the user's: scope, money, prod, data, security, irreversible
   actions, pushing, merging. Other decisions that would stop the work: low impact, decide;
-  medium, one `smithy consult` call to the user's strong model (smelt, warden, tend ship it; it
+  medium, one `smithy consult` call to the user's judge model (else strong) (smelt, warden, tend ship it; it
   uses the current harness's CLI, no tools); log what was decided and why.
 
 ## 4 · Turn repeated work into scripts
@@ -97,7 +99,7 @@ Never propose one the user declined, and not under hush. Ideas from
 
 | Thought | Reality |
 |---|---|
-| "Too small for smelt" | That is what `fast` is for: a few minutes, still test-first. |
+| "Too small for smelt" | Truly small (the first row of the route table) needs no skill. Anything with new behaviour is `fast`: a few minutes, still test-first. |
 | "I'll plan it in my head" | Plans live in the task list so warden and the next session can use them. |
 | "I'll just ask the user this fact" | Facts are scout's job; ask the user only for decisions. |
 | "A comment will explain it" | Put the why in the module README or an ADR. |
@@ -109,19 +111,6 @@ Never propose one the user declined, and not under hush. Ideas from
 
 ## 6 · Settings and setup
 
-All settings live in two JSON files, repo first: `<repo>/.smithy/config.json` (this repo only)
-and `~/.smithy/config.json` (the user's defaults). `smithy config list` shows every setting
-with its value, where it came from and what uses it; `smithy config set [--repo] <key> <value>`
-changes one. Nobody has to edit JSON by hand.
-
-Two ways to fill them:
-- **Up front** — when the user says "use-smithy setup" (or `/use-smithy setup`): run
-  `smithy setup status`, then ask every unset setting in one message (numbered, each with your
-  recommendation, "yes" accepts all), save the answers, and offer the agent-instructions block
-  (`smithy setup block add <file>`, only with a yes, after showing `references/AGENTS-BLOCK.md`).
-  Then, if `setup status` says smithy is not on PATH, offer once to make `smithy` a terminal
-  command for the user (`smithy status`, `smithy tasks board --all`): on a yes,
-  `smithy setup path add` (one line in their shell's startup file).
-- **On first use** — any skill that needs an unset setting asks just that one, once, and saves
-  it: `--repo` when the answer is about this repo (where specs go), user-level otherwise
-  (models, merge and cleanup defaults).
+All settings live in `<repo>/.smithy/config.json` and `~/.smithy/config.json` (`smithy config
+list`, `smithy config set`). For "use-smithy setup" or a setting asked on first use, read
+`references/SETUP.md`.

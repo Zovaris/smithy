@@ -31,7 +31,8 @@ const receiptUsage = `usage:
       Exits with the command's exit code.
   smithy receipt list [--md] [--all]
       receipts for the current commit (--all: every commit); --md prints a table for a PR body.
-      A receipt taken on another commit is marked stale; with uncommitted changes, dirty.
+      A receipt taken on another commit is marked stale (unless only task, spec or changelog
+      files changed since); with uncommitted changes, dirty.
   smithy receipt clear
 Receipts live in <repo>/.smelt/receipts.jsonl; .smelt/ ignores itself (its own .gitignore).`
 
@@ -46,19 +47,29 @@ type Receipt struct {
 	At       string   `json:"at"`
 	Millis   int64    `json:"ms"`
 	Platform string   `json:"platform"`
+	// sameCode: taken on an earlier commit, but only Markdown changed since.
+	sameCode bool
 }
 
 func receiptsPath(root string) string { return filepath.Join(root, ".smelt", "receipts.jsonl") }
 
 func head(root string) (string, bool) {
 	sha, _ := ghx.Run("git", "-C", root, "rev-parse", "HEAD")
-	st, _ := ghx.Run("git", "-C", root, "status", "--porcelain", "--untracked-files=no")
+	st, _ := ghx.Run("git", "-C", root, "status", "--porcelain", "--", ".", ":(exclude,glob)docs/specs/**/*.md", ":(exclude,glob).docs/**/*.md", ":(exclude)CHANGELOG.md", ":(exclude).smelt", ":(exclude).smithy/config.json", ":(exclude,glob)**/zz_*_test.*", ":(exclude,glob)**/zz_*_test", ":(exclude,glob)**/zz_*.test.*", ":(exclude,glob)**/zz_*.spec.*")
 	return sha, st != ""
 }
 
 // Run executes argv in root, tees its output to out and returns the receipt.
 func Run(root, claim string, argv []string, out io.Writer) (Receipt, error) {
 	cmd := exec.Command(argv[0], argv[1:]...)
+	if len(argv) == 1 && strings.ContainsAny(argv[0], " \t") {
+		// One quoted command line (zsh doesn't word-split "$cmd"): let the shell split it.
+		if runtime.GOOS == "windows" {
+			cmd = exec.Command("cmd", "/c", argv[0])
+		} else {
+			cmd = exec.Command("sh", "-c", argv[0])
+		}
+	}
 	cmd.Dir = root
 	h := sha256.New()
 	w := io.MultiWriter(out, h)
@@ -194,7 +205,7 @@ func Markdown(rs []Receipt, head string, dirtyNow bool) string {
 // or "stale" (another commit). dirtyNow is whether the working tree has uncommitted changes.
 func (r Receipt) State(head string, dirtyNow bool) string {
 	switch {
-	case r.Commit != head:
+	case r.Commit != head && !r.sameCode:
 		return "stale"
 	case r.Dirty || dirtyNow:
 		return "dirty"
@@ -226,6 +237,29 @@ func Redact(s string) string {
 }
 
 var secretArg = regexp.MustCompile(`(?i)((?:--?(?:token|password|passwd|secret|api[-_]?key|auth)[= ]+|bearer\s+))([^\s'"]+)`)
+
+// planDoc is a task or spec file (docs/specs, .docs) or the changelog: marking a task done there
+// can't change what a command proved.
+func planDoc(f string) bool {
+	return f == "CHANGELOG.md" || strings.HasSuffix(f, ".md") && (strings.HasPrefix(f, "docs/specs/") || strings.HasPrefix(f, ".docs/"))
+}
+
+// docsOnlySince reports whether every file changed from commit a to b is a planDoc.
+func docsOnlySince(root, a, b string) bool {
+	if a == "" || a == b {
+		return a == b
+	}
+	out, err := ghx.Run("git", "-C", root, "diff", "--name-only", a, b)
+	if err != nil {
+		return false
+	}
+	for _, f := range strings.Fields(out) {
+		if !planDoc(f) {
+			return false
+		}
+	}
+	return true
+}
 
 func short(s string) string {
 	if len(s) > 7 {
@@ -308,7 +342,8 @@ func ReceiptMain(args []string) int {
 		if !all {
 			kept := rs[:0]
 			for _, r := range rs {
-				if r.Commit == sha {
+				if r.Commit == sha || docsOnlySince(root, r.Commit, sha) {
+					r.sameCode = r.Commit != sha
 					kept = append(kept, r)
 				}
 			}

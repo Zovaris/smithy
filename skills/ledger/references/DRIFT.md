@@ -8,6 +8,9 @@
 - **Missing references:** paths and backticked symbols named in docs that no longer exist in the
   code. A path is only checked when it contains a `/` and a file extension (`scripts/x.sh`,
   not `x.sh`).
+- **Always-loaded files:** lines and bytes of AGENTS.md, CLAUDE.md, `docs/agents/STANDARDS.md`
+  and `scripts/SCRIPTS.md`, where they exist; STANDARDS.md also shows its rule count and is
+  flagged over the budget. A file that keeps growing is trimmed in the same branch.
 - **Public API changes without docs:** changed source files with exported symbols whose doc
   comments or module README didn't change in the same diff.
 

@@ -203,6 +203,9 @@ var findSkill = agents.FindSkill
 var allowRe = regexp.MustCompile(`"behavior"\s*:\s*"allow"`)
 
 func githubMode(r *report) {
+	if ok, origin := ghx.OriginIsGitHub(); !ok && origin != "" {
+		r.warn("origin is not a GitHub remote ("+origin+"): ship items stop at a pushed branch, no PR", "point origin at GitHub, or run items as scout/branch-only")
+	}
 	switch ghx.Mode() {
 	case "gh":
 		r.ok("gh found")

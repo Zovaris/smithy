@@ -20,7 +20,7 @@ scan does); a revision expression is used as given. Without an origin default br
 the report covers the whole history.
 Sections: changed code and the docs that mention it (by path or exported symbol); paths and
 ` + "`name()`" + ` symbols named in docs that no longer exist; public API added or changed without any
-doc change in the diff. Report only: exits 0, or 2 for a base git can't resolve. Judgement comes after (references/DRIFT.md).`
+doc change in the diff; the size of the always-loaded files (STANDARDS.md flagged over its rule budget). Report only: exits 0, or 2 for a base git can't resolve. Judgement comes after (references/DRIFT.md).`
 
 var (
 	srcExts = map[string]bool{".ts": true, ".tsx": true, ".js": true, ".jsx": true, ".mjs": true, ".cjs": true,
@@ -143,6 +143,33 @@ func MissingRefs(p, text string, corpus func() string) []string {
 		}
 	}
 	return missing
+}
+
+const standardsBudget = 30
+
+var alwaysLoaded = []string{"AGENTS.md", "CLAUDE.md", "docs/agents/STANDARDS.md", "scripts/SCRIPTS.md"}
+
+// SizeLine reports one always-loaded file as "name: N lines, M bytes"; STANDARDS.md also counts its
+// "- " rule lines and flags them past the budget in references/STANDARDS-FORMAT.md.
+func SizeLine(name, text string) string {
+	n := strings.Count(text, "\n")
+	if text != "" && !strings.HasSuffix(text, "\n") {
+		n++
+	}
+	out := fmt.Sprintf("%s: %d lines, %d bytes", name, n, len(text))
+	if strings.HasSuffix(name, "STANDARDS.md") {
+		rules := 0
+		for _, l := range splitLines(text) {
+			if strings.HasPrefix(l, "- ") {
+				rules++
+			}
+		}
+		out += fmt.Sprintf(", %d rules", rules)
+		if rules > standardsBudget {
+			out += fmt.Sprintf(", over budget (%d)", standardsBudget)
+		}
+	}
+	return out
 }
 
 var codeSymRx = regexp.MustCompile(`^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)?$`)
@@ -356,6 +383,18 @@ func Drift(args []string) int {
 		fmt.Println("- none")
 	default:
 		fmt.Printf("- docs changed in this diff (%s); re-read them against: %s\n", strings.Join(changedDocs, ", "), strings.Join(flagged, ", "))
+	}
+
+	fmt.Println("\n## Always-loaded files")
+	anySize := false
+	for _, p := range alwaysLoaded {
+		if exists(p) {
+			anySize = true
+			fmt.Println("- " + SizeLine(p, readOrEmpty(p)))
+		}
+	}
+	if !anySize {
+		fmt.Println("- none")
 	}
 	return 0
 }

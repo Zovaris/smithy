@@ -1,7 +1,10 @@
 # Codebase map — `docs/agents/MAP.md`
 
-A one-page orientation an agent reads instead of exploring the repo. Facts only, each checkable
-against the code; date it and note the commit it describes.
+A short orientation an agent reads instead of exploring the repo. Only facts the code doesn't
+make obvious (what a folder is for when its name doesn't say, where tests should drive the
+system, what not to touch and why); never what `ls`, the manifest or the README already show.
+Each fact is checkable against the code and every path in it exists (`smithy drift` checks);
+date it and note the commit it describes.
 
 ```markdown
 # Map
@@ -32,5 +35,5 @@ Updated: YYYY-MM-DD at <short sha>
 <links to the ADRs that shape the layout>
 ```
 
-Keep it under ~120 lines. Refresh when entry points, layout or commands change; `sync` flags a
+Budget about 1k tokens (~4 KB): drop a section that has nothing non-obvious to say. Refresh when entry points, layout or commands change; `sync` flags a
 map whose paths no longer exist.

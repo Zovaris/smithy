@@ -28,17 +28,24 @@ var Known = []Setting{
 	{"git.branch", "{type}/{key}-{slug}", "smelt warden", "branch name template: {type} feat/fix/docs/refactor/test/chore, {key} ticket or task id, {slug} from the title"},
 	{"git.worktree", "{parent}/worktrees/{repo}-{branch}", "smelt warden tend", "worktree path template ({branch} with / as -)"},
 	{"tasks.ignore", "ask", "smelt plan", "with tasks.commit false: gitignore (commit a .gitignore line) or exclude (local .git/info/exclude)"},
-	{"warden.merge", "ask", "warden", "auto: workers merge green PRs; manual: they stop at ready; unset: warden asks per batch"},
+	{"warden.merge", "ask", "warden", "auto: warden merges green PRs (workers never do); manual: warden lists green PRs for the user; unset: warden asks per batch"},
 	{"warden.cleanup", "auto", "warden", "auto: end finished workers and remove worktrees and local branches without asking"},
-	{"warden.max", "3", "warden", "parallel workers (a token-cost cap)"},
-	{"warden.mode", "smelt fast", "warden", "worker mode: smelt fast, smelt normal, smelt full or plain"},
+	{"warden.max", "5", "warden", "parallel workers (a token-cost cap)"},
+	{"warden.mode", "smelt normal", "warden", "batch check speed: smelt fast, smelt normal, smelt full or plain"},
 	{"warden.worker_model", "route", "warden", "route: pick cheap/mid/strong per task; session: same model as the parent session; or one model name for every worker"},
 	{"agent.effort", "medium", "smelt warden scout tend", "reasoning effort for every agent smithy starts: low or medium; anything higher is capped at medium"},
+	{"agent.timeout", "90", "smelt warden", "minutes before smithy agent kills a headless agent (0 = no limit)"},
 	{"watch.events", "checks,merged,closed,conflict,review,comment,push,new,updated", "smithy wait", "which events wake an agent waiting on GitHub"},
 	{"watch.every", "30", "smithy wait", "seconds between GitHub polls"},
 	{"watch.max", "50", "smithy wait", "minutes before a heartbeat exit (4) when nothing happened"},
-	{"tend.watch", "prs", "tend", "what /tend watch looks at: prs, issues or all"},
+	{"tend.watch", "prs", "tend", "what /tend watch follows: a comma list of prs, issues, actions, base, alerts, or all"},
 	{"tend.label", "agent", "tend", "label of issues tend may queue for warden"},
+	{"stack.test", "", "smelt warden", "this repo's test command when smithy stack can't detect it (also stack.single, stack.lint, stack.typecheck, stack.dev, …); set with --repo"},
+	{"decide.url", "", "smithy decide", "decision model endpoint; set with decide.model to turn smithy decide on (a path ending in /scores uses the behavior format, else System One)"},
+	{"decide.model", "", "smithy decide", "decision model id, e.g. span-01-free, jev-latest, kev-latest"},
+	{"decide.key_env", "", "smithy decide", "name of the env var holding the key (never the key); empty for a local model"},
+	{"decide.enabled", "true", "smithy decide", "false after three failed calls in a row; set true to turn it back on"},
+	{"decide.timeout", "3000", "smithy decide", "milliseconds before a decide call is dropped"},
 }
 
 // ErrUnset means the key has no value and no default: ask the user once, then save it.
@@ -52,7 +59,8 @@ func UserFile() string {
 	return filepath.Join(ghx.Home(), "config.json")
 }
 
-// RepoFile is this repo's settings file ("" outside a repo). Before 0.8 it was
+// RepoFile is this repo's settings file ("" outside a repo). In a linked worktree it is the main
+// checkout's, unless the worktree tracks its own, so one setting holds for every worktree. Before 0.8 it was
 // .agents/config.json, still read until someone moves it.
 func RepoFile() string {
 	cwd, _ := os.Getwd()
@@ -61,6 +69,14 @@ func RepoFile() string {
 		return ""
 	}
 	f := filepath.Join(top, ".smithy", "config.json")
+	if _, err := ghx.Run("git", "-C", top, "ls-files", "--error-unmatch", ".smithy/config.json"); err != nil {
+		if common, err := ghx.Run("git", "-C", top, "rev-parse", "--path-format=absolute", "--git-common-dir"); err == nil && filepath.Base(common) == ".git" {
+			if main := filepath.Dir(common); main != top {
+				top = main
+				f = filepath.Join(top, ".smithy", "config.json")
+			}
+		}
+	}
 	if _, err := os.Stat(f); err != nil {
 		if old := filepath.Join(top, ".agents", "config.json"); exists(old) {
 			return old
@@ -363,7 +379,7 @@ func Normalize(key, value string) (string, string, error) {
 	return "", "", fmt.Errorf("agent.effort must be low or medium, got %q", value)
 }
 
-func tier(t string) bool { return t == "cheap" || t == "mid" || t == "strong" }
+func tier(t string) bool { return t == "cheap" || t == "mid" || t == "strong" || t == "judge" }
 
 // Model returns the user's model for a tier in the current harness.
 func Model(t string) (string, error) {
@@ -407,8 +423,8 @@ func AutoMigrate() {
 }
 
 const usage = `usage: smithy config <command>
-  model <cheap|mid|strong>              model for this harness; exit 3 when unset
-  set-model <cheap|mid|strong> <name> [harness]
+  model <cheap|mid|strong|judge>              model for this harness; exit 3 when unset
+  set-model <cheap|mid|strong|judge> <name> [harness]
   get <key>                             effective value (repo, user, default); exit 3 when unset
   set [--repo] <key> <value>            value stored as JSON when it is JSON
   unset [--repo] <key>                  remove a saved value (back to the default)
@@ -435,7 +451,7 @@ func Main(args []string) int {
 	switch args[0] {
 	case "model":
 		if len(args) < 2 || !tier(args[1]) {
-			fmt.Fprintln(os.Stderr, "usage: smithy config model <cheap|mid|strong>")
+			fmt.Fprintln(os.Stderr, "usage: smithy config model <cheap|mid|strong|judge>")
 			return 2
 		}
 		m, err := Model(args[1])
@@ -445,7 +461,7 @@ func Main(args []string) int {
 		fmt.Println(m)
 	case "set-model":
 		if len(args) < 3 || !tier(args[1]) {
-			fmt.Fprintln(os.Stderr, "usage: smithy config set-model <cheap|mid|strong> <name> [harness]")
+			fmt.Fprintln(os.Stderr, "usage: smithy config set-model <cheap|mid|strong|judge> <name> [harness]")
 			return 2
 		}
 		if len(args) > 3 {
@@ -547,7 +563,7 @@ func Main(args []string) int {
 				return readFail(err)
 			}
 		}
-		for _, t := range []string{"cheap", "mid", "strong"} {
+		for _, t := range []string{"cheap", "mid", "strong", "judge"} {
 			v, ok := readKey(UserFile(), "models."+h+"."+t)
 			src := ""
 			if ok {

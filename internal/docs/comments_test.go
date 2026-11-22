@@ -172,3 +172,30 @@ func TestAddedLines(t *testing.T) {
 		t.Errorf("extra lines: %v", got)
 	}
 }
+
+func TestSmithyAllowMarkerIsNotAComment(t *testing.T) {
+	if f := CheckSlash([]string{`const k = "AKIA0000000000000000" // smithy:allow`}, ".ts"); len(f) != 0 {
+		t.Fatalf("slash marker flagged: %v", f)
+	}
+	if f := CheckHash([]string{`k = "AKIA0000000000000000"  # smithy:allow`}, ".py"); len(f) != 0 {
+		t.Fatalf("hash marker flagged: %v", f)
+	}
+}
+
+func TestRegexLiteralIsNotAComment(t *testing.T) {
+	if f := CheckSlash([]string{`const p = s.replace(/^b\//, "");`, `const q = a.split(/\s*\/\/\s*/);`}, ".ts"); len(f) != 0 {
+		t.Fatalf("regex flagged: %v", f)
+	}
+	if f := CheckSlash([]string{`const n = a / b; // ratio of a to b`}, ".ts"); len(f) != 1 {
+		t.Fatalf("division then a comment should still be flagged once: %v", f)
+	}
+}
+
+func TestRegexAfterKeywordAndJSXClosingTag(t *testing.T) {
+	if f := CheckSlash([]string{`return /\/\//.test(s);`}, ".ts"); len(f) != 0 {
+		t.Fatalf("regex after return flagged: %v", f)
+	}
+	if f := CheckSlash([]string{`return <p>a</p>; // note`}, ".tsx"); len(f) != 1 {
+		t.Fatalf("comment after a JSX closing tag missed: %v", f)
+	}
+}

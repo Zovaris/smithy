@@ -13,6 +13,9 @@ for d in skills/*/; do
   grep -q '^description: .\{40,\}' "$f" || bad "$s: description missing or too short"
   if [[ " $USER_INVOKED " == *" $s "* ]]; then grep -q '^disable-model-invocation: true' "$f" || bad "$s: should be user-invoked"
   else grep -q '^disable-model-invocation' "$f" && bad "$s: should be model-invocable"; fi
+  if grep -q '^argument-hint:' "$f"; then grep -q '^argument-hint: "' "$f" || bad "$s: argument-hint must be quoted"; fi
+  grep -q '^argument-hint:.*\\|' "$f" && bad "$s: argument-hint has a backslash escape"
+  grep -q '^<[A-Z-]*>$' "$f" && bad "$s: pseudo-tag line in SKILL.md"
   grep -rqi 'agent-kit' "$d" && bad "$s: mentions agent-kit"
   for r in $(grep -ohE '(^|[ `(])((references|agents)/[A-Za-z0-9_-]+\.md|scripts/[a-z0-9_.-]+\.(sh|js))' "$f" | sed -E 's/^[ `(]//' | sort -u); do
     [ -e "$d/$r" ] || bad "$s: SKILL.md references missing $r"

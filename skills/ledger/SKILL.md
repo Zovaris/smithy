@@ -25,16 +25,19 @@ runs. `smithy <command>` in this skill means `<skill-dir>/scripts/smithy <comman
 | API reference | generated from doc comments (TypeDoc, pdoc/mkdocstrings, pkgsite, Javadoc, rustdoc, Dokka) |
 
 The agent instructions file (AGENTS.md / CLAUDE.md) stays short: commands, the comment policy
-line, and pointers to the files above.
+line, and pointers to the files above. Always-loaded text costs tokens on every run and
+generated context files tend to hurt, so `smithy drift` reports the size of these files and of
+`docs/agents/STANDARDS.md` and `scripts/SCRIPTS.md`; write only what the code doesn't show.
 
 ## Modes
 
 - **init** — create `docs/README.md` (index), `docs/adr/0000-record-architecture-decisions.md`
   (accepted: we use ADRs), `docs/GLOSSARY.md`, `docs/agents/STANDARDS.md` and `scripts/SCRIPTS.md` (headers only; the
   standards file collects judgement rules the reviewers enforce, the scripts file one line per
-  script: name — what — when). Add to AGENTS.md (or CLAUDE.md if
-  that is what the repo uses; with neither, create AGENTS.md) a short block: where docs live and
-  the comment policy. Detect the stack and offer the matching lint config from
+  script: name — what — when). Add a block of at most ~15 lines (where docs live, the comment
+  policy) where the harness reads it: Claude Code reads AGENTS.md only when no CLAUDE.md exists.
+  Only CLAUDE.md → the block goes there; only AGENTS.md or neither → AGENTS.md (create it); both →
+  the block stays in AGENTS.md and CLAUDE.md gets the line `@AGENTS.md` if it lacks it. Detect the stack and offer the matching lint config from
   `references/COMMENTS.md`; write it only on yes. Headless (nobody to answer): don't write it,
   report the snippet. Done: the five files exist and are listed in `docs/README.md`.
 - **adr `<title>`** — run the ADR test below first; only when it passes, `smithy adr "<title>"` creates the

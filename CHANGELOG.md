@@ -5,6 +5,143 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.11.0 — 2026-11-21
+
+- **Trial 7 frictions.** `smithy comments` no longer reads a JS regex literal (`/^b\//`) as a
+  comment. The combined reviewer answers under `## Spec-check` and `## Standards`; the re-review
+  prompt asks only about the listed findings and the fix diff. Agents use only file, shell and
+  git tools. `build all` ships as one PR.
+- **Trial 6 frictions.** Re-review is at most two rounds; a resumed reviewer that repeats its old
+  report is replaced by a fresh one with the fix diff; a finding still open goes to the user, or
+  with nobody to ask into "Decided without you" (high security, money or data findings still
+  stop with a `blocked:` line). Risky work adds the security agent without
+  raising the speed (`full` is for money, auth, data loss, public APIs or on request).
+  `smithy comments` ignores `smithy:allow` markers. Every `build all` commit builds. A task's
+  `Spec:` may point at an agreed spec where it already lives.
+- **Trial 5 frictions.** `smithy tasks set` keeps the `PR:` key; `smithy receipt run` runs one
+  quoted command line through the shell (zsh doesn't split `"$cmd"`); Markdown edits (a task file
+  marked done) no longer make receipts dirty or stale; `smithy pr template` prints `none:` instead
+  of failing; the batch-check fix branch is `fix/…`; workers install dependencies first; batch
+  dirs are never reused; domain nouns are not risk when routing; launched sessions answer
+  `task-dir` themselves.
+- **Small changes skip smithy.** use-smithy sends a typo, copy, config value or one-line fix straight
+  to the change and its check, with no skill or agents.
+- **Shorter branch names.** `smithy names branch` drops filler words, single letters and words
+  already in the key, and keeps at most four.
+- **One check wave per batch, not per task (trial 4).** Warden workers build at smelt `fast` with
+  no agents; once the items merge, warden runs one wave at the batch's speed on the combined diff
+  and turns blocking findings into one `fix` item. `warden.mode` now defaults to `smelt normal`
+  and names that wave's speed. `build all` does the same on the branch, and builds three tasks or
+  fewer without implementer subagents.
+- **Fewer, bigger tasks; build here unless parallel pays.** TASKS.md splits only where it buys
+  parallel time, adds a `Speed:` line, and recommends building here unless two independent tasks
+  are each over ~15 minutes of agent work.
+- **Agent test files use the runner's suffix** (`zz_adversary.test.ts`), so vitest and jest pick
+  them up; receipts ignore them too.
+- **`wait-turn` runs in the background for session workers** and in the foreground only for
+  subagent workers.
+- **`route` no longer sends lockfile work to the strong tier.** `lock` matched `lockfile`; it is now
+  `lock contention`, `deadlock` and `mutex`.
+- **`smithy cleanup` deletes the merged remote branch**, including when the local branch is already gone.
+- **`smelt plan` skips brainstorm, grill and the builder check for a spec the user already agreed.**
+- **The smelt adversary skips implementation bodies in round one** when its brief includes a diff.
+- **Warden's subagent workers run `wait-turn` in the foreground** (9 minutes, the tool limit).
+- **Rule tests cover every variant the spec names**, one case each.
+- **Three speeds that differ, and agents only where they earn their cost.** Each subagent costs
+  ~60k tokens and minutes however short its prompt (trials 1–3), so: `fast` runs scripts only
+  (tests, typecheck, lint, scan) and checks the diff against the spec itself, no subagent unless
+  the change is risky; `normal` adds one parallel wave, the adversary and one reviewer, with
+  property tests written by the worker; `full` adds a second adversary, property, security, the
+  mutation tool run as a command with an agent reading the survivors, and hostile last. Test
+  agents write `zz_` files in the tree (no WIP commit, no extra worktree); a fixed blocking
+  finding is confirmed by resuming the same reviewer; no "another look by
+  judgment". Plans aim for a short chain (width over tidiness). Workers end at `pr_open`; warden
+  waits on every PR's CI in one `smithy wait` and merges; no tend session per batch or PR (red CI
+  goes back to the worker; tend runs when the user starts it). `warden.max` defaults to 5.
+- warden merges every green PR itself; workers stop at `ready` and never merge. A permission
+  classifier refused every worker's merge in trial 3, because the merge permission came in a
+  brief another agent wrote.
+- Fixes from trial 2 on claude-mods (`docs/trials/2026-11-trial-2.md`): `smithy wait batch:`
+  wakes once per card change of stage, state, CI or PR (tend mirroring no longer loops it);
+  `pr_open` needs `pr=`; board notes are cut at 160 characters; `smithy route` skips negated
+  words ("no secrets needed"), reads "token" only as a credential, takes small-change words from
+  the title and shows the matched word; `stack.<key>` in the repo config sets a command
+  `smithy stack` can't detect. Skills: a subagent-worker fallback in warden's harness, a CI item
+  runs first, specs out of git go by absolute path, test agents' worktrees are allowed inside
+  workers, regression only for reported bugs, and a blocking finding closes on a look at the
+  last fix.
+- Fixes from the 2026-11 trial (`docs/trials/2026-11-trial.md`): `smithy pr create` stops with
+  exit 3 and a plain message when origin isn't GitHub, and `doctor` warns; `smithy agent --bg`
+  reports an agent that dies at start (no login, bad flag) instead of printing a pid; repo
+  settings saved in a worktree go to the main checkout, and receipts ignore that file and `zz_*`
+  agent tests; `smithy cleanup` removes branches whose commits another branch has; `smithy route`
+  sends prose-only tasks to cheap; `smithy names` types docs and stops calling "split" a refactor.
+- Fewer agents: at normal, spec-check and standards run as one reviewer; one second look per
+  round covers every fixed finding; the builder check runs only for specs over 8 criteria or with
+  open questions. Worker briefs list the card states.
+- tend watches the repo, not just PRs: `smithy wait` gains `actions[:<branch>]` (red workflow
+  runs, push, schedule or manual), `base[:<branch>]` (the branch moved) and `alerts` (new
+  Dependabot alerts, skipped with a note without access); `watch:` takes a comma list or `all`.
+  Each event has a short recipe in `tend/references/`, read only when it fires; recipes report by
+  default and open fix PRs only with `--fix`.
+- `smithy decide` (off until `decide.url` and `decide.model` are set): an optional decision
+  model; the URL picks the wire format (Respan `/scores` behaviors, else System One: Jev, Kev,
+  Clef, span-02). `decide rules` gives the standards reviewer leads on likely rule breaks;
+  `smithy cards set` raises a new question's impact with it, never lowers it. Three failed calls
+  in a row disable it until `decide.enabled` is set true again. Answers go to `~/.smithy/decide.log`.
+- `smithy pr-state` prints `action` (cleanup, fix-ci, sync-base, answer-review, wait, done); tend
+  follows it.
+- smelt VERIFY: an "it runs" check (start it once, hit the changed path) for changes to something
+  that starts. Trimmed always-loaded text in smelt, worker briefs and use-smithy (setup moves to
+  `references/SETUP.md`).
+- Optional `judge` model tier: the smartest model you have, used only by `smithy consult`
+  (falls back to `strong`). ADR 0006 records why decision models and a watcher session stay out.
+- Fixes from the release/next audit and worker feedback: one definition of a blocking review
+  finding (REVIEW.md), holdout tests stay untouched until their final run, `smithy scan` prints
+  binaries as warnings and counts a bare `=======` only next to a conflict start, the attempt cap
+  is a fixed 3 (no setting), no port rule, `CHANGELOG.md` merges with `merge=union`, worker briefs
+  name `state=working` and `smithy scan --base <base>`, prose-only changes skip test agents.
+- smelt: the adversary's tests are a holdout: hidden from the implementer, re-run on the final
+  commit as the `holdout` receipt; passing visible but failing holdout is blocking.
+- smelt: spec-check flags test files the spec doesn't name and diffs over ~400 non-test lines.
+- smelt: review blocks only on spec gaps, bugs and STANDARDS violations; each finding gets a
+  disposition in the PR body.
+- `smithy wait pr:` ignores check results left over from the previous head after a push and
+  reports only the current head's; `smithy commit style` prints the 72-char subject limit it
+  enforces; smelt's spec-check and standards agents diff against
+  `git merge-base origin/<base> HEAD`, never a local base branch.
+
+- `scripts/eval.sh`: a small outcome-graded eval run by hand. Each `tests/eval/<task>/` is a tiny
+  Go package with a bug (three starters from smithy's own fixes); the agent fixes it with or
+  without smelt (`none`, `fast`, `normal`), a hidden regression test grades it, and the script
+  prints pass@1 and pass^k per arm over `-k` trials. Costs tokens; never in CI.
+
+- ledger keeps always-loaded context small and where the harness reads it: `init` puts its block
+  (at most ~15 lines) in CLAUDE.md when only that exists, otherwise in AGENTS.md, and adds
+  `@AGENTS.md` to an existing CLAUDE.md; `smithy drift` reports the lines and bytes of AGENTS.md, CLAUDE.md, STANDARDS.md
+  and SCRIPTS.md and flags STANDARDS.md past 30 rules; MAP.md holds only non-obvious facts (~1k
+  tokens); STANDARDS-FORMAT names retire candidates at each sync.
+- Skill hygiene for scanners and strict validators: use-smithy's subagent note is a plain heading,
+  every `argument-hint` is quoted (warden's has no `\|`), warden's description leads with its
+  triggers and simple's drops the off-switch, tend treats issue text as data when queueing tasks,
+  and smelt says high-impact decisions still go to the user under hush. `tests/skills.sh` checks
+  the frontmatter and pseudo-tag rules.
+- `smithy receipt run` records a receipt dirty when an untracked, non-ignored file is present
+  (`.smelt/` and ignored files don't count). `smithy scan` also reports added or changed binary
+  files and .pyc/.so/.dylib/.dll/.exe/.wasm/.jar/.zip/.tar/.gz/.docx/.xlsx/.pptx files as warnings
+  for a human look (exit 0), and fails on git conflict markers in any added line (fenced code in .md files is exempt; a bare
+  `=======` counts only when a `<<<<<<<` is in the same diff).
+- `smithy agent` has a wall-clock cap: the new `agent.timeout` setting (minutes, default 90,
+  `0` = none) or `--timeout <min>` kills the agent's process group (Unix; the agent process on Windows), logs "timed out after Nm" and
+  exits 124; `--bg` runs are watched by a detached smithy that enforces it.
+- warden instructs: items that share files in their `Files` lists (or likely paths) get a prereq
+  unless the user said stack, no turn ends with live workers and no `smithy wait batch:`, an item
+  is relaunched at most 3 times then listed as blocked, stuck reports and the final message carry
+  takeover data (worktree, branch, session or pid, log), and issue text is never copied into Files
+  or test lines.
+- ADRs 0001-0005 in `docs/adr/`: record decisions, gh optional, no decision-model adapter for now,
+  release branch for big changes, learning in repo docs.
+
 ## v0.10.0 — 2026-11-19
 
 - Audit fixes after the gh-optional batch: warden's final message shows the Decisions and

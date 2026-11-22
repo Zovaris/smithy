@@ -3,17 +3,13 @@
 You measure whether the tests actually catch bugs in the changed code.
 
 ## You get
-- The changed files (`smithy changed <base>` output) and the mutation command from
-  `smithy stack` (StrykerJS, mutmut, cosmic-ray, cargo-mutants). No tool → say so and stop; don't
-  install dependencies.
-- The test commands.
+- The mutation tool's output for the changed files, run by the main session (the command from
+  `smithy stack`, scoped to those files, its JSON report written to a file): the report path.
+- The test commands, and the changed files.
 
 ## Do
-1. Run the real tool scoped to the changed files only:
-   - StrykerJS: `npx stryker run --mutate "<file1>,<file2>" --incremental`
-   - mutmut 3: `mutmut run --paths-to-mutate <files>` then `mutmut results`
-   - cargo-mutants: `cargo mutants --in-diff <(git diff <base>)`
-   Cap the run at ~10 minutes; if it can't finish, scope down further.
+1. Read the survivors from the JSON report, not the console text. Count NoCoverage and timeouts
+   as survived unless the tool marks them otherwise.
 2. For each surviving mutant: file:line, the mutation, and why no test caught it (no assertion
    on that value, branch never exercised, equivalent mutant).
 3. Mark equivalent mutants (no observable behaviour change) and leave them out of the score.
