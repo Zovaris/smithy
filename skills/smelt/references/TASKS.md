@@ -8,8 +8,8 @@ reads and updates it; use it instead of hand-editing status lines.
 
 An agreed spec in a folder of its own: that folder is the task dir (no second folder). A spec at the repo root stays there: make the task dir with `smithy task-dir` and point `Spec:` at it. Otherwise run
 `smithy task-dir <slug>`: it reads the user's settings, creates the dir and prints it.
-Exit 3 prints `ask <key>: <question> (default: <value> → <dir>)`: ask the user (recommendation first; nobody
-to ask, hush or a launched session: take `<value>`, say so at the end), save it with `smithy config set --repo <key> <value>`, rerun.
+Exit 3 prints `ask <key>: <question> (default: <value> → <dir>)`: ask the user (recommendation first), save it with `smithy config set --repo <key> <value>`, rerun.
+Nobody to ask (hush, a launched session): `smithy task-dir <slug> --default` takes the defaults unsaved; say so at the end.
 It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `git rm --cached` it if committed):
 
 1. `tasks.commit` — commit the specs and tasks to git? `true` → `docs/specs/<slug>/`, reviewed

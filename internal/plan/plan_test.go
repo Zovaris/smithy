@@ -361,3 +361,32 @@ func TestStackIgnoresABranchsOwnOverride(t *testing.T) {
 		}
 	}
 }
+
+func TestTaskDirDefault(t *testing.T) {
+	dir := newRepo(t)
+	home := t.TempDir()
+	t.Setenv("SMITHY_CONFIG", filepath.Join(home, "config.json"))
+	t.Setenv("SMITHY_HOME", home)
+	t.Chdir(dir)
+	if code := TaskDirMain([]string{"s1"}); code != 3 {
+		t.Fatalf("unset without --default: exit %d, want 3", code)
+	}
+	if code := TaskDirMain([]string{"s1", "--default"}); code != 0 {
+		t.Fatalf("--default: exit %d", code)
+	}
+	if st, err := os.Stat(filepath.Join(dir, "docs", "specs", "s1")); err != nil || !st.IsDir() {
+		t.Error("--default did not create docs/specs/s1")
+	}
+	if _, _, err := config.Effective("tasks.commit"); err == nil {
+		t.Error("--default saved tasks.commit")
+	}
+	if err := config.Set(config.RepoFile(), "tasks.commit", "false"); err != nil {
+		t.Fatal(err)
+	}
+	if d, _, err := taskDir("s2", true); err != nil || d != filepath.Join(dir, ".docs", "specs", "s2") {
+		t.Errorf("ignore default: %q %v", d, err)
+	}
+	if ex, _ := os.ReadFile(filepath.Join(dir, ".git", "info", "exclude")); !strings.Contains(string(ex), ".docs/\n") {
+		t.Errorf("ignore default is exclude: %q", ex)
+	}
+}

@@ -12,11 +12,13 @@ import (
 	"github.com/Zovaris/smithy/internal/tasks"
 )
 
-const taskDirUsage = `usage: smithy task-dir <slug>
+const taskDirUsage = `usage: smithy task-dir <slug> [--default]
 Resolves (and creates) the task dir for a new plan from the user's settings, so smelt and
 warden put specs and tasks in the same place.
 Prints the absolute dir. Exit 3 with ` + "`ask <key>: <question>`" + ` when a setting it needs is unset:
 ask the user (the line ends with the default it would take), save it (` + "`smithy config set --repo <key> <value>`" + `), run it again.
+--default: nobody to ask (a launched session, hush): take each unset setting's default without
+saving it, and name it on stderr.
   tasks.location  repo (default) | local | board
   tasks.commit    true: docs/specs/<slug> (committed) · false: .docs/specs/<slug> (kept out of git)
   tasks.ignore    with commit false — gitignore: add ` + "`.docs/`" + ` to .gitignore (commit that line
@@ -44,7 +46,18 @@ const (
 
 // TaskDir resolves and creates the task dir for slug from the settings of the repo at the
 // working directory; board reports tasks.location board. An *AskError names an unset setting.
-func TaskDir(slug string) (dir string, board bool, err error) {
+func TaskDir(slug string) (string, bool, error) { return taskDir(slug, false) }
+
+// taskDir is TaskDir; def takes an unset setting's default instead of returning an *AskError.
+func taskDir(slug string, def bool) (dir string, board bool, err error) {
+	effective := func(key, dflt string) (string, error) {
+		v, _, err := config.Effective(key)
+		if err != nil && def {
+			fmt.Fprintf(os.Stderr, "default %s=%s (unset; not saved)\n", key, dflt)
+			return dflt, nil
+		}
+		return v, err
+	}
 	top, err := ghx.Run("git", "rev-parse", "--show-toplevel")
 	if err != nil || top == "" {
 		return "", false, ErrNotRepo
@@ -55,14 +68,14 @@ func TaskDir(slug string) (dir string, board bool, err error) {
 		dir = filepath.Join(tasks.PlansHome(), filepath.Base(top), slug)
 		return dir, false, os.MkdirAll(dir, 0o755)
 	}
-	commit, _, cerr := config.Effective("tasks.commit")
+	commit, cerr := effective("tasks.commit", "true")
 	if cerr != nil {
 		return "", false, &AskError{"tasks.commit", askCommit, "true → " + filepath.Join(top, "docs", "specs", slug)}
 	}
 	if commit == "true" {
 		dir = filepath.Join(top, "docs", "specs", slug)
 	} else {
-		ignore, _, ierr := config.Effective("tasks.ignore")
+		ignore, ierr := effective("tasks.ignore", "exclude")
 		if ierr != nil {
 			return "", false, &AskError{"tasks.ignore", askIgnore, "exclude → " + filepath.Join(top, ".docs", "specs", slug)}
 		}
@@ -124,11 +137,15 @@ func ignoreLine(file, line string) error {
 
 // TaskDirMain runs `smithy task-dir <slug>` and returns the exit code.
 func TaskDirMain(args []string) int {
-	if len(args) != 1 || args[0] == "-h" || args[0] == "--help" {
+	def := len(args) == 2 && args[1] == "--default"
+	if def {
+		args = args[:1]
+	}
+	if len(args) != 1 || args[0] == "-h" || args[0] == "--help" || args[0] == "--default" {
 		fmt.Fprintln(os.Stderr, taskDirUsage)
 		return 2
 	}
-	dir, board, err := TaskDir(args[0])
+	dir, board, err := taskDir(args[0], def)
 	var ask *AskError
 	switch {
 	case errors.As(err, &ask):
