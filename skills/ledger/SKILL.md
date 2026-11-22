@@ -55,6 +55,7 @@ on every run, and `smithy drift` reports their size; write only what the code do
   repo. Refresh it when entry points or layout change. Done: every entry point it names exists.
 - **sync `[base]`** — `references/DRIFT.md`: `smithy drift [base]` first (deterministic),
   then judge what it flags. Update the docs in the same branch; report what changed.
+  Done when `smithy drift` reports nothing left unhandled.
 - **comments `[paths]`** — `smithy comments <paths>` (or `--diff <base>`). For each finding:
   move the content to the module README or an ADR, turn it into a doc comment if it documents
   public API, or delete it. A TODO/FIXME is first opened as an issue, or its text listed for the
@@ -65,7 +66,8 @@ on every run, and `smithy drift` reports their size; write only what the code do
 ## ADR test
 
 Only when all three hold: **hard to reverse**, **surprising without context**, a **real
-trade-off**. Otherwise one line in the spec or module README (a local "why" goes there too).
+trade-off**. Otherwise one line in the spec or module README. A "why is this weird" comment
+about a cross-cutting choice becomes an ADR; a local "why" goes in the module README.
 
 ## Always
 

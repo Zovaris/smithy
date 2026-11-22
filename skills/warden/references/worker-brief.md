@@ -24,7 +24,7 @@ What workers are:
 | `<committed repo task file …>` | the line, with the file path | no task file, or it isn't committed (`docs/specs`) |
 | `<has prereqs or the batch is full: …>` | the wait-turn line | no prereqs and a free running slot |
 | `<relaunch: …>` | the relaunch line | first launch |
-| `<warden channel: …>` | "Put it in the card's note.", or the message line `references/harness.md` gives for this harness | never |
+| `<warden channel: …>` | the "channel line" column of `references/harness.md` for this harness | never |
 
 ```
 You are worker <id> in warden batch <batch>: <title>. Kind: <ship|scout>.
@@ -46,10 +46,10 @@ requirements from the intent and the code"; out of scope if the user named it>
 
 ## How
 - Read <hush-skill> once if the path is set.
-- Workflow: <mode smelt: "read <smelt-skill> and follow it yourself from the build phase to ship
-  at speed fast, every phase in order (build test-first, check the diff against the Spec-check
+- Workflow: <mode smelt: "read <smelt-skill> and follow it yourself at speed fast: phase 0, then build to ship
+  (plan and spec skipped at fast), every phase in order (build test-first, check the diff against the Spec-check
   list in its agents/reviewer.md yourself, verify with `smithy receipt run`, `smithy scan --base <base>`, PR
-  body with `smithy receipt list --md`). Launch no test or review agents: the warden runs one
+  body with `smithy receipt list --md`). Launch no test or review agents, except a security agent if the change is risky: the warden runs one
   check wave on the whole batch after the merges. Skipping a phase is a failed task, not a
   shortcut; its references/, agents/ and scripts/ paths are relative to its folder.
   Don't try to invoke it as a slash command." | mode plain: "work the way the repo's agent instructions
@@ -111,7 +111,7 @@ as the current step.
 - Decisions settled alone go in the PR body under "Decided without you".
 
 ## Closing line
-<warden channel: "Put it in the card's note." | the harness's message line>
+<warden channel: the "channel line" from `references/harness.md`>
 End each turn with exactly one line and nothing else:
 "done: <id> PR <url>" | "done: <id> ready <url or branch>" | "done: <id> reported" |
 "done: <id> decide: <question>" | "done: <id> blocked: <why>".

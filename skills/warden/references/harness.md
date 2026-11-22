@@ -16,6 +16,7 @@ reuses it.
 | **end** worker | `kill <pid>` if alive |
 | auto-end on PR close | none: the final message says to run warden cleanup |
 | worker closing line | the card's `note` |
+| **channel line** (the brief's `<warden channel>`) | "Put it in the card's note." |
 | **subagent** (short read-only job, or a fallback worker) | the harness's own subagent tool; none: `smithy agent --readonly [--model <m>] <prompt-file>` |
 
 `smithy agent` picks the installed CLI (`AGENT_CLI`, or `AGENT_CMD` for any other command, with no
@@ -39,16 +40,16 @@ background, so its brief runs `smithy wait-turn` in the foreground.
 
 ## Per-harness details
 
-| Harness | spawn · tell · end | wake | Notes |
-|---|---|---|---|
-| Claude Code CLI | `claude --bg -n "warden <batch> <id>" [--model <m>] "<brief>"` · `SendMessage` to its address · `claude stop <id>` + `claude rm <id>` | `smithy wait` with `run_in_background` | Your name: `ListAgents` prints "This session is <name>"; the brief's channel line is "Send it to the warden with SendMessage, to: <name>". Launch from the workspace root with this session's `--permission-mode`. `claude agents --json` lists workers. Subagent: Agent tool. No PR auto-fix (verify on each wake). Unattended flag: `claude -p --permission-mode auto` |
-| Claude Code desktop (optional) | `start_session` · `SendMessage` to its `local_…` id · `archive_session` | `smithy wait` with `run_in_background` | Below |
-| Codex | `codex exec` (git dir writable, network on) · resume (`codex exec resume <id>`) untested | foreground | subagent: `spawn_agent` |
-| OpenCode | `opencode run --standalone --auto` | resumes on background exit | has subagents |
-| Gemini CLI | `gemini --approval-mode yolo` | only with `tools.shell.backgroundCompletionBehavior: "inject"` | has subagents |
-| Cursor | `agent -p --force` | foreground | has subagents |
-| DeepSeek Harness (dsh) | `dsh headless --approval-policy never` | resumes on background exit | has subagents |
-| Pi | `pi -p` | foreground | no subagents: `smithy agent --readonly` |
+| Harness | spawn · tell · end | wake | channel line | Notes |
+|---|---|---|---|---|
+| Claude Code CLI | `claude --bg -n "warden <batch> <id>" [--model <m>] "<brief>"` · `SendMessage` to its address · `claude stop <id>` + `claude rm <id>` | `smithy wait` with `run_in_background` | "Send it to the warden with SendMessage, to: <name>." | Your name: `ListAgents` prints "This session is <name>"; the brief's channel line is "Send it to the warden with SendMessage, to: <name>". Launch from the workspace root with this session's `--permission-mode`. `claude agents --json` lists workers. Subagent: Agent tool. No PR auto-fix (verify on each wake). Unattended flag: `claude -p --permission-mode auto` |
+| Claude Code desktop (optional) | `start_session` · `SendMessage` to its `local_…` id · `archive_session` | `smithy wait` with `run_in_background` | "Put it in the card's note." | Below |
+| Codex | `codex exec` (git dir writable, network on) · resume (`codex exec resume <id>`) untested | foreground | "Put it in the card's note." | subagent: `spawn_agent` |
+| OpenCode | `opencode run --standalone --auto` | resumes on background exit | "Put it in the card's note." | has subagents |
+| Gemini CLI | `gemini --approval-mode yolo` | only with `tools.shell.backgroundCompletionBehavior: "inject"` | "Put it in the card's note." | has subagents |
+| Cursor | `agent -p --force` | foreground | "Put it in the card's note." | has subagents |
+| DeepSeek Harness (dsh) | `dsh headless --approval-policy never` | resumes on background exit | "Put it in the card's note." | has subagents |
+| Pi | `pi -p` | foreground | "Put it in the card's note." | no subagents: `smithy agent --readonly` |
 
 ### Claude Code desktop
 

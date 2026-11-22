@@ -59,14 +59,13 @@ stores every value as the user's standing permission for this batch.
    names branch <key> "<title>"`; `<worktree>` = `smithy names worktree <branch> <repo>`, never
    inside the repo; `<from>` = base, or the prereq's branch when stacked). Write the brief from
    `references/worker-brief.md` to `<batch-dir>/<id>.brief.md` and **spawn** each with its full
-   text as the prompt. Record session id or pid, bump `launches`, store `base_sha`.
-   Done when every item has a recorded running worker.
-3. **Watch.** `smithy wait batch:<batch>` in the background; on wake read only the printed
+   text as the prompt; no tend session (agents start only to fix something). Record session id or pid, bump `launches`, store `base_sha`. Done when every item has a recorded running worker.
+3. **Watch.** `smithy wait batch:<batch>` in the background (done when it returns); on wake read only the printed
    cards (`smithy cards get` if a line isn't enough; a log only if a card is missing or wrong).
 4. **Act** on each non-final card by `references/acting.md`: decide by impact, verify PRs, merge,
-   clean up, recover stuck ones.
-5. **Finish** when every item is `merged`, `reported`, `dropped`, held or waiting on the user,
-   and the batch check and its `fix` item merged. **End** finished workers; leave `blocked` /
+   clean up, recover stuck ones; someone else's PR already covers an item → `dropped` with a
+   pointer. Done when no printed card is left unhandled.
+5. **Finish** when every item is `merged`, `reported`, `dropped`, held or waiting on the user, and the batch check and its `fix` item merged. **End** finished workers; leave `blocked` /
    `failed` ones open. Done when the final message is sent.
 
 ## Talking to the user
@@ -77,4 +76,5 @@ warden <batch>: done
 ```
 then the **Decisions** and **Followups** lines (`references/acting.md`), takeover data (worktree,
 branch, session id or pid, log) for each unmerged item, and the open manual-merge PRs with their
-state (`tend watch` keeps them green). A wake with nothing for the user: no text, just the next wait.
+state (`tend watch` keeps them green); where the harness can't auto-end workers, say that
+`warden cleanup` ends the `ready` ones after their merges. A wake with nothing for the user: no text, just the next wait.

@@ -1,7 +1,7 @@
 ---
 name: smelt
 description: Use when planning, building, fixing, reviewing or shipping a code change, from any phase and at a chosen speed (fast, normal, full), whether the user asks or use-smithy routes the work here; not for a typo or one-line change.
-argument-hint: "[brainstorm|plan|spec|build [next|all]|test|review|ship|debug|adr|retro|init | from <phase>] [fast|full] <task or path>"
+argument-hint: "[brainstorm|plan|spec|build [next|all]|check|ship|debug|adr|retro|init | from <phase>] [fast|full] <task or path>"
 ---
 
 # smelt
@@ -26,17 +26,17 @@ Plain words work in any harness ("smelt plan <idea>").
 | Command | Runs |
 |---|---|
 | `smelt <task>` | no agreed plan → `plan` (at `fast`: `build`, criteria from the task); a plan, spec or task → `build`; a bug → `debug` |
-| `smelt brainstorm <idea>` | `references/BRAINSTORM.md` only |
+| `smelt brainstorm <idea>` | `references/BRAINSTORM.md` |
 | `smelt plan <idea>` | brainstorm → grill → spec → builder check (> 8 criteria or open questions) → tasks → ask how to run them. An agreed spec skips to tasks |
 | `smelt build next [dir]` · `build all [dir]` | `smithy tasks next`, build it to ship · every task in order (`references/EXECUTE.md`) |
-| `smelt <phase>` · `smelt from <phase>` | that phase only, or from it to the end (`spec`, `build`, `test`, `review`, `ship`, `retro`) |
+| `smelt <phase>` · `smelt from <phase>` | that phase only, or from it to the end (`spec`, `build`, `check`, `ship`, `retro`) |
 | `smelt debug <bug>` | `references/DEBUG.md` → build → check (regression agent) → ship |
 | `smelt adr <title>` · `smelt init` | ledger's `adr` / `init` mode when `smithy skills ledger` finds it; else `references/DOCS.md`. Done when the files are written and listed |
 
-A plan already in the chat *is* the spec: start at `build`, write its criteria to `.smelt/spec.md`.
+A plan in the chat *is* the spec: start at `build`, criteria to `.smelt/spec.md`.
 
 ## Speed
-Tell the user the speed and phases in one line first (a launched agent puts them in its report).
+Say the speed and phases in one line first (a launched agent: in its report).
 
 | | fast | normal (default) | full |
 |---|---|---|---|
@@ -44,20 +44,22 @@ Tell the user the speed and phases in one line first (a launched agent puts them
 | Plan | criteria from the task | spec if none exists | brainstorm, grill, spec, builder check, tasks |
 | Build | TDD on the criteria | TDD on every behaviour | same |
 | Scripts | suite, typecheck, lint, `smithy scan` | + property tests you write if the repo has a PBT library | + the mutation tool |
-| Agents, one parallel wave | none (you run the reviewer's Spec-check list) | adversary (runtime logic; regression for a reported bug) + reviewer | adversary, property, reviewer, security, mutation, e2e if UI/endpoints; hostile last if it runs |
+| Agents, one parallel wave | none (you run `agents/reviewer.md`, Spec-check section, yourself) | adversary (runtime logic; regression for a reported bug) + reviewer | adversary, property, reviewer, security, mutation, e2e if UI/endpoints; hostile last if it runs |
+| Re-review | none | fixed blocking findings only, ≤ 2 rounds (`references/RECEIVING.md` step 5) | same |
 | Target | ~5 min, no agent | ~10–15 min, 2–3 agents | ~6 agents |
+| Docs | ADR only if forced | glossary/ADR when they apply | + retro |
 
 **Risky** (auth, money, personal data, input parsing, file or shell access, secrets) adds the
 security agent at any speed; it never raises the speed. A prose-only change (docs, skill text)
-gets no test agents: its seam is the doc lint, its review is Spec-check alone. Each agent costs
-~60k tokens: property and mutation need a tool `smithy stack` shows, else "not applicable".
+gets no test agents: its seam is the doc lint, its review is Spec-check alone. Property and mutation
+need a tool `smithy stack` shows, else "not applicable".
 
 ## Phases
 
 | Phase | Do | Done when |
 |---|---|---|
 | **0 context** (always) | Read AGENTS.md / CLAUDE.md, CONTRIBUTING.md, `docs/GLOSSARY.md`, ADR titles, `docs/agents/STANDARDS.md`, the spec (ledger's context rules if installed). Run `smithy stack` once and use its commands. Note if you're in a worktree. Run the suite once as baseline. | you can name the seams and the baseline result (pre-existing failures named) |
-| **plan** | At plan: read `references/BRAINSTORM.md`, then `references/GRILLING.md`. Why → 2–3 approaches the user picks → design → remaining decisions. Facts via scout. | the user approved the design and decisions |
+| **plan** | At plan: read `references/BRAINSTORM.md`, then `references/GRILLING.md`. Why → 2–3 approaches the user picks → design → remaining decisions. Facts via scout; ADR candidates go to ledger's `adr` mode once the user confirms (else `references/DOCS.md`). | the user approved the design and decisions |
 | **spec** | At spec: read `references/SPEC.md`, then `references/TASKS.md`. Spec with agreed seams; > 8 criteria or open questions → `agents/builder.md`. Tracer-bullet tasks; ask: here all, here one at a time, warden, or later. | spec + tasks written, each fits one fresh context; the user chose |
 | **build** | At build: read `references/TDD.md`. From a task file: `smithy tasks set <file> status=doing`. One test at a time; single files while working, full suite at the end. | VERIFY: suite, typecheck, lint green; every criterion has a test |
 | **check** | At check: read `references/CHECK.md` (findings: `references/RECEIVING.md`). Launch the speed's agents in one wave; fix reproduced findings test-first. At full, hostile runs last on the fixed commit. | every finding fixed or declined in one line; no open blocking finding; high security shown to the user; VERIFY on the suite |

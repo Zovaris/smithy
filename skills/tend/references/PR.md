@@ -23,8 +23,8 @@ inside the repo). Then repeat:
      push: `--force-with-lease` only on branches of a warden batch you were given, or of a PR the
      user asked you to tend by name; on anyone else's branch, merge the base instead or stop
      with "needs you". Conflicts you can't resolve from both sides' intent → "needs you".
-   - **unresolved review threads** (`answer-review`, human or bot) → smelt's receiving rules (`smithy skills smelt` prints its
-     SKILL.md; read `references/RECEIVING.md` beside it). Without smelt: verify each claim, fix
+   - **unresolved review threads** (`answer-review`, human or bot) → smelt's `references/RECEIVING.md` (`smithy skills smelt` prints
+     smelt's SKILL.md; the file is in smelt's `references/` beside it). Without smelt: verify each claim, fix
      real in-scope ones test-first and reply with the sha, decline scope creep with one line,
      resolve only threads you fixed. At most 3 bot rounds
      per PR (a person you disagree with twice → "needs you"); the count lives in the card's `review_rounds` (`smithy cards set <batch> <id>
@@ -42,6 +42,9 @@ inside the repo). Then repeat:
      told to stay until merged).
 3. Commit fixes with `smithy commit` (style once, one concern per commit); push without force
    unless the rebase rule above allows it.
+
+Done when the PR's `action` is `done` (green), `cleanup` (merged or closed) or it was handed
+back with "needs you" / a card state, and its end line is written.
 
 ## When a PR doesn't get green
 

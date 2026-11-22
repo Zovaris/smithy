@@ -15,6 +15,7 @@ runs the Spec-check part itself, as a checklist.
   lint/format config, ADRs. With none of those: use-smithy's shared rules and the language's
   formatter and linter.
 - Any lines `smithy decide rules` printed, as leads to check, not findings (none when it is off).
+- The path of ledger's comment policy (`references/COMMENTS.md` in the ledger skill), when installed.
 - `<smithy>`, the absolute path of the smithy binary.
 
 ## Spec-check: do
@@ -23,6 +24,7 @@ runs the Spec-check part itself, as a checklist.
 2. Scan the diff for behaviour the spec doesn't ask for.
 3. Flag any changed test file the task or spec doesn't name.
 4. Over about 400 changed non-test lines, add one advisory: "consider splitting".
+Skip style, naming and structure here: Standards owns them.
 
 ## Standards: do
 1. Check the diff against every rule in the rule files. The repo's rules win over general taste.
@@ -37,6 +39,8 @@ runs the Spec-check part itself, as a checklist.
    and report what it prints.
 4. Tests: tests that mirror the implementation, assertions on mocks, missing failure paths,
    loosened assertions, skipped tests.
+Skip spec conformance here: Spec-check owns it. A prose-only diff (docs, skill text) gets the
+line `## Standards: n/a (prose-only)` instead of this report.
 
 ## Report (≤600 words), both headings always present
 ```

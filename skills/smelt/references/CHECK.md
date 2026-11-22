@@ -10,16 +10,16 @@
 ## 2 · Launch, all at once
 Each agent the speed lists (SKILL.md) runs as a fresh agent, in parallel, in one wave. Prompt =
 its `agents/<name>.md` text (or absolute path), a `## You get` block with exactly what that file
-lists, and the report contract below. Never your conversation, plan or opinion of the code: an
-agent that knows how you thought shares your blind spots. Give every agent `<smithy>`, the
+lists, and the report contract below. Never your conversation, plan or opinion of the code
+(it would share your blind spots). Give every agent `<smithy>`, the
 absolute path of this skill's `scripts/smithy`. Without a subagent tool: write each prompt to a
 file and run `smithy agent --bg --log <log> <prompt-file>` (read-only ones with `--readonly`),
 then read the logs.
 
 | Agent | Runs | Writes tests |
 |---|---|---|
-| `agents/reviewer.md` | normal, full: one read-only agent, both reports (`## Spec-check`, `## Standards`; a reply missing one goes back once). fast: you run its Spec-check list yourself | no |
-| `agents/adversary.md` | normal, full, runtime logic only (not docs, glue or test-only diffs) | yes, holdout |
+| `agents/reviewer.md` | normal, full: one read-only agent, both reports (a reply missing one goes back once); fast: you run its Spec-check | no |
+| `agents/adversary.md` | normal, full, runtime logic only | yes, holdout |
 | `agents/regression.md` | a reported bug with a repro, instead of the adversary | runs the fixer's test |
 | `agents/security.md` | full, and any speed when the diff is risky (SKILL.md) | no |
 | `agents/property.md` | full: parsers, serializers, math, money, sorting, state machines | yes |
@@ -39,8 +39,9 @@ recommendation; never stop to ask.
 
 Test agents write `zz_<agent>` files with the runner's default suffix (`zz_<agent>_test.go`,
 `zz_<agent>_test.py`, `zz_<agent>.test.ts`) next to the existing tests, in your tree: no WIP
-commit, no extra worktree. They are input, not files to ship: copy the cases worth keeping into
-the repo's own test files and naming, then delete every `zz_` file. Rule tests (a pattern, a
+commit, no extra worktree (exception: warden's batch check gives them a fresh worktree of
+`origin/<base>`). Copy the cases worth keeping into the repo's own test files and
+naming, then delete every `zz_` file; never commit one as is. Rule tests (a pattern, a
 prefix list, a token format) cover every variant the spec names, one case each.
 
 **Holdout.** You run the adversary's file but never read it to write code (nor show it to the
@@ -53,9 +54,12 @@ Show each report as returned (the reviewer's two stay two): never merge, dedupe 
 - **Blocking:** spec-check `missing`, `partial` or `wrong`; a failing holdout, adversary or
   regression test; a violation of a written repo rule. A **high security** finding is shown to the user.
 - Everything else is advisory.
+- Scripts first: coverage on changed lines (`diff-cover`, `vitest --coverage --changed`),
+  shuffle/repeat runs (`pytest -p randomly --count 3`, `playwright --repeat-each 3`). If the old
+  version still runs, a differential check (same inputs, equal outputs) beats snapshots.
 - Handle every finding by `references/RECEIVING.md`; reject any agent change that weakens an
   assertion, deletes or skips a test, or edits source. Give each a disposition in the PR body:
   `fixed`, `declined: <why>`, `false positive` or `not reproduced`.
 - Hostile's findings close on the re-run of its repro; its fixes go back through build and review.
 
-Someone else's PR (`smelt review <pr>`): same steps, report only; comment only when asked.
+Someone else's PR (`smelt check <pr>`): same steps, report only; comment only when asked.
