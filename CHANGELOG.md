@@ -5,6 +5,13 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **Trial 6 frictions.** Re-review is at most two rounds; a resumed reviewer that repeats its old
+  report is replaced by a fresh one with the fix diff; a finding still open goes to the user, or
+  with nobody to ask into "Decided without you" (high security, money or data findings still
+  stop with a `blocked:` line). Risky work adds the security agent without
+  raising the speed (`full` is for money, auth, data loss, public APIs or on request).
+  `smithy comments` ignores `smithy:allow` markers. Every `build all` commit builds. A task's
+  `Spec:` may point at an agreed spec where it already lives.
 - **Trial 5 frictions.** `smithy tasks set` keeps the `PR:` key; `smithy receipt run` runs one
   quoted command line through the shell (zsh doesn't split `"$cmd"`); Markdown edits (a task file
   marked done) no longer make receipts dirty or stale; `smithy pr template` prints `none:` instead
@@ -41,7 +48,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   property tests written by the worker; `full` adds a second adversary, property, security, the
   mutation tool run as a command with an agent reading the survivors, and hostile last. Test
   agents write `zz_` files in the tree (no WIP commit, no extra worktree); a fixed blocking
-  finding is confirmed by resuming the same reviewer, not a fresh one; no "another look by
+  finding is confirmed by resuming the same reviewer; no "another look by
   judgment". Plans aim for a short chain (width over tidiness). Workers end at `pr_open`; warden
   waits on every PR's CI in one `smithy wait` and merges; no tend session per batch or PR (red CI
   goes back to the worker; tend runs when the user starts it). `warden.max` defaults to 5.

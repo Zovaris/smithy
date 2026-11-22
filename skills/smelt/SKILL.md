@@ -47,12 +47,12 @@ starting; a subagent or worker running smelt stays silent and puts them in its r
 
 | | fast | normal (default) | full |
 |---|---|---|---|
-| For | small or clear changes, warden workers | most features and fixes | risky logic, money, data, auth, public APIs |
+| For | small or clear changes, warden workers | most features and fixes | money, auth, data loss, public APIs, or when asked |
 | Plan / spec | skipped; criteria from the task | spec if none exists | brainstorm + grill + spec + builder check (if needed) + tasks |
 | Build | TDD on the acceptance criteria only | TDD on every behaviour | TDD on every behaviour |
 | Checks (scripts) | suite, typecheck, lint, `smithy scan` | same, plus property tests you write when the repo has a PBT library | same, plus the mutation tool run as a command |
 | Agents (one wave, in parallel) | none: you check the diff against `agents/spec-check.md` yourself; a security agent only if the change is risky | adversary (runtime logic only; regression instead for a reported bug) + one reviewer (spec-check and standards); security as a third only if risky, never more than three | adversary, property, one reviewer for spec-check and standards, security, one agent reading the surviving mutants, e2e when UI or endpoints changed; hostile last, for a service or CLI that runs |
-| Re-review | none | the same reviewer, resumed, looks only at the fixes for a blocking finding | same |
+| Re-review | none | the reviewer looks only at the fixes for a blocking finding, two rounds at most (REVIEW.md step 6) | same |
 | Target | ~5 min, no subagent | ~10–15 min, 2–3 subagents | the safest flow, ~6 subagents |
 | Verify gate | always | always | always |
 | Docs | ADR only if forced | glossary/ADR when they apply | glossary/ADR when they apply + retro |
@@ -65,7 +65,7 @@ Property and mutation need a tool in the repo (`smithy stack` shows it); without
 at the end. A trivial change (copy, style, one-liner) doesn't need smelt (use-smithy); if smelt was asked for, it is `fast`. A prose-only change (docs, skill
 text) needs no test agents: its seam is the doc lint if the repo has one, and review is spec-check alone, at any speed.
 Risky means the change touches auth, money, personal data, input parsing, file or shell access,
-or secrets. Under hush, never ask, not even about the speed (pick it and say which at the end); high-impact
+or secrets; it adds the security agent at the speed you picked, it doesn't raise the speed. Under hush, never ask, not even about the speed (pick it and say which at the end); high-impact
 decisions (security, money, personal data, production) still stop with a `blocked:` line (hush).
 
 ## Phases
@@ -106,9 +106,9 @@ criterion has a test".
 lists at the same time, as parallel **subagents**, each with only what its file in `agents/`
 lists, never your plan or reasoning. Test agents write `zz_<agent>` test files (TESTING.md) in your tree;
 you fix the code, they never do. Never merge or rerank their reports. A blocking finding you
-fixed closes when the same reviewer, resumed, says so.
+fixed closes as REVIEW.md step 6 says.
 **Done:** every reproduced finding fixed (failing test first) or declined with one line, no
-open blocking finding, every high security finding shown to the user, VERIFY gate on the suite.
+open blocking finding (or each one recorded as REVIEW.md step 6 allows), every high security finding shown to the user, VERIFY gate on the suite.
 At `full`, with something that runs, `agents/hostile.md` runs on the fixed commit last; its
 fixes go back through build and the same reviewer.
 

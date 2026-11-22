@@ -20,7 +20,7 @@ Started by you (by name, the way your harness starts skills) or by an agent thro
 
 | | fast | normal (default) | full |
 |---|---|---|---|
-| For | small or clear changes | most features and fixes | auth, money, data, public APIs |
+| For | small or clear changes | most features and fixes | money, auth, data loss, public APIs, or when asked |
 | Plan | criteria from the task | a spec if none exists | brainstorm, grill, spec, builder check for large or open specs, tasks |
 | Checks (scripts) | suite, typecheck, lint, scan | + property tests you write | + the mutation tool |
 | Agents, one wave in parallel | none (you check against the spec) | adversary + one reviewer | two adversaries, property, reviewer, security, mutant reader; hostile last |

@@ -37,12 +37,13 @@ For each task:
    every speed. The speed's agents run once, on the whole branch, after the last task.
 6. **Fix loop**: send the reproduced findings back to a fresh implementer with the diff. At most
    3 rounds; round 3 uses the strong model. Still failing → `BLOCKED` with the findings.
-7. Commit the task atomically (`smithy commit`). Its `status=done pr=<url>` is set at ship, once
+7. Commit the task atomically (`smithy commit`); every commit builds and passes its tests, so a
+   file a later task fills in starts as a stub here. Its `status=done pr=<url>` is set at ship, once
    the PR exists.
 
 After the last task, at the highest `Speed:` among the tasks: `fast` → ship; `normal` or `full` →
 one check wave on the whole branch (SKILL.md's table, its agents in parallel), one fix wave,
-the same reviewer resumed on the fixes, then ship.
+the re-review of REVIEW.md step 6, then ship.
 
 ## Rulings
 

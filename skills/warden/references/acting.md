@@ -63,8 +63,8 @@ or shell access, or secrets. Test agents work in a fresh worktree of `origin/<ba
 worker's.
 Findings follow smelt's receiving rules. The blocking ones become one new `fix` item: one worker
 (same brief, speed `fast`, intent = the findings verbatim, branch from `smithy names branch -
-"<batch> review" fix`), one PR, merged like the others; then **tell** the same reviewer, resumed, to
-confirm at the fix's commit. A high security finding also goes to the user. Non-blocking ones
+"<batch> review" fix`), one PR, merged like the others; then the re-review of smelt's REVIEW.md step 6
+at the fix's commit. A high security finding also goes to the user. Non-blocking ones
 go under **Followups**.
 
 ## batch end (final message)

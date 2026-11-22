@@ -33,9 +33,12 @@
    resume the same reviewer (your harness's message or resume to that subagent) with the fixes'
    diff and `smithy receipt list` output, asked only "is each finding resolved, and did the
    fixes add a new problem?". It already has the context, so this is cheap. Where the harness
-   can't resume a subagent, send one fresh subagent per round with the same files. A finding it
-   keeps open goes back to step 5; a second "still open" goes to the user. Advisory findings and
-   fixes for them need no look.
+   can't resume a subagent, or the resumed reply repeats its earlier report instead of judging the
+   fixes, send one fresh subagent with the same files plus the fixes' diff. At most two such
+   rounds: a finding still open after the second goes to the user, or, with nobody to ask (hush,
+   a launched session), into the PR's "Decided without you" as an open risk with its repro, and
+   you move on; a high security, money or data finding still stops with a `blocked:` line. A new problem the re-review finds in a fix is a new finding, not another round of
+   the old one. Advisory findings and fixes for them need no look.
 
 Reviewing someone else's PR (`/smelt review <pr>`): same steps, report only; post comments only
 when the user asks.

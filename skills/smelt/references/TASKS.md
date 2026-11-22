@@ -66,7 +66,7 @@ Status: todo
 Blocked by: <NN, NN | none>
 Speed: <fast | normal | full>
 PR: -
-Spec: ./spec.md
+Spec: <relative path to the spec: ./spec.md, or the agreed spec where it already lives>
 
 ## What
 <one paragraph>

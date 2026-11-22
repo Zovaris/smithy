@@ -14,7 +14,7 @@ const commentsUsage = `smithy comments: checks the comment policy and prints ` +
   smithy comments [paths...]         files or folders (default: the repo)
   smithy comments --diff <base>      only lines added against <base> (and staged ones)
 Allowed: public API doc comments, license/SPDX headers, shebangs, a shell script's header block,
-tool directives with a reason, go:build/generate, Rust /// //! and SAFETY. Everything else is
+tool directives with a reason, smithy:allow markers, go:build/generate, Rust /// //! and SAFETY. Everything else is
 reported. Heuristic: languages ts tsx js jsx mjs cjs py go rs java kt sh. Exit 1 on findings.`
 
 var (
@@ -127,6 +127,8 @@ func slashDirective(body, ext string) string {
 		}
 		return msgReason
 	case ext == ".go" && goDirectRx.MatchString(b):
+		return "ok"
+	case strings.HasPrefix(b, "smithy:allow"):
 		return "ok"
 	case strings.HasPrefix(b, "prettier-ignore") || strings.HasPrefix(b, "biome-ignore") ||
 		strings.HasPrefix(b, "istanbul ignore") || strings.HasPrefix(b, "c8 ignore"):
@@ -264,7 +266,7 @@ func CheckHash(lines []string, ext string) []Finding {
 				continue
 			}
 		}
-		if shell && shellckRx.MatchString(b) {
+		if shell && shellckRx.MatchString(b) || strings.HasPrefix(strings.TrimSpace(b), "smithy:allow") {
 			continue
 		}
 		if strings.TrimFunc(before, isPySpace) != "" {
