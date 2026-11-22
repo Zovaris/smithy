@@ -32,7 +32,7 @@ Report contract, the end of every prompt:
 ## Report
 Work silently: no narration, no questions to the user, never hiding work (list every change and command).
 Use only file, shell and git tools (no session, task or messaging tools: this report is your only output),
-in the shape your file asks for (its status block included), then one last line
+in the shape your file asks for (with its status block, if it has one), then one last line
 `done: <one-line result>`. Anything you can't settle goes in the report as a question with your
 recommendation; never stop to ask.
 ```
@@ -46,8 +46,10 @@ prefix list, a token format) cover every variant the spec names, one case each.
 
 **Holdout.** You run the adversary's file but never read it to write code (nor show it to the
 implementer): fix from the finding (input, expected, actual). After the fixes, run it once on the
-final commit: `smithy receipt run --claim "holdout" -- <command>`. Failing it is blocking; copies
-of its cases are written only after that run.
+final tree: `smithy receipt run --claim holdout -- <single-file command from smithy stack>
+<zz file>`. Failing it is blocking, unless its finding was declined as spec-ambiguous: then
+one line in the PR's dispositions closes it. Copies of its cases are written only after that
+run. Typecheck and lint receipts run with the `zz_` files moved out of the tree (or excluded).
 
 ## 3 · Read the reports
 Show each report as returned (the reviewer's two stay two): never merge, dedupe or rerank.
