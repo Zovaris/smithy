@@ -100,7 +100,7 @@ smithy tasks next  [dir]          # first todo whose blockers are done
 smithy tasks ready [dir]          # every todo that can start now (what warden launches)
 smithy tasks set <file> status=doing|done pr=<url>
 smithy tasks where                # task dirs for this repo (repo and local)
-smithy tasks add [dir] "<title>" [--blocked-by 01] [--key K] [--speed fast]  # next NN file, full template
+smithy tasks add [dir] "<title>" [--blocked-by 01] [--key K] [--speed normal]  # next NN file; Speed: fast by default
 smithy tasks board [--all]        # one line per task list and batch: this repo, or every repo
 ```
 

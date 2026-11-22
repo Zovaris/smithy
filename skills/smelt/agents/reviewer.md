@@ -69,5 +69,8 @@ Standards: at most 10 findings, most important first. Blocking only for a violat
 repo rule (`docs/agents/STANDARDS.md`, else AGENTS.md / CLAUDE.md / CONTRIBUTING.md); a bug you
 see is `should` unless a test reproduces it; everything else `should` or `nit`.
 Only claims you can point to a line for. Nothing found is a valid result in either report.
-Re-review: you get the blocking findings to check; answer only whether each is resolved
-(file:line). Don't re-list advisory, `should` or `nit` items.
+Re-review: read the code at the commit sha in your prompt (`git show <sha>:<file>`), never an
+older one. Check every spec-check row that was missing, partial or wrong and every blocking
+Standards finding; answer only whether each is resolved (file:line). A departure recorded in
+`rulings.md` as an open risk for the user closes as "deferred to user"; don't re-flag it.
+Don't re-list advisory, `should` or `nit` items.

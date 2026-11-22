@@ -5,6 +5,15 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **A/B trial frictions (r4).** `smithy tasks add` defaults to `Speed: fast`. Skills: re-review
+  covers every spec-check row that was missing, partial or wrong plus Standards blocking, reads
+  the exact commit sha, and closes a departure recorded in `rulings.md` as "deferred to user";
+  a user-answer `partial` with nobody to ask becomes a ruling; read-only agents ignore `zz_*`
+  files, which move to the system temp dir for typecheck and lint; adversary expected values
+  are re-derived; declined holdout tests may be dropped; another ref is reviewed in a detached
+  worktree; rebase-proof uses the no-tests flag and runs only for more than one source commit;
+  `status=done pr=` lands in a follow-up commit; check `smithy commit`'s exit code; single-file
+  test runs skip pretest hooks. `docs/trials/2026-11-v012-rounds.md` summarises the v0.12 rounds.
 - **A/B trial frictions (r3).** `smithy verify` counts `checks=none` as pending when the repo
   has a workflow file; `smithy route --domain` (config `route.domain`) takes the product's nouns,
   which never count as risk; `smithy task-dir`'s ask line prints the default it would take;

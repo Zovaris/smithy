@@ -75,6 +75,7 @@ need a tool `smithy stack` shows, else "not applicable".
   `.smelt/rulings.md`) and the PR's "Decided without you". Not for security, money, personal
   data, production, push/merge or `smithy:allow` on a real secret: stop with a `blocked:` line.
   Lessons: `references/SHIP.md`.
+- Check `smithy commit`'s exit code before running receipts.
 - Command shapes: `smithy receipt run --claim "<c>" -- <cmd> <args>`; commit with
   `smithy commit "<msg>" <path>...` (never `git add` first: it wants a clean index; subject
   under 72 characters; if it fails: `git restore --staged <paths>`, then retry); a fixture that

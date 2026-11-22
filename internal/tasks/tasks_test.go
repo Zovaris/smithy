@@ -177,11 +177,11 @@ func TestAdd(t *testing.T) {
 		t.Errorf("f1 %s", f1)
 	}
 	b, _ := os.ReadFile(f1)
-	if want := "# 01 · Add Login Page!\nStatus: todo\nBlocked by: none\nSpeed: normal\nPR: -\n" + taskTemplate; string(b) != want {
+	if want := "# 01 · Add Login Page!\nStatus: todo\nBlocked by: none\nSpeed: fast\nPR: -\n" + taskTemplate; string(b) != want {
 		t.Errorf("body:\n%s", b)
 	}
 	write(t, filepath.Join(dir, "spec.md"), "spec")
-	f2, err := Add(dir, "Rate limit", "01", "PROJ-12", "fast")
+	f2, err := Add(dir, "Rate limit", "01", "PROJ-12", "normal")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func TestAdd(t *testing.T) {
 		t.Errorf("f2 %s", f2)
 	}
 	b, _ = os.ReadFile(f2)
-	if !strings.Contains(string(b), "Blocked by: 01\nSpeed: fast\nPR: -\nKey: PROJ-12\nSpec: ./spec.md\n") {
+	if !strings.Contains(string(b), "Blocked by: 01\nSpeed: normal\nPR: -\nKey: PROJ-12\nSpec: ./spec.md\n") {
 		t.Errorf("body:\n%s", b)
 	}
 	tk, _ := Parse(f2)
