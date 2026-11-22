@@ -86,6 +86,15 @@ func (r repo) pydep(name string) bool {
 	return false
 }
 
+// pytest reports whether the repo uses pytest: a dependency or a pytest config.
+func (r repo) pytest() bool {
+	if r.pydep("pytest") || r.file("pytest.ini") || r.file("conftest.py") || r.file("tests/conftest.py") {
+		return true
+	}
+	b, _ := os.ReadFile(filepath.Join(r.dir, "pyproject.toml"))
+	return strings.Contains(string(b), "[tool.pytest")
+}
+
 func or(v, fallback string) string {
 	if v != "" {
 		return v
@@ -203,11 +212,12 @@ func Stack(dir string) []Line {
 		if r.file("poetry.lock") {
 			run = "poetry run "
 		}
-		if unittest {
-			test, single = or(test, "python3 -m unittest"), or(single, "python3 -m unittest <module>")
+		if unittest || !r.pytest() {
+			test, single = or(test, "python3 -m unittest discover"), or(single, "python3 -m unittest <module>")
+		} else {
+			test = or(test, run+"pytest -q")
+			single = or(single, run+"pytest -q <file>")
 		}
-		test = or(test, run+"pytest -q")
-		single = or(single, run+"pytest -q <file>")
 		if r.pydep("mypy") {
 			typecheck = join(typecheck, "; ", run+"mypy .")
 		}

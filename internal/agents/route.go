@@ -286,7 +286,7 @@ func RouteMain(args []string) int {
 		speed = "normal"
 	}
 	if strings.TrimSpace(text) == "" && kind == "ship" {
-		fmt.Fprintln(os.Stderr, "smithy route: give --file or --text")
+		fmt.Fprintln(os.Stderr, routeUsage)
 		return 2
 	}
 	domain, ok := opt("--domain")
