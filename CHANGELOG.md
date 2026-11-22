@@ -5,6 +5,18 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **R15 warden risky-task-list frictions.** New `smithy batch init <tasks_dir> --repo <dir>
+  [--base b] [--merge auto|manual] [--max n]` writes `batch.json` from a task dir (ids, titles,
+  paths as intent, speed, prereqs from Blocked by, branch and worktree names, risky and route
+  from the task text; a taken batch dir gets `-2`), and `smithy batch add` appends one item (the
+  batch check's fix). `smithy brief` copies every line of the task dir's `rulings.md` for any task
+  file, committed or not. Intake: commit and push a `docs/specs` task dir to the base before
+  launch, else use `.docs/specs`. Risky workers set card `security=ran` (or `not-run:<reason>`);
+  the warden never merges a risky item without `security=ran`. `smithy cards set` names the
+  unknown `state=` value. `smithy route` usage says it routes the task when `--agent` is omitted;
+  `backfill` and `stored data` count as risky, and smelt's Risky list names data migrations and
+  in-place rewrites of stored data. smelt's RECEIVING.md: a pre-existing finding outside every
+  task's scope is a follow-up (a high security one goes to the user).
 - **R14 warden bug-fix frictions.** Intake marks bug reports `route: debug` and risky items
   `risky: true` in `batch.json`; `smithy brief` then tells the worker to take smelt's debug path
   (a failing `smithy receipt run --claim repro` committed before the fix) or run the security
