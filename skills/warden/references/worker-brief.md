@@ -1,22 +1,22 @@
 # Worker brief
 Contents: what workers are · how the brief is rendered · the template.
 
-Render it, never write it by hand: `smithy brief <batch> <id> [--to <warden-name>] [--subagent]`
-fills the template below from `batch.json` (the item's fields, the batch's merge and mode), the
-installed skills and `references/harness.md`, writes `<batch-dir>/<id>.brief.md` and prints its
-path. It checks the worktree is on the item's branch; exit 2 names what it can't fill (fix it,
-render again). `--to`: your name, where the channel line needs one; `--subagent`: the fallback.
-
+Never by hand: `smithy brief <batch> <id> [--to <warden-name>] [--subagent]` fills the template
+from `batch.json`, the installed skills and `references/harness.md` into `<batch-dir>/<id>.brief.md`,
+checking the worktree is on the item's branch; exit 2 names what it can't fill. `--to`: your
+name, where the channel line needs one; `--subagent`: the fallback.
 What workers are:
 - They read the hush and smelt SKILL.md files at the brief's absolute paths (no slash commands:
   harnesses differ). Silent: only the status card and one closing line, never the user.
 - Mode `smelt <speed>`: workers build at smelt `fast`; the speed sets the one check wave on the
-  merged batch (`references/acting.md`, batch check). Mode `plain`: the repo's instructions.
-- Effort: `agent.effort` (default and cap medium); a harder item gets a stronger model, not more effort.
+  merged batch (`references/acting.md`, batch check). Mode `plain`: the repo's instructions, else
+  just the brief.
+- Effort: `agent.effort` (cap medium); a harder item gets a stronger model, not more effort.
 
 Template: `{{x}}` is filled, `[if x]`…`[end]` kept only when x holds (`!x`: when not); `intent`
-verbatim; `rulings`: lines of the task dir's `rulings.md` and `<batch-dir>/decisions.md` naming
-the id; `taskfile`: the source is a file committed on the base; `wait`: prereqs, or past `max`
+is copied verbatim, never summarized or given added requirements, plans or criteria; rulings
+never go to reviewers; `rulings`: lines of the task dir's `rulings.md` and
+`<batch-dir>/decisions.md` naming the id; `taskfile`: the source is a file committed on the base; `wait`: prereqs, or past `max`
 among items without prereqs on a first launch; `relaunch`: `launches` > 0.
 
 ```
@@ -51,7 +51,7 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
   (a security agent only if the change is risky): the warden checks the merged batch once. Skipping a phase is a failed task, not a shortcut; its
   references/, agents/ and scripts/ paths are relative to its folder. Not a slash command.
 [end]
-[if !smelt]- Workflow: the repo's agent instructions (AGENTS.md / CLAUDE.md): tests for what you change, typecheck and lint green.
+[if !smelt]- Workflow: the repo's agent instructions (AGENTS.md / CLAUDE.md), else just this brief: tests for what you change, typecheck and lint green.
 [end][if taskfile]
 - In your branch, set the task file's `Status: done` and `PR: <url>`
   (`{{smithy}} tasks set {{source}} status=done pr=<url>`) once the PR exists, as a follow-up
@@ -74,8 +74,8 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
   action, check git log, git status and `gh pr list --head {{branch}}` (when `gh` is installed);
   continue from what exists, never open a second PR or force-push.
 [end]
-- Stay current with the base: `git fetch origin && git merge origin/{{base}}` (resolve, run the
-  tests) before opening the PR. Other PRs merge into the same base while you work.
+- Stay current with the base: `git fetch origin && git merge origin/{{base}}`[if stack] (`origin/{{from}}`
+  instead until {{prereq}} has merged)[end] (resolve, run the tests) before opening the PR. Other PRs merge into the same base while you work.
 - Commits: `{{smithy}} commit style` once, then one atomic commit per concern with
   `{{smithy}} commit "<msg>" <paths>` in that style. PR: `{{smithy}} pr template`; fill every
   heading of the template if there is one, then `{{smithy}} pr create --base {{base}} --title "<t>"
@@ -85,7 +85,7 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
   for, or need coordinated redesign → needs_decision, impact high. File count or failing tests
   alone are not reasons to stop.
 - Same obstacle twice after a real fix attempt: state=blocked with the one thing you need; stop.
-- Do not create worktrees or issues; never start, fork or hand off sessions.
+  Do not create worktrees or issues; never start, fork or hand off sessions.
 
 ## Status card
 `{{smithy}} cards set {{batch}} {{id}} key=value…` at every phase change and before

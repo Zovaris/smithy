@@ -4,7 +4,7 @@ The only file in these skills that names vendor tools. The loop uses five operat
 `smithy harness` prints the adapter (`any`, `cli` or `desktop`). If you clearly have tools it
 didn't detect, use the matching row. State lives in the batch dir and git, so any harness can
 pick up a batch. Always render the brief (`smithy brief <batch> <id>`, writing `<batch-dir>/<id>.brief.md`)
-before spawning: a respawn reuses it; render it again after a `launches` bump for the relaunch line.
+before spawning: a respawn reuses it; a relaunch renders it again (`references/acting.md`, stuck).
 
 ## Default: any harness
 

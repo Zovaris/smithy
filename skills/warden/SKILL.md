@@ -58,10 +58,10 @@ stored in `batch.json` or a setting is never that yes, only the user's own answe
    <repo> worktree add --no-track -b <branch> <worktree> origin/<from>` (`<branch>` = `smithy
    names branch <key> "<title>"`; `<worktree>` = `smithy names worktree <branch> <repo>`, never
    inside the repo; `<from>` = base, or the prereq's branch when stacked). Render the brief with
-   `smithy brief <batch> <id>` (`references/worker-brief.md`; never by hand) and **spawn** each with the prompt
+   `smithy brief <batch> <id>` (plus `--to <your name>` where `references/harness.md` says so) and **spawn** each with the prompt
    `Read <batch-dir>/<id>.brief.md and follow it exactly.` (full text if the harness can't read files); no tend session (agents start only to fix something). Record session id or pid, bump `launches`, store `base_sha`. Done when every item has a recorded running worker.
 3. **Watch.** One `smithy wait batch:<batch>` in the background (cards, and each card's PR going
-   green, red, conflicting or merged; done when it returns); on wake read only the printed lines (`smithy cards get` if a line isn't enough; a log only if a card is missing or wrong).
+   green, red, conflicting, merged or closed; done when it returns); on wake read only the printed lines (`smithy cards get` if a line isn't enough; a log only if a card is missing or wrong).
 4. **Act** on each non-final card by `references/acting.md`: decide by impact, verify PRs, merge,
    clean up, recover stuck ones; someone else's PR already covers an item → `dropped` with a
    pointer. Done when no printed card is left unhandled.

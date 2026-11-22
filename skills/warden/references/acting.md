@@ -94,8 +94,8 @@ line each, grouped as **Decisions** and **Followups**, each with the PR it came 
 Recovery ladder, one rung per wake:
 1. Answer from the intent if the note asks something it settles.
 2. One corrective line to the worker (**tell**).
-3. Relaunch in the **same worktree** with the brief's relaunch line, only while the item's
-   `launches` is below 3 (first launch included).
+3. Relaunch in the **same worktree**, only while the item's `launches` is below 3 (first launch
+   included): bump `launches`, then `smithy brief <batch> <id>` again (it adds the relaunch line).
 4. At the cap, set the card `state=blocked` and tell the user
    with the `note`; the item stays listed as blocked until they act.
 
