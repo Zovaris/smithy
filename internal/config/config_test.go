@@ -523,3 +523,15 @@ func TestRepoFileInWorktreeIsTheMainCheckouts(t *testing.T) {
 		t.Fatalf("RepoFile in worktree = %s, want under %s", RepoFile(), main)
 	}
 }
+
+func TestAskTimeoutDefault(t *testing.T) {
+	for _, s := range Known {
+		if s.Key == "ask.timeout" {
+			if s.Default != "10" {
+				t.Fatalf("ask.timeout default %q", s.Default)
+			}
+			return
+		}
+	}
+	t.Fatal("ask.timeout not a known setting")
+}

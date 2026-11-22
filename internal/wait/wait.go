@@ -726,6 +726,8 @@ Targets (any mix):
   base[:<branch>]     the branch (default: origin's default) moved on origin
   alerts              a new open Dependabot alert (skipped, with a note, without read access)
                       actions and alerts already there on the first run are recorded, not reported
+  timer:<minutes>     fires after the minutes (exit 0, "timer: <m>m elapsed"); alone, no GitHub;
+                      the ask timeout: smithy wait timer:$(smithy config get ask.timeout)
   watch[:<scopes>]    tend's watch mode; scopes is a comma list of prs, issues, actions, base,
                       alerts, or all (default tend.watch; issue label from tend.label)
 Finished checks are reported at once. Exit 0 = events, 4 = heartbeat, 2 = bad target, 3 = no GitHub access (gh missing or signed out and no GH_TOKEN).
@@ -771,6 +773,27 @@ func onlyBatches(targets []string) bool {
 	return true
 }
 
+var sleep = time.Sleep
+
+// timer handles `smithy wait timer:<minutes>`, which takes no other target.
+func timer(targets []string) (int, bool) {
+	for _, t := range targets {
+		arg, ok := strings.CutPrefix(t, "timer:")
+		if !ok {
+			continue
+		}
+		m, err := strconv.ParseFloat(arg, 64)
+		if len(targets) > 1 || err != nil || m <= 0 {
+			fmt.Fprintf(os.Stderr, "smithy wait: timer takes positive minutes and no other target: %s\n", strings.Join(targets, " "))
+			return 2, true
+		}
+		sleep(time.Duration(m * float64(time.Minute)))
+		fmt.Printf("timer: %gm elapsed\n", m)
+		return 0, true
+	}
+	return 0, false
+}
+
 // Main runs `smithy wait`.
 func Main(args []string) int {
 	var targets []string
@@ -809,6 +832,9 @@ func Main(args []string) int {
 	if len(targets) == 0 {
 		fmt.Fprintln(os.Stderr, usage)
 		return 2
+	}
+	if code, ok := timer(targets); ok {
+		return code
 	}
 	targets, watchMode := expandWatch(targets)
 	for _, t := range targets {
