@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func init() {
@@ -441,5 +442,24 @@ func TestDoctorSkillNotInHarness(t *testing.T) {
 	o, c := doctor(t, "--quiet")
 	if c != 0 || !strings.Contains(o, "  warn  codex can't load tend, hush (installed elsewhere, not in its skills folder)\n        fix: link each into /h/skills") {
 		t.Errorf("%d\n%s", c, o)
+	}
+}
+
+func TestWaitTurnMaxFlag(t *testing.T) {
+	newBatch(t, `{"max":0,"items":[{"id":"c"}]}`)
+	old := waitStep
+	waitStep = 50 * time.Millisecond
+	defer func() { waitStep = old }()
+	for _, args := range [][]string{{"b1", "c", "--max", "0.01"}, {"b1", "c", "--max=0.01"}, {"b1", "c", "0.01"}} {
+		start := time.Now()
+		o, _, code := capture(t, func() int { return WaitTurn(args) })
+		if el := time.Since(start); code != 4 || strings.TrimSpace(o) != "waiting c" || el < 500*time.Millisecond || el > 3*time.Second {
+			t.Errorf("%v: code %d out %q after %v", args, code, o, el)
+		}
+	}
+	for _, bad := range []string{"x", "NaN", "Inf", "-1"} {
+		if _, e, c := capture(t, func() int { return WaitTurn([]string{"b1", "c", "--max", bad}) }); c != 2 || !strings.Contains(e, "usage") {
+			t.Errorf("bad --max %s: %d %q", bad, c, e)
+		}
 	}
 }

@@ -160,6 +160,7 @@ func TestPRWatcherFirstPoll(t *testing.T) {
 		want []string
 	}{
 		{"green", prFixture{rollup: green}, allOpts(), []string{"pr 5 checks=green u5"}},
+		{"green but conflicting", prFixture{rollup: green, mergeable: "CONFLICTING"}, allOpts(), []string{"pr 5 conflict u5"}},
 		{"red", prFixture{rollup: red}, allOpts(), []string{"pr 5 checks=red failed=unit-tests u5"}},
 		{"pending is quiet", prFixture{rollup: pending}, allOpts(), nil},
 		{"no checks is quiet", prFixture{}, allOpts(), nil},
@@ -794,7 +795,7 @@ func TestBatchWatcherPRs(t *testing.T) {
 	e.put(t, "pr.json", prFixture{rollup: green, mergeable: "CONFLICTING"}.json())
 	writeCard(t, "b1", "c", `{"state":"working","pr":"u7","updated":"`+stamp(0)+`"}`)
 	got, _ := w.poll()
-	if !reflect.DeepEqual(got, []string{"batch b1 a pr 5 checks=green u5", "batch b1 c pr 5 checks=green u5", "batch b1 c pr 5 conflict u5"}) {
+	if !reflect.DeepEqual(got, []string{"batch b1 a pr 5 conflict u5", "batch b1 c pr 5 conflict u5"}) {
 		t.Errorf("a PR first seen during the wait reports its state: %q", got)
 	}
 	if got, _ := w.poll(); got != nil {

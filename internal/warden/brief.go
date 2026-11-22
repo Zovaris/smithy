@@ -17,7 +17,7 @@ const briefUsage = `usage: smithy brief <batch> <id> [--to <warden-name>] [--sub
 Renders the worker brief of item <id> from batch.json and the template in warden's
 references/worker-brief.md, writes <batch-dir>/<id>.brief.md and prints its path.
 --to: the warden's name, for a harness whose channel line names it; --subagent: the worker
-runs as a subagent of this session (wait-turn in the foreground).
+runs as a subagent of this session (wait-turn capped at one minute, in the foreground, repeated).
 Exit 2 names a field it can't fill (missing in batch.json, or the worktree isn't on the branch).`
 
 type briefItem struct {
@@ -347,8 +347,9 @@ func Brief(args []string) int {
 		ruleFiles = append(ruleFiles, filepath.Join(td, "rulings.md"))
 	}
 	switch {
-	case source == "" || source == it.Intent && !pathLike(source):
-		spec = "Read requirements from the intent and the code."
+	case source == "" || source == "none" || source == it.Intent && !pathLike(source):
+		source = ""
+		spec = "The intent above is the spec; read the code it touches."
 	case pathLike(source):
 		if !filepath.IsAbs(source) {
 			source = filepath.Join(bt.Repo, source)
@@ -377,7 +378,11 @@ func Brief(args []string) int {
 			if !isFile(ref) {
 				return fail("the Spec: line of %s points at %s, which doesn't exist", read, ref)
 			}
-			spec += "\nThe task's spec: " + ref + " (read it too)."
+			if pathLike(it.Intent) {
+				spec = "The task's spec: " + ref + " (the intent names the task file; read both first)."
+			} else {
+				spec += "\nThe task's spec: " + ref + " (read it too)."
+			}
 		}
 		if taskfile && len(ruleFiles) == 0 {
 			ruleFiles = append(ruleFiles, filepath.Join(filepath.Dir(read), "rulings.md"))
@@ -406,9 +411,6 @@ func Brief(args []string) int {
 		}
 	}
 	minutes := "50"
-	if subagent {
-		minutes = "9"
-	}
 	vars := map[string]string{
 		"id": id, "batch": batch, "title": it.Title, "kind": it.Kind, "repo": bt.Repo,
 		"worktree": it.Worktree, "branch": it.Branch, "base": it.Base, "merge": merge,

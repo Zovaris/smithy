@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -163,7 +164,15 @@ func checksLine(s *prState) string {
 	if len(s.checks.failed) > 0 {
 		f = " failed=" + strings.Join(s.checks.failed, ",")
 	}
+	if s.mergeable == "CONFLICTING" && s.checks.state == "green" {
+		return conflictLine(s)
+	}
 	return fmt.Sprintf("pr %d checks=%s%s %s", s.num, s.checks.state, f, s.url)
+}
+
+// conflictLine replaces checks=green for a PR that can't merge: green alone would read as done.
+func conflictLine(s *prState) string {
+	return fmt.Sprintf("pr %d conflict %s", s.num, s.url)
 }
 
 func finished(c checks) bool { return c.state == "green" || c.state == "red" }
@@ -217,8 +226,8 @@ func (w *prWatcher) poll() ([]string, error) {
 	if o.on("checks") && finished(s.checks) && (s.checks.state != last.checks.state || s.head != last.head) {
 		out = append(out, checksLine(s))
 	}
-	if s.mergeable == "CONFLICTING" && last.mergeable != "CONFLICTING" && o.on("conflict") {
-		out = append(out, fmt.Sprintf("pr %d conflict %s", s.num, s.url))
+	if s.mergeable == "CONFLICTING" && last.mergeable != "CONFLICTING" && o.on("conflict") && !slices.Contains(out, conflictLine(s)) {
+		out = append(out, conflictLine(s))
 	}
 	if (s.reviews > last.reviews || s.review != last.review) && o.on("review") {
 		r := strings.ToLower(s.review)
@@ -516,8 +525,8 @@ func (w *batchWatcher) firstSight(r cards.Row, pw *prWatcher, lines []string, st
 		}
 		lines = keep
 	}
-	if pw.last.mergeable == "CONFLICTING" && pw.last.state == "OPEN" {
-		lines = append(lines, fmt.Sprintf("pr %d conflict %s", pw.last.num, pw.last.url))
+	if pw.last.mergeable == "CONFLICTING" && pw.last.state == "OPEN" && !slices.Contains(lines, conflictLine(pw.last)) {
+		lines = append(lines, conflictLine(pw.last))
 	}
 	var out []string
 	for _, l := range lines {

@@ -20,7 +20,7 @@ argument-hint: "<pr-url|number|branch> [...] | batch <warden batch> | watch [<sc
 | Command | Does |
 |---|---|
 | `smithy pr-state <pr>` | checks, mergeable, review, unresolved threads, behind, `action` |
-| `smithy verify <repo-dir> <branch> [pr-url]` | pushed head, checks, mergeable; `draft` (exit 3) when green but a draft; `pending`/`red` exit 1; a URL not of that checkout exits 2 |
+| `smithy verify <repo-dir> <branch> [pr-url]` | pushed head, checks, mergeable; `draft` (exit 3) when green but a draft; `conflict` (exit 4) when it can't merge; `pending`/`red` exit 1; a URL not of that checkout exits 2 |
 | `smithy wait <target>…` | `pr:<url>` (bare number: this checkout's repo), `run:<id>`, `branch:<name>`, `prs`, `issues:<label>`, `batch:<name>` |
 | `smithy wait watch[:<scopes>]` | one wait over `prs`, `issues`, `actions`, `base`, `alerts` (default `tend.watch`) |
 | `smithy commit` · `smithy names` · `smithy consult` · `smithy config` | commits, worktree path, judge call, settings |
@@ -31,7 +31,8 @@ At the first PR: read `references/PR.md` (the loop every PR goes through).
 - PR urls, numbers or branches: one loop per PR, then stop.
 - `batch <name>`: each item of that warden batch as it reaches `pr_open` or `ready` (`smithy
   cards board <name> --json`; the PR is the card's `pr`, the repo its `origin`). Between PRs
-  `smithy wait batch:<name>`; stop when every item is merged, dropped or reported.
+  `smithy wait batch:<name>`; stop when every item is merged, dropped or reported. A PR with
+  a warden card (batch input, a `watch prs` PR of a batch, or `--card`): `references/PR.md`, green.
 - `watch [<scopes>]`: tend matching PRs, then `smithy wait watch[:<scopes>]` and handle each
   event, until stopped or `--max-hours` (default 8). Scopes, comma list or `all` (default
   `smithy config get tend.watch`, else `prs`): `prs` (the user's, a batch's; `--label` adds

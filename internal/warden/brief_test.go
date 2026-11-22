@@ -131,11 +131,11 @@ func TestBriefWaitRelaunchStack(t *testing.T) {
 	got := string(b)
 	for _, want := range []string{
 		"Merge mode: auto. Stacked on a: merge only after it has merged.",
-		"`'" + filepath.Join(skillsDir(t), "warden", "scripts", "smithy") + "' wait-turn b1 b 9`, one run per shell call",
+		"`'" + filepath.Join(skillsDir(t), "warden", "scripts", "smithy") + "' wait-turn b1 b --max 1`, one run per shell call",
 		"a call killed without an exit code: run it again in a new call; 0: go.\n  Exit 5 or any other: the card is blocked; end your turn. When it says go",
 		"git merge origin/feat/a`",
 		"git merge origin/main` (`origin/feat/a`\n  instead until a has merged)",
-		"Read requirements from the intent and the code.",
+		"The intent above is the spec; read the code it touches.",
 		"to: boss.",
 	} {
 		if !strings.Contains(got, want) {
@@ -227,6 +227,9 @@ func TestBriefTaskFileIntent(t *testing.T) {
 			t.Errorf("%d %s: missing %q in:\n%s", c, er, want, got)
 		}
 	}
+	if strings.Contains(got, filepath.Join(e.wt, "docs", "specs", "01-a.md")) {
+		t.Errorf("task file path printed twice:\n%s", got)
+	}
 	writeFile(t, filepath.Join(e.wt, "docs", "specs", "01-a.md"), "# 01\nSpec: ./gone.md\n")
 	if _, er, c := brief(t, "b1", "a"); c != 2 || !strings.Contains(er, "gone.md") {
 		t.Errorf("a Spec: line to nothing: %d %s", c, er)
@@ -234,5 +237,26 @@ func TestBriefTaskFileIntent(t *testing.T) {
 	newBrief(t, strings.Replace(oneItem, "docs/specs/01-a.md", "docs/specs/09-none.md", 1))
 	if _, er, c := brief(t, "b1", "a"); c != 2 || !strings.Contains(er, "09-none.md") {
 		t.Errorf("a task file that resolves to nothing: %d %s", c, er)
+	}
+}
+
+func TestBriefSourceNone(t *testing.T) {
+	newBrief(t, strings.Replace(oneItem, `"source":"docs/specs/01-a.md"`, `"source":"none"`, 1))
+	t.Setenv("WARDEN_HARNESS", "codex")
+	o, er, c := brief(t, "b1", "a")
+	b, _ := os.ReadFile(o)
+	got := string(b)
+	if c != 0 || strings.Contains(got, "Board item") || !strings.Contains(got, "The intent above is the spec") {
+		t.Errorf("%d %s\n%s", c, er, got)
+	}
+}
+
+func TestBriefSubagentWait(t *testing.T) {
+	newBrief(t, strings.Replace(oneItem, `"prereqs":[]`, `"prereqs":["z"]`, 1))
+	t.Setenv("WARDEN_HARNESS", "codex")
+	o, er, c := brief(t, "b1", "a", "--subagent")
+	b, _ := os.ReadFile(o)
+	if got := string(b); c != 0 || !strings.Contains(got, "wait-turn b1 a --max 1`") {
+		t.Errorf("%d %s\n%s", c, er, got)
 	}
 }

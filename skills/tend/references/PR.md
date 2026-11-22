@@ -36,7 +36,9 @@ inside the repo). Then repeat:
    - **changes requested or review still required with no open thread, or blocked** (`needs-you`)
      → "needs you <url>: <why>" (a card: `state=blocked`).
    - **green, mergeable, approved or no review required** (`done`) → `green` (`smithy verify` says `draft`
-     for a draft PR: report `green (draft)` and leave it a draft). Merge (`smithy pr merge <pr>`) only if whoever launched
+     for a draft PR: report `green (draft)` and leave it a draft). A PR with a warden card (batch input, a `watch prs` PR of a batch, or `--card`): never merge;
+     stop at green and update the card only with `smithy cards set <batch> <id> note=<what you fixed>`;
+     the warden merges when merge is auto, otherwise the user does. Otherwise merge (`smithy pr merge <pr>`) only if whoever launched
      you said `merge auto`, never a draft, and into the production branch only when the launch
      says the user approved it (use-smithy: merges); otherwise stop at green (or keep waiting when
      told to stay until merged).

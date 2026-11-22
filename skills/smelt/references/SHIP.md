@@ -31,7 +31,7 @@ else update the docs the change touched (`references/DOCS.md`). Then:
   and commit that change as a follow-up commit on the PR branch. A warden worker ends
   here (its brief). Alone, wait
   with `smithy wait pr:<pr-url>` (use-smithy's wait rule). Run `smithy verify` only after it ends: right after a push GitHub still shows the old head. A red CI whose log points at this change: fix it here, test-first. Otherwise, when it reports red CI, a
-  conflict or a review comment, hand that PR to **tend** (`smithy skills tend` prints its path)
+  conflict (`smithy verify` says `conflict`, exit 4) or a review comment, hand that PR to **tend** (`smithy skills tend` prints its path)
   as one silent **subagent**: "Read <tend-skill> and follow it for <pr-url>; never merge" plus the
   report contract; it fixes that and ends. Waiting never needs an agent. On merge, clean up.
   GitHub modes, one line each: with `gh`, `smithy pr create` opens the PR (best experience);

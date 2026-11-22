@@ -5,6 +5,18 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **R13 warden + tend frictions.** `wait-turn` takes `--max <min>` (the positional still works) and
+  a `--subagent` brief calls `wait-turn … --max 1` per foreground call, so no harness moves it to
+  the background. `smithy brief` says the intent is the spec for source `none` (no "Board item
+  none") and prints a task-file item's path once. `smithy wait` prints `conflict` instead of
+  `checks=green` for a conflicting PR; `smithy verify` has its own `conflict` verdict (exit 4),
+  no longer `red`, and it wins over `pending` and `red`. Tend never merges a PR with a warden card
+  (batch input, a batch's PR under `watch prs`, or `--card`): it stops at green and updates the
+  card only via `smithy cards set`; the warden merges when merge is auto, otherwise the user does. Append-only shared files (CHANGELOG, API lists, index
+  files) don't count as overlap; their conflicts go to tend. Workers ask (`needs_decision`) before
+  editing CI config or check scripts outside their task's files. smelt plan waits for the builder
+  check's report before writing tasks. `smithy task-dir <slug> --default` takes unset defaults
+  instead of exiting 3.
 - **R12 warden frictions.** `smithy brief` reads a task-file path given as the intent, puts the
   task's `Spec:` file in Spec, includes every line of the task dir's `rulings.md` for a task-file
   item, and exits 2 when the task file or its `Spec:` file doesn't exist. `smithy wait batch:`
