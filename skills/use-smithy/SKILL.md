@@ -29,11 +29,12 @@ consult`). `smithy route` picks the tier (`--agent <file>` for a smelt agent); `
 model <tier>` gives the model. Unset (exit 3 or `-`): ask once per harness for every unset tier in
 one message, save with `smithy config set-model <tier> <name>` (user config; smithy ships no
 names); meanwhile, and under hush or in a launched session, use the session's model and say so.
-Effort stays at `agent.effort` (cap medium): harder jobs get a stronger tier.
+Effort stays at `agent.effort` (cap medium): harder jobs get a stronger tier. At smelt `full` every
+check agent routes to strong (~6 strong contexts per wave). Branch names: `smithy names branch <key|-> "<title>" [type]`.
 
 ## Route
 
-Run `smithy skills --list` once per session; offer only skills it lists (and the harness shows).
+Run `smithy skills --list` once, unless your brief names the skills; offer only skills it lists (and the harness shows).
 To run one, read the SKILL.md path it prints. Start-by-name syntax differs per harness; never assume one.
 
 | The user wants… | Use |

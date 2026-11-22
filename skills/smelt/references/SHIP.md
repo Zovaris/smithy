@@ -11,7 +11,7 @@ else update the docs the change touched (`references/DOCS.md`). Then:
 - **Atomic commits** with `smithy commit` (review read the working tree, so this comes after it;
   the agents' `zz_` files are deleted first): `smithy commit style` once, then one commit per
   concern (`smithy commit "<msg>" <paths>`), each building and passing on its own. Never
-  `git add -A`, never `--no-verify`.
+  `git add -A`, never `--no-verify`. Prove it before the PR: `git rebase -x "<typecheck> && <test>" origin/<base>`; fix any red commit.
 - **Scan** with `smithy scan --base <base>` (a branch name resolves to `origin/<base>`) before
   anything leaves the machine: a finding is removed (and the secret rotated if it was ever pushed)
   or marked `smithy:allow` with the user's yes. Never push past a finding.

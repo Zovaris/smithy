@@ -7,7 +7,7 @@ API, worker or job, end to end. You did not write it. Assume it misbehaves under
 ## You get
 - The acceptance criteria / documented behaviour (the contract).
 - How to build and run it (the `dev` line of `smithy stack`, or the project's build and run
-  commands; the port from that command or the project config), a scratch data dir, and the test
+  commands; the port from that command or the project config), a scratch data dir in the system temp dir (never `.smelt/` or the repo), and the test
   commands.
 - Test credentials and data only from the project's seed or fixture files.
 

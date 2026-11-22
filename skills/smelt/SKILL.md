@@ -27,7 +27,7 @@ Plain words work in any harness ("smelt plan <idea>").
 |---|---|
 | `smelt <task>` | no agreed plan → `plan` (at `fast`: `build`, criteria from the task); a plan, spec or task → `build`; a bug → `debug` |
 | `smelt brainstorm <idea>` | `references/BRAINSTORM.md` |
-| `smelt plan <idea>` | brainstorm → grill → spec → builder check (> 8 criteria or open questions) → tasks → ask how to run them. An agreed spec skips to tasks |
+| `smelt plan <idea>` | brainstorm → grill → spec → builder check (> 8 criteria or open questions) → tasks → ask how to run them. An agreed spec skips to its builder check (> 8 criteria), then tasks |
 | `smelt build next [dir]` · `build all [dir]` | `smithy tasks next`, build it to ship · every task in order (`references/EXECUTE.md`) |
 | `smelt <phase>` · `smelt from <phase>` | that phase only, or from it to the end (`spec`, `build`, `check`, `ship`, `retro`) |
 | `smelt debug <bug>` | `references/DEBUG.md` → build → check (regression agent) → ship |
@@ -44,9 +44,9 @@ Say the speed and phases in one line first (a launched agent: in its report).
 | Plan | criteria from the task | spec if none exists | brainstorm, grill, spec, builder check, tasks |
 | Build | TDD on the criteria | TDD on every behaviour | same |
 | Scripts | suite, typecheck, lint, `smithy scan` | + property tests you write if the repo has a PBT library | + the mutation tool |
-| Agents, one parallel wave | none (you run `agents/reviewer.md`, Spec-check section, yourself) | adversary (runtime logic; regression for a reported bug) + reviewer | adversary, property, reviewer, security, mutation, e2e if UI/endpoints; hostile last if it runs |
+| Agents, one parallel wave | none, a security agent if risky (you run `agents/reviewer.md`, Spec-check section, yourself; its table goes in the PR body's agents section) | adversary (runtime logic; regression for a reported bug) + reviewer | adversary, property, reviewer, security, mutation, e2e if UI or served HTTP endpoints (not outbound calls); hostile last if it runs |
 | Re-review | none | fixed blocking findings only, ≤ 2 rounds (`references/RECEIVING.md` step 5) | same |
-| Target | ~5 min, no agent | ~10–15 min, 2–3 agents | ~6 agents |
+| Target | ~5 min | ~10–15 min, 2–3 agents | ~6 agents |
 | Docs | ADR only if forced | glossary/ADR when they apply | + retro |
 
 **Risky** (auth, money, personal data, input parsing, file or shell access, secrets) adds the
