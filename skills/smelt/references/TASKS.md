@@ -6,7 +6,7 @@ reads and updates it; use it instead of hand-editing status lines.
 
 ## Where it lives
 
-An agreed spec already in the repo: its folder is the task dir (no second folder). Otherwise run
+An agreed spec in a folder of its own: that folder is the task dir (no second folder). A spec at the repo root stays there: make the task dir with `smithy task-dir` and point `Spec:` at it. Otherwise run
 `smithy task-dir <slug>`: it reads the user's settings, creates the dir and prints it.
 Exit 3 prints `ask <key>: <question> (default: <value> → <dir>)`: ask the user (recommendation first; nobody
 to ask, hush or a launched session: take `<value>`, say so at the end), save it with `smithy config set --repo <key> <value>`, rerun.

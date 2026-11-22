@@ -3,7 +3,7 @@
 Docs first: `smithy comments --diff <base>` on the changed files (API doc comments
 only, the why goes to docs); with the ledger skill installed, also its `sync` mode on the diff,
 else update the docs the change touched (`references/DOCS.md`). Then:
-- **Branch:** still on the base? `git switch -c "$(smithy names branch <key|-> "<title>")"`
+- **Branch:** (made in phase 0) still on the base? `git switch -c "$(smithy names branch <key|-> "<title>")"`
   (`<key>`: the ticket, issue or task `NN`). Already on a branch the harness or the user made
   for this work? Keep it. Never invent another naming scheme.
 - **Integrate:** full suite on the tree you're about to ship (after rebasing or merging the
@@ -30,7 +30,7 @@ else update the docs the change touched (`references/DOCS.md`). Then:
   and commit that change as a follow-up commit on the PR branch. A warden worker ends
   here (its brief). Alone, wait
   with `smithy wait pr:<pr-url>` (no tokens while it waits), in the background where the harness
-  wakes on exit, else in the foreground; never sleep loops. Only when it reports red CI, a
+  wakes on exit, else in the foreground; never sleep loops. Run `smithy verify` only after it ends: right after a push GitHub still shows the old head. Only when it reports red CI, a
   conflict or a review comment, hand that PR to **tend** (`smithy skills tend` prints its path)
   as one silent **subagent**: "Read <tend-skill> and follow it for <pr-url>; never merge" plus the
   report contract; it fixes that and ends. Waiting never needs an agent. On merge, clean up.

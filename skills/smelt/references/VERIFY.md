@@ -20,7 +20,7 @@ No claim without fresh evidence ("should work" is not evidence). This gate close
 | It runs | something that starts (server, CLI, worker): start it once (`dev` line of `smithy stack`, or `go run ./cmd/…`, `node bin/…`) and hit the changed path, output shown |
 | An agent did it | its VCS diff, read, plus its tests passing when you run them |
 | Refactor safe | suite green before and after, no snapshot or assertion changed |
-| Ready to open a PR | `smithy scan` clean (each binary warning looked at), `smithy receipt list` fresh for HEAD, diff matches the task |
+| Ready to open a PR | `smithy scan` clean (each binary warning looked at), `smithy receipt list` fresh for HEAD (the holdout receipt may be one commit behind, `references/CHECK.md`), diff matches the task |
 | PR ready to merge | the above, and `smithy verify <repo-dir> <branch> <pr-url>` says `green` |
 | Docs updated | the docs diff, every symbol it names still exists |
 

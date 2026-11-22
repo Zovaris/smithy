@@ -5,6 +5,12 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **A/B trial frictions (r5).** `smithy stack` reports `node --test <file>` as the single-file
+  command when the test script is `node --test`. Skills: create the work branch in phase 0, the
+  security agent comes on top of the speed's agents, rulings state their exact boundary, a spec
+  at the repo root stays there, the holdout receipt may sit one commit behind, `verify` runs only
+  after `smithy wait pr:`. README: the speeds section is gone.
+
 - **A/B trial frictions (r4).** `smithy tasks add` defaults to `Speed: fast`. Skills: re-review
   covers every spec-check row that was missing, partial or wrong plus Standards blocking, reads
   the exact commit sha, and closes a departure recorded in `rulings.md` as "deferred to user";
