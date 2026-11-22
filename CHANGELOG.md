@@ -10,8 +10,10 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   item, and exits 2 when the task file or its `Spec:` file doesn't exist. `smithy wait batch:`
   reports PRs already green, red or conflicting at the start for merge-auto cards that aren't
   `ready`, skips the warden's own `merged` cards, and keeps reported PR events in the batch's
-  `wait-seen.json` so a relaunched wait doesn't repeat them. A `--subagent` brief waits in one
-  foreground loop over `wait-turn` exit 4; workers parked there close with `done: <id> waiting`.
+  `.wait-seen` so a relaunched wait doesn't repeat them (ready or manual cards: red and conflicts
+  only). `wait-turn` exits 5 when a prereq was dropped. A `--subagent` brief runs one `wait-turn`
+  per foreground shell call, again on exit 4 or a killed call; session workers parked in
+  `wait-turn` close with `done: <id> waiting`. Template paths to smithy are quoted.
   `smithy doctor` says `workers: subagent fallback; they end with this session` when no spawn path
   exists. warden's batch check runs the reviewer on at least mid with the test command, runs a
   `zz_` holdout against the fix branch before merging it, and says tend starts only on red CI,

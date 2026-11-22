@@ -70,8 +70,8 @@ names the repo's test command (from AGENTS.md / CI) so findings come with a fail
 Findings follow smelt's `references/RECEIVING.md`. The blocking ones become one new `fix` item: one worker
 (same brief, speed `fast`, intent = the findings verbatim, branch from `smithy names branch -
 "<batch> review" fix`), one PR, merged like the others; then smelt's re-review (smelt's `references/RECEIVING.md`, step 5)
-at the fix's commit. Before merging the fix PR, run any `zz_` holdout test from the check
-worktree against `origin/<fix-branch>`. You write the fix PR's dispositions (every finding, including declined
+at the fix's commit. Before merging the fix PR, run any `zz_` holdout test in a fresh
+worktree of `origin/<fix-branch>`. You write the fix PR's dispositions (every finding, including declined
 ones and why) in its body. A high security finding also goes to the user. Non-blocking ones
 go under **Followups**.
 
@@ -95,7 +95,7 @@ line each, grouped as **Decisions** and **Followups**, each with the PR it came 
 
 ## stuck (`blocked`, `failed`, or no card update for 45 min)
 
-A worker whose closing line is `done: <id> waiting` is parked in `smithy wait-turn`: its stage is
+A session (background) worker whose closing line is `done: <id> waiting` is parked in `smithy wait-turn`: its stage is
 `waiting`, not stuck; nothing to do until its turn comes.
 
 Recovery ladder, one rung per wake:
