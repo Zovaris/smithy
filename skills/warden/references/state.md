@@ -2,7 +2,8 @@
 
 Batch dir `~/.smithy/warden/<batch>/` (`$WARDEN_HOME`; `<batch>` = `YYYYMMDD-HHMM` or the
 feature slug). No secrets or client data in it. A dir that already exists (empty or not) is
-never reused: add `-2`, `-3` to the name.
+never reused: add `-2`, `-3` to the name. `smithy batch init <tasks_dir> --repo <dir> [--base b] [--merge auto|manual] [--max n]`
+writes it from a task dir (that naming included); `smithy batch add <batch> --id --title --intent [--base]` appends an item.
 
 ## batch.json (yours)
 
@@ -30,7 +31,7 @@ never reused: add `-2`, `-3` to the name.
 Fields: `state`, `phase`, `progress` (`3/7`, the worker's own task list), `branch`, `pr`, `ci`,
 `decision_key`, `question`, `options`, `recommendation`, `impact` (`impact_by=decide` when the
 decision model raised it), `tests_run`, `risks`,
-`review_rounds`, `note`.
+`review_rounds`, `security` (risky items: `ran` or `not-run:<reason>`), `note`.
 
 | State | Meaning |
 |---|---|
