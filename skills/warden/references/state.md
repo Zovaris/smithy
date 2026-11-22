@@ -3,7 +3,7 @@
 Batch dir `~/.smithy/warden/<batch>/` (`$WARDEN_HOME`; `<batch>` = `YYYYMMDD-HHMM` or the
 feature slug). No secrets or client data in it. A dir that already exists (empty or not) is
 never reused: add `-2`, `-3` to the name. `smithy batch init <tasks_dir> --repo <dir> [--base b] [--merge auto|manual] [--max n]`
-writes it from a task dir (that naming included); `smithy batch add <batch> --id --title --intent [--base]` appends an item.
+writes it from a task dir as `<repo>-<task dir name>` (merge stays empty without `--merge`: set the user's plan-line answer); `smithy batch add <batch> --id --title --intent [--base] [--speed]` appends an item.
 
 ## batch.json (yours)
 

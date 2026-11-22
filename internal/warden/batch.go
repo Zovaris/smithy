@@ -17,12 +17,16 @@ import (
 
 const batchUsage = `usage: smithy batch <command>
   init <tasks_dir> --repo <dir> [--base b] [--merge auto|manual] [--max n]
-      writes <batch-dir>/batch.json (batch = the task dir's name, -2, -3 when taken) from the task
+      writes <batch-dir>/batch.json (batch = <repo>-<task dir name>, -2, -3 when taken) from the task
       files that aren't done or dropped: id <slug>-NN, title, intent = the file's path, speed,
       prereqs from Blocked by, branch and worktree from smithy names, risky and route: debug from
-      the task text (smelt's Risky list; a fix-type title). Prints the batch dir.
-  add <batch> --id <id> --title <t> --intent <text> [--base b]
-      appends one item (a fix item from the batch check); base defaults to the first item's.
+      the task text (smelt's Risky list; a fix-type title). Prints the batch dir. Blockers that are
+      done or dropped aren't prereqs. Refused while another batch has unfinished items from the
+      same task dir or on the same branches. Without --merge, merge stays empty and smithy brief
+      refuses until you set the user's auto/manual answer.
+  add <batch> --id <id> --title <t> --intent <text> [--base b] [--speed fast|normal|full]
+      appends one item (a fix item from the batch check); base defaults to the first item's, speed
+      to the batch mode's; refuses a duplicate id, title or branch.
 Review batch.json before launch: mode, merge and production are yours to settle with the user.`
 
 type batchItem struct {
@@ -131,7 +135,9 @@ func batchInit(args []string) error {
 	slug := filepath.Base(td)
 	nn := map[int]string{}
 	for _, t := range ts {
-		nn[num(t.NN)] = t.NN
+		if t.Status != "done" && t.Status != "dropped" {
+			nn[num(t.NN)] = t.NN
+		}
 	}
 	var items []batchItem
 	for _, t := range ts {
@@ -168,12 +174,16 @@ func batchInit(args []string) error {
 	if len(items) == 0 {
 		return fmt.Errorf("every task in %s is done or dropped", td)
 	}
-	name := slug
+	if err := clash(td, items); err != nil {
+		return err
+	}
+	stem := filepath.Base(repo) + "-" + slug
+	name := stem
 	for n := 2; ; n++ {
 		if _, err := os.Stat(filepath.Join(cards.Home(), name)); os.IsNotExist(err) {
 			break
 		}
-		name = fmt.Sprintf("%s-%d", slug, n)
+		name = fmt.Sprintf("%s-%d", stem, n)
 	}
 	dir := filepath.Join(cards.Home(), name)
 	bt := map[string]any{"batch": name, "repo": repo, "stack": false, "production": "", "mode": "smelt normal",
@@ -195,6 +205,48 @@ func batchInit(args []string) error {
 	return nil
 }
 
+// clash refuses a batch whose task dir or branches an existing batch still has unfinished.
+func clash(td string, items []batchItem) error {
+	mine := map[string]bool{}
+	for _, it := range items {
+		mine[it.Branch] = true
+	}
+	entries, _ := os.ReadDir(cards.Home())
+	for _, e := range entries {
+		raw, err := os.ReadFile(filepath.Join(cards.Home(), e.Name(), "batch.json"))
+		if err != nil {
+			continue
+		}
+		var bt briefBatch
+		if json.Unmarshal(raw, &bt) != nil {
+			continue
+		}
+		for _, it := range bt.Items {
+			if finished(e.Name(), it.ID) {
+				continue
+			}
+			if bt.TasksDir != "" && realPath(bt.TasksDir) == realPath(td) {
+				return fmt.Errorf("batch %s still runs %s (item %s); finish or clean it up first", e.Name(), td, it.ID)
+			}
+			if mine[it.Branch] {
+				return fmt.Errorf("batch %s already uses branch %s (item %s)", e.Name(), it.Branch, it.ID)
+			}
+		}
+	}
+	return nil
+}
+
+// finished says an item's card is final (merged, dropped or reported).
+func finished(batch, id string) bool {
+	raw, err := os.ReadFile(filepath.Join(cards.Home(), batch, id+".json"))
+	if err != nil {
+		return false
+	}
+	var c struct{ State string }
+	json.Unmarshal(raw, &c)
+	return c.State == "merged" || c.State == "dropped" || c.State == "reported"
+}
+
 func writeBatch(dir string, bt map[string]any) error {
 	b, err := json.MarshalIndent(bt, "", "  ")
 	if err != nil {
@@ -204,7 +256,7 @@ func writeBatch(dir string, bt map[string]any) error {
 }
 
 func batchAdd(args []string) error {
-	o, pos, err := batchOpts(args, "--id", "--title", "--intent", "--base")
+	o, pos, err := batchOpts(args, "--id", "--title", "--intent", "--base", "--speed")
 	if err != nil {
 		return err
 	}
@@ -224,8 +276,8 @@ func batchAdd(args []string) error {
 	base := o["--base"]
 	for _, x := range list {
 		m, _ := x.(map[string]any)
-		if m["id"] == o["--id"] {
-			return fmt.Errorf("item %s already exists", o["--id"])
+		if m["id"] == o["--id"] || m["title"] == o["--title"] {
+			return fmt.Errorf("item %s already exists (same id or title)", m["id"])
 		}
 		if b, _ := m["base"].(string); base == "" {
 			base = b
@@ -235,9 +287,27 @@ func batchAdd(args []string) error {
 	if base == "" {
 		base = defaultBase(repo)
 	}
-	it, err := newItem(repo, o["--id"], "-", o["--title"], o["--intent"], o["--title"]+"\n"+o["--intent"], base, "fast", nil)
+	speed := o["--speed"]
+	if speed == "" {
+		mode, _ := bt["mode"].(string)
+		speed = "normal"
+		if f := strings.Fields(mode); len(f) == 2 && f[0] == "smelt" {
+			speed = f[1]
+		} else if strings.HasPrefix(mode, "plain") {
+			speed = "fast"
+		}
+	}
+	if speed != "fast" && speed != "normal" && speed != "full" {
+		return fmt.Errorf("--speed is %q, want fast, normal or full", speed)
+	}
+	it, err := newItem(repo, o["--id"], "-", o["--title"], o["--intent"], o["--title"]+"\n"+o["--intent"], base, speed, nil)
 	if err != nil {
 		return err
+	}
+	for _, x := range list {
+		if m, _ := x.(map[string]any); m["branch"] == it.Branch {
+			return fmt.Errorf("item %s already uses branch %s", m["id"], it.Branch)
+		}
 	}
 	bt["items"] = append(list, it)
 	if err := writeBatch(dir, bt); err != nil {
