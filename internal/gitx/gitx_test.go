@@ -250,3 +250,26 @@ func TestCommitFailurePrintsErrorLast(t *testing.T) {
 		t.Fatalf("exit %d, stderr %q", code, b)
 	}
 }
+
+func TestCIPending(t *testing.T) {
+	dir := t.TempDir()
+	if CIPending(dir) {
+		t.Error("no workflows dir: want false")
+	}
+	wf := filepath.Join(dir, ".github", "workflows")
+	if err := os.MkdirAll(wf, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wf, "README.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if CIPending(dir) {
+		t.Error("no workflow file: want false")
+	}
+	if err := os.WriteFile(filepath.Join(wf, "ci.yml"), []byte("on: push"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !CIPending(dir) {
+		t.Error("ci.yml: want true")
+	}
+}

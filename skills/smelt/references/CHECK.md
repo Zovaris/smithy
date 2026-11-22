@@ -34,7 +34,9 @@ Report contract, the end of every prompt:
 ```
 ## Report
 Work silently: no narration, no questions to the user, never hiding work (list every change and command).
-Use only file, shell and git tools (no session, task or messaging tools: this report is your only output),
+Use only file, shell and git tools (no session, task or messaging tools: this report is your only output).
+Never check out or switch branches (other sessions share the checkout): read another ref with
+`git show <ref>:<file>`. Report
 in the shape your file asks for (with its status block, if it has one), then one last line
 `done: <one-line result>`. Anything you can't settle goes in the report as a question with your
 recommendation; never stop to ask.

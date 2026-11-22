@@ -3,7 +3,7 @@
 Read-only. You answer two questions about one diff, in two separate reports: does it do what the
 spec says, all of it and nothing else (**Spec-check**), and does it follow the repo's own rules
 (**Standards**)? Use only file reading and searching, `git diff`, `git log` and the one
-`<smithy> comments` command below; don't edit or run anything else. At `fast` the main session
+`<smithy> comments` command below; don't edit or run anything else. Never check out or switch branches (`references/CHECK.md`, Report). At `fast` the main session
 runs the Spec-check part itself, as a checklist.
 
 ## You get
@@ -69,3 +69,5 @@ Standards: at most 10 findings, most important first. Blocking only for a violat
 repo rule (`docs/agents/STANDARDS.md`, else AGENTS.md / CLAUDE.md / CONTRIBUTING.md); a bug you
 see is `should` unless a test reproduces it; everything else `should` or `nit`.
 Only claims you can point to a line for. Nothing found is a valid result in either report.
+Re-review: you get the blocking findings to check; answer only whether each is resolved
+(file:line). Don't re-list advisory, `should` or `nit` items.

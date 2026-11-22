@@ -1,8 +1,8 @@
 # State
 
 Batch dir `~/.smithy/warden/<batch>/` (`$WARDEN_HOME`; `<batch>` = `YYYYMMDD-HHMM` or the
-feature slug). No secrets or client data in it. A dir that already holds another batch's
-`batch.json` is never reused: add `-2`, `-3` to the name.
+feature slug). No secrets or client data in it. A dir that already exists (empty or not) is
+never reused: add `-2`, `-3` to the name.
 
 ## batch.json (yours)
 

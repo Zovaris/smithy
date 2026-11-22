@@ -13,6 +13,7 @@ else update the docs the change touched (`references/DOCS.md`). Then:
   concern (`smithy commit "<msg>" <paths>`), each building and passing on its own. Never
   `git add -A`, never `--no-verify`. Prove it before the PR, on a clean tree:
   `git rebase -x "<typecheck> && <test>" origin/<base>`; a red commit gets a fixup, then re-run.
+  A skeleton task lands as one buildable commit, so it passes too.
 - **Scan** with `smithy scan --base <base>` (a branch name resolves to `origin/<base>`) before
   anything leaves the machine: a finding is removed (and the secret rotated if it was ever pushed)
   or marked `smithy:allow` with the user's yes. Never push past a finding.

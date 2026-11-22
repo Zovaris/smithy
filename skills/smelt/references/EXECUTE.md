@@ -8,7 +8,8 @@ rulings. For tasks that can run at the same time in separate worktrees and PRs, 
 
 ## Models
 
-Each implementer agent gets the model `smithy route --file <task file> --speed <speed>` picks
+Each implementer agent gets the model `smithy route --file <task file> --speed <speed> --domain
+"<the product's nouns, e.g. secret for a secret scanner>"` picks
 (cheap, mid or strong, from the task's risk, difficulty and size); tasks you build yourself
 skip it. Each check agent gets `smithy route --agent <name>` (the adversary and security run on
 at least mid); the last fix round uses strong. You may move a pick one tier with a reason (a
