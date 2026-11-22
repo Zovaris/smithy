@@ -129,6 +129,19 @@ func Stack(dir string) []Line {
 		langs = append(langs, "ts")
 	}
 	python := r.file("pyproject.toml") || len(r.glob("requirements*.txt")) > 0 || r.file("setup.py")
+	// No packaging file or other language, only test files that import unittest: python -m unittest.
+	unittest := false
+	if !python && !hasPkg && !r.file("Cargo.toml") && !r.file("go.mod") {
+		for _, f := range append(r.glob("tests/test*.py"), r.glob("test*.py")...) {
+			b, _ := os.ReadFile(f)
+			if strings.Contains(string(b), "pytest") {
+				unittest = false
+				break
+			}
+			unittest = unittest || strings.Contains(string(b), "unittest")
+		}
+	}
+	python = python || unittest
 	if python {
 		langs = append(langs, "python")
 	}
@@ -189,6 +202,9 @@ func Stack(dir string) []Line {
 		}
 		if r.file("poetry.lock") {
 			run = "poetry run "
+		}
+		if unittest {
+			test, single = or(test, "python3 -m unittest"), or(single, "python3 -m unittest <module>")
 		}
 		test = or(test, run+"pytest -q")
 		single = or(single, run+"pytest -q <file>")

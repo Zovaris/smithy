@@ -71,6 +71,11 @@ func TestStack(t *testing.T) {
 		{"node-test", map[string]string{
 			"package.json": `{"scripts":{"test":"node --test"}}`,
 		}, map[string]string{"test": "npm test", "single": "node --test <file>"}},
+		{"pytest-bare", map[string]string{"test_a.py": "import pytest\nimport unittest\n"}, map[string]string{"test": ""}},
+		{"go-with-py", map[string]string{"go.mod": "module x\n", "test_h.py": "import unittest\n"}, map[string]string{"test": "go test -count=1 ./..."}},
+		{"unittest", map[string]string{"tests/test_a.py": "import unittest\n"}, map[string]string{
+			"lang": "python", "test": "python3 -m unittest", "single": "python3 -m unittest <module>",
+		}},
 		{"python", map[string]string{
 			"pyproject.toml":       "[project]\ndependencies = [\"Mypy\", \"ruff\"]\n# pyright\n",
 			"requirements-dev.txt": "hypothesis\ncosmic-ray\n",
