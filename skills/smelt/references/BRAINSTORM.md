@@ -44,4 +44,4 @@ Then grill the remaining open decisions (the plan phase's next step) and write t
 ## `/smelt brainstorm`
 
 Stops after step 3: the design is saved (`spec.md` with `Status: draft`) and nothing is split or
-built. Under hush: skip the questions, pick the approach yourself (unless it is on use-smithy's stop list: `blocked:`) and list what you assumed.
+built. Under hush: skip the questions, pick the approach yourself (on use-smithy's stop list: the hard floor → `blocked:`, the rest → consult + `smithy decisions add`) and list what you assumed.

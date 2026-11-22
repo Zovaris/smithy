@@ -58,7 +58,7 @@ Decisions that come up without the user, by impact:
   `ESCALATE` → it's high.
 - **high** (scope, customer-visible behaviour, money, data, security, public API or schema,
   production, irreversible): the user's, by use-smithy's **Decisions**: ask with the
-  `ask.timeout` timer, then consult and `smithy decisions add`; its hard floor waits for the user.
+  `ask.timeout` timer, then consult and `smithy decisions add`; its hard floor: the user, or `blocked:` with nobody to ask.
 
 Every decision made without the user is one line in `<dir>/rulings.md`:
 `- NN · <question> → <choice> (why)`, with its exact boundary ("multi-column rows only"): agents grade against the words. Rulings bind later tasks (pass the relevant ones in each

@@ -24,17 +24,18 @@ over it. `smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's fo
 | Repo style | Atomic commits (`smithy commit`), PRs from the template (`smithy pr`). ADR-worthy decisions → ledger; no explanatory code comments. |
 | Delegation | Delegate to a fresh-context agent if the harness can (its subagent tool, or `smithy agent [--readonly] <prompt-file>` with a headless CLI), else run the work yourself, one item after another. |
 
-**Decisions** (the stop list). A human in the session: ask, then run `smithy wait timer:<m>` in the
-background, m = `smithy config get ask.timeout` (0: wait for the answer); an answer first → ignore
-the timer. Timer fired (`--by timeout`), no wake on background exit, or nobody to ask (hush, a
-launched session; warden workers ask warden): one `smithy consult "<question>" "<options>"`, options
-neutral, safest first when security is involved, never "as written" for an insecure request (fails →
-the safest). Follow the pick, go on, log it: `smithy decisions add "<q>" "<choice>" --why "<reason>"
-[--by timeout] [--ref <pr|file>]`. **Hard floor**, never auto-decided: merging or deploying to the
-production branch, deleting or irreversibly rewriting user data, credentials, secrets or logins,
-money: wait for the user, or end `blocked: <why>` when nobody can answer. At the start of the user's
-next message run `smithy decisions pending`; any → list them first ("decided without you: … — keep
-or change?"), then `smithy decisions confirm <n>|--all` or `change <n> "<choice>"`.
+**Decisions** (the stop list). **Hard floor**, never auto-decided: merging or deploying to the production branch, deleting or irreversibly rewriting user data, credentials, secrets or logins, money. Wait for the user,
+or, with nobody to ask (hush, a launched session; warden workers ask warden), end `blocked: <why>`. The rest:
+1. Nobody to ask → step 3, `--by consult`. Else ask, then run `smithy wait timer:<m>` in the background,
+   m = `smithy config get ask.timeout` (0: no timer, wait); no wake on a background exit: step 3 at once.
+2. The user answers first → stop the timer (the harness's kill for that background task), use the
+   answer. Only exit 0 printing `timer: <m>m elapsed` means it fired → step 3 with `--by timeout`.
+3. `smithy consult "<question>" "<options>"`: neutral options, safest first when security is
+   involved, never "as written" for an insecure request (fails → the safest). Follow the pick, go on.
+4. `smithy decisions add "<q>" "<choice>" --why "<reason>" --by timeout|consult [--ref <pr|file>]`.
+At the start of each reply (simple does it too): `smithy decisions pending` lists any → show
+them first ("decided without you: … — keep or change?"), then `smithy decisions confirm <n>|--all`
+or `change <n> "<choice>"` (n as pending numbers them).
 
 **Model tiers.** cheap, mid, strong per harness, plus optional `judge` (only for `smithy
 consult`). `smithy route` picks the tier (`--agent <file>` for a smelt agent); `smithy config
@@ -62,8 +63,7 @@ Not installed? Work plainly; mention the skill once.
 
 ## Scripts
 
-Before a one-off command, check the repo's `scripts/SCRIPTS.md` (or its scripts folder). At the end of a task (not under hush):
-read `references/SAVE-SCRIPTS.md` (this skill's) to propose saving repeated commands as scripts.
+Before a one-off command, check the repo's `scripts/SCRIPTS.md` (or its scripts folder). At the end of a task (not under hush): read `references/SAVE-SCRIPTS.md` (this skill's) to propose saving repeated commands as scripts.
 
 ## Red flags
 

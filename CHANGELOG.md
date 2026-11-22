@@ -6,14 +6,14 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 ## Unreleased
 
 - **Ask, with a timeout.** The user's decisions (use-smithy's stop list) are asked and waited on
-  for at most `ask.timeout` minutes (new setting, default 10; 0 waits) through a background
+  for at most `ask.timeout` minutes (new setting, default 10; 0 = don't start the timer) through a background
   `smithy wait timer:<min>` (new target, exit 0 when it fires). No answer in time, or nobody to
   ask (hush, launched sessions, warden workers through warden): one `smithy consult` with neutral
   options, safest first for security, and the pick is logged with the new `smithy decisions add`
-  (`~/.smithy/decisions/<repo>.md`; `pending`, `list`, `confirm <n>|--all`, `change <n>`). A hard
-  floor is never auto-decided: production merge or deploy, deleting or irreversibly rewriting
-  user data, credentials, secrets or logins, money. use-smithy owns the rule and shows pending
-  decisions at the start of the user's next message; hush, smelt (Always, EXECUTE rulings) and
+  (`~/.smithy/decisions/<repo>.md`; `pending` numbers the unconfirmed ones and `confirm <n>|--all` / `change <n>` take that
+  number; `list` shows all; locked, atomic writes; fields can't contain `·` or `→`). A hard
+  floor is never auto-decided: merging or deploying to the production branch, deleting or irreversibly rewriting user data, credentials, secrets or logins, money. use-smithy owns the rule and shows pending
+  decisions at the start of each reply (simple too, as a statement under hush); hush, smelt (Always, EXECUTE rulings) and
   warden (decide stage, batch end, worker brief) point to it.
 
 - **R15 warden risky-task-list frictions.** New `smithy batch init <tasks_dir> --repo <dir>

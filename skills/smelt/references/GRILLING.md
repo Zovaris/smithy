@@ -17,5 +17,5 @@ Treat the plan as a design tree. Each round:
 
 Stop when the frontier is empty. Then give a numbered summary of every decision and wait for the
 user's confirmation before the spec. Under hush, skip the interview: take your recommendation
-for every decision not on use-smithy's stop list and list them in the final message; a decision
-on it is `blocked:`.
+for every decision not on use-smithy's stop list and list them in the final message; on it:
+the hard floor → `blocked:`, the rest → consult + `smithy decisions add` (use-smithy **Decisions**).
