@@ -862,3 +862,17 @@ func TestBatchWatcherStartRedOnReady(t *testing.T) {
 		t.Errorf("red on a ready card, and a card missing from batch.json on the batch default: %q", got)
 	}
 }
+
+func TestRelaunchLineWhileCardsOpen(t *testing.T) {
+	sandbox(t)
+	writeCard(t, "b1", "a", `{"state":"merged"}`)
+	writeCard(t, "b1", "b", `{"state":"pr_open"}`)
+	w, _ := newBatch("b1", false)
+	if got := relaunchLines([]watcher{w}); !reflect.DeepEqual(got, []string{"relaunch: smithy wait batch:b1"}) {
+		t.Errorf("open card: %q", got)
+	}
+	writeCard(t, "b1", "b", `{"state":"dropped"}`)
+	if got := relaunchLines([]watcher{w}); got != nil {
+		t.Errorf("all final: %q", got)
+	}
+}
