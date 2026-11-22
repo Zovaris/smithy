@@ -399,3 +399,16 @@ func TestRouteNotDoesNotNegateRisk(t *testing.T) {
 		}
 	}
 }
+
+func TestRouteDomainNounsAreNotRisk(t *testing.T) {
+	text := "Scan files for secrets and print each secret masked"
+	if tier, _ := Route(text, "ship", "normal"); tier != "strong" {
+		t.Errorf("no domain: %s, want strong", tier)
+	}
+	if tier, why := RouteDomain(text, "ship", "normal", "secrets, rule"); tier != "mid" {
+		t.Errorf("domain secrets: %s %v, want mid", tier, why)
+	}
+	if tier, _ := RouteDomain(text+" behind auth", "ship", "normal", "secret"); tier != "strong" {
+		t.Errorf("other risk still counts: %s", tier)
+	}
+}
