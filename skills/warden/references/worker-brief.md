@@ -1,5 +1,4 @@
 # Worker brief
-
 Contents: what workers are · slot table · the brief (work silently, intent, spec, how, status card, closing line).
 
 Fill the `<…>` slots and drop the lines that don't apply (table below). `<intent>` is copied verbatim from
