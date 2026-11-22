@@ -15,7 +15,7 @@ else update the docs the change touched (`references/DOCS.md`). Then:
   `git add -A`, never `--no-verify`. Prove it before the PR, on a clean tree:
   `git rebase -x "<typecheck> && <test>" origin/<base>`, with the runner's no-tests flag in
   `<test>` (`--passWithNoTests` or its equivalent); run it only when more than one commit
-  touches source. A red commit gets a fixup, then re-run.
+  touches source, from the first commit that has a build file (a docs-only commit is exempt). A red commit gets a fixup, then re-run.
   A skeleton task lands as one buildable commit, so it passes too.
 - **Scan** with `smithy scan --base <base>` (a branch name resolves to `origin/<base>`) before
   anything leaves the machine: a finding is removed (and the secret rotated if it was ever pushed)

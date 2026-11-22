@@ -1,5 +1,7 @@
 # Acting on cards
 
+Contents: decide · verify · merged · batch check · batch end · reported/dropped · stuck.
+
 One section per stage. Every final item goes through `smithy cleanup <repo> <branch> <worktree>`:
 worktree and local branch removed, unpushed work refused with `kept <branch>: …`, which goes in the
 final message instead of being forced. With `cleanup ask`, list what you would clean and end, and

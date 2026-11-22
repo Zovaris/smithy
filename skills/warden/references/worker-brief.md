@@ -1,5 +1,7 @@
 # Worker brief
 
+Contents: what workers are · slot table · the brief (work silently, intent, spec, how, status card, closing line).
+
 Fill the `<…>` slots and drop the lines that don't apply (table below). `<intent>` is copied verbatim from
 `batch.json`: never summarize it or add requirements, plans or acceptance criteria to it.
 `<warden-dir>` is this skill's folder (workers run `<warden-dir>/scripts/smithy`, never a bare

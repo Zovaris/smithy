@@ -246,6 +246,7 @@ func Stack(dir string) []Line {
 	if gomod {
 		test, single = or(test, "go test -count=1 ./..."), or(single, "go test ./<pkg> -run <Name>")
 		typecheck, pbt = or(typecheck, "go vet ./..."), or(pbt, "go fuzz (go test -fuzz)")
+		lint = or(lint, "test -z \"$(gofmt -l .)\"")
 	}
 
 	var over struct {
