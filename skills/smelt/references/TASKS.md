@@ -6,9 +6,10 @@ reads and updates it; use it instead of hand-editing status lines.
 
 ## Where it lives
 
-Run `smithy task-dir <slug>`: it reads the user's settings, creates the dir and prints it.
-When it exits 3 it prints `ask <key>: <question>`: ask the user that (your recommendation first;
-with nobody to ask, under hush or in a launched session, pick `true` and say so at the end),
+An agreed spec already in the repo: its folder is the task dir (no second folder). Otherwise run
+`smithy task-dir <slug>`: it reads the user's settings, creates the dir and prints it.
+When it exits 3 it prints `ask <key>: <question> (default …)`: ask the user that (your recommendation first;
+with nobody to ask, under hush or in a launched session, take the printed default and say so at the end),
 save the answer for this repo with `smithy config set --repo <key> <value>`, run it again.
 It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `git rm --cached` it if committed):
 
@@ -24,7 +25,6 @@ It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `g
 `tasks.commit` says. `smithy config list` shows the current values.
 
 Other places: list them in `$SMELT_TASKS_DIRS` (colon-separated) so `smithy tasks` finds them.
-
 Board tasks still get the same fields (status, blocked by, PR) in the issue body or labels; the
 spec stays in the repo or local dir and the issues link to it.
 
@@ -49,9 +49,9 @@ spec stays in the repo or local dir and the issues link to it.
 - **Self-review** before showing it:
   1. Coverage: every acceptance criterion of the spec lands in exactly one task.
   2. Interfaces line up: each `Consumes` is `Produces`d by a blocker or already exists.
-  3. Collisions: tasks without a `Blocked by` between them don't modify the same files.
+  3. Collisions: unblocked tasks share no file, test files too (each task gets its own).
   4. Proportion: no task is a horizontal layer, none is bigger than a day, none is trivial
-     enough to merge into its neighbour.
+     enough to merge into its neighbour. A test of a stub never asserts the stub's output.
   5. Width: the longest `Blocked by` chain, and each task's speed (its `Speed:` line: fast
      unless it holds logic that earns normal or full).
 - Show the list (number, title, one line, blocked by); wait for approval (else SKILL.md Always).
@@ -100,7 +100,7 @@ smithy tasks next  [dir]          # first todo whose blockers are done
 smithy tasks ready [dir]          # every todo that can start now (what warden launches)
 smithy tasks set <file> status=doing|done pr=<url>
 smithy tasks where                # task dirs for this repo (repo and local)
-smithy tasks add [dir] "<title>" [--blocked-by 01] [--key PROJ-12]   # next NN file from the template
+smithy tasks add [dir] "<title>" [--blocked-by 01] [--key K] [--speed fast]  # next NN file, full template
 smithy tasks board [--all]        # one line per task list and batch: this repo, or every repo
 ```
 
