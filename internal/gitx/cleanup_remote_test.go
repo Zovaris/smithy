@@ -50,3 +50,34 @@ func TestDropRemoteDeletesOnlyMergedBranches(t *testing.T) {
 		t.Errorf("unmerged remote branch was deleted: %s", got)
 	}
 }
+
+// A clean local base behind origin is fast-forwarded; a dirty checkout is left alone.
+func TestFastForwardCleanBase(t *testing.T) {
+	bare := filepath.Join(t.TempDir(), "origin.git")
+	if out, err := exec.Command("git", "init", "-q", "--bare", "-b", "main", bare).CombinedOutput(); err != nil {
+		t.Fatalf("init bare: %v\n%s", err, out)
+	}
+	repo := t.TempDir()
+	gitIn(t, repo, "init", "-q", "-b", "main")
+	gitIn(t, repo, "remote", "add", "origin", bare)
+	commitFile(t, repo, "a.txt")
+	gitIn(t, repo, "push", "-q", "origin", "main")
+	other := t.TempDir()
+	gitIn(t, other, "clone", "-q", bare, ".")
+	commitFile(t, other, "b.txt")
+	gitIn(t, other, "push", "-q", "origin", "main")
+	gitIn(t, repo, "fetch", "-q", "origin")
+	t.Chdir(repo)
+	if err := os.WriteFile(filepath.Join(repo, "a.txt"), []byte("dirty"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fastForward("origin/main")
+	if git("rev-parse", "main") == git("rev-parse", "origin/main") {
+		t.Fatal("dirty checkout was fast-forwarded")
+	}
+	gitIn(t, repo, "checkout", "-q", "--", "a.txt")
+	fastForward("origin/main")
+	if git("rev-parse", "main") != git("rev-parse", "origin/main") {
+		t.Fatal("clean base not fast-forwarded")
+	}
+}
