@@ -15,8 +15,8 @@ What workers are:
 
 Template: `{{x}}` is filled, `[if x]`…`[end]` kept only when x holds (`!x`: when not); `intent`
 is copied verbatim, never summarized or given added requirements, plans or criteria; rulings
-never go to reviewers; `rulings`: lines of the task dir's `rulings.md` and
-`<batch-dir>/decisions.md` naming the id; `taskfile`: the source is a file committed on the base; `wait`: prereqs, or past `max`
+never go to reviewers; `rulings`: every line of the task dir's `rulings.md` when the source (or a path intent) is a
+committed task file, else its lines naming the id, plus `<batch-dir>/decisions.md` lines naming the id; `taskfile`: that committed file (its `Spec:` line goes into Spec); `wait`: prereqs, or past `max`
 among items without prereqs on a first launch; `relaunch`: `launches` > 0.
 
 ```
@@ -63,11 +63,11 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
   state=blocked note=wrong-worktree, stop. A fresh worktree has no dependencies: install them with
   the lockfile command (`npm ci`, `go mod download`, `uv sync`) so a red test fails for the right reason.
 [if wait]
-- Then wait for your turn: run `{{smithy}} wait-turn {{batch}} {{id}} {{minutes}}` [if !subagent]in the background[end][if subagent]in the
-  foreground with your shell tool's longest timeout (an in-session worker can't be woken from
-  the background)[end] and wait for it to end (no tokens while it waits; never poll); exit 4 means run it again, exit 0
-  means go. When it says go, set `state=working`, `git fetch origin && git merge origin/{{from}}`
-  so you start from the merged prereqs.
+[if !subagent]- Then wait for your turn: run `{{smithy}} wait-turn {{batch}} {{id}} {{minutes}}` in the background and wait
+  for it to end (no tokens while it waits; never poll); exit 4 means run it again, exit 0 means go.[end][if subagent]- Then wait for your turn in ONE foreground shell call (never background: nothing can wake you)
+  with your shell tool's longest timeout: `rc=4; while [ $rc -eq 4 ]; do {{smithy}} wait-turn {{batch}} {{id}} {{minutes}}; rc=$?; done; echo rc=$rc`.
+  rc=0 means go; any other rc: state=blocked note=wait-turn-rc.[end] When it says go, set
+  `state=working`, `git fetch origin && git merge origin/{{from}}` so you start from the merged prereqs.
 [end]
 [if relaunch]
 - This is a relaunch. Read {{batchdir}}/{{id}}.inbox.md first if it exists. Before any outside
@@ -116,5 +116,5 @@ as the current step.
 {{channel}}
 End each turn with exactly one line and nothing else:
 "done: {{id}} PR <url>" | "done: {{id}} ready <url or branch>" | "done: {{id}} reported" |
-"done: {{id}} decide: <question>" | "done: {{id}} blocked: <why>".
+"done: {{id}} decide: <question>" | "done: {{id}} blocked: <why>" | "done: {{id}} waiting".
 ```
