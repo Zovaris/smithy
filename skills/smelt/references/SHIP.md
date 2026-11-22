@@ -11,14 +11,15 @@ else update the docs the change touched (`references/DOCS.md`). Then:
 - **Atomic commits** with `smithy commit` (review read the working tree, so this comes after it;
   the agents' `zz_` files are deleted first): `smithy commit style` once, then one commit per
   concern (`smithy commit "<msg>" <paths>`), each building and passing on its own. Never
-  `git add -A`, never `--no-verify`. Prove it before the PR: `git rebase -x "<typecheck> && <test>" origin/<base>`; fix any red commit.
+  `git add -A`, never `--no-verify`. Prove it before the PR, on a clean tree:
+  `git rebase -x "<typecheck> && <test>" origin/<base>`; a red commit gets a fixup, then re-run.
 - **Scan** with `smithy scan --base <base>` (a branch name resolves to `origin/<base>`) before
   anything leaves the machine: a finding is removed (and the secret rotated if it was ever pushed)
   or marked `smithy:allow` with the user's yes. Never push past a finding.
 - **Close, one of three.** (1) **PR**, the default, with `smithy pr create`: if `smithy pr
   template` finds one, fill every heading (N/A when one doesn't apply); otherwise what and why,
   tests added, commands run with results (paste `smithy receipt list --md`), agents run and what
-  they found, agents not run and why, "Decided without you" (from `rulings.md` if any), ADRs
+  they found, agents not run and why, the Spec-check table (fast), "Decided without you" (from `rulings.md` if any), ADRs
   added. Title in the commit style: `smithy pr create --base <b> --title "<t>" --body-file <f>`;
   write the PR body file inside the worktree's `.smelt/` or the system temp dir, never next to
   the worktree. From a task file: `smithy tasks set <file> status=done pr=<url>`. A warden worker ends

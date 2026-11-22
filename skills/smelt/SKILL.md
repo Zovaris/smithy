@@ -44,7 +44,7 @@ Say the speed and phases in one line first (a launched agent: in its report).
 | Plan | criteria from the task | spec if none exists | brainstorm, grill, spec, builder check, tasks |
 | Build | TDD on the criteria | TDD on every behaviour | same |
 | Scripts | suite, typecheck, lint, `smithy scan` | + property tests you write if the repo has a PBT library | + the mutation tool |
-| Agents, one parallel wave | none, a security agent if risky (you run `agents/reviewer.md`, Spec-check section, yourself; its table goes in the PR body's agents section) | adversary (runtime logic; regression for a reported bug) + reviewer | adversary, property, reviewer, security, mutation, e2e if UI or served HTTP endpoints (not outbound calls); hostile last if it runs |
+| Agents, one parallel wave | none, a security agent if risky (you run `agents/reviewer.md`, Spec-check section, yourself; its table goes in the PR body's agents section) | adversary (runtime logic; regression for a reported bug) + reviewer | adversary, property, reviewer, security, e2e if UI or served HTTP endpoints (not outbound calls); mutation as a second step, after fixes; hostile last if it runs |
 | Re-review | none | fixed blocking findings only, ≤ 2 rounds (`references/RECEIVING.md` step 5) | same |
 | Target | ~5 min | ~10–15 min, 2–3 agents | ~6 agents |
 | Docs | ADR only if forced | glossary/ADR when they apply | + retro |

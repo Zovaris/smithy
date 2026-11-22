@@ -14,7 +14,8 @@ lists, and the report contract below. Never your conversation, plan or opinion o
 (it would share your blind spots). Give every agent `<smithy>`, the
 absolute path of this skill's `scripts/smithy`. Without a subagent tool: write each prompt to a
 file and run `smithy agent --bg --log <log> <prompt-file>` (read-only ones with `--readonly`),
-then read the logs. Each agent's model: `smithy route --agent agents/<name>.md --speed <speed>`. Test
+then read the logs. Each agent's tier: `smithy route --agent agents/<name>.md --speed <speed>`, then the model from
+`smithy config model <tier>`; at full every check agent routes to strong (seven strong contexts). Test
 agents run only their own `zz_` file (others may be red). Mutation is a second step: run the
 tool after the wave's fixes, then launch its agent.
 

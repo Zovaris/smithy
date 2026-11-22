@@ -10,8 +10,7 @@ Run `smithy task-dir <slug>`: it reads the user's settings, creates the dir and 
 When it exits 3 it prints `ask <key>: <question>`: ask the user that (your recommendation first;
 with nobody to ask, under hush or in a launched session, pick `true` and say so at the end),
 save the answer for this repo with `smithy config set --repo <key> <value>`, run it again.
-It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; if a commit took
-it, `git rm --cached` it):
+It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `git rm --cached` it if committed):
 
 1. `tasks.commit` — commit the specs and tasks to git? `true` → `docs/specs/<slug>/`, reviewed
    with the code. `false` → `.docs/specs/<slug>/`, next to the code but out of git.
@@ -25,6 +24,7 @@ it, `git rm --cached` it):
 `tasks.commit` says. `smithy config list` shows the current values.
 
 Other places: list them in `$SMELT_TASKS_DIRS` (colon-separated) so `smithy tasks` finds them.
+
 Board tasks still get the same fields (status, blocked by, PR) in the issue body or labels; the
 spec stays in the repo or local dir and the issues link to it.
 
