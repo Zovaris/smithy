@@ -12,7 +12,7 @@ do it on the user's yes.
 By `impact`, with the levels of smelt's `references/EXECUTE.md` (Rulings); you may raise it, never
 lower it; `impact_by=decide` means the decision model raised it:
 - **low**: decide on the merits.
-- **medium**: `smithy consult` with the worker's question and options verbatim, in neutral order.
+- **medium**: `smithy consult` with the worker's question and options verbatim, in neutral order (fails → decide yourself).
   `NEED-INFO` goes back to the worker; `ESCALATE` makes it high.
 - **high** (also: the same kind of finding recurring): the user decides. One
   message with all of them; each gives the intent, the proposed change, the smallest alternative

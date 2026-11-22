@@ -88,7 +88,7 @@ func TestStack(t *testing.T) {
 			"lang": "rust", "test": "cargo test", "lint": "cargo clippy", "property": "proptest",
 		}},
 		{"go", map[string]string{"go.mod": "module x\n", "CLAUDE.md": ""}, map[string]string{
-			"lang": "go", "test": "go test -count=1 ./...", "typecheck": "go vet ./...", "doc": "CLAUDE.md", "lint": "test -z \"$(gofmt -l .)\"",
+			"lang": "go", "test": "go test -count=1 ./...", "typecheck": "go vet ./...", "doc": "CLAUDE.md", "lint": "x=$(gofmt -l .) && test -z \"$x\"",
 		}},
 		{"bun over yarn, jest", map[string]string{"package.json": `{"dependencies":{"jest":"1"}}`, "yarn.lock": "", "bun.lock": ""}, map[string]string{
 			"pkg-manager": "bun", "test": "", "single": "npx jest <file>",

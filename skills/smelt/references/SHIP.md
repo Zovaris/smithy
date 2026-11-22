@@ -9,13 +9,14 @@ else update the docs the change touched (`references/DOCS.md`). Then:
 - **Integrate:** full suite on the tree you're about to ship (after rebasing or merging the
   base), VERIFY gate. Red → back to build.
 - **Atomic commits** with `smithy commit` (review read the working tree, so this comes after it;
-  the agents' `zz_` files, kept in the system temp dir during check, are deleted first; check
+  the agents' `zz_` files, kept in the system temp dir during check, are deleted first and `git reset -q` undoes the check's `git add -N`; check
   each `smithy commit` exit code before running receipts): `smithy commit style` once, then one commit per
   concern (`smithy commit "<msg>" <paths>`), each building and passing on its own. Never
   `git add -A`, never `--no-verify`. Prove it before the PR, on a clean tree:
   `git rebase -x "<typecheck> && <test>" origin/<base>`, with the runner's no-tests flag in
   `<test>` (`--passWithNoTests` or its equivalent); run it only when more than one commit
-  touches source, from the first commit that has a build file (a docs-only commit is exempt). A red commit gets a fixup, then re-run.
+  touches source. Docs-only commits before the build file exists: start the command with
+  `[ -f <build file> ] || exit 0;`. A red commit gets a fixup, then re-run.
   A skeleton task lands as one buildable commit, so it passes too.
 - **Scan** with `smithy scan --base <base>` (a branch name resolves to `origin/<base>`) before
   anything leaves the machine: a finding is removed (and the secret rotated if it was ever pushed)

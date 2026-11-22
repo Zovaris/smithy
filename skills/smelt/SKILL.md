@@ -76,9 +76,10 @@ gets no test agents: its seam is the doc lint, its review is Spec-check alone. M
     "Decided without you".
   - Except use-smithy's stop list (scope, public API, money, prod, data, security, credentials,
     irreversible actions, push/merge) or `smithy:allow` on a real secret: stop with `blocked: <why>`.
+- Lessons: `references/SHIP.md`.
 - Receipts: `smithy receipt run --claim "<c>" -- <cmd> <args>`.
-- Commits: `smithy commit "<msg>" <path>...` on a clean index (unstaged files only), subject
-  under 72 characters. If it fails: `git restore --staged <paths>`, then retry.
+- Commits: `smithy commit "<msg>" <path>...`, subject under 72 characters. Never `git add`
+  first: it refuses staged files. If it fails: `git restore --staged <paths>`, then retry.
 - A fixture that looks like a secret gets `smithy:allow` on its line.
 
 ## Red flags

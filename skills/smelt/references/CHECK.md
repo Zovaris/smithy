@@ -3,7 +3,7 @@
 ## 1 · Prepare
 1. Base: `git fetch origin <base>`, then `git merge-base HEAD origin/<base>` (base = PR target,
    else the default branch; never the local `<base>`). Diff = `git diff <merge-base>` after
-   `git add -N <new files>` (undo with `git reset -q` before `smithy commit`). Empty diff → say so and stop.
+   `git add -N <new files>` (SHIP resets it). Empty diff → say so and stop.
 2. Spec: the task/spec path, commit messages, the PR body or `docs/specs/`. None → the reviewer
    uses the PR description and says so.
 
