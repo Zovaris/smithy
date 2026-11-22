@@ -139,7 +139,7 @@ them, with defaults, are in [docs/settings.md](docs/settings.md).
 
 ```bash
 npx skills add Zovaris/smithy -g -y --skill '*' -a claude-code -a codex   # no prompts
-npx skills add Zovaris/smithy@v0.11.0 -g                                   # pin a release
+npx skills add Zovaris/smithy@v0.12.0 -g                                   # pin a release
 npx skills update -g                                                      # update
 ```
 
