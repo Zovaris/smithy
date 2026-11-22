@@ -200,11 +200,12 @@ func TestBriefRelaunch(t *testing.T) {
 func TestBriefUncommittedTaskFile(t *testing.T) {
 	e := newBrief(t, strings.Replace(oneItem, "docs/specs/01-a.md", "docs/specs/02-new.md", 1))
 	writeFile(t, filepath.Join(e.repo, "docs", "specs", "02-new.md"), "spec")
+	writeFile(t, filepath.Join(e.repo, "docs", "specs", "rulings.md"), "- every task: stdlib only\n")
 	t.Setenv("WARDEN_HARNESS", "codex")
 	o, er, c := brief(t, "b1", "a")
 	b, _ := os.ReadFile(o)
 	got := string(b)
-	if c != 0 || !strings.Contains(got, filepath.Join(e.repo, "docs", "specs", "02-new.md")+" (read-only reference outside your worktree") || strings.Contains(got, "tasks set") {
+	if c != 0 || !strings.Contains(got, filepath.Join(e.repo, "docs", "specs", "02-new.md")+" (read-only reference outside your worktree") || strings.Contains(got, "tasks set") || !strings.Contains(got, "- every task: stdlib only") {
 		t.Errorf("%d %s\n%s", c, er, got)
 	}
 }

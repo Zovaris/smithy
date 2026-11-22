@@ -478,6 +478,9 @@ func TestRouteRiskWordsAreSpecific(t *testing.T) {
 		"block formula injection in CSV export": "strong",
 		"handle personal data on export":        "strong",
 		"add dependency injection container":    "mid",
+		"rewrite the notes file in place":       "strong",
+		"convert stored records to v2":          "strong",
+		"fix button placement in placeholder":   "mid",
 	} {
 		if got, r := Route(text, "ship", "normal"); got != want {
 			t.Errorf("Route(%q) = %s %q, want %s", text, got, r, want)
