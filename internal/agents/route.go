@@ -22,6 +22,7 @@ count as risk; config key route.domain (smithy config set --repo route.domain ".
 --agent picks the kind from a smelt agent (adversary and security run on at least mid): reviewer, security and builder are review;
 adversary, regression, property, mutation, e2e and hostile are test; implementer is ship (give
 the task with --file or --text); tend and scout (or their SKILL.md) are their own kind.
+Without --agent it routes the task given by --file, --text or --board (kind ship unless --kind).
 Prints ` + "`<tier> <model>  # reasons`" + `, or JSON with --json. <model> is the user's model for that
 tier in this harness (smithy config model <tier>); ` + "`-`" + ` when unset (use the session default, and
 ask the user to name the tier once and save it with ` + "`smithy config set-model`" + `). The caller may move one tier up or down with a stated reason;
@@ -30,7 +31,7 @@ Tiers: cheap (mechanical, read-only, small), mid (most feature work), strong (ri
 cross-cutting, or the last fix round).`
 
 var (
-	risky   = []string{"auth", "login", "password", "secret", "access token", "auth token", "api token", "api key", "permission", "security", "payment", "billing", "money", "invoice", "migration", "schema", "database", "concurren", "race condition", "lock contention", "deadlock", "mutex", "crypto", "encrypt", "data loss", "delete user", "production", "public api", "sql injection", "command injection", "prompt injection", "formula injection", "untrusted", "personal data", "pii", "input parsing", "file access", "file upload", "path traversal", "shell access", "shell command"}
+	risky   = []string{"auth", "login", "password", "secret", "access token", "auth token", "api token", "api key", "permission", "security", "payment", "billing", "money", "invoice", "migration", "schema", "database", "concurren", "race condition", "lock contention", "deadlock", "mutex", "crypto", "encrypt", "data loss", "delete user", "production", "public api", "sql injection", "command injection", "prompt injection", "formula injection", "untrusted", "personal data", "pii", "input parsing", "file access", "file upload", "path traversal", "shell access", "shell command", "backfill", "stored data"}
 	hard    = []string{"architecture", "redesign", "refactor", "performance", "investigate", "root cause", "why does", "ambiguous", "trade-off", "cross-cutting", "rewrite", "remake", "protocol", "parser", "compiler", "algorithm"}
 	prose   = []string{"doc", "docs", "documentation", "readme", "contributing", "changelog", "guide", "adr", "wording"}
 	trivial = []string{"typo", "copy change", "wording", "rename", "bump", "version", "color", "colour", "style tweak", "readme", "comment", "lint", "format"}
@@ -96,6 +97,11 @@ func first(s []string, n int) []string {
 		return s[:n]
 	}
 	return s
+}
+
+// Risky says the text names a risky word (smelt's Risky list), minus the domain's nouns.
+func Risky(text, domain string) bool {
+	return len(matches(strings.ToLower(text), riskyWithout(domain))) > 0
 }
 
 // Route picks the tier for a task text, kind (ship, scout, review, fix, tend) and speed (fast,

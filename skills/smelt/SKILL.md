@@ -49,7 +49,7 @@ Say the speed and phases in one line first (a launched agent: in its report).
 | Target | ~5 min | ~10–15 min, 2–3 agents | ~6 agents |
 | Docs | ADR only if forced | glossary/ADR when they apply | + retro |
 
-**Risky** (auth, money, personal data, input parsing, file or shell access, secrets) adds the
+**Risky** (auth, money, personal data, input parsing, file or shell access, secrets, data migration or in-place rewrite of stored data) adds the
 security agent at any speed, on top of the speed's agents; it never raises the speed. A prose-only change (docs, skill text)
 gets no test agents: its seam is the doc lint, its review is Spec-check alone. Mutation needs a tool
 `smithy stack` shows, else "not applicable".
