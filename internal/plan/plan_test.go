@@ -261,6 +261,9 @@ func TestTaskDir(t *testing.T) {
 					t.Errorf("%s has .docs/ %d times: %q", name, n, b)
 				}
 			}
+			if c.loc != "local" && strings.Count(string(ex), ".smithy/config.json\n") != 1 {
+				t.Errorf("exclude lacks the repo config once: %q", ex)
+			}
 			check(".gitignore", gi, c.wantGitignore)
 			check("exclude", ex, c.wantExclude)
 			if c.gitignore == "node_modules" && string(gi) != "node_modules\n.docs/\n" {

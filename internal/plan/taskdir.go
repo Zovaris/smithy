@@ -43,6 +43,7 @@ func TaskDir(slug string) (dir string, board bool, err error) {
 	if err != nil || top == "" {
 		return "", false, ErrNotRepo
 	}
+	excludeRepoConfig(top)
 	loc := config.Get("tasks.location", "repo")
 	if loc == "local" {
 		dir = filepath.Join(tasks.PlansHome(), filepath.Base(top), slug)
@@ -78,6 +79,22 @@ func TaskDir(slug string) (dir string, board bool, err error) {
 		dir = filepath.Join(top, ".docs", "specs", slug)
 	}
 	return dir, loc == "board", os.MkdirAll(dir, 0o755)
+}
+
+// excludeRepoConfig keeps an untracked .smithy/config.json, written by the settings this command
+// asks for, out of git status via the local .git/info/exclude.
+func excludeRepoConfig(top string) {
+	if _, err := os.Stat(filepath.Join(top, ".smithy", "config.json")); err != nil {
+		return
+	}
+	if _, err := ghx.Run("git", "-C", top, "ls-files", "--error-unmatch", ".smithy/config.json"); err == nil {
+		return
+	}
+	f, err := ghx.Run("git", "-C", top, "rev-parse", "--path-format=absolute", "--git-path", "info/exclude")
+	if err != nil || os.MkdirAll(filepath.Dir(f), 0o755) != nil {
+		return
+	}
+	_ = ignoreLine(f, ".smithy/config.json")
 }
 
 func ignoreLine(file, line string) error {
