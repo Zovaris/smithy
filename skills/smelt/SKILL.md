@@ -67,7 +67,7 @@ need a tool `smithy stack` shows, else "not applicable".
 | **retro** | At retro: read `references/DOCS.md`. Mechanical mistakes → a check; judgement → `docs/agents/STANDARDS.md`; user facts → harness memory; project facts → docs. | each accepted lesson written; the rest named as dropped |
 
 ## Always
-- Keep a task list of your phases (the harness's to-do tool if any) and tick it.
+- Keep a task list of your phases (the harness's to-do tool if any; refused, as in a subagent: list them in your final message) and tick it.
 - An agent's open question comes back in its report; answer it by the shared rule (a warden
   worker asks warden) and record it in the PR's "Decided without you".
 - **Nobody to ask** (hush, or a launched session): an approval or a choice (how to run a task

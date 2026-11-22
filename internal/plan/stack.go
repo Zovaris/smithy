@@ -129,6 +129,9 @@ func Stack(dir string) []Line {
 		langs = append(langs, "ts")
 	}
 	python := r.file("pyproject.toml") || len(r.glob("requirements*.txt")) > 0 || r.file("setup.py")
+	// No packaging file, only stdlib unittest files: python -m unittest.
+	unittest := !python && len(r.glob("tests/test*.py"))+len(r.glob("test*.py")) > 0
+	python = python || unittest
 	if python {
 		langs = append(langs, "python")
 	}
@@ -189,6 +192,9 @@ func Stack(dir string) []Line {
 		}
 		if r.file("poetry.lock") {
 			run = "poetry run "
+		}
+		if unittest {
+			test, single = or(test, "python3 -m unittest"), or(single, "python3 -m unittest <module>")
 		}
 		test = or(test, run+"pytest -q")
 		single = or(single, run+"pytest -q <file>")

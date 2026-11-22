@@ -5,6 +5,11 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **A/B trial frictions (r6).** `smithy stack` reports `python3 -m unittest` for stdlib-only
+  Python repos. Skills: commit before the check wave, a finding is declined as spec-ambiguous
+  only by quoting both readings (with the declined test ids), a refused to-do tool falls back to
+  the final message.
+
 - **A/B trial frictions (r5).** `smithy stack` reports `node --test <file>` as the single-file
   command when the test script is `node --test`. Skills: create the work branch in phase 0, the
   security agent comes on top of the speed's agents, rulings state their exact boundary, a spec

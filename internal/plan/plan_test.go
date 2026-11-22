@@ -71,6 +71,9 @@ func TestStack(t *testing.T) {
 		{"node-test", map[string]string{
 			"package.json": `{"scripts":{"test":"node --test"}}`,
 		}, map[string]string{"test": "npm test", "single": "node --test <file>"}},
+		{"unittest", map[string]string{"tests/test_a.py": ""}, map[string]string{
+			"lang": "python", "test": "python3 -m unittest", "single": "python3 -m unittest <module>",
+		}},
 		{"python", map[string]string{
 			"pyproject.toml":       "[project]\ndependencies = [\"Mypy\", \"ruff\"]\n# pyright\n",
 			"requirements-dev.txt": "hypothesis\ncosmic-ray\n",
