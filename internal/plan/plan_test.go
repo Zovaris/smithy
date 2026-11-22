@@ -71,6 +71,9 @@ func TestStack(t *testing.T) {
 		{"tsc-node-test", map[string]string{
 			"package.json": `{"scripts":{"test":"tsc && node --test dist/test/*.test.js"}}`,
 		}, map[string]string{"test": "npm test", "single": "node --test <file>"}},
+		{"mentions-node-test", map[string]string{
+			"package.json": `{"scripts":{"test":"echo node --test is unused && mocha"}}`,
+		}, map[string]string{"test": "npm test", "single": ""}},
 		{"node-test", map[string]string{
 			"package.json": `{"scripts":{"test":"node --test"}}`,
 		}, map[string]string{"test": "npm test", "single": "node --test <file>"}},

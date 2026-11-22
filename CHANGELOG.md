@@ -8,7 +8,9 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - **A/B trial frictions (r9, Haiku at every speed).** `smithy tasks add --speed` works (the flag
   was missing from the CLI's flag table, so every call failed with "unknown option"). `smithy
   stack` reports `node --test <file>` when the test script runs `node --test` after a build
-  step. smelt's ship step switches to the base branch before `smithy cleanup`.
+  step. `smithy route --domain` is accepted too, and a test now checks that every flag a command's
+  usage documents is in its flag table. smelt's ship step switches the main checkout off the
+  branch before `smithy cleanup`.
 
 - **A/B trial frictions (r8) and skill-writing practices.** `smithy stack` reports
   `gofmt -l` as Go's lint. Skills: smelt's "Nobody to ask" and commit rules are one instruction

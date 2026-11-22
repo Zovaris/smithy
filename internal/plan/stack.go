@@ -171,7 +171,7 @@ func Stack(dir string) []Line {
 			}
 		} else if r.dep("jest") {
 			single, cov = "npx jest <file>", "npx jest --coverage --changedSince=<base>"
-		} else if sc, _ := r.pkg["scripts"].(map[string]any); strings.HasSuffix(strings.TrimSpace(fmt.Sprint(sc["test"])), "node --test") || strings.Contains(fmt.Sprint(sc["test"]), "node --test ") {
+		} else if sc, _ := r.pkg["scripts"].(map[string]any); runsNodeTest(fmt.Sprint(sc["test"])) {
 			single = "node --test <file>"
 		}
 		if r.script("typecheck") {
@@ -340,4 +340,16 @@ func StackMain(args []string) int {
 		fmt.Printf("%-12s %s\n", l.Key+":", or(l.Value, "none"))
 	}
 	return 0
+}
+
+// runsNodeTest reports whether a package.json test script runs `node --test` as one of its
+// commands (split on &&, || and ;), not just mentions it.
+func runsNodeTest(script string) bool {
+	for _, part := range regexp.MustCompile(`&&|\|\||;`).Split(script, -1) {
+		p := strings.TrimSpace(part)
+		if p == "node --test" || strings.HasPrefix(p, "node --test ") {
+			return true
+		}
+	}
+	return false
 }
