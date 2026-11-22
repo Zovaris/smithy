@@ -33,6 +33,10 @@ const receiptUsage = `usage:
       receipts for the current commit (--all: every commit); --md prints a table for a PR body.
       A receipt taken on another commit is marked stale (unless only task, spec or changelog
       files changed since); with uncommitted changes, dirty.
+  smithy receipt check-red [--claim repro]
+      exit 0 when a receipt with that claim exited non-zero on a commit before HEAD (the failing
+      reproduction, committed before the fix) and one with that claim passes on HEAD; else exit 1
+      naming what is missing. list also shows such red receipts ("red before fix").
   smithy receipt clear
 Receipts live in <repo>/.smelt/receipts.jsonl; .smelt/ ignores itself (its own .gitignore).`
 
@@ -49,6 +53,42 @@ type Receipt struct {
 	Platform string   `json:"platform"`
 	// sameCode: taken on an earlier commit, but only Markdown changed since.
 	sameCode bool
+	// redFirst: a failing repro on an earlier commit, the red half of red-then-green.
+	redFirst bool
+}
+
+// earlier reports whether commit a is a strict ancestor of b.
+func earlier(root, a, b string) bool {
+	if a == "" || a == b {
+		return false
+	}
+	_, err := ghx.Run("git", "-C", root, "merge-base", "--is-ancestor", a, b)
+	return err == nil
+}
+
+// CheckRed finds the red-then-green pair for claim: a non-zero receipt on an earlier commit and a
+// zero one on head with a clean tree. It returns what is missing, "" when both exist.
+func CheckRed(root string, rs []Receipt, claim string) string {
+	sha, dirty := head(root)
+	red, green := false, false
+	for _, r := range rs {
+		if r.Claim != claim {
+			continue
+		}
+		if r.Exit != 0 && !r.Dirty && earlier(root, r.Commit, sha) {
+			red = true
+		}
+		if r.Exit == 0 && (r.Commit == sha || docsOnlySince(root, r.Commit, sha)) && !r.Dirty && !dirty {
+			green = true
+		}
+	}
+	switch {
+	case !red:
+		return fmt.Sprintf("no failing %q receipt on an earlier commit: commit the repro test alone, run `smithy receipt run --claim %s -- <cmd>` (it must exit non-zero), then fix", claim, claim)
+	case !green:
+		return fmt.Sprintf("no passing %q receipt on HEAD with a clean tree: commit the fix, then run it again", claim)
+	}
+	return ""
 }
 
 func receiptsPath(root string) string { return filepath.Join(root, ".smelt", "receipts.jsonl") }
@@ -205,6 +245,8 @@ func Markdown(rs []Receipt, head string, dirtyNow bool) string {
 // or "stale" (another commit). dirtyNow is whether the working tree has uncommitted changes.
 func (r Receipt) State(head string, dirtyNow bool) string {
 	switch {
+	case r.redFirst:
+		return "red before fix"
 	case r.Commit != head && !r.sameCode:
 		return "stale"
 	case r.Dirty || dirtyNow:
@@ -355,6 +397,9 @@ func ReceiptMain(args []string) int {
 				if r.Commit == sha || docsOnlySince(root, r.Commit, sha) {
 					r.sameCode = r.Commit != sha
 					kept = append(kept, r)
+				} else if r.Claim == "repro" && r.Exit != 0 && !r.Dirty && earlier(root, r.Commit, sha) {
+					r.redFirst = true
+					kept = append(kept, r)
 				}
 			}
 			if hidden := len(rs) - len(kept); hidden > 0 {
@@ -369,6 +414,25 @@ func ReceiptMain(args []string) int {
 		for _, r := range rs {
 			fmt.Printf("%s\texit %d\t%s\t%s\t%s\n", short(r.Commit), r.Exit, r.State(sha, dirtyNow), r.Claim, Redact(Shown(r.Command)))
 		}
+		return 0
+	case "check-red":
+		claim := "repro"
+		if len(args) == 3 && args[1] == "--claim" {
+			claim = args[2]
+		} else if len(args) != 1 {
+			fmt.Fprintln(os.Stderr, receiptUsage)
+			return 2
+		}
+		rs, err := Load(root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "receipt:", err)
+			return 1
+		}
+		if miss := CheckRed(root, rs, claim); miss != "" {
+			fmt.Println("not red-first:", miss)
+			return 1
+		}
+		fmt.Printf("red-first: %q failed on an earlier commit and passes on HEAD\n", claim)
 		return 0
 	case "clear":
 		if err := os.Remove(receiptsPath(root)); err != nil && !os.IsNotExist(err) {
