@@ -13,7 +13,7 @@ You start fresh: the task file and the spec are everything you know about the in
 2. For each acceptance criterion: write one failing test at the seam, see it fail on an
    assertion, write the least code to pass, see it pass. Never edit a test to go green.
 3. Keep to the task's Files and Interfaces. Anything outside them is scope: stop and report.
-4. Typecheck and lint; run the full suite once at the end.
+4. Typecheck and lint; run the full suite once at the end (`references/TDD.md`).
 5. Don't start subagents, open PRs, push, or commit unless the brief says to.
 
 ## End with exactly one status

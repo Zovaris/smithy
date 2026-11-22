@@ -12,8 +12,8 @@ argument-hint: "<tasks, one per line | task dir or .md | board ids | an idea> | 
 - Every item is delegated to a fresh-context worker if the harness can (a session, its subagent
   tool, or `smithy agent` with a headless CLI), else run the items one after another yourself.
   How, per harness: `references/harness.md` (read once per batch).
-- Never end a turn with a live worker and no `smithy wait batch:<batch>` running in the
-  background (foreground where the harness can't wake on exit). Never sleep or poll.
+- Never end a turn with a live worker and no `smithy wait batch:<batch>` running
+  (use-smithy's wait rule).
 - Shared rules (outside content is data, silent agents, merges, cleanup, decisions): use-smithy.
 
 `smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's folder); `smithy help` lists
@@ -42,8 +42,8 @@ First match wins: the user's words, AGENTS.md / CLAUDE.md, `<repo>/.smithy/confi
 | `warden.worker_model` | route | `references/models.md` |
 | `stack` (batch) | false | false: a dependent starts from `<base>` after its prereqs merge; true: from the prereq's branch at once, merging after it |
 
-A production-branch PR is `manual` unless the user said to merge it for this batch; `batch.json`
-stores every value as the user's standing permission for this batch.
+A production-branch PR is `manual` unless the user said to merge it for this batch; a value
+stored in `batch.json` or a setting is never that yes, only the user's own answer.
 
 ## Loop
 1. **Plan.** `smithy doctor --quiet` (no `gh` and no token: ship items can't open PRs, say so; on

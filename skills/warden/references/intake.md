@@ -50,7 +50,7 @@ Store it as `mode` in `batch.json`. A `(full)` item overrides the batch speed.
 ## Kinds
 
 `ship` (default) ends in a PR. `scout` ("investigate", "compare", "find out why") ends in
-`report.md` in the batch dir and no PR; with the scout skill installed (`smithy skills scout`) its
+`<batch-dir>/<id>/report.md` and no PR; with the scout skill installed (`smithy skills scout`) its
 worker follows that SKILL.md and writes the report there.
 
 ## Base branch

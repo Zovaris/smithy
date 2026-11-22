@@ -5,6 +5,13 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **Full audit fixes.** `warden.max` falls back to 5 in `smithy wait-turn`, matching the
+  config default and docs. Skills: use-smithy owns the stop list (hush and smelt point to it),
+  impact levels, merge and wait rules live in one place each, VERIFY allows working-tree
+  receipts before ship, smelt README phases and speeds match SKILL.md, ADR format points to
+  ledger, tend's inbox is `smithy task-dir inbox`, scout reports go to `<batch-dir>/<id>/report.md`,
+  use-smithy's `references/SCRIPTS.md` is now `SAVE-SCRIPTS.md`; `route.domain` is documented.
+
 - **A/B trial frictions (r7, full speed).** `smithy wait pr:` reports checks as pending while
   this checkout's `origin/<branch>` is strictly ahead of the PR head GitHub shows (a push it
   hasn't seen).

@@ -7,13 +7,12 @@ do it on the user's yes.
 
 ## decide (`needs_decision`)
 
-By `impact` (you may raise it, never lower it; `impact_by=decide` means the decision model raised it):
-- **low** (local, cheap to undo, restores or completes the intent): decide on the merits.
-- **medium** (shapes a module or internal contract): `smithy consult` with the worker's question and
-  options verbatim, in neutral order. `NEED-INFO` goes back to the worker; `ESCALATE` makes it
-  high.
-- **high** (widens scope beyond the intent, customer-visible, money, data, security, public API or
-  schema, production, irreversible, or the same kind of finding recurring): the user decides. One
+By `impact`, with the levels of smelt's `references/EXECUTE.md` (Rulings); you may raise it, never
+lower it; `impact_by=decide` means the decision model raised it:
+- **low**: decide on the merits.
+- **medium**: `smithy consult` with the worker's question and options verbatim, in neutral order.
+  `NEED-INFO` goes back to the worker; `ESCALATE` makes it high.
+- **high** (also: the same kind of finding recurring): the user decides. One
   message with all of them; each gives the intent, the proposed change, the smallest alternative
   that still meets the intent, and your recommendation. Wait.
 
@@ -61,8 +60,7 @@ smelt's `references/CHECK.md`) in one wave of parallel fresh-context agents on:
   task such as a skeleton shipped before the batch, `base_sha` = the commit before it), plus each
   `ready` item's `gh pr diff`;
 - the spec: the task dir's spec, else every item's intent.
-Add the security agent when any item touches auth, money, personal data, input parsing, file
-or shell access, or secrets. Test agents work in a fresh worktree of `origin/<base>`, never in a
+Add the security agent when any item is risky (smelt's SKILL.md). Test agents work in a fresh worktree of `origin/<base>`, never in a
 worker's.
 Findings follow smelt's `references/RECEIVING.md`. The blocking ones become one new `fix` item: one worker
 (same brief, speed `fast`, intent = the findings verbatim, branch from `smithy names branch -

@@ -109,7 +109,7 @@ smithy tasks board [--all]        # one line per task list and batch: this repo,
 Ask how to run it (nobody to ask: SKILL.md Always), recommendation first, only offering what is
 installed. Recommend **here** unless at least two independent tasks are each big (more than ~15
 minutes of agent work): for a small list or a long chain, one session building in order is
-faster and several times cheaper than parallel workers (trial 4, `docs/trials`).
+faster and several times cheaper than parallel workers.
 - **Here, all of it:** smelt `build all`: built in order, one check wave on the whole branch at
   the end.
 - **Here, one at a time:** smelt `build next` (e.g. `/smelt build next`; repeat until `smithy tasks next` says all done).

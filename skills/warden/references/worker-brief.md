@@ -93,8 +93,7 @@ ready, merged, dropped, reported. Keep `progress` as <done>/<total> of your task
 as the current step.
 - Decision needed: state=needs_decision with decision_key (short slug), question, options (JSON
   list, each with its trade-off and the code lines that matter, neutral), recommendation and
-  impact (low: local, cheap to undo; medium: shapes a module or internal contract; high: widens
-  scope, customer-visible, money, data, security, public API/schema, prod, irreversible). End
+  impact (low, medium or high: smelt's `references/EXECUTE.md`, Rulings). End
   your turn. The warden closes the question; later progress doesn't.
 - PR opened, local checks green and every blocking finding closed: state=pr_open pr=<url>
   tests_run=<commands actually run> risks=<or none>, then end your turn. Don't wait for CI and
