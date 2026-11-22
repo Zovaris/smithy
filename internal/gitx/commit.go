@@ -198,6 +198,7 @@ func CommitMain(args []string) int {
 		return die(p, "nothing to commit in: %s", strings.Join(paths, " "))
 	}
 	if c := attached("git", "commit", "-q", "-m", msg); c != 0 {
+		die(p, "git commit failed (exit %d); nothing committed, paths left staged", c)
 		return c
 	}
 	return attached("git", "log", "-1", "--format=%h %s")
