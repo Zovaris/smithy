@@ -7,7 +7,7 @@ argument-hint: "[brainstorm|plan|spec|build [next|all]|check|ship|debug|adr|retr
 # smelt
 
 ## Critical rules
-- Test first: one failing test before any code; never edit, skip or delete a test to go green.
+- Test first: one failing test before any code (property tests may follow unit-tested code); never edit, skip or delete a test to go green.
   If a test contradicts the spec, stop and say so.
 - No claim without fresh evidence (`references/VERIFY.md`): "passes" names the command and result.
 - Agents get only what their `agents/<name>.md` lists, never your plan or reasoning; you fix
@@ -70,12 +70,15 @@ need a tool `smithy stack` shows, else "not applicable".
 - Keep a task list of your phases (the harness's to-do tool if any) and tick it.
 - An agent's open question comes back in its report; answer it by the shared rule (a warden
   worker asks warden) and record it in the PR's "Decided without you".
-- **Nobody to ask** (hush, or a launched session): an approval, a choice (how to run a task
-  list) or a lesson's yes → take your recommendation and record it in the task dir's
-  `rulings.md` and the PR's "Decided without you".
+- **Nobody to ask** (hush, or a launched session): an approval or a choice (how to run a task
+  list) → take your recommendation; record it in `rulings.md` (task dir; a single task:
+  `.smelt/rulings.md`) and the PR's "Decided without you". Not for security, money, personal
+  data, production, push/merge or `smithy:allow` on a real secret: stop with a `blocked:` line.
+  Lessons: `references/SHIP.md`.
 - Command shapes: `smithy receipt run --claim "<c>" -- <cmd> <args>`; commit with
   `smithy commit "<msg>" <path>...` (never `git add` first: it wants a clean index; subject
-  under 72 characters); a fixture that looks like a secret gets `smithy:allow` on its line.
+  under 72 characters; if it fails: `git restore --staged <paths>`, then retry); a fixture that
+  looks like a secret gets `smithy:allow` on its line.
 
 ## Red flags
 | Thought | Reality |

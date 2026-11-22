@@ -13,7 +13,8 @@ Code carries no explanatory comments. Allowed:
 
 Forbidden: explanatory inline or block comments, commented-out code, TODO/FIXME/HACK/XXX (open
 an issue), bare directives without a reason. Enforce with the stack's linter
-(below) plus `smithy comments` in pre-commit (and in CI only where smithy is installed on the runner).
+(below) plus `smithy comments` in pre-commit (and in CI only where smithy is installed on the
+runner).
 
 ## Enforcing it
 
@@ -104,5 +105,5 @@ style:
 
 ## Everywhere
 
-Run `smithy comments --diff <base>` in a pre-commit hook (and in CI where the runner has smithy installed) so the policy holds
-whatever editor or agent wrote the code.
+Run `smithy comments --diff <base>` in a pre-commit hook (and in CI where the runner has smithy
+installed) so the policy holds whatever editor or agent wrote the code.

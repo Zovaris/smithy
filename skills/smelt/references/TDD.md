@@ -25,7 +25,7 @@ doc lint, or a grep that the required line exists (review reads the meaning).
 | Thought | Reality |
 |---|---|
 | "Too simple to need a test" | Simple code breaks too; the test takes a minute. |
-| "I'll write the tests after" | They pass on the first run and prove nothing. (Property tests may follow unit-tested code: they guard its invariants.) |
+| "I'll write the tests after" | They pass on the first run and prove nothing. |
 | "I'll keep the code I wrote as reference" | Code before its test gets deleted; start from red. |
 | "The test is wrong, I'll adjust it to green" | Stop, say why, fix it as its own red step. |
 | "Mocking this is easier" | Mock only boundaries, or you test the mock. |

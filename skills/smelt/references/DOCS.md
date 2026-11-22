@@ -67,5 +67,5 @@ skill owns (its `references/STANDARDS-FORMAT.md`); without ledger:
 
 `<evidence>` is a receipt, a failing test, a review finding, a `file:line` or a ruling from
 `rulings.md`. With the ledger skill installed (`smithy skills ledger`), follow its STANDARDS
-rules (budget, retire) instead of restating them here. Write only what the user accepted; under
-hush, list the proposed lines in the report and write nothing.
+rules (budget, retire) instead of restating them here. Write only what the user accepted; with
+nobody to ask, follow the lesson rule in `references/SHIP.md`.

@@ -54,9 +54,9 @@ run. Typecheck and lint receipts run with the `zz_` files moved out of the tree 
 ## 3 · Read the reports
 Show each report as returned (the reviewer's two stay two): never merge, dedupe or rerank.
 - **Blocking:** spec-check `missing`, `partial` or `wrong`; a failing holdout, adversary or
-  regression test; a violation of a written repo rule. A **high security** finding is shown to the user.
+  regression test (unless declined as spec-ambiguous, holdout rule above); a violation of a written repo rule. A **high security** finding is shown to the user.
 - Everything else is advisory.
-- Scripts first: coverage on changed lines (`diff-cover`, `vitest --coverage --changed`),
+- Scripts first: coverage on changed lines (the coverage command `smithy stack` prints, if any),
   shuffle/repeat runs (`pytest -p randomly --count 3`, `playwright --repeat-each 3`). If the old
   version still runs, a differential check (same inputs, equal outputs) beats snapshots.
 - Handle every finding by `references/RECEIVING.md`; reject any agent change that weakens an

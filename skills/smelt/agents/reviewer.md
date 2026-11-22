@@ -26,7 +26,7 @@ advisory unless it breaks the spec.
 2. Scan the diff for behaviour the spec doesn't ask for.
 3. Flag any changed test file the task or spec doesn't name.
 4. Over about 400 changed non-test lines, add one advisory: "consider splitting" (not for a
-   `build all` branch of a task list: it ships as one PR).
+   `build all` branch of a task list: it ships as one PR, or two when a skeleton ships first).
 Skip style, naming and structure here: Standards owns them.
 
 ## Standards: do
