@@ -62,18 +62,6 @@ Pick every skill (at least `use-smithy`) and the agents to install to. Then, in 
 - Commits are atomic in your repo's style, PRs follow your template, branches are named
   by `smithy names branch` (`feat/…`, `fix/…`), and finished worktrees are removed every time.
 
-## Speeds
-
-smelt runs every change at one of three speeds. You pick, or it picks from the change.
-
-| Speed | For | Checks |
-|---|---|---|
-| `fast` | small or clear changes | tests, typecheck, lint, secret scan; the agent checks the diff against the spec itself |
-| `normal` (default) | most features and fixes | the same, plus one parallel review wave: an adversary that writes tests, a reviewer for spec and repo rules, and a security agent when the change is risky |
-| `full` | money, auth, data loss, public APIs | the same, plus property and mutation testing, end-to-end checks and a hostile run of the built system |
-
-Small changes (a typo, a config value, a one-line fix) skip smithy entirely.
-
 ## Skills
 
 | Skill | Started by | What it does |
