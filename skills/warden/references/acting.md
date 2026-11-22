@@ -24,7 +24,7 @@ yourself: `smithy cards set <batch> <id> state=working decision_key=`. Log low a
 
 ## verify (`pr_open`, `ready`)
 
-`smithy verify <repo> <branch> <pr-url>` prints one verdict:
+A risky item whose card lacks `security=ran` is never merged: **tell** its worker to run the security agent. Else `smithy verify <repo> <branch> <pr-url>` prints one verdict:
 - `green`: merge auto, and either not the production branch or the user approved a production
   merge for this batch → `smithy pr merge <pr>` (workers never merge: the merge permission is
   the user's, given to you, and a permission check would refuse it from a worker). Use the repo's

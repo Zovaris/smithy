@@ -46,7 +46,7 @@ shared files (CHANGELOG, API or export lists, index files) don't count: their co
 says which items overlap, on what, and whether it chose wait or stack. An item that adds or
 changes CI is a prereq of the others when the repo has none yet: their PRs get no checks until it
 merges. Specs out of git (`.docs/specs`, `~/.smithy/plans`) aren't in worktrees: briefs give
-their absolute paths. A committed task dir must be on `<base>` (pushed) before launch, or workers get absolute paths to it.
+their absolute paths. A committed task dir (`docs/specs`) is committed and pushed to `<base>` before launch; when you can't push to `<base>` (or it's production), use `.docs/specs` (`tasks.commit=false`) instead. A task file not on `<base>` gets no status-done step in its brief: you update it.
 
 ## Worker mode
 

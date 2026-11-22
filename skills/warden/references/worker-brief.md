@@ -13,7 +13,7 @@ channel line needs one; `--subagent`: the fallback), checking the worktree is on
 Template: `{{x}}` is filled, `[if x]`…`[end]` kept only when x holds (`!x`: when not); `intent`
 is copied verbatim, never summarized or given added requirements, plans or criteria; rulings
 never go to reviewers; `rulings`: every line of the task dir's `rulings.md` when the source (or a path intent) is a
-committed task file, else its lines naming the id, plus `<batch-dir>/decisions.md` lines naming the id; `taskfile`: that committed file (its `Spec:` line goes into Spec); `wait`: prereqs, or past `max`
+task file, committed or not, else its lines naming the id, plus `<batch-dir>/decisions.md` lines naming the id; `taskfile`: that committed file (its `Spec:` line goes into Spec); `wait`: prereqs, or past `max`
 among items without prereqs on a first launch; `relaunch`: `launches` > 0; `debug` / `risky`: the item's `route` / `risky`.
 
 ```
@@ -49,7 +49,7 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
 [end][if debug]- Bug: smelt fast via the debug path (its references/DEBUG.md): commit the repro test alone, then on that
   clean commit `'{{smithy}}' receipt run --claim repro -- <cmd>` (must exit non-zero); then the fix commit,
   the same command green, `'{{smithy}}' receipt check-red` passing.
-[end][if risky]- Risky (smelt's SKILL.md Risky list): run its security agent on your diff before pr_open.
+[end][if risky]- Risky (smelt's SKILL.md Risky list): run its security agent on your diff before pr_open; card `security=ran` (or `security=not-run:<reason>`: the warden won't merge it).
 [end][if !smelt]- Workflow: the repo's agent instructions (AGENTS.md / CLAUDE.md), else just this brief: tests for what you change, typecheck and lint green.
 [end][if taskfile]
 - In your branch, set the task file's `Status: done` and `PR: <url>`
