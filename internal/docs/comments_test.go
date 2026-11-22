@@ -172,3 +172,12 @@ func TestAddedLines(t *testing.T) {
 		t.Errorf("extra lines: %v", got)
 	}
 }
+
+func TestSmithyAllowMarkerIsNotAComment(t *testing.T) {
+	if f := CheckSlash([]string{`const k = "AKIA0000000000000000" // smithy:allow`}, ".ts"); len(f) != 0 {
+		t.Fatalf("slash marker flagged: %v", f)
+	}
+	if f := CheckHash([]string{`k = "AKIA0000000000000000"  # smithy:allow`}, ".py"); len(f) != 0 {
+		t.Fatalf("hash marker flagged: %v", f)
+	}
+}
