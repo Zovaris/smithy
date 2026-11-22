@@ -5,6 +5,17 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **Skill diet.** Skills load fewer tokens and work in any harness. The top-session read set for
+  a `normal` smelt build drops from ~9.5k to ~5.5k tokens. Shared rules live once, in a
+  use-smithy table; descriptions are trigger-only; phases end in "Done when". Merged references:
+  smelt `TESTING.md` + `REVIEW.md` → `CHECK.md`, smelt agents `spec-check.md` + `standards.md`
+  → `reviewer.md`, scout `FORMAT.md` → `INVESTIGATOR.md`, tend alerts, issues and base recipes →
+  `ACTIONS.md` (receiving points at smelt's), use-smithy `AGENTS-BLOCK.md` → `SETUP.md`
+  (`smithy setup block add` reads the block between its markers), ledger ADR and glossary
+  formats → `FORMATS.md`. Vendor tool names live only in warden's `references/harness.md`.
+  `tests/skills.sh` fails on a SKILL.md over 80 lines (smelt 100), a reference over 120, or a
+  vendor tool name outside harness.md.
+
 ## v0.11.0 — 2026-11-21
 
 - **Trial 7 frictions.** `smithy comments` no longer reads a JS regex literal (`/^b\//`) as a

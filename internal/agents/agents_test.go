@@ -206,6 +206,16 @@ func TestSkills(t *testing.T) {
 	}
 }
 
+func TestExtractBlock(t *testing.T) {
+	doc := "# Setup\n\n<!-- use-smithy:start -->\n## Agent skills\n<!-- use-smithy:end -->\nafter\n"
+	if got := ExtractBlock(doc); got != "<!-- use-smithy:start -->\n## Agent skills\n<!-- use-smithy:end -->\n" {
+		t.Fatalf("extract: %q", got)
+	}
+	if ExtractBlock("no block") != "" || ExtractBlock("<!-- use-smithy:start -->\nopen") != "" {
+		t.Fatal("extract without a closed block must be empty")
+	}
+}
+
 func TestBlock(t *testing.T) {
 	blk := "<!-- use-smithy:start -->\nhi\n<!-- use-smithy:end -->\n"
 	once := AddBlock("# Rules\n", blk)
@@ -231,7 +241,7 @@ func TestBlock(t *testing.T) {
 
 func TestAgentKind(t *testing.T) {
 	for in, want := range map[string]string{
-		"spec-check": "review", "skills/smelt/agents/security.md": "review",
+		"spec-check": "review", "skills/smelt/agents/reviewer.md": "review", "skills/smelt/agents/security.md": "review",
 		"hostile.md": "test", "adversary": "test", "implementer": "ship",
 		"skills/tend/SKILL.md": "tend", "scout": "scout",
 	} {

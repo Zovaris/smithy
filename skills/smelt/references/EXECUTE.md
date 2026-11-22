@@ -2,7 +2,7 @@
 
 `/smelt build all [dir]` works every task of a task list in this session. Three tasks or fewer,
 or under ~1 hour of work in all: build them yourself in order, no implementer subagents. More:
-one fresh implementer **subagent** per task, so your own context only holds briefs, diffs and
+one fresh-context implementer agent per task, so your own context only holds briefs, diffs and
 rulings. For tasks that
 can run at the same time in separate worktrees and PRs, warden on `<dir>` (read the SKILL.md `smithy skills warden` prints) is the parallel
 alternative.
@@ -24,7 +24,7 @@ For each task:
 1. `smithy tasks set <file> status=doing`.
 2. **Brief.** Prompt = `agents/implementer.md` + `## You get`: the task file's path and text, the
    spec path, the test commands from `smithy stack`, the files and interfaces the task lists, and
-   the rulings so far that touch it, and the report contract (`references/TESTING.md`). Never your
+   the rulings so far that touch it, and the report contract (`references/CHECK.md`). Never your
    conversation.
 3. **Status.** The implementer ends with one of:
    - `DONE` → step 4.
@@ -33,7 +33,7 @@ For each task:
      can answer, ask (under hush, stop with a `blocked:` line).
    - `BLOCKED` → `smithy tasks set <file> status=todo`, note why, move to the next unblocked task.
 4. **Verify** (the verify gate): read the diff, run the task's tests (the full suite only at the end when `fast`).
-5. **Check** the task's diff against the task file with the spec-check checklist yourself, at
+5. **Check** the task's diff against the task file with the Spec-check list of `agents/reviewer.md` yourself, at
    every speed. The speed's agents run once, on the whole branch, after the last task.
 6. **Fix loop**: send the reproduced findings back to a fresh implementer with the diff. At most
    3 rounds; round 3 uses the strong model. Still failing → `BLOCKED` with the findings.
@@ -45,7 +45,7 @@ The branch ships as one PR.
 
 After the last task, at the highest `Speed:` among the tasks: `fast` → ship; `normal` or `full` →
 one check wave on the whole branch (SKILL.md's table, its agents in parallel), one fix wave,
-the re-review of REVIEW.md step 6, then ship.
+the re-review (`references/RECEIVING.md`, step 5), then ship.
 
 ## Rulings
 

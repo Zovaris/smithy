@@ -23,6 +23,6 @@ Other roles: `smithy consult` uses `judge` (optional, the smartest model), else 
 ## Effort
 
 Workers run at `agent.effort` (default and cap `medium`; `smithy config get agent.effort`). Through
-`smithy agent` it is passed for you. A worker started another way (app sessions, `claude --bg`)
+`smithy agent` it is passed for you. A worker started another way (`references/harness.md`)
 gets `--effort <value>` where that launcher takes it; otherwise it runs at the harness default,
 and you say so once. Never raise effort for a hard task: pick a stronger tier instead.
