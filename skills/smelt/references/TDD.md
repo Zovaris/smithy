@@ -10,7 +10,7 @@ For each behaviour in the acceptance criteria, in tracer-bullet order:
 4. **Refactor** once green: behaviour unchanged, tests untouched. Untested code: snapshot it
    first and require zero diffs (never update snapshots in the same pass).
 
-Typecheck every few cycles; full suite at the end. Docs-only changes: the seam is the repo's
+Typecheck every few cycles; the full suite once, at the end of the task (at `fast`, of the list). Docs-only changes: the seam is the repo's
 doc lint, or a grep that the required line exists (review reads the meaning).
 
 ## Good tests

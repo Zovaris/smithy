@@ -14,9 +14,7 @@ Each implementer agent gets the model `smithy route --file <task file> --speed <
 skip it. Each check agent gets `smithy route --agent <name>` (the adversary and security run on
 at least mid); the last fix round uses strong. You may move a pick one tier with a reason (a
 domain noun, like "secret" in a secret scanner, is not risk), never below the `--agent` floor;
-a model the user named always wins. A tier whose model is unset prints `-`:
-ask the user once to name it and save it with `smithy config set-model <tier> <name>`; until
-then, or when you can't ask, use the session default.
+a model the user named always wins. A tier whose model is unset prints `-`: use-smithy's model-tier rule.
 
 ## Loop
 
@@ -34,7 +32,7 @@ For each task:
    - `NEEDS_CONTEXT` → answer from the spec or code (ruling) and send it back; if only the user
      can answer, ask (under hush, stop with a `blocked:` line).
    - `BLOCKED` → `smithy tasks set <file> status=todo`, note why, move to the next unblocked task.
-4. **Verify** (the verify gate): read the diff, run the task's tests (the full suite only at the end when `fast`).
+4. **Verify** (the verify gate): read the diff, run the task's tests (full suite: `references/TDD.md`).
 5. **Check** the task's diff against the task file with the Spec-check list of `agents/reviewer.md` yourself, at
    every speed. The speed's agents run once, on the whole branch, after the last task.
 6. **Fix loop**: send the reproduced findings back to a fresh implementer with the diff. At most
@@ -58,8 +56,8 @@ Decisions that come up without the user, by impact:
   "<options, neutral order>" [--context <file>]`, one tool-less call to the user's judge model (else strong)
   in whatever harness you're in. Follow its pick; `NEED-INFO` → find that out and ask again;
   `ESCALATE` → it's high.
-- **high** (scope, customer-visible behaviour, money, data, security, public API, production,
-  irreversible): the user decides.
+- **high** (scope, customer-visible behaviour, money, data, security, public API or schema,
+  production, irreversible): the user decides.
 
 Every decision made without the user is one line in `<dir>/rulings.md`:
 `- NN · <question> → <choice> (why)`, with its exact boundary ("multi-column rows only"): agents grade against the words. Rulings bind later tasks (pass the relevant ones in each

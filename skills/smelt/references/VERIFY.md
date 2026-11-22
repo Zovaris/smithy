@@ -5,9 +5,9 @@ No claim without fresh evidence ("should work" is not evidence). This gate close
 1. **Name the claim** in one line.
 2. **Pick the evidence** from the table.
 3. **Produce it now**, in this context (not earlier or another agent's output). Test,
-   typecheck and lint run as `smithy receipt run --claim "<claim>" -- <command>` on a committed
-   tree. A dirty-tree receipt is valid for
-   the red step only.
+   typecheck and lint run as `smithy receipt run --claim "<claim>" -- <command>`; before
+   ship they may run on the working tree, and "Ready to open a PR" needs them re-run on the
+   committed HEAD (`references/SHIP.md`).
 4. **Read the result**: exit code, failures, skips, warnings.
 5. **State claim → command → result**, or what still fails.
 

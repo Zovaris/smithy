@@ -1,6 +1,6 @@
 # Turn repeated work into scripts
 
-Before a one-off command, check `scripts/SCRIPTS.md`. At the end of a task (never mid-task, not
+Before a one-off command, check the repo's `scripts/SCRIPTS.md`. At the end of a task (never mid-task, not
 under hush): ran the same multi-step command twice, or wrote a throwaway script (heredoc,
 `python -c`, long pipeline) the project will need again? Propose saving them in one line. On a
 yes: the repo's `scripts/`, executable, a usage line, arguments not session values, secrets from

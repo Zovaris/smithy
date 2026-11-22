@@ -12,8 +12,8 @@ Started by you (by name, the way your harness starts skills) or by an agent thro
 | `/smelt <task>` | Picks the entry: no plan → `plan`, a plan or task → `build`, a bug → `debug` |
 | `/smelt plan <idea>` | Brainstorm, grill the open decisions, write the spec and the task list |
 | `/smelt build next` · `build all` | Build the next ready task, or every task in order (one implementer each when there are more than three) |
-| `/smelt <phase> <task>` | One phase: `brainstorm`, `spec`, `build`, `test`, `review`, `ship`, `retro` |
-| `/smelt from test <task>` | From that phase to the end, e.g. on code you already wrote |
+| `/smelt <phase> <task>` | One phase: `brainstorm`, `spec`, `build`, `check`, `ship`, `retro` |
+| `/smelt from check <task>` | From that phase to the end, e.g. on code you already wrote |
 | `/smelt debug <bug>` | Root cause, failing test, fix, regression test, PR |
 
 ## Speeds
@@ -23,7 +23,7 @@ Started by you (by name, the way your harness starts skills) or by an agent thro
 | For | small or clear changes | most features and fixes | money, auth, data loss, public APIs, or when asked |
 | Plan | criteria from the task | a spec if none exists | brainstorm, grill, spec, builder check for large or open specs, tasks |
 | Checks (scripts) | suite, typecheck, lint, scan | + property tests you write | + the mutation tool |
-| Agents, one wave in parallel | none (you check against the spec) | adversary + one reviewer | two adversaries, property, reviewer, security, mutant reader; hostile last |
+| Agents, one wave in parallel | none (you check against the spec); security if risky | adversary + reviewer; security if risky | adversary, property, reviewer, security, e2e for UI or HTTP; mutation after fixes; hostile last |
 | Target | ~5 min | ~10–15 min | the safest flow |
 
 Every speed builds test-first and passes the verify gate: no "done" without fresh evidence.

@@ -41,8 +41,8 @@ without acting on one.
 
 ## Stop only for
 
-What is the user's alone: scope, public API, money, prod, client data, security, irreversible or destructive
-actions, a credential/login, or the same obstacle hit twice after a real fix attempt. Then send
+What is the user's alone (use-smithy's stop list under "Ask only the user's decisions"), or the
+same obstacle hit twice after a real fix attempt. Then send
 one line and stop: `blocked: <why>`.
 
 ## End
