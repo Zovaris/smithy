@@ -65,7 +65,7 @@ func (r repo) dep(name string) bool {
 }
 
 func (r repo) pydep(name string) bool {
-	re := regexp.MustCompile(`(?i)^[^#]*\b` + regexp.QuoteMeta(name) + `\b`)
+	re := regexp.MustCompile(`(?i)^[^#]*(^|["'\[,])\s*` + regexp.QuoteMeta(name) + `\b`)
 	files := append([]string{filepath.Join(r.dir, "pyproject.toml")}, r.glob("requirements*.txt")...)
 	files = append(files, filepath.Join(r.dir, "setup.cfg"))
 	for _, f := range files {
@@ -88,11 +88,15 @@ func (r repo) pydep(name string) bool {
 
 // pytest reports whether the repo uses pytest: a dependency or a pytest config.
 func (r repo) pytest() bool {
-	if r.pydep("pytest") || r.file("pytest.ini") || r.file("conftest.py") || r.file("tests/conftest.py") {
+	if r.pydep("pytest") || r.file("pytest.ini") || r.file("conftest.py") || r.file("tests/conftest.py") || r.file("test/conftest.py") {
 		return true
 	}
 	b, _ := os.ReadFile(filepath.Join(r.dir, "pyproject.toml"))
-	return strings.Contains(string(b), "[tool.pytest")
+	if strings.Contains(string(b), "[tool.pytest") {
+		return true
+	}
+	t, _ := os.ReadFile(filepath.Join(r.dir, "tox.ini"))
+	return regexp.MustCompile(`(?im)^\[pytest\]|^\s*(deps\s*=\s*)?pytest\b`).Match(t)
 }
 
 func or(v, fallback string) string {
@@ -213,7 +217,11 @@ func Stack(dir string) []Line {
 			run = "poetry run "
 		}
 		if unittest || !r.pytest() {
-			test, single = or(test, "python3 -m unittest discover"), or(single, "python3 -m unittest <module>")
+			discover := "python3 -m unittest discover"
+			if st, err := os.Stat(filepath.Join(dir, "tests")); err == nil && st.IsDir() {
+				discover += " -s tests"
+			}
+			test, single = or(test, run+discover), or(single, run+"python3 -m unittest <module>")
 		} else {
 			test = or(test, run+"pytest -q")
 			single = or(single, run+"pytest -q <file>")

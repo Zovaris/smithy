@@ -30,7 +30,7 @@ advisory unless it breaks the spec.
 Skip style, naming and structure here: Standards owns them.
 
 ## Standards: do
-1. Check the diff against every rule in the rule files. The repo's rules win over general taste. Report only violations of written repo rules and correctness, never style preferences.
+1. Check the diff against every rule in the rule files. The repo's rules win over general taste. Report only violations of written repo rules and correctness; smells stay advisory unless they break the spec or a written rule.
 2. Then these smells, only where they make the code harder to change or easier to break:
    duplicated logic, long function doing several things, shallow module, feature envy,
    primitive obsession on domain values (money, ids, dates), boolean flag parameters, hidden

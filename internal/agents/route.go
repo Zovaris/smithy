@@ -285,7 +285,7 @@ func RouteMain(args []string) int {
 	if speed == "" {
 		speed = "normal"
 	}
-	if strings.TrimSpace(text) == "" && kind == "ship" {
+	if strings.TrimSpace(text) == "" {
 		fmt.Fprintln(os.Stderr, routeUsage)
 		return 2
 	}

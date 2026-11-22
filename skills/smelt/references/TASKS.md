@@ -24,7 +24,7 @@ It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `g
 `tasks.commit` says. `smithy config list` shows the current values.
 
 Other places: list them in `$SMELT_TASKS_DIRS` (colon-separated). Board tasks keep the same fields
-(status, blocked by, PR) in the issue body or labels; the spec stays in the repo or local dir.
+(status, blocked by, PR) in the issue body or labels; the spec stays in the repo or local dir and the issues link to it.
 
 ## Splitting
 

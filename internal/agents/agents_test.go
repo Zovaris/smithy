@@ -152,6 +152,8 @@ func TestRouteMainRejectsBadFlags(t *testing.T) {
 		{"--text", "x", "--kind"},
 		{"--text"},
 		{},
+		{"--kind", "review"},
+		{"--agent", "adversary"},
 		{"--json"},
 		{"--text", "x", "--speed", "--json"},
 	} {
@@ -265,7 +267,7 @@ func TestAgentFloorLiftsAdversaryAndSecurity(t *testing.T) {
 		r, w, _ := os.Pipe()
 		old := os.Stdout
 		os.Stdout = w
-		code := RouteMain([]string{"--agent", a, "--speed", "fast"})
+		code := RouteMain([]string{"--agent", a, "--speed", "fast", "--text", "x"})
 		w.Close()
 		os.Stdout = old
 		out, _ := io.ReadAll(r)

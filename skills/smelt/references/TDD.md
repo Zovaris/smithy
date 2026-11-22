@@ -32,7 +32,7 @@ doc lint, or a grep that the required line exists (review reads the meaning).
 | "I'll keep the code I wrote as reference" | Code before its test gets deleted; start from red. |
 | "The test is wrong, I'll adjust it to green" | Stop, say why, fix it as its own red step. |
 | "Mocking this is easier" | Mock only boundaries, or you test the mock. |
-| "Same failure a third time" or a diff outside the task's files | Stop and re-plan. |
+| "One more try, same error" or "I'll touch this other file too" | The same failure three times, or a diff outside the task's files: stop and re-plan. |
 | "Skip the failing test just this once" | `skip`, `only`, `xfail`, loosened asserts and snapshot updates are refused. |
 
 Optional guard: `smithy guard-tests` blocks test-file edits while `.smelt/green` exists (`touch`
