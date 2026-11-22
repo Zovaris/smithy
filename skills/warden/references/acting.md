@@ -28,7 +28,9 @@ yourself: `smithy cards set <batch> <id> state=working decision_key=`. Log low a
   merge for this batch → `smithy pr merge <pr>` (workers never merge: the merge permission is
   the user's, given to you, and a permission check would refuse it from a worker). Use the repo's
   usual merge method; a rebase merge refused because the branch has merge commits → a merge
-  commit, never a force-push. Not mergeable (the base moved) → **tell** the worker to merge the base and push. Refused → list
+  commit, never a force-push. Not mergeable (the base moved) → **tell** the worker to merge the base and push.
+  Several green PRs that conflict once the first merges: merge one, `gh pr update-branch <pr>`
+  each of the rest (on a conflict, **tell** its worker to merge the base), then verify them again. Refused → list
   it with the doctor's permission hint.
   Production without that yes, or merge manual → card `state=ready`, listed for the user.
 - `pending`: wait on every pending PR of the batch in one call, `smithy wait pr:<a> pr:<b> …`
@@ -55,8 +57,9 @@ Workers build at smelt `fast`, so the batch is reviewed once, as a whole. When t
 the batch and its items is `fast`, or mode is `plain`, skip this. Otherwise, before the final message, run smelt's check phase at the
 batch's speed (read the SKILL.md `smithy skills smelt` prints: its speed table and
 smelt's `references/CHECK.md`) in one wave of parallel fresh-context agents on:
-- the diff `git diff <base_sha>..origin/<base>` (`base_sha` from `batch.json`), plus each `ready`
-  item's `gh pr diff`;
+- the diff `git diff <base_sha>..origin/<base>` (`base_sha` from `batch.json`; when a foundation
+  task such as a skeleton shipped before the batch, `base_sha` = the commit before it), plus each
+  `ready` item's `gh pr diff`;
 - the spec: the task dir's spec, else every item's intent.
 Add the security agent when any item touches auth, money, personal data, input parsing, file
 or shell access, or secrets. Test agents work in a fresh worktree of `origin/<base>`, never in a
@@ -64,7 +67,8 @@ worker's.
 Findings follow smelt's `references/RECEIVING.md`. The blocking ones become one new `fix` item: one worker
 (same brief, speed `fast`, intent = the findings verbatim, branch from `smithy names branch -
 "<batch> review" fix`), one PR, merged like the others; then smelt's re-review (smelt's `references/RECEIVING.md`, step 5)
-at the fix's commit. A high security finding also goes to the user. Non-blocking ones
+at the fix's commit. You write the fix PR's dispositions (every finding, including declined
+ones and why) in its body. A high security finding also goes to the user. Non-blocking ones
 go under **Followups**.
 
 ## batch end (final message)

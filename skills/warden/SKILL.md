@@ -58,8 +58,8 @@ stores every value as the user's standing permission for this batch.
    <repo> worktree add --no-track -b <branch> <worktree> origin/<from>` (`<branch>` = `smithy
    names branch <key> "<title>"`; `<worktree>` = `smithy names worktree <branch> <repo>`, never
    inside the repo; `<from>` = base, or the prereq's branch when stacked). Write the brief from
-   `references/worker-brief.md` to `<batch-dir>/<id>.brief.md` and **spawn** each with its full
-   text as the prompt; no tend session (agents start only to fix something). Record session id or pid, bump `launches`, store `base_sha`. Done when every item has a recorded running worker.
+   `references/worker-brief.md` to `<batch-dir>/<id>.brief.md` and **spawn** each with the prompt
+   `Read <batch-dir>/<id>.brief.md and follow it exactly.`; no tend session (agents start only to fix something). Record session id or pid, bump `launches`, store `base_sha`. Done when every item has a recorded running worker.
 3. **Watch.** `smithy wait batch:<batch>` in the background (done when it returns); on wake read only the printed
    cards (`smithy cards get` if a line isn't enough; a log only if a card is missing or wrong).
 4. **Act** on each non-final card by `references/acting.md`: decide by impact, verify PRs, merge,

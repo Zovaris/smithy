@@ -16,7 +16,8 @@ What workers are:
   diff once the items merge (`references/acting.md`, batch check). Mode `plain`: the repo's agent
   instructions, else just the brief.
 - Effort: `agent.effort` (default and cap medium); a harder item gets a stronger model, not more effort.
-- The prompt you spawn with is this brief's full text, never a pointer to the file.
+- The prompt you spawn with is `Read <batch-dir>/<id>.brief.md and follow it exactly.` (the file
+  exists for respawns); a harness that can't read files gets the full text.
 
 | Slot | Value | Drop the line when |
 |---|---|---|
@@ -41,7 +42,7 @@ PR target: <base>. Merge mode: <auto|manual>.<stack: " Stacked on <prereq>: merg
 <intent>
 
 ## Spec
-<task file path or board key (read it first: its acceptance criteria are the spec), or "read
+<task file path relative to your worktree, or board key (read it first: its acceptance criteria are the spec), or "read
 requirements from the intent and the code"; out of scope if the user named it>
 
 ## How
