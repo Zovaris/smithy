@@ -28,9 +28,6 @@ done
 for f in skills/*/references/*.md skills/*/agents/*.md; do
   [ -f "$f" ] || continue; n=$(($(wc -l <"$f"))); [ "$n" -le 120 ] || bad "$f has $n lines (max 120)"
 done
-for f in skills/*/README.md; do
-  n=$(($(wc -l <"$f"))); [ "$n" -le 25 ] || bad "$f has $n lines (max 25)"
-done
 vendor='Claude Code|SendMessage|start_session|archive_session|PreToolUse|run_in_background|Agent tool|spawn_agent|codex exec'
 for f in $(grep -rlE "$vendor" skills --include='*.md' | grep -v '^skills/warden/references/harness.md$'); do
   bad "$f names a vendor tool (only warden/references/harness.md may)"

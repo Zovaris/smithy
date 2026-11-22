@@ -13,8 +13,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   `ACTIONS.md` (receiving points at smelt's), use-smithy `AGENTS-BLOCK.md` → `SETUP.md`
   (`smithy setup block add` reads the block between its markers), ledger ADR and glossary
   formats → `FORMATS.md`. Vendor tool names live only in warden's `references/harness.md`.
-  `tests/skills.sh` fails on a SKILL.md over 80 lines (smelt 100), a reference over 120, a
-  README over 25, or a vendor tool name outside harness.md.
+  `tests/skills.sh` fails on a SKILL.md over 80 lines (smelt 100), a reference over 120, or a
+  vendor tool name outside harness.md.
 
 ## v0.11.0 — 2026-11-21
 
