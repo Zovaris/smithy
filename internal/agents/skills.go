@@ -98,31 +98,35 @@ func SkillsMain(args []string) int {
 	return 0
 }
 
-// HarnessSkillDirs lists the folders the harness h loads skills from (user folder first, then
-// the repo at top); nil when the harness is unknown.
+// HarnessSkillDirs lists the folders the harness h loads skills from: its user folders first,
+// then the repo at top (each harness reads its own repo folders, not every one); nil when the
+// harness is unknown.
 func HarnessSkillDirs(h, top, home string, getenv func(string) string) []string {
 	agents := filepath.Join(home, ".agents", "skills")
-	var user []string
+	var user, repo []string
 	switch h {
 	case "claude-cli", "claude-desktop":
-		user = []string{filepath.Join(home, ".claude", "skills")}
+		user, repo = []string{filepath.Join(home, ".claude", "skills")}, []string{".claude"}
 	case "codex":
-		user = []string{filepath.Join(home, ".codex", "skills"), agents}
+		user, repo = []string{agents, filepath.Join(home, ".codex", "skills")}, []string{".agents"}
 	case "opencode":
 		user = []string{filepath.Join(envOr(getenv, "XDG_CONFIG_HOME", filepath.Join(home, ".config")), "opencode", "skills"), filepath.Join(home, ".claude", "skills"), agents}
+		repo = []string{".opencode", ".claude", ".agents"}
 	case "gemini":
-		user = []string{filepath.Join(home, ".gemini", "skills"), agents}
+		user, repo = []string{filepath.Join(home, ".gemini", "skills"), agents}, []string{".gemini", ".agents"}
 	case "cursor":
-		user = []string{filepath.Join(home, ".cursor", "skills"), agents}
+		user, repo = []string{filepath.Join(home, ".cursor", "skills"), agents}, []string{".cursor", ".agents"}
 	case "pi":
-		user = []string{filepath.Join(envOr(getenv, "PI_CODING_AGENT_DIR", filepath.Join(home, ".pi", "agent")), "skills"), agents}
+		user, repo = []string{filepath.Join(envOr(getenv, "PI_CODING_AGENT_DIR", filepath.Join(home, ".pi", "agent")), "skills"), agents}, []string{".pi", ".agents"}
 	case "dsh":
-		user = []string{filepath.Join(envOr(getenv, "DSH_HOME", filepath.Join(home, ".dsh")), "skills"), agents}
+		user, repo = []string{filepath.Join(envOr(getenv, "DSH_HOME", filepath.Join(home, ".dsh")), "skills"), agents}, []string{".agents"}
 	default:
 		return nil
 	}
 	if top != "" {
-		user = append(user, filepath.Join(top, ".claude", "skills"), filepath.Join(top, ".agents", "skills"))
+		for _, r := range repo {
+			user = append(user, filepath.Join(top, r, "skills"))
+		}
 	}
 	return user
 }
