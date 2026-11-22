@@ -214,9 +214,10 @@ func (r Receipt) State(head string, dirtyNow bool) string {
 }
 
 // Shown is a receipt's command as typed: one command line that came in as a single string
-// prints bare, since the shell split it; anything else is quoted like Quote.
+// prints bare, since the shell split it, unless it names an existing path (a program with a
+// space in its name); anything else is quoted like Quote.
 func Shown(argv []string) string {
-	if len(argv) == 1 && strings.ContainsAny(argv[0], " \t") {
+	if len(argv) == 1 && strings.ContainsAny(argv[0], " \t") && !exists(argv[0]) {
 		return argv[0]
 	}
 	return Quote(argv)
@@ -379,3 +380,5 @@ func ReceiptMain(args []string) int {
 	fmt.Fprintln(os.Stderr, receiptUsage)
 	return 2
 }
+
+func exists(p string) bool { _, err := os.Stat(p); return err == nil }
