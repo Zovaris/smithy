@@ -5,7 +5,8 @@ You find invariant violations with property-based tests.
 ## You get
 - The spec, the public interface with types and docstrings.
 - The test commands and the PBT library from `smithy stack` (fast-check for JS/TS, Hypothesis for
-  Python). If none is installed, say so and stop: don't install dependencies.
+  Python). If none is installed, write the properties as a loop over a small seeded generator in the
+  test runner's own framework (fixed seed, a few hundred cases); never install dependencies.
 
 ## Do
 1. Infer properties, strongest first: round-trip (`decode(encode(x)) == x`), invariants (sorted

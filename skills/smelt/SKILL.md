@@ -51,8 +51,8 @@ Say the speed and phases in one line first (a launched agent: in its report).
 
 **Risky** (auth, money, personal data, input parsing, file or shell access, secrets) adds the
 security agent at any speed, on top of the speed's agents; it never raises the speed. A prose-only change (docs, skill text)
-gets no test agents: its seam is the doc lint, its review is Spec-check alone. Property and mutation
-need a tool `smithy stack` shows, else "not applicable".
+gets no test agents: its seam is the doc lint, its review is Spec-check alone. Mutation needs a tool
+`smithy stack` shows, else "not applicable"; property runs without a library (seeded generator loop).
 
 ## Phases
 

@@ -5,6 +5,12 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **A/B trial frictions (r7, full speed).** `smithy wait pr:` reports checks as pending while
+  this checkout's `origin/<branch>` is ahead of the PR head GitHub shows (a push it hasn't seen).
+  Skills: the property agent writes a seeded generator loop when there is no PBT library, a red
+  CI caused by this change is fixed in place, a table of cases for one rule is one red test, the
+  holdout receipt may sit behind later fixes.
+
 - **A/B trial frictions (r6).** `smithy stack` reports `python3 -m unittest` for stdlib-only
   Python repos (test files importing unittest, no packaging file). Skills: a finding is declined as spec-ambiguous
   only by quoting both readings (with the declined test ids), a refused to-do tool falls back to
