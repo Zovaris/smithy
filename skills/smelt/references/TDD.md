@@ -2,7 +2,8 @@
 
 ## Loop
 For each behaviour in the acceptance criteria, in tracer-bullet order:
-1. **Red.** One test at an agreed seam; run that file. It fails on an assertion naming the
+1. **Red.** One test at an agreed seam; run that file (a single-file command skips pretest
+   hooks: build first when tests spawn the built CLI). It fails on an assertion naming the
    missing behaviour (an import, syntax or setup error is not red: stub the export returning an empty value first).
 2. **Green.** The least code that passes; run the file again.
 3. Next behaviour; never all tests up front.

@@ -291,13 +291,13 @@ func contains(l []string, s string) bool {
 const taskTemplate = "\n## What\n\n## Acceptance criteria\n- [ ] \n\n## Files\n- create:  · modify:  · test: \n\n## Interfaces\n- Consumes: \n- Produces: \n\n## Notes\n"
 
 // Add writes the next NN task file from the template and returns its path.
-// speed is fast, normal or full ("" means normal).
+// speed is fast, normal or full ("" means fast).
 func Add(dir, title, blockedBy, key, speed string) (string, error) {
 	if blockedBy == "" {
 		blockedBy = "none"
 	}
 	if speed == "" {
-		speed = "normal"
+		speed = "fast"
 	}
 	if speed != "fast" && speed != "normal" && speed != "full" {
 		return "", fmt.Errorf("unknown speed %q (fast, normal, full)", speed)

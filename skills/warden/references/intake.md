@@ -66,7 +66,8 @@ intent or the task.
 ## Status back to the source
 
 So smelt and the board stay in sync:
-- Local task dir: `smithy tasks set <file> status=doing` at launch, `status=done pr=<url>` when merged,
+- Local task dir: `smithy tasks set <file> status=doing` at launch, `status=done pr=<url>` once the PR exists
+  (a follow-up commit on the PR branch),
   `status=dropped` when dropped.
 - Committed repo task dir (`docs/specs`): the worker sets `Status: done` and `PR:` in its own
   branch, so it lands with the PR; you don't commit to the base branch.

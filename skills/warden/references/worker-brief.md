@@ -56,7 +56,8 @@ requirements from the intent and the code"; out of scope if the user named it>
   Don't try to invoke it as a slash command." | mode plain: "work the way the repo's agent instructions
   (AGENTS.md / CLAUDE.md) say: tests for what you change, typecheck and lint green.">
 <committed repo task file (docs/specs): "- In your branch, set the task file's `Status: done` and `PR: <url>`
-  (`<warden-dir>/scripts/smithy tasks set <file> status=done pr=<url>`) so it lands with the PR.">
+  (`<warden-dir>/scripts/smithy tasks set <file> status=done pr=<url>`) once the PR exists, as a
+  follow-up commit on the PR branch.">
 - First step: `cd <worktree>`. Your session may start in another folder and the shell may reset
   its folder between calls, so start every command with `cd <worktree> &&`. Then check `pwd -P` and `git rev-parse --show-toplevel` equal <worktree> and the branch
   is <branch>. If not: state=blocked note=wrong-worktree, stop. A fresh worktree has no
