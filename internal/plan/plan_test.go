@@ -235,6 +235,9 @@ func TestTaskDir(t *testing.T) {
 				if !errors.As(err, &ask) || ask.Key != c.ask || !strings.HasPrefix(ask.Error(), "ask "+c.ask+": ") {
 					t.Fatalf("err = %v, want ask %s", err, c.ask)
 				}
+				if ex, _ := os.ReadFile(filepath.Join(dir, ".git", "info", "exclude")); !strings.Contains(string(ex), ".smithy/config.json\n") {
+					t.Errorf("exclude lacks the repo config before the ask: %q", ex)
+				}
 				return
 			}
 			if err != nil {

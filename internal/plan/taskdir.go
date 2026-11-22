@@ -81,12 +81,9 @@ func TaskDir(slug string) (dir string, board bool, err error) {
 	return dir, loc == "board", os.MkdirAll(dir, 0o755)
 }
 
-// excludeRepoConfig keeps an untracked .smithy/config.json, written by the settings this command
-// asks for, out of git status via the local .git/info/exclude.
+// excludeRepoConfig keeps an untracked .smithy/config.json out of git via the local
+// .git/info/exclude, before the settings this command asks for can write it.
 func excludeRepoConfig(top string) {
-	if _, err := os.Stat(filepath.Join(top, ".smithy", "config.json")); err != nil {
-		return
-	}
 	if _, err := ghx.Run("git", "-C", top, "ls-files", "--error-unmatch", ".smithy/config.json"); err == nil {
 		return
 	}
