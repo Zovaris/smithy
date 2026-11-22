@@ -14,7 +14,10 @@ lists, and the report contract below. Never your conversation, plan or opinion o
 (it would share your blind spots). Give every agent `<smithy>`, the
 absolute path of this skill's `scripts/smithy`. Without a subagent tool: write each prompt to a
 file and run `smithy agent --bg --log <log> <prompt-file>` (read-only ones with `--readonly`),
-then read the logs.
+then read the logs. Each agent's tier: `smithy route --agent agents/<name>.md --speed <speed>`, then the model from
+`smithy config model <tier>`; at full every check agent routes to strong (seven strong contexts). Test
+agents run only their own `zz_` file (others may be red). Mutation is a second step: run the
+tool after the wave's fixes, then launch its agent.
 
 | Agent | Runs | Writes tests |
 |---|---|---|
@@ -23,7 +26,7 @@ then read the logs.
 | `agents/regression.md` | a reported bug with a repro, instead of the adversary | runs the fixer's test |
 | `agents/security.md` | full, and any speed when the diff is risky (SKILL.md) | no |
 | `agents/property.md` | full: parsers, serializers, math, money, sorting, state machines | yes |
-| `agents/mutation.md` | full, after you run the mutation tool from `smithy stack`: reads surviving mutants | proposes |
+| `agents/mutation.md` | full, second step, after you run the mutation tool from `smithy stack`: reads surviving mutants | proposes |
 | `agents/e2e.md` | full, UI flows or HTTP endpoints changed and the app runs locally | yes |
 | `agents/hostile.md` | full, last, on the fixed commit of a runnable CLI, API, worker or job | no |
 
@@ -49,7 +52,7 @@ implementer): fix from the finding (input, expected, actual). After the fixes, r
 final tree: `smithy receipt run --claim holdout -- <single-file command from smithy stack>
 <zz file>`. Failing it is blocking, unless its finding was declined as spec-ambiguous: then
 one line in the PR's dispositions closes it. Copies of its cases are written only after that
-run. Typecheck and lint receipts run with the `zz_` files moved out of the tree (or excluded).
+run (a whole-file move into the repo's tests plus lint fixes is fine). Typecheck and lint receipts run with the `zz_` files moved out of the tree (or excluded).
 
 ## 3 · Read the reports
 Show each report as returned (the reviewer's two stay two): never merge, dedupe or rerank.

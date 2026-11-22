@@ -39,3 +39,14 @@ func TestTypeAddressIsNotDocs(t *testing.T) {
 		t.Fatalf("got %s", got)
 	}
 }
+
+func TestMainBranchRejectsTypeKey(t *testing.T) {
+	for _, k := range []string{"feat", "fix", "docs", "refactor", "test", "chore"} {
+		if got := Main([]string{"branch", k, "mdlinks-cli"}); got != 2 {
+			t.Errorf("names branch %s = exit %d, want 2", k, got)
+		}
+	}
+	if got := Main([]string{"branch", "-", "add login", "feat"}); got != 0 {
+		t.Errorf("names branch - = exit %d, want 0", got)
+	}
+}

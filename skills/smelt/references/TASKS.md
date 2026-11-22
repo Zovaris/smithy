@@ -10,7 +10,7 @@ Run `smithy task-dir <slug>`: it reads the user's settings, creates the dir and 
 When it exits 3 it prints `ask <key>: <question>`: ask the user that (your recommendation first;
 with nobody to ask, under hush or in a launched session, pick `true` and say so at the end),
 save the answer for this repo with `smithy config set --repo <key> <value>`, run it again.
-It asks at most twice per repo, ever:
+It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `git rm --cached` it if committed):
 
 1. `tasks.commit` — commit the specs and tasks to git? `true` → `docs/specs/<slug>/`, reviewed
    with the code. `false` → `.docs/specs/<slug>/`, next to the code but out of git.
@@ -43,9 +43,9 @@ spec stays in the repo or local dir and the issues link to it.
 - **Width over tidiness:** tasks run in parallel, so the wall time is the longest chain, not the
   task count. Shape the split so the chain is short: one shared foundation first (skeleton, CI,
   a schema or interface), then as many independent tasks as possible, each coding against the
-  agreed interface rather than waiting for its implementation. A chain longer than 2 is a
-  finding: say so with the list and how to shorten it. Parallel only pays when at least two
-  independent tasks are each big (more than ~15 minutes of agent work).
+  agreed interface rather than waiting for its implementation. A chain longer than 2 (3 if
+  the first is a skeleton/CI task shipped as its own PR) is a finding: say so with the list
+  and how to shorten it. Parallel only pays when at least two independent tasks are each big (more than ~15 minutes of agent work).
 - **Self-review** before showing it:
   1. Coverage: every acceptance criterion of the spec lands in exactly one task.
   2. Interfaces line up: each `Consumes` is `Produces`d by a blocker or already exists.

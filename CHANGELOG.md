@@ -5,6 +5,14 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **A/B trial frictions (r2).** smelt: fast lists a security agent when risky and puts its
+  Spec-check table in the PR body; e2e means UI or served HTTP endpoints; an agreed spec still
+  gets the builder check; SHIP proves each commit with `git rebase -x`; CHECK names each agent's
+  `smithy route` tier, full's seven strong contexts, own-`zz`-file runs, mutation as a second step and holdout moves; hostile scratch
+  goes in the system temp dir; adversary and property write no explanatory comments; TDD stubs
+  the export for red; a 3-link chain is fine after a skeleton PR. use-smithy shows
+  `smithy names branch <key|-> "<title>" [type]`. `smithy names branch`
+  rejects a type word as key; `smithy task-dir` excludes `.smithy/config.json` before it asks.
 - **Skill diet.** Skills load fewer tokens and work in any harness. The top-session read set for
   a `normal` smelt build drops from ~9.5k to ~5.5k tokens. Shared rules live once, in a
   use-smithy table; descriptions are trigger-only; phases end in "Done when". Merged references:

@@ -22,7 +22,7 @@ the bodies come in round two.
    malformed input, error paths and their messages.
 2. Write tests for the most likely breaks in a new file next to the existing tests
    (`zz_adversary` plus the suffix the test runner picks up: `zz_adversary_test.go`, `zz_adversary.test.ts`). Literal expected values derived from the
-   spec, never from running the code.
+   spec, never from running the code. No explanatory comments in the tests.
 3. Run them. Keep failing tests; re-run each failing one to rule out flakiness.
 4. Never edit source code or existing tests. Never loosen your own assertion to make it pass;
    if the spec is ambiguous, say so instead.

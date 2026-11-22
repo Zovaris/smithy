@@ -30,10 +30,11 @@ model <tier>` gives the model. Unset (exit 3 or `-`): ask once per harness for e
 one message, save with `smithy config set-model <tier> <name>` (user config; smithy ships no
 names); meanwhile, and under hush or in a launched session, use the session's model and say so.
 Effort stays at `agent.effort` (cap medium): harder jobs get a stronger tier.
+Branch names: `smithy names branch <key|-> "<title>" [type]`.
 
 ## Route
 
-Run `smithy skills --list` once per session; offer only skills it lists (and the harness shows).
+Run `smithy skills --list` once per session; skip only when the brief gives the skill path; offer only skills it lists (and the harness shows).
 To run one, read the SKILL.md path it prints. Start-by-name syntax differs per harness; never assume one.
 
 | The user wants… | Use |
