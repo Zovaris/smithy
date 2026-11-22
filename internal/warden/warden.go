@@ -62,13 +62,17 @@ func cardState(dir, id string) string {
 	return c.State
 }
 
-const waitUsage = `usage: smithy wait-turn <batch> <id> [max-min=9]
+const waitUsage = `usage: smithy wait-turn <batch> <id> [--max <min>]   (default 9; a bare third argument is the same)
 A launched worker whose item can't start yet waits here, inside its own session, until its
 prereqs are merged (or pr_open/ready with stack) and a slot is free under the batch's max.
 Then it claims the slot (state=working) and prints "go <id>".
-Exit 0 = go; 4 = still waiting after max-min (call it again: one blocking call per turn,
-under the 10-minute tool limit); 5 = a prereq was dropped (card set blocked); 2 = usage or
+--max caps one call in minutes; a subagent uses --max 1 so each call fits a harness's
+foreground limit.
+Exit 0 = go; 4 = still waiting after the cap (call it again: one blocking call per turn); 5 = a prereq was dropped (card set blocked); 2 = usage or
 unknown item.`
+
+// waitStep is how often wait-turn rechecks; the last sleep is cut to the cap.
+var waitStep = 20 * time.Second
 
 // WaitTurn runs `smithy wait-turn`.
 func WaitTurn(args []string) int {
@@ -76,13 +80,31 @@ func WaitTurn(args []string) int {
 		fmt.Fprintln(os.Stderr, waitUsage)
 		return 2
 	}
-	batch, id := args[0], args[1]
 	maxMin := 9.0
-	if len(args) > 2 {
-		if v, err := strconv.ParseFloat(args[2], 64); err == nil {
-			maxMin = v
+	var pos []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if v, ok := strings.CutPrefix(a, "--max="); ok {
+			a = v
+		} else if a == "--max" && i+1 < len(args) {
+			i++
+			a = args[i]
+		} else if len(pos) < 2 {
+			pos = append(pos, a)
+			continue
 		}
+		v, err := strconv.ParseFloat(a, 64)
+		if err != nil || v < 0 {
+			fmt.Fprintln(os.Stderr, waitUsage)
+			return 2
+		}
+		maxMin = v
 	}
+	if len(pos) < 2 {
+		fmt.Fprintln(os.Stderr, waitUsage)
+		return 2
+	}
+	batch, id := pos[0], pos[1]
 	dir := filepath.Join(cards.Home(), batch)
 	p, err := readPlan(dir)
 	if err != nil {
@@ -145,10 +167,11 @@ func WaitTurn(args []string) int {
 			}
 			_ = os.Remove(lock)
 		}
-		if !time.Now().Before(end) {
+		left := time.Until(end)
+		if left <= 0 {
 			break
 		}
-		time.Sleep(20 * time.Second)
+		time.Sleep(min(waitStep, left))
 	}
 	fmt.Println("waiting", id)
 	return 4

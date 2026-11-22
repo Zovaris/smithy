@@ -39,5 +39,5 @@ var foreign = map[string]bool{
 	"agent --force": true, "agent --permission-mode": true, "agent --sandbox": true,
 	"agent --standalone": true, "agent --tools": true,
 	"changed --mutate": true, "route --repo": true, "status --all": true,
-	"task-dir --repo": true, "version --version": true,
+	"task-dir --repo": true, "version --version": true, "brief --max": true,
 }

@@ -4,8 +4,7 @@ Contents: what workers are · how the brief is rendered · the template.
 Never by hand: `smithy brief <batch> <id> [--to <warden-name>] [--subagent]` fills the template
 from `batch.json`, the installed skills and `references/harness.md` into `<batch-dir>/<id>.brief.md`,
 checking the worktree is on the item's branch; exit 2 names what it can't fill. `--to`: your
-name, where the channel line needs one; `--subagent`: the fallback.
-What workers are:
+name, where the channel line needs one; `--subagent`: the fallback. What workers are:
 - They read the hush and smelt SKILL.md files at the brief's absolute paths (no slash commands:
   harnesses differ). Silent: only the status card and one closing line, never the user.
 - Mode `smelt <speed>`: workers build at smelt `fast`; the speed sets the one check wave on the
@@ -64,8 +63,8 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
   the lockfile command (`npm ci`, `go mod download`, `uv sync`) so a red test fails for the right reason.
 [if wait]
 [if !subagent]- Then wait for your turn: run `'{{smithy}}' wait-turn {{batch}} {{id}} {{minutes}}` in the background and wait
-  for it to end (no tokens while it waits; never poll); exit 4: run it again; 0: go.[end][if subagent]- Then wait for your turn: `'{{smithy}}' wait-turn {{batch}} {{id}} {{minutes}}`, one run per shell call, in the
-  foreground (never background: nothing can wake you). Exit 4, or a call killed without an exit code: run it again in a new call; 0: go.[end]
+  for it to end (no tokens while it waits; never poll); exit 4: run it again; 0: go.[end][if subagent]- Then wait for your turn: `'{{smithy}}' wait-turn {{batch}} {{id}} --max 1`, one run per shell call, in the
+  foreground (never background: nothing can wake you; one minute fits any foreground limit). Exit 4: run it again in a new call; 0: go.[end]
   Exit 5 or any other: the card is blocked; end your turn. When it says go, set
   `state=working`, `git fetch origin && git merge origin/{{from}}` so you start from the merged prereqs.
 [end]
@@ -81,8 +80,9 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
   heading of the template if there is one, then `'{{smithy}}' pr create --base {{base}} --title "<t>"
   --body-file <f>`. Write the PR body file inside {{worktree}}/.smelt/ or the system temp dir,
   never next to the worktree. Never `git add -A` or `--no-verify`; skip any preview, nobody answers.
-- Scope: stop only when the change would break callers, change what a module is responsible
-  for, or need coordinated redesign → needs_decision, impact high. File count or failing tests
+- Scope: CI config or check scripts (`.github/`, scripts CI runs) outside the task's files →
+  needs_decision, even to fix them. Else stop only when the change would break callers, change
+  what a module is responsible for, or need coordinated redesign → needs_decision, impact high. File count or failing tests
   alone are not reasons to stop.
 - Same obstacle twice after a real fix attempt: state=blocked with the one thing you need; stop.
   Do not create worktrees or issues; never start, fork or hand off sessions.
