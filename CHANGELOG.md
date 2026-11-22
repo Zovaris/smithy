@@ -5,6 +5,16 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **A/B trial frictions (r3).** `smithy verify` counts `checks=none` as pending when the repo
+  has a workflow file; `smithy route --domain` (config `route.domain`) takes the product's nouns,
+  which never count as risk; `smithy task-dir`'s ask line prints the default it would take;
+  `smithy tasks add` writes the full template and takes `--speed`. Skills: `smithy:allow` markers
+  pass the comment policy; read-only agents never switch branches (`git show <ref>:<file>`);
+  re-reviews answer only the blocking findings; the batch check diff starts before a foundation
+  task and warden writes the fix PR's dispositions; conflicting green PRs merge one at a time
+  with `gh pr update-branch`; workers get a "Read <brief> and follow it" prompt; any existing
+  batch dir gets a suffix; an agreed spec's folder is the task dir; split self-review catches
+  stub-output tests and a shared test file; `rebase -x` exempts skeleton, docs and tooling commits.
 - **A/B trial frictions (r2).** smelt: fast lists a security agent when risky and puts its
   Spec-check table in the PR body; e2e means UI or served HTTP endpoints; an agreed spec still
   gets the builder check; SHIP proves each commit with `git rebase -x`; CHECK names each agent's
