@@ -480,8 +480,8 @@ func TestMainSetGet(t *testing.T) {
 	if code != 1 || !strings.Contains(se, "no card missing") {
 		t.Fatalf("%d %q", code, se)
 	}
-	_, se, code = capture(t, func() int { return Main([]string{"set", "b1", "a", "state=bogus"}) })
-	if code != 1 || !strings.Contains(se, "state must be one of") {
+	_, se, code = capture(t, func() int { return Main([]string{"set", "b1", "a", "state=done"}) })
+	if code != 1 || !strings.Contains(se, `unknown state "done"`) || !strings.Contains(se, "pr_open, ready, merged") {
 		t.Fatalf("%d %q", code, se)
 	}
 }

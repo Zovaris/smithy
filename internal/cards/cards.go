@@ -111,7 +111,7 @@ func Set(batch, id string, pairs []string) (map[string]any, error) {
 	}
 	state := s(cur, "state")
 	if state != "" && !has(States, state) {
-		return nil, fmt.Errorf("state must be one of %s", strings.Join(States, ", "))
+		return nil, fmt.Errorf("unknown state %q: state must be one of %s", state, strings.Join(States, ", "))
 	}
 	if state != "needs_decision" && s(cur, "decision_key") != "" {
 		return nil, fmt.Errorf("decision %s is still open; the warden closes it with decision_key=", s(cur, "decision_key"))
