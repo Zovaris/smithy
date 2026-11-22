@@ -26,7 +26,8 @@ by name (a slash command, `$name`, `@name` or plain words); never assume one.
 
 | The user wants… | Use | How |
 |---|---|---|
-| to build, change or fix code | **smelt** | Announce "Using smelt `<route>` `<speed>`" in one line, read smelt's SKILL.md and follow it: no plan → `plan`, a plan, spec or task → `build`, a bug → `debug`. Trivial work is `fast`. Its approval gates still apply. |
+| a small change: a typo, copy, a config value, a one-line fix, a rename in one file | **none** | Do it directly: make the change, run the check that covers it (its test, lint or build), commit. No skill, no plan, no agents. |
+| to build, change or fix code | **smelt** | Announce "Using smelt `<route>` `<speed>`" in one line, read smelt's SKILL.md and follow it: no plan → `plan`, a plan, spec or task → `build`, a bug → `debug`. Its approval gates still apply. |
 | several tasks done at once, or a task list run in parallel | **warden** | Spawns sessions and costs tokens: propose it with the task list and wait for a yes, then run it. |
 | a fact, a comparison, "why does X", "can we Y" (not past project decisions: ledger search) | **scout** | Model-invoked; read-only; answers with sources. |
 | a decision recorded, docs, module READMEs, comment policy, a codebase map, to search past decisions | **ledger** | Model-invoked. Search past decisions with its `search` mode before re-deciding anything. |
@@ -98,7 +99,7 @@ Never propose one the user declined, and not under hush. Ideas from
 
 | Thought | Reality |
 |---|---|
-| "Too small for smelt" | That is what `fast` is for: a few minutes, still test-first. |
+| "Too small for smelt" | Truly small (the first row of the route table) needs no skill. Anything with new behaviour is `fast`: a few minutes, still test-first. |
 | "I'll plan it in my head" | Plans live in the task list so warden and the next session can use them. |
 | "I'll just ask the user this fact" | Facts are scout's job; ask the user only for decisions. |
 | "A comment will explain it" | Put the why in the module README or an ADR. |

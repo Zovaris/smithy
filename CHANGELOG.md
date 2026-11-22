@@ -5,6 +5,10 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **Small changes skip smithy.** use-smithy sends a typo, copy, config value or one-line fix straight
+  to the change and its check, with no skill or agents.
+- **Shorter branch names.** `smithy names branch` drops filler words, single letters and words
+  already in the key, and keeps at most four.
 - **One check wave per batch, not per task (trial 4).** Warden workers build at smelt `fast` with
   no agents; once the items merge, warden runs one wave at the batch's speed on the combined diff
   and turns blocking findings into one `fix` item. `warden.mode` now defaults to `smelt normal`

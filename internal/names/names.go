@@ -84,6 +84,28 @@ var cleanup = []struct {
 	rep string
 }{{regexp.MustCompile(`/-`), "/"}, {regexp.MustCompile(`--+`), "-"}, {regexp.MustCompile(`-+$`), ""}}
 
+var filler = map[string]bool{"a": true, "an": true, "the": true, "and": true, "or": true, "of": true, "for": true, "from": true, "to": true, "with": true, "in": true, "on": true, "by": true, "into": true}
+
+// branchSlug keeps a branch short: filler words dropped, words already in key dropped, at most
+// four words, none a single letter.
+func branchSlug(s, key string) string {
+	inKey := map[string]bool{}
+	for _, w := range strings.Split(strings.ToLower(key), "-") {
+		inKey[w] = true
+	}
+	var kept []string
+	for _, w := range strings.Split(s, "-") {
+		if len(w) < 2 || filler[w] || inKey[w] {
+			continue
+		}
+		kept = append(kept, w)
+		if len(kept) == 4 {
+			break
+		}
+	}
+	return strings.Join(kept, "-")
+}
+
 // Branch builds a branch from the git.branch template. key is a ticket or task id ("-" or "" for none).
 func Branch(key, title, typ string) string {
 	if key == "-" {
@@ -93,7 +115,7 @@ func Branch(key, title, typ string) string {
 	if typ == "" {
 		typ = Type(title)
 	}
-	s := strings.TrimPrefix(Slug(title), typ+"-")
+	s := branchSlug(strings.TrimPrefix(Slug(title), typ+"-"), key)
 	b := config.Get("git.branch", "{type}/{key}-{slug}")
 	b = strings.NewReplacer("{type}", typ, "{key}", key, "{slug}", s).Replace(b)
 	for _, c := range cleanup {

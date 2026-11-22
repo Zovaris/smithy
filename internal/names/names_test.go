@@ -5,10 +5,12 @@ import "testing"
 func TestBranch(t *testing.T) {
 	t.Setenv("SMITHY_CONFIG", t.TempDir()+"/config.json")
 	cases := []struct{ key, title, want string }{
-		{"PROJ-123", "Add login with Google", "feat/PROJ-123-add-login-with-google"},
+		{"PROJ-123", "Add login with Google", "feat/PROJ-123-add-login-google"},
 		{"#42", "Fix null crash", "fix/42-null-crash"},
 		{"-", "Update README", "docs/update-readme"},
 		{"03", "Añadir búsqueda", "feat/03-anadir-busqueda"},
+		{"lighter-warden", "Lighter warden and smelt from A/B", "feat/lighter-warden-smelt"},
+		{"-", "Make the batch check run once at the end of a warden batch", "feat/make-batch-check-run"},
 	}
 	for _, c := range cases {
 		if got := Branch(c.key, c.title, ""); got != c.want {

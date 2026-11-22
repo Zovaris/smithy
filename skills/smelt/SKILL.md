@@ -62,7 +62,7 @@ adds agents only where they find what scripts can't, and launches them together 
 Property and mutation need a tool in the repo (`smithy stack` shows it); without one they are
 "not applicable", never a new dependency the user didn't ask for.
 `fast` should finish in one sitting: no subagent unless the change is risky, full suite once
-at the end. A trivial change (copy, style, one-liner) is always `fast`. A prose-only change (docs, skill
+at the end. A trivial change (copy, style, one-liner) doesn't need smelt (use-smithy); if smelt was asked for, it is `fast`. A prose-only change (docs, skill
 text) needs no test agents: its seam is the doc lint if the repo has one, and review is spec-check alone, at any speed.
 Risky means the change touches auth, money, personal data, input parsing, file or shell access,
 or secrets. Under hush, never ask, not even about the speed (pick it and say which at the end); high-impact
@@ -150,6 +150,6 @@ Phase-specific ones live in TDD, DEBUG and VERIFY; these cover the whole workflo
 
 | Thought | Reality |
 |---|---|
-| "Too small for the workflow" | Then it's `fast`, not skipped: a test and the verify gate still. |
+| "Too small for the workflow" | A typo or one-liner is (use-smithy); new behaviour is `fast`, not skipped: a test and the verify gate still. |
 | "I know what they want, skip the questions" | Your belief is thinner than it feels. Ask the one question that matters. |
 | "Let me clean up these old branches too" | Only what smelt created. Never force. |
