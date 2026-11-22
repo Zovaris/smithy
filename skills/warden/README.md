@@ -20,12 +20,12 @@ Started by you (by name, the way your harness starts skills) or by an agent afte
 1. Reads the tasks, their dependencies and the base branch; shows the plan in one message.
 2. Launches every worker in your turn; tasks that must wait (dependencies, `warden.max`) wait in
    their own session without tokens.
-3. Each worker builds with smelt (`fast` by default), opens a PR and ends.
+3. Each worker builds with smelt at `fast` (no agents), opens a PR and ends; warden checks the whole batch in one wave after the merges.
 4. Warden waits on every PR's CI at once and merges when you said `auto` (it asks once per batch
    unless `warden.merge` is set); red CI goes back to the worker.
 5. Finished worktrees and branches are removed.
 
 ## Settings
 
-`warden.max` (5), `warden.mode` (`smelt fast`), `warden.merge` (unset: warden asks once per batch),
+`warden.max` (5), `warden.mode` (`smelt normal`: workers build at `fast`, then one check wave on the whole batch), `warden.merge` (unset: warden asks once per batch),
 `warden.cleanup` (`auto`), `warden.worker_model` (`route`). See [settings](../../docs/settings.md).

@@ -26,9 +26,9 @@ The slash form is one example: the same words in plain text work in any harness 
 |---|---|
 | `/smelt <task>` | infer: no agreed plan → `plan` (at `fast`: `build`, criteria from the task); plan/spec/task exists → `build`; a bug → `debug` |
 | `/smelt brainstorm <idea>` | `references/BRAINSTORM.md` only: the why, approaches, a draft design |
-| `/smelt plan <idea>` | brainstorm → grill → spec → builder check (more than 8 criteria, or open questions left) → task list → ask how to run it |
+| `/smelt plan <idea>` | brainstorm → grill → spec → builder check (more than 8 criteria, or open questions left) → task list → ask how to run it. A spec the user already agreed skips brainstorm, grill and the builder check: straight to the task list |
 | `/smelt build next [dir]` | `smithy tasks next`, mark it `doing`, build it to `ship`, mark it `done` |
-| `/smelt build all [dir]` | `references/EXECUTE.md`: every task here, one implementer subagent each |
+| `/smelt build all [dir]` | `references/EXECUTE.md`: every task here in order, one check wave on the whole branch at the end |
 | `/smelt <phase> <task>` | that phase only: `spec`, `build`, `test`, `review`, `ship`, `retro` |
 | `/smelt from <phase> <task>` | that phase to the end, e.g. `from test` on code you already wrote |
 | `/smelt debug <bug>` | `references/DEBUG.md` → build (fix) → test (`agents/regression.md`) → review → ship |
@@ -62,7 +62,7 @@ adds agents only where they find what scripts can't, and launches them together 
 Property and mutation need a tool in the repo (`smithy stack` shows it); without one they are
 "not applicable", never a new dependency the user didn't ask for.
 `fast` should finish in one sitting: no subagent unless the change is risky, full suite once
-at the end. A trivial change (copy, style, one-liner) is always `fast`. A prose-only change (docs, skill
+at the end. A trivial change (copy, style, one-liner) doesn't need smelt (use-smithy); if smelt was asked for, it is `fast`. A prose-only change (docs, skill
 text) needs no test agents: its seam is the doc lint if the repo has one, and review is spec-check alone, at any speed.
 Risky means the change touches auth, money, personal data, input parsing, file or shell access,
 or secrets. Under hush, never ask, not even about the speed (pick it and say which at the end); high-impact
@@ -90,8 +90,8 @@ the user confirms; else `references/DOCS.md`.
 test seams; for a spec with more than 8 criteria or with questions still open, a fresh
 `agents/builder.md` subagent sorts what's
 still open into answered / minor (decide) / theirs (ask). Then tracer-bullet tasks with Files
-and Interfaces, self-reviewed, where the user picks; then ask how to run them: here one at a
-time (`build next`), here all at once (`build all`), in parallel with warden (if installed),
+and Interfaces, self-reviewed, where the user picks; then ask how to run them (TASKS.md, recommending here
+for a small list): here all at once (`build all`), here one at a time (`build next`), in parallel with warden (if installed),
 or later. **Done:** spec + tasks written, each fits one fresh context; the user chose.
 
 **build · TDD** — `references/TDD.md`. From a task file: `smithy tasks set <file> status=doing`
@@ -104,7 +104,7 @@ criterion has a test".
 **check · One wave** — `references/TESTING.md` and `references/REVIEW.md` (findings:
 `references/RECEIVING.md`). Once the build's checks are green, launch every agent the speed
 lists at the same time, as parallel **subagents**, each with only what its file in `agents/`
-lists, never your plan or reasoning. Test agents write `zz_<agent>_test.*` files in your tree;
+lists, never your plan or reasoning. Test agents write `zz_<agent>` test files (TESTING.md) in your tree;
 you fix the code, they never do. Never merge or rerank their reports. A blocking finding you
 fixed closes when the same reviewer, resumed, says so.
 **Done:** every reproduced finding fixed (failing test first) or declined with one line, no
@@ -150,6 +150,6 @@ Phase-specific ones live in TDD, DEBUG and VERIFY; these cover the whole workflo
 
 | Thought | Reality |
 |---|---|
-| "Too small for the workflow" | Then it's `fast`, not skipped: a test and the verify gate still. |
+| "Too small for the workflow" | A typo or one-liner is (use-smithy); new behaviour is `fast`, not skipped: a test and the verify gate still. |
 | "I know what they want, skip the questions" | Your belief is thinner than it feels. Ask the one question that matters. |
 | "Let me clean up these old branches too" | Only what smelt created. Never force. |

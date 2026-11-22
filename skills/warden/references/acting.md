@@ -49,6 +49,24 @@ dependents are already waiting and start on their own. A `followup: <file>` in t
 found after the merge: small and inside the intent → add it as an item (spawn it if this harness
 can from here, else propose it); bigger → a scope question for the user, with the other decisions.
 
+## batch check (every ship item `merged` or `ready`)
+
+Workers build at smelt `fast`, so the batch is reviewed once, as a whole. When the highest speed among
+the batch and its items is `fast`, or mode is `plain`, skip this. Otherwise, before the final message, run smelt's check phase at the
+batch's speed (read the SKILL.md `smithy skills smelt` prints: its speed table and
+`references/REVIEW.md`, `references/TESTING.md`) in one wave of parallel **subagents** on:
+- the diff `git diff <base_sha>..origin/<base>` (`base_sha` from `batch.json`), plus each `ready`
+  item's `gh pr diff`;
+- the spec: the task dir's spec, else every item's intent.
+Add the security agent when any item touches auth, money, personal data, input parsing, file
+or shell access, or secrets. Test agents work in a fresh worktree of `origin/<base>`, never in a
+worker's.
+Findings follow smelt's receiving rules. The blocking ones become one new `fix` item: one worker
+(same brief, speed `fast`, intent = the findings verbatim, branch from `smithy names branch fix
+"<batch> review"`), one PR, merged like the others; then **tell** the same reviewer, resumed, to
+confirm at the fix's commit. A high security finding also goes to the user. Non-blocking ones
+go under **Followups**.
+
 ## batch end (final message)
 
 When every item is final, read `<batch-dir>/decisions.md` and every card's `followup:` note (cards

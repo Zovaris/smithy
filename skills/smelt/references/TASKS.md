@@ -35,6 +35,9 @@ spec stays in the repo or local dir and the issues link to it.
   its own, not a horizontal layer.
 - **Prefactor first:** "make the change easy, then make the easy change". Wide renames or
   migrations use expand → migrate → contract tasks.
+- **Fewest tasks that work.** One task per part that can be built and tested on its own; a
+  CLI or a feature one agent builds in under an hour is 1 to 3 tasks, not one per file. Each task
+  costs a worker and a PR, so split only where it buys real parallel time.
 - Each fits one fresh context window; split anything bigger than ~1 day of human work.
 - `Blocked by` only for real dependencies (one task needs another's code or schema). Tasks that
   merely touch nearby files are not blocked; tasks that would edit the same lines are.
@@ -42,15 +45,16 @@ spec stays in the repo or local dir and the issues link to it.
   task count. Shape the split so the chain is short: one shared foundation first (skeleton, CI,
   a schema or interface), then as many independent tasks as possible, each coding against the
   agreed interface rather than waiting for its implementation. A chain longer than 2 is a
-  finding: say so with the list and how to shorten it.
+  finding: say so with the list and how to shorten it. Parallel only pays when at least two
+  independent tasks are each big (more than ~15 minutes of agent work).
 - **Self-review** before showing it:
   1. Coverage: every acceptance criterion of the spec lands in exactly one task.
   2. Interfaces line up: each `Consumes` is `Produces`d by a blocker or already exists.
   3. Collisions: tasks without a `Blocked by` between them don't modify the same files.
   4. Proportion: no task is a horizontal layer, none is bigger than a day, none is trivial
      enough to merge into its neighbour.
-  5. Width: the longest `Blocked by` chain, and each task's speed (fast unless it holds logic
-     that earns normal or full).
+  5. Width: the longest `Blocked by` chain, and each task's speed (its `Speed:` line: fast
+     unless it holds logic that earns normal or full).
 - Show the list (number, title, one line, blocked by) and wait for approval before writing.
 
 ## Task file — `NN-<slug>.md`
@@ -59,6 +63,7 @@ spec stays in the repo or local dir and the issues link to it.
 # NN · <title>
 Status: todo
 Blocked by: <NN, NN | none>
+Speed: <fast | normal | full>
 PR: -
 Spec: ./spec.md
 
@@ -102,9 +107,14 @@ smithy tasks board [--all]        # one line per task list and batch: this repo,
 
 ## After the list is written
 
-Ask how to run it, recommendation first, only offering what is installed:
+Ask how to run it, recommendation first, only offering what is installed. Recommend **here**
+unless at least two independent tasks are each big (more than ~15 minutes of agent work): for a
+small list or a long chain, one session building in order is faster and several times cheaper
+than parallel workers (trial 4, `docs/trials`).
+- **Here, all of it:** smelt `build all`: built in order, one check wave on the whole branch at
+  the end.
 - **Here, one at a time:** smelt `build next` (e.g. `/smelt build next`; repeat until `smithy tasks next` says all done).
-- **In parallel:** warden on the task dir (read the SKILL.md `smithy skills warden` prints) when
+- **In parallel:** warden on the task dir (workers build at `fast`; warden checks the batch once at its speed) (read the SKILL.md `smithy skills warden` prints) when
   it is installed (it is listed among
   your skills, or `<skill-dir>/../warden/SKILL.md` exists). Mixing is fine: build some here,
   hand the rest over; both read and write the same status lines.

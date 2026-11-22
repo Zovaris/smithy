@@ -23,6 +23,10 @@ trial:
   four agents or more; the full-only agents (a second adversary, a separate standards reviewer,
   hostile on a library) found nothing new for +168k. So full runs one adversary and one combined
   reviewer too, and hostile only where something runs; normal caps at three agents.
+- Trial 4's A/B (`docs/trials/2026-11-trial-4.md`): one session without smithy built the same
+  CLI in ~11 min and ~180k tokens; smithy took ~31 min and ~1.8M, half of it in per-task agents,
+  and both caught 3/3 planted defects. So agents run once per change, not once per task: warden
+  workers and `build all` tasks build at `fast`, and one wave checks the whole batch or branch.
 - Each trial's report lives in `docs/trials/`; this ADR is updated, not duplicated, when one
   changes the agent set.
 

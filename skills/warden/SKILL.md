@@ -57,7 +57,7 @@ CLAUDE.md), `<repo>/.smithy/config.json`, `~/.smithy/config.json`, then the buil
 | `warden.max` | 5 | Running limit: workers past it are launched too and wait in `smithy wait-turn` |
 | `warden.merge` | ask | unset (`smithy config get` exits 3): ask in the plan line, once per batch, "auto or manual?"; auto: you merge each green PR after `smithy verify` says green (workers never merge); manual: you list each green PR for the user |
 | `warden.cleanup` | auto | auto: end finished workers and remove worktrees and local branches without asking |
-| `warden.mode` | smelt fast | How workers build: `smelt fast\|normal\|full` or `plain`; an item that is risky by smelt's definition (auth, money, personal data, input parsing, file or shell access, secrets) runs at least `normal` |
+| `warden.mode` | smelt normal | `smelt fast\|normal\|full` or `plain`. Workers always build at smelt `fast` (no agents); the speed sets the one check wave warden runs on the whole batch after the merges (`references/acting.md`, batch check) |
 | `warden.worker_model` | route | Models per item: `references/models.md` |
 | `stack` (batch only) | false | Asked in the plan line when an item has prereqs: false (wait for merge): the dependent starts from `<base>` after its prereqs merge; true (stacked): it starts from the prereq's branch at once and merges only after the prereq has merged |
 
@@ -94,7 +94,7 @@ read it once per batch).
    or the prereq's branch when `stack` is true). Write each brief from `references/worker-brief.md` to
    `<batch-dir>/<id>.brief.md` and **spawn** all at once on each item's model
    (`references/models.md`) with the brief's full text as the prompt, never a pointer to the
-   file (spawn refused: `references/harness.md`, Subagent workers). Record each session id or pid and bump `launches`. No tend session: waiting costs nothing
+   file (spawn refused: `references/harness.md`, Subagent workers). Record each session id or pid and bump `launches`; record each base's `origin/<base>` commit as `base_sha` before the first launch. No tend session: waiting costs nothing
    in the binary, and an agent is only started when there is something to fix.
 3. **Watch.** Never end a turn while any worker is live without a running `smithy wait batch:<batch>`
    (**wake**, in the background): a turn that ends without it leaves the batch unsupervised. It wakes
@@ -102,7 +102,8 @@ read it once per batch).
    worker's transcript or log only when its card is missing or contradicts itself.
 4. **Act** on each card whose stage isn't final (`references/acting.md`): decide by impact,
    verify PRs, clean up merged, reported and dropped items, recover stuck ones.
-5. **Finish** when every item is `merged`, `reported`, `dropped`, held or waiting on the user.
+5. **Finish** when every item is `merged`, `reported`, `dropped`, held or waiting on the user,
+   after the batch check (`references/acting.md`) and its `fix` item, if any, have merged.
    **End** every finished worker still running;
    leave `blocked` / `failed` ones open for the user.
    Workers still `ready` end on their own when the PR closes where the harness auto-archives;

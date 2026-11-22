@@ -123,6 +123,7 @@ func TestSplitArgs(t *testing.T) {
 func TestRoute(t *testing.T) {
 	cases := []struct{ text, kind, speed, want string }{
 		{"fix typo in README", "ship", "normal", "cheap"},
+		{"regenerate the lockfile after the upgrade", "ship", "normal", "mid"},
 		{"add OAuth login with tokens", "ship", "normal", "strong"},
 		{"add CSV export to reports", "ship", "normal", "mid"},
 		{"add CSV export", "ship", "full", "strong"},

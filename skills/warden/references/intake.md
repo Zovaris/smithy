@@ -42,8 +42,9 @@ their absolute paths.
 ## Worker mode
 
 Once per batch, unless the user said it or `warden.mode` is set: with smelt installed ask "smelt
-(fast / normal / full) or plain?", default `smelt fast`. Without smelt: `plain`, no question.
-Under hush, or in a session another one launched, don't ask: use `smelt fast` and say so.
+(fast / normal / full) or plain?" (the speed of the one check wave on the whole batch; workers
+always build at `fast`), default `smelt normal`. Without smelt: `plain`, no question.
+Under hush, or in a session another one launched, don't ask: use `smelt normal` and say so.
 Store it as `mode` in `batch.json`. A `(full)` item overrides the batch speed.
 
 ## Kinds

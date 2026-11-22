@@ -24,7 +24,7 @@ Tiers: cheap (mechanical, read-only, small), mid (most feature work), strong (ri
 cross-cutting, or the last fix round).`
 
 var (
-	risky   = []string{"auth", "login", "password", "secret", "access token", "auth token", "api token", "api key", "permission", "security", "payment", "billing", "money", "invoice", "migration", "schema", "database", "concurren", "race condition", "lock", "crypto", "encrypt", "data loss", "delete user", "production", "public api"}
+	risky   = []string{"auth", "login", "password", "secret", "access token", "auth token", "api token", "api key", "permission", "security", "payment", "billing", "money", "invoice", "migration", "schema", "database", "concurren", "race condition", "lock contention", "deadlock", "mutex", "crypto", "encrypt", "data loss", "delete user", "production", "public api"}
 	hard    = []string{"architecture", "redesign", "refactor", "performance", "investigate", "root cause", "why does", "ambiguous", "trade-off", "cross-cutting", "rewrite", "remake", "protocol", "parser", "compiler", "algorithm"}
 	prose   = []string{"doc", "docs", "documentation", "readme", "contributing", "changelog", "guide", "adr", "wording"}
 	trivial = []string{"typo", "copy change", "wording", "rename", "bump", "version", "color", "colour", "style tweak", "readme", "comment", "lint", "format"}

@@ -5,6 +5,29 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **Small changes skip smithy.** use-smithy sends a typo, copy, config value or one-line fix straight
+  to the change and its check, with no skill or agents.
+- **Shorter branch names.** `smithy names branch` drops filler words, single letters and words
+  already in the key, and keeps at most four.
+- **One check wave per batch, not per task (trial 4).** Warden workers build at smelt `fast` with
+  no agents; once the items merge, warden runs one wave at the batch's speed on the combined diff
+  and turns blocking findings into one `fix` item. `warden.mode` now defaults to `smelt normal`
+  and names that wave's speed. `build all` does the same on the branch, and builds three tasks or
+  fewer without implementer subagents.
+- **Fewer, bigger tasks; build here unless parallel pays.** TASKS.md splits only where it buys
+  parallel time, adds a `Speed:` line, and recommends building here unless two independent tasks
+  are each over ~15 minutes of agent work.
+- **Agent test files use the runner's suffix** (`zz_adversary.test.ts`), so vitest and jest pick
+  them up; receipts ignore them too.
+- **`wait-turn` runs in the background for session workers** and in the foreground only for
+  subagent workers.
+- **`route` no longer sends lockfile work to the strong tier.** `lock` matched `lockfile`; it is now
+  `lock contention`, `deadlock` and `mutex`.
+- **`smithy cleanup` deletes the merged remote branch**, including when the local branch is already gone.
+- **`smelt plan` skips brainstorm, grill and the builder check for a spec the user already agreed.**
+- **The smelt adversary skips implementation bodies in round one** when its brief includes a diff.
+- **Warden's subagent workers run `wait-turn` in the foreground** (9 minutes, the tool limit).
+- **Rule tests cover every variant the spec names**, one case each.
 - **Three speeds that differ, and agents only where they earn their cost.** Each subagent costs
   ~60k tokens and minutes however short its prompt (trials 1–3), so: `fast` runs scripts only
   (tests, typecheck, lint, scan) and checks the diff against the spec itself, no subagent unless
@@ -49,7 +72,6 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   in a row disable it until `decide.enabled` is set true again. Answers go to `~/.smithy/decide.log`.
 - `smithy pr-state` prints `action` (cleanup, fix-ci, sync-base, answer-review, wait, done); tend
   follows it.
-- smelt normal runs mutation on core logic when the repo has a mutation tool.
 - smelt VERIFY: an "it runs" check (start it once, hit the changed path) for changes to something
   that starts. Trimmed always-loaded text in smelt, worker briefs and use-smithy (setup moves to
   `references/SETUP.md`).
