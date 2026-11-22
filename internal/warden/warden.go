@@ -200,6 +200,8 @@ func readSettings(f string) (claudeSettings, bool) {
 
 var findSkill = agents.FindSkill
 
+var missingInHarness = agents.MissingInHarness
+
 var allowRe = regexp.MustCompile(`"behavior"\s*:\s*"allow"`)
 
 func githubMode(r *report) {
@@ -263,6 +265,10 @@ func Doctor(args []string) int {
 		} else {
 			r.warn(s+" skill not installed", "npx skills add Zovaris/smithy -g --skill "+s)
 		}
+	}
+	if missing, dir := missingInHarness(h); len(missing) > 0 {
+		r.warn(h+" can't load "+strings.Join(missing, ", ")+" (installed elsewhere, not in its skills folder)",
+			"link each into "+dir+" (ln -s <skill-dir> "+dir+"/<name>), or npx skills add Zovaris/smithy -g --skill <name>")
 	}
 	for _, m := range []string{"cheap", "strong"} {
 		if v, err := config.Model(m); err == nil {

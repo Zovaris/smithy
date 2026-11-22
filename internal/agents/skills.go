@@ -97,3 +97,59 @@ func SkillsMain(args []string) int {
 	fmt.Println(p)
 	return 0
 }
+
+// HarnessSkillDirs lists the folders the harness h loads skills from (user folder first, then
+// the repo at top); nil when the harness is unknown.
+func HarnessSkillDirs(h, top, home string, getenv func(string) string) []string {
+	agents := filepath.Join(home, ".agents", "skills")
+	var user []string
+	switch h {
+	case "claude-cli", "claude-desktop":
+		user = []string{filepath.Join(home, ".claude", "skills")}
+	case "codex":
+		user = []string{filepath.Join(home, ".codex", "skills"), agents}
+	case "opencode":
+		user = []string{filepath.Join(envOr(getenv, "XDG_CONFIG_HOME", filepath.Join(home, ".config")), "opencode", "skills"), filepath.Join(home, ".claude", "skills"), agents}
+	case "gemini":
+		user = []string{filepath.Join(home, ".gemini", "skills"), agents}
+	case "cursor":
+		user = []string{filepath.Join(home, ".cursor", "skills"), agents}
+	case "pi":
+		user = []string{filepath.Join(envOr(getenv, "PI_CODING_AGENT_DIR", filepath.Join(home, ".pi", "agent")), "skills"), agents}
+	case "dsh":
+		user = []string{filepath.Join(envOr(getenv, "DSH_HOME", filepath.Join(home, ".dsh")), "skills"), agents}
+	default:
+		return nil
+	}
+	if top != "" {
+		user = append(user, filepath.Join(top, ".claude", "skills"), filepath.Join(top, ".agents", "skills"))
+	}
+	return user
+}
+
+// MissingInHarness returns the skills installed somewhere (FindSkill) that the harness h can't
+// load, with the folder to link them into; dir is "" when h is unknown.
+func MissingInHarness(h string) (missing []string, dir string) {
+	cwd, _ := os.Getwd()
+	home := os.Getenv("HOME")
+	if home == "" {
+		home, _ = os.UserHomeDir()
+	}
+	dirs := HarnessSkillDirs(h, ghx.RepoRoot(cwd), home, os.Getenv)
+	if dirs == nil {
+		return nil, ""
+	}
+	for _, s := range Known {
+		if _, ok := FindSkill(s); !ok {
+			continue
+		}
+		seen := false
+		for _, d := range dirs {
+			seen = seen || isFile(filepath.Join(d, s, "SKILL.md"))
+		}
+		if !seen {
+			missing = append(missing, s)
+		}
+	}
+	return missing, dirs[0]
+}

@@ -204,6 +204,15 @@ func TestSkills(t *testing.T) {
 	if _, ok := FindSkill("tend"); ok {
 		t.Error("tend found")
 	}
+	if m, d := MissingInHarness("claude-cli"); len(m) != 0 || d != filepath.Join(home, ".claude", "skills") {
+		t.Errorf("claude-cli has scout linked: %q %s", m, d)
+	}
+	if m, _ := MissingInHarness("codex"); len(m) != 1 || m[0] != "scout" {
+		t.Errorf("codex can't load scout: %q", m)
+	}
+	if m, d := MissingInHarness("unknown"); m != nil || d != "" {
+		t.Errorf("unknown harness: %q %s", m, d)
+	}
 	c := SkillCandidates("x", "/s/use-smithy/scripts", "/top", "/h", env(nil))
 	if c[0] != "/s/x/SKILL.md" || c[1] != "/top/.agents/skills/x/SKILL.md" || c[len(c)-1] != "/h/.dsh/skills/x/SKILL.md" {
 		t.Errorf("candidates = %q", c)

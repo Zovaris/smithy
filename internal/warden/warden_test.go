@@ -10,7 +10,15 @@ import (
 )
 
 func init() {
+	missingInHarness = func(string) ([]string, string) {
+		return strings.Fields(os.Getenv("WARDEN_TEST_UNLINKED")), "/h/skills"
+	}
 	findSkill = func(name string) (string, bool) {
+		if root := os.Getenv("WARDEN_TEST_SKILL_ROOT"); root != "" {
+			p := filepath.Join(root, name, "SKILL.md")
+			_, err := os.Stat(p)
+			return p, err == nil
+		}
 		for _, s := range strings.Fields(os.Getenv("WARDEN_TEST_SKILLS")) {
 			if s == name {
 				return "/skills/" + s, true
@@ -425,4 +433,13 @@ func TestDoctorClaudeSettings(t *testing.T) {
 			t.Errorf("%d\n%s", c, o)
 		}
 	})
+}
+
+func TestDoctorSkillNotInHarness(t *testing.T) {
+	newDoctor(t, "git", "gh")
+	t.Setenv("WARDEN_TEST_UNLINKED", "tend hush")
+	o, c := doctor(t, "--quiet")
+	if c != 0 || !strings.Contains(o, "  warn  codex can't load tend, hush (installed elsewhere, not in its skills folder)\n        fix: link each into /h/skills") {
+		t.Errorf("%d\n%s", c, o)
+	}
 }
