@@ -67,7 +67,8 @@ A launched worker whose item can't start yet waits here, inside its own session,
 prereqs are merged (or pr_open/ready with stack) and a slot is free under the batch's max.
 Then it claims the slot (state=working) and prints "go <id>".
 Exit 0 = go; 4 = still waiting after max-min (call it again: one blocking call per turn,
-under the 10-minute tool limit); 2 = usage or unknown item.`
+under the 10-minute tool limit); 5 = a prereq was dropped (card set blocked); 2 = usage or
+unknown item.`
 
 // WaitTurn runs `smithy wait-turn`.
 func WaitTurn(args []string) int {
@@ -121,7 +122,7 @@ func WaitTurn(args []string) int {
 			st := cardState(dir, pr)
 			if st == "dropped" {
 				set("state=blocked", "note=prereq "+pr+" was dropped")
-				return 0
+				return 5
 			}
 			if !(st == "merged" || p.Stack && (st == "pr_open" || st == "ready")) {
 				ready = false
