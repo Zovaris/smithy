@@ -8,9 +8,8 @@ reads and updates it; use it instead of hand-editing status lines.
 
 An agreed spec already in the repo: its folder is the task dir (no second folder). Otherwise run
 `smithy task-dir <slug>`: it reads the user's settings, creates the dir and prints it.
-When it exits 3 it prints `ask <key>: <question> (default …)`: ask the user that (your recommendation first;
-with nobody to ask, under hush or in a launched session, take the printed default and say so at the end),
-save the answer for this repo with `smithy config set --repo <key> <value>`, run it again.
+Exit 3 prints `ask <key>: <question> (default: <value> → <dir>)`: ask the user (recommendation first; nobody
+to ask, hush or a launched session: take `<value>`, say so at the end), save it with `smithy config set --repo <key> <value>`, rerun.
 It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `git rm --cached` it if committed):
 
 1. `tasks.commit` — commit the specs and tasks to git? `true` → `docs/specs/<slug>/`, reviewed
@@ -25,6 +24,7 @@ It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `g
 `tasks.commit` says. `smithy config list` shows the current values.
 
 Other places: list them in `$SMELT_TASKS_DIRS` (colon-separated) so `smithy tasks` finds them.
+
 Board tasks still get the same fields (status, blocked by, PR) in the issue body or labels; the
 spec stays in the repo or local dir and the issues link to it.
 

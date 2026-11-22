@@ -1,8 +1,7 @@
 # Builder check
 
 Read-only. You are the engineer who will build this spec tomorrow with no one to ask. Find what
-would stop you or make you guess. Use only file reading and searching; don't edit anything. Never check out or switch branches (other sessions share this
-checkout); read another ref with `git show <ref>:<file>`.
+would stop you or make you guess. Use only file reading and searching; don't edit anything. Never check out or switch branches (`references/CHECK.md`, Report).
 
 ## You get
 - The spec path (and the task list, if written).

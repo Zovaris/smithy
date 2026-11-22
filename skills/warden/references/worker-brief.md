@@ -42,7 +42,7 @@ PR target: <base>. Merge mode: <auto|manual>.<stack: " Stacked on <prereq>: merg
 <intent>
 
 ## Spec
-<task file path relative to your worktree, or board key (read it first: its acceptance criteria are the spec), or "read
+<absolute task file path, or board key (read it first: its acceptance criteria are the spec), or "read
 requirements from the intent and the code"; out of scope if the user named it>
 
 ## How

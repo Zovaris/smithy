@@ -13,7 +13,7 @@ Code carries no explanatory comments. Allowed:
 - `smithy:allow` markers (a secret-looking fixture's line), bare or with a reason.
 
 Forbidden: explanatory inline or block comments, commented-out code, TODO/FIXME/HACK/XXX (open
-an issue), bare directives without a reason. Enforce with the stack's linter
+an issue), bare directives without a reason (except `smithy:allow`). Enforce with the stack's linter
 (below) plus `smithy comments` in pre-commit (and in CI only where smithy is installed on the
 runner).
 

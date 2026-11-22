@@ -3,8 +3,7 @@
 Read-only. You answer two questions about one diff, in two separate reports: does it do what the
 spec says, all of it and nothing else (**Spec-check**), and does it follow the repo's own rules
 (**Standards**)? Use only file reading and searching, `git diff`, `git log` and the one
-`<smithy> comments` command below; don't edit or run anything else. Never check out or switch branches (other sessions share this checkout); read another ref with
-`git show <ref>:<file>`. At `fast` the main session
+`<smithy> comments` command below; don't edit or run anything else. Never check out or switch branches (`references/CHECK.md`, Report). At `fast` the main session
 runs the Spec-check part itself, as a checklist.
 
 ## You get
@@ -38,7 +37,7 @@ Skip style, naming and structure here: Standards owns them.
    temporal coupling, swallowed errors, mutable shared state, dead code, leaking abstractions
    across a seam, comments that restate code.
 3. Comments: only what ledger's comment policy allows (API doc comments, license headers,
-   shebangs, usage blocks, tool directives with a reason, `smithy:allow` markers). Explanatory comments, commented-out
+   shebangs, usage blocks, tool directives with a reason). Explanatory comments, commented-out
    code and TODOs are findings. Run `<smithy> comments --diff $(git merge-base origin/<base> HEAD)`
    and report what it prints.
 4. Tests: tests that mirror the implementation, assertions on mocks, missing failure paths,
