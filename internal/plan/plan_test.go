@@ -68,6 +68,9 @@ func TestStack(t *testing.T) {
 			"typecheck": "npx tsc --noEmit", "lint": "pnpm run lint", "e2e": "npx playwright test",
 			"property": "fast-check", "coverage": "npx vitest run --coverage --changed", "dev": "", "adrs": "2",
 		}},
+		{"tsc-node-test", map[string]string{
+			"package.json": `{"scripts":{"test":"tsc && node --test dist/test/*.test.js"}}`,
+		}, map[string]string{"test": "npm test", "single": "node --test <file>"}},
 		{"node-test", map[string]string{
 			"package.json": `{"scripts":{"test":"node --test"}}`,
 		}, map[string]string{"test": "npm test", "single": "node --test <file>"}},

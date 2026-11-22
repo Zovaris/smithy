@@ -45,7 +45,7 @@ else update the docs the change touched (`references/DOCS.md`). Then:
   origin is another forge or a local repo): commit, branch, receipts and scan as above, then
   skip the PR and the wait, and say so in the final
   message (a warden worker: `state=ready note=no-github-pr`).
-- **Clean up** once merged or discarded: `smithy cleanup <repo> <branch> [<worktree>]`,
+- **Clean up** once merged or discarded: switch to the base branch, then `smithy cleanup <repo> <branch> [<worktree>]`,
   only for worktrees and branches smelt created. It keeps work that is on no remote and no other branch; never force it.
   The merge usually comes later, from the user: `smithy cleanup` then, and it never removes a
   worktree it isn't given (only the ones smelt created); end the test and review agents as soon as their

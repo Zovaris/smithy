@@ -171,7 +171,7 @@ func Stack(dir string) []Line {
 			}
 		} else if r.dep("jest") {
 			single, cov = "npx jest <file>", "npx jest --coverage --changedSince=<base>"
-		} else if sc, _ := r.pkg["scripts"].(map[string]any); strings.TrimSpace(fmt.Sprint(sc["test"])) == "node --test" || strings.HasPrefix(fmt.Sprint(sc["test"]), "node --test ") {
+		} else if sc, _ := r.pkg["scripts"].(map[string]any); strings.HasSuffix(strings.TrimSpace(fmt.Sprint(sc["test"])), "node --test") || strings.Contains(fmt.Sprint(sc["test"]), "node --test ") {
 			single = "node --test <file>"
 		}
 		if r.script("typecheck") {
