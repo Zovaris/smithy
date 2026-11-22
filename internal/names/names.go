@@ -137,6 +137,9 @@ func Worktree(branch, dir string) (string, error) {
 	return strings.NewReplacer("{parent}", filepath.Dir(top), "{repo}", filepath.Base(top), "{branch}", strings.ReplaceAll(branch, "/", "-")).Replace(w), nil
 }
 
+// typeWords are the branch types; a key equal to one is a misplaced type.
+var typeWords = map[string]bool{"feat": true, "fix": true, "docs": true, "refactor": true, "test": true, "chore": true}
+
 const usage = `usage: smithy names <command>
   branch <key|-> "<title>" [type]   e.g. feat/PROJ-123-add-login, fix/42-null-crash
   worktree <branch> [repo-dir]      <repo-parent>/worktrees/<repo>-<branch with / as ->
@@ -153,6 +156,10 @@ func Main(args []string) int {
 	case "branch":
 		if len(args) < 3 {
 			fmt.Fprintln(os.Stderr, usage)
+			return 2
+		}
+		if typeWords[args[1]] {
+			fmt.Fprintln(os.Stderr, "key looks like a type; use `-` for no key and pass the type last: smithy names branch - \"<title>\" "+args[1])
 			return 2
 		}
 		typ := ""
