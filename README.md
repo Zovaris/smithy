@@ -16,6 +16,9 @@
 [![Cursor](https://img.shields.io/badge/Cursor-supported-000000)](#harnesses)
 [![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-supported-4285f4?logo=googlegemini&logoColor=white)](#harnesses)
 
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Skills](#skills) ·
+[Harnesses](#harnesses) · [The smithy binary](#the-smithy-binary) · [Settings](#settings)
+
 </div>
 
 smithy turns your coding agent into a small engineering team. It plans before it builds, writes
@@ -43,6 +46,25 @@ Pick every skill (at least `use-smithy`) and the agents to install to. Then, in 
 ## How it works
 
 ![How the smithy skills work together](docs/flow.svg)
+
+One change, end to end:
+
+```mermaid
+flowchart LR
+    idea([Your idea]) --> route{use-smithy}
+    route -->|one task| spec[smelt: plan and spec<br/>you approve]
+    route -->|many tasks| tasks[Task list<br/>NN-slug.md]
+    spec --> tasks
+    tasks -->|one at a time| build[smelt: failing test first,<br/>then the code]
+    tasks -->|in parallel, after your yes| warden[warden: one silent worker<br/>per task, own worktree]
+    warden --> build
+    build --> check[Independent checks:<br/>adversary tests, reviewer,<br/>security when risky]
+    check --> proof[Receipts and secret scan]
+    proof --> pr[Pull request]
+    pr --> tend[tend: CI, rebases,<br/>review threads]
+    tend --> merge([Merged, worktree removed])
+    merge --> lessons[Up to 3 lessons,<br/>kept only with your yes]
+```
 
 - **use-smithy** is loaded by the agent on its own and routes each piece of work to the skill that
   fits.
