@@ -5,6 +5,17 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **R12 warden frictions.** `smithy brief` reads a task-file path given as the intent, puts the
+  task's `Spec:` file in Spec, includes every line of the task dir's `rulings.md` for a task-file
+  item, and exits 2 when the task file or its `Spec:` file doesn't exist. `smithy wait batch:`
+  reports PRs already green, red or conflicting at the start for merge-auto cards that aren't
+  `ready`, skips the warden's own `merged` cards, and keeps reported PR events in the batch's
+  `wait-seen.json` so a relaunched wait doesn't repeat them. A `--subagent` brief waits in one
+  foreground loop over `wait-turn` exit 4; workers parked there close with `done: <id> waiting`.
+  `smithy doctor` says `workers: subagent fallback; they end with this session` when no spawn path
+  exists. warden's batch check runs the reviewer on at least mid with the test command, runs a
+  `zz_` holdout against the fix branch before merging it, and says tend starts only on red CI,
+  conflicts or review comments.
 - **warden trial frictions.** `smithy brief <batch> <id> [--to <name>] [--subagent]` renders a
   worker brief from `batch.json` and the template block in `warden/references/worker-brief.md`
   (the single source, read from the installed skill), filling every slot (stack, task file,
