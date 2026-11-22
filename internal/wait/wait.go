@@ -452,11 +452,49 @@ func (w *listWatcher) poll() ([]string, error) {
 	return out, nil
 }
 
-// batchWatcher wakes on cards that need the warden, or any change with --all.
+// batchWatcher wakes on cards that need the warden, or any change with --all, and on a change
+// of CI verdict, mergeability or merge/close of any card's PR (when GitHub is reachable).
 type batchWatcher struct {
 	name, since, stuckBefore string
-	all                      bool
+	all, gh                  bool
 	seen                     map[string]string
+	prs                      map[string]*prWatcher
+	prNext                   time.Time
+}
+
+// prEvery spaces the PR reads of a batch wait apart; card reads stay at the batch interval.
+var prEvery = 30 * time.Second
+
+var prEvents = opts{events: map[string]bool{"checks": true, "conflict": true, "merged": true, "closed": true}}
+
+var final = map[string]bool{"merged": true, "reported": true, "dropped": true}
+
+// prLines polls the PR of every non-final card. A PR seen for the first time is only recorded,
+// so the wake is a change, not the state it was already in.
+func (w *batchWatcher) prLines(rows []cards.Row) []string {
+	if !w.gh || time.Now().Before(w.prNext) {
+		return nil
+	}
+	w.prNext = time.Now().Add(prEvery)
+	var out []string
+	for _, r := range rows {
+		if r.PR == "" || final[r.State] {
+			continue
+		}
+		pw, known := w.prs[r.PR]
+		if !known {
+			pw = newPR(r.PR, prEvents)
+			w.prs[r.PR] = pw
+		}
+		lines, err := pw.poll()
+		if err != nil || !known {
+			continue
+		}
+		for _, l := range lines {
+			out = append(out, fmt.Sprintf("batch %s %s %s", w.name, r.ID, l))
+		}
+	}
+	return out
 }
 
 // mark is what makes a card worth a wake: its stage, state, CI verdict and PR. Other field
@@ -491,7 +529,8 @@ func newBatch(name string, all bool) (*batchWatcher, error) {
 	for _, r := range rows {
 		seen[r.ID] = mark(r)
 	}
-	return &batchWatcher{name: name, since: time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), stuckBefore: stuck(rows), all: all, seen: seen}, nil
+	return &batchWatcher{name: name, since: time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), stuckBefore: stuck(rows), all: all, seen: seen,
+		gh: ghx.Ready() == nil, prs: map[string]*prWatcher{}}, nil
 }
 
 func (w *batchWatcher) poll() ([]string, error) {
@@ -505,6 +544,7 @@ func (w *batchWatcher) poll() ([]string, error) {
 			out = append(out, fmt.Sprintf("batch %s %s  %s  %s  %s  %s", w.name, r.ID, r.Stage, r.Phase, r.Progress, r.Text))
 		}
 	}
+	out = append(out, w.prLines(rows)...)
 	if len(out) > 0 {
 		return out, nil
 	}
@@ -523,7 +563,8 @@ Targets (any mix):
   branch:<name>       every workflow run on the branch's latest commit finished
   prs[:<label>]       a PR opened or updated: yours, a warden batch's, or with the label
   issues[:<label>]    an issue opened or updated with the label (default agent)
-  batch:<name>        a warden card needs the warden (--all: any card change); polls every 10 s
+  batch:<name>        a warden card needs the warden (--all: any card change), or a card's PR
+                      turned green/red, conflicts, merged or closed; polls cards every 10 s, PRs every 30 s
   actions[:<branch>]  a workflow run on the branch (default: origin's default) finished red,
                       push, schedule or manual
   base[:<branch>]     the branch (default: origin's default) moved on origin
