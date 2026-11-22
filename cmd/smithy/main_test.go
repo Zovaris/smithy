@@ -171,6 +171,13 @@ func TestTasksAfterTaskDir(t *testing.T) {
 	if out, e, code := run(t, repo, env, "tasks", "list"); code != 0 || !strings.Contains(out, "first") {
 		t.Fatalf("tasks list: exit %d, out %q, err %q", code, out, e)
 	}
+	out, e, code = run(t, repo, env, "tasks", "add", dir, "second", "--speed", "full")
+	if code != 0 {
+		t.Fatalf("tasks add --speed: exit %d, err %q", code, e)
+	}
+	if b, _ := os.ReadFile(strings.TrimSpace(out)); !strings.Contains(string(b), "Speed: full") {
+		t.Fatalf("tasks add --speed full wrote %q", b)
+	}
 }
 
 func TestDoubleDashReachesNoCommand(t *testing.T) {

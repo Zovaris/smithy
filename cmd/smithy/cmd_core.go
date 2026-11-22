@@ -23,7 +23,7 @@ func init() {
 		})
 	register("names", "branch and worktree names", names.Usage, "", names.Main)
 	register("tasks", "the shared task list (smithy tasks board --all)", tasks.Usage, "", tasks.Main)
-	registerSub("tasks", "add", "--blocked-by= --key=")
+	registerSub("tasks", "add", "--blocked-by= --key= --speed=")
 	registerSub("tasks", "board", "--all")
 	register("status", "every task list and batch on this machine",
 		"usage: smithy status\nEvery task list and warden batch on this machine (smithy tasks board --all).", "",
