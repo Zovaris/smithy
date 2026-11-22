@@ -169,7 +169,7 @@ func TestSet(t *testing.T) {
 
 func TestAdd(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "list")
-	f1, err := Add(dir, "Add Login Page!", "", "")
+	f1, err := Add(dir, "Add Login Page!", "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,11 +177,11 @@ func TestAdd(t *testing.T) {
 		t.Errorf("f1 %s", f1)
 	}
 	b, _ := os.ReadFile(f1)
-	if want := "# 01 · Add Login Page!\nStatus: todo\nBlocked by: none\nPR: -\n\n## What\n\n## Acceptance criteria\n- [ ] \n"; string(b) != want {
+	if want := "# 01 · Add Login Page!\nStatus: todo\nBlocked by: none\nSpeed: fast\nPR: -\n" + taskTemplate; string(b) != want {
 		t.Errorf("body:\n%s", b)
 	}
 	write(t, filepath.Join(dir, "spec.md"), "spec")
-	f2, err := Add(dir, "Rate limit", "01", "PROJ-12")
+	f2, err := Add(dir, "Rate limit", "01", "PROJ-12", "normal")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,20 +189,28 @@ func TestAdd(t *testing.T) {
 		t.Errorf("f2 %s", f2)
 	}
 	b, _ = os.ReadFile(f2)
-	if !strings.Contains(string(b), "Blocked by: 01\nPR: -\nKey: PROJ-12\nSpec: ./spec.md\n") {
+	if !strings.Contains(string(b), "Blocked by: 01\nSpeed: normal\nPR: -\nKey: PROJ-12\nSpec: ./spec.md\n") {
 		t.Errorf("body:\n%s", b)
 	}
 	tk, _ := Parse(f2)
 	if !reflect.DeepEqual(tk.Blockers, []string{"01"}) || tk.Title != "Rate limit" {
 		t.Errorf("parsed %+v", tk)
 	}
-	f3, err := Add(dir, "!!!", "", "")
+	f3, err := Add(dir, "!!!", "", "", "")
 	if err != nil || filepath.Base(f3) != "03-task.md" {
 		t.Errorf("empty slug: %s %v", f3, err)
 	}
 	blocker := filepath.Join(t.TempDir(), "file")
 	write(t, blocker, "x")
-	if _, err := Add(filepath.Join(blocker, "sub"), "x", "", ""); err == nil {
+	for _, sec := range []string{"## Files", "## Interfaces", "## Notes"} {
+		if !strings.Contains(string(b), sec) {
+			t.Errorf("template misses %s", sec)
+		}
+	}
+	if _, err := Add(dir, "bad", "", "", "turbo"); err == nil {
+		t.Error("bad speed: want error")
+	}
+	if _, err := Add(filepath.Join(blocker, "sub"), "x", "", "", ""); err == nil {
 		t.Error("unwritable dir: want error")
 	}
 }

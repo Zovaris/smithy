@@ -1,4 +1,23 @@
-# Enforcing the comment policy
+# Comment policy and enforcement
+
+## Policy
+
+Code carries no explanatory comments. Allowed:
+- Doc comments on public API: TSDoc/JSDoc `/** */`, Python docstrings, GoDoc `// Name …` right
+  above an exported symbol, Javadoc, Rust `///` and `//!`, KDoc.
+- License or SPDX headers, shebangs, encoding lines, and a script's opening usage block (the
+  comment header right after the shebang).
+- Tool directives **with a reason**: `eslint-disable-next-line rule -- reason`,
+  `@ts-expect-error reason`, `# noqa: E501 reason`, `# type: ignore[code]`, `//nolint:name // reason`.
+- `//go:build`, `//go:generate`, Rust `// SAFETY:` on unsafe blocks.
+- `smithy:allow` markers (a secret-looking fixture's line), bare or with a reason.
+
+Forbidden: explanatory inline or block comments, commented-out code, TODO/FIXME/HACK/XXX (open
+an issue), bare directives without a reason (except `smithy:allow`). Enforce with the stack's linter
+(below) plus `smithy comments` in pre-commit (and in CI only where smithy is installed on the
+runner).
+
+## Enforcing it
 
 Linters do most of the work; `smithy comments` is the cross-language catch-all for what they
 can't express (a blanket ban on explanatory comments). Offer the snippet for the repo's stack and
@@ -87,5 +106,5 @@ style:
 
 ## Everywhere
 
-Run `smithy comments --diff <base>` in a pre-commit hook and in CI so the policy holds
-whatever editor or agent wrote the code.
+Run `smithy comments --diff <base>` in a pre-commit hook (and in CI where the runner has smithy
+installed) so the policy holds whatever editor or agent wrote the code.

@@ -16,15 +16,20 @@
 [![Cursor](https://img.shields.io/badge/Cursor-supported-000000)](#harnesses)
 [![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-supported-4285f4?logo=googlegemini&logoColor=white)](#harnesses)
 
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Skills](#skills) ·
+[Harnesses](#harnesses) · [The smithy binary](#the-smithy-binary) · [Settings](#settings)
+
 </div>
 
-smithy turns your coding agent into a small engineering team: it plans before it builds, writes
-the failing test first, checks its work with independent reviewers, runs many tasks in parallel
-and keeps the pull requests green until they merge. It works in any harness that loads
-`SKILL.md` skills (Claude Code, Codex, OpenCode, Cursor, Gemini, Pi,
-DeepSeek Harness), and needs git. It is built for GitHub: the [GitHub CLI](https://cli.github.com) (`gh`) gives the full
-experience but is optional (with `GH_TOKEN`/`GITHUB_TOKEN` smithy uses the GitHub API; with neither, it
-pushes the branch and prints a compare URL to open the PR by hand).
+smithy turns your coding agent into a small engineering team. It plans before it builds, writes
+the failing test first, checks its work with independent reviewers, runs tasks in parallel and
+keeps pull requests green until they merge.
+
+- **Any harness** that loads `SKILL.md` skills: Claude Code, Codex, OpenCode, Cursor, Gemini CLI,
+  Pi, DeepSeek Harness.
+- **Requires** git. Built for GitHub: the [GitHub CLI](https://cli.github.com) (`gh`) is
+  recommended; with only `GH_TOKEN`/`GITHUB_TOKEN` smithy uses the API, and with neither it pushes
+  the branch and prints a compare URL.
 
 ## Quick start
 
@@ -75,10 +80,11 @@ Pick every skill (at least `use-smithy`) and the agents to install to. Then, in 
 
 ## Harnesses
 
-Nothing depends on one vendor. What changes per harness is how you start a skill, how warden
-starts workers and whether a waiting session can be woken up:
+Nothing depends on one vendor. Per harness, only three things change: how you start a skill, how
+warden starts workers, and whether a session waiting on a background command resumes on its own
+(otherwise it waits in the foreground).
 
-| Harness | Skills folder (global) | Start a skill | Warden workers | Wake on background exit |
+| Harness | Skills folder (global) | Start a skill | Warden workers | Resumes after background wait |
 |---|---|---|---|---|
 | Claude Code desktop | `~/.claude/skills` | `/smelt` | app sessions (`start_session`) | yes |
 | Claude Code CLI | `~/.claude/skills` | `/smelt` | `claude --bg` | yes |
@@ -100,13 +106,15 @@ asks for a yes before it starts sessions.
 ![How a skill runs the smithy binary](docs/binary.svg)
 
 Everything mechanical (settings, branch names, task lists, status cards, commits and PRs in your
-repo's style, waiting on CI) is one small Go binary, `smithy`. You never install it: each skill
-ships a launcher that downloads the binary for your platform from the matching release the first
-time it runs, verifies its checksum and its GitHub build attestation (with `gh`), and caches it
-in `~/.smithy/bin/`. Without `gh` it downloads with `curl`, verifies the checksum only and prints
-a warning (install the GitHub CLI to verify the build's origin); a mismatch refuses. A `gh`
-too old for `gh attestation` still refuses unless you set `SMITHY_ALLOW_UNATTESTED=1`. Agents wait on GitHub without
-spending tokens:
+repo's style, waiting on CI) is one small Go binary, `smithy`. You never install it:
+
+- Each skill ships a launcher that downloads the binary for your platform from the matching
+  release on first run and caches it in `~/.smithy/bin/`.
+- With `gh`, it verifies the checksum and the GitHub build attestation. Without `gh`, it verifies
+  the checksum only and warns. A mismatch always refuses; a `gh` too old for attestations refuses
+  unless `SMITHY_ALLOW_UNATTESTED=1`.
+
+Agents wait on GitHub without spending tokens:
 
 ```bash
 smithy wait pr:42                 # checks finished (with failed names), merged, closed, conflict, review
@@ -131,7 +139,7 @@ them, with defaults, are in [docs/settings.md](docs/settings.md).
 
 ```bash
 npx skills add Zovaris/smithy -g -y --skill '*' -a claude-code -a codex   # no prompts
-npx skills add Zovaris/smithy@v0.10.0 -g                                   # pin a release
+npx skills add Zovaris/smithy@v0.12.0 -g                                   # pin a release
 npx skills update -g                                                      # update
 ```
 

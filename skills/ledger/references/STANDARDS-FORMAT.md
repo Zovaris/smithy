@@ -26,7 +26,7 @@ One rule per line, nothing else but the header:
 - A rule now enforced by a lint, test or type check is retired: code owns it.
 - Retiring is deleting the line; git keeps the history. No "retired" section.
 - A rule whose covered path is gone is retired or its `covers` updated.
-- ADRs are never deleted, only superseded (`ADR-FORMAT.md`).
+- ADRs are never deleted, only superseded (`FORMATS.md`).
 
 ## SCRIPTS line
 

@@ -228,3 +228,48 @@ func TestCommitStylePrintsSubjectLimit(t *testing.T) {
 		t.Fatalf("exit %d, output %q", code, b)
 	}
 }
+
+func TestCommitFailurePrintsErrorLast(t *testing.T) {
+	dir := t.TempDir()
+	for _, a := range [][]string{{"init", "-q"}, {"config", "user.email", "t@t"}, {"config", "user.name", "t"}} {
+		exec.Command("git", append([]string{"-C", dir}, a...)...).Run()
+	}
+	hook := filepath.Join(dir, ".git", "hooks", "pre-commit")
+	os.WriteFile(hook, []byte("#!/bin/sh\necho hook says no >&2\nexit 1\n"), 0o755)
+	os.WriteFile(filepath.Join(dir, "a.txt"), []byte("x"), 0o644)
+	t.Chdir(dir)
+	old := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+	code := CommitMain([]string{"fix: add a", "a.txt"})
+	os.Stderr = old
+	w.Close()
+	b, _ := io.ReadAll(r)
+	out := strings.Split(strings.TrimSpace(string(b)), "\n")
+	if code == 0 || !strings.HasPrefix(out[len(out)-1], "smithy commit: git commit failed") {
+		t.Fatalf("exit %d, stderr %q", code, b)
+	}
+}
+
+func TestCIPending(t *testing.T) {
+	dir := t.TempDir()
+	if CIPending(dir) {
+		t.Error("no workflows dir: want false")
+	}
+	wf := filepath.Join(dir, ".github", "workflows")
+	if err := os.MkdirAll(wf, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(wf, "README.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if CIPending(dir) {
+		t.Error("no workflow file: want false")
+	}
+	if err := os.WriteFile(filepath.Join(wf, "ci.yml"), []byte("on: push"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !CIPending(dir) {
+		t.Error("ci.yml: want true")
+	}
+}

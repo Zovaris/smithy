@@ -27,6 +27,7 @@ trial:
   CLI in ~11 min and ~180k tokens; smithy took ~31 min and ~1.8M, half of it in per-task agents,
   and both caught 3/3 planted defects. So agents run once per change, not once per task: warden
   workers and `build all` tasks build at `fast`, and one wave checks the whole batch or branch.
+- The v0.12 A/B rounds (`docs/trials/2026-11-v012-rounds.md`): fast costs about a plain session; warden pays only for big independent tasks.
 - Each trial's report lives in `docs/trials/`; this ADR is updated, not duplicated, when one
   changes the agent set.
 

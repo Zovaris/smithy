@@ -52,6 +52,20 @@ func DefaultFile(h, home, cwd string, getenv func(string) string) string {
 // HasBlock reports whether text holds the use-smithy block.
 func HasBlock(text string) bool { return strings.Contains(text, blockStart) }
 
+// ExtractBlock returns the first use-smithy block in text, markers included, ending in a newline;
+// empty when text has none.
+func ExtractBlock(text string) string {
+	i := strings.Index(text, blockStart)
+	if i < 0 {
+		return ""
+	}
+	j := strings.Index(text[i:], blockEnd)
+	if j < 0 {
+		return ""
+	}
+	return text[i:i+j+len(blockEnd)] + "\n"
+}
+
 // StripBlock removes every use-smithy block, markers included, and the blank lines it leaves at
 // the end; each kept line ends in a newline.
 func StripBlock(text string) string {
@@ -89,16 +103,16 @@ func AddBlock(text, block string) string {
 
 func blockFile() (string, error) {
 	if d := ghx.SkillDir(); d != "" {
-		if f := filepath.Join(d, "..", "references", "AGENTS-BLOCK.md"); isFile(f) {
+		if f := filepath.Join(d, "..", "references", "SETUP.md"); isFile(f) {
 			return f, nil
 		}
 	}
 	if p, ok := FindSkill("use-smithy"); ok {
-		if f := filepath.Join(filepath.Dir(p), "references", "AGENTS-BLOCK.md"); isFile(f) {
+		if f := filepath.Join(filepath.Dir(p), "references", "SETUP.md"); isFile(f) {
 			return f, nil
 		}
 	}
-	return "", errors.New("smithy setup: use-smithy/references/AGENTS-BLOCK.md not found")
+	return "", errors.New("smithy setup: use-smithy/references/SETUP.md not found")
 }
 
 func defaultFile() string {
@@ -144,6 +158,11 @@ func block(args []string) int {
 		blk, err := os.ReadFile(bf)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
+		blk = []byte(ExtractBlock(string(blk)))
+		if len(blk) == 0 {
+			fmt.Fprintln(os.Stderr, "smithy setup: no use-smithy block in", bf)
 			return 1
 		}
 		if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {

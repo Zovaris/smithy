@@ -12,8 +12,10 @@ import (
 
 const routeUsage = `Model router: picks the cheapest model tier that can do a task well, from the task itself.
   smithy route [--file <task.md>] [--text "<task words>"] [--kind ship|scout|review|fix|tend|test]
-               [--agent <agent file or name>] [--speed fast|normal|full] [--json]
---agent picks the kind from a smelt agent: spec-check, standards, security and builder are review;
+               [--agent <agent file or name>] [--speed fast|normal|full] [--domain "<nouns>"] [--json]
+--domain is a comma list of the product's own nouns (secret for a secret scanner) that never
+count as risk; config key route.domain (smithy config set --repo route.domain "...") is the default.
+--agent picks the kind from a smelt agent (adversary and security run on at least mid): reviewer, security and builder are review;
 adversary, regression, property, mutation, e2e and hostile are test; implementer is ship (give
 the task with --file or --text); tend and scout (or their SKILL.md) are their own kind.
 Prints ` + "`<tier> <model>  # reasons`" + `, or JSON with --json. <model> is the user's model for that
@@ -85,6 +87,35 @@ func first(s []string, n int) []string {
 // Route picks the tier for a task text, kind (ship, scout, review, fix, tend) and speed (fast,
 // normal, full), with the reasons.
 func Route(text, kind, speed string) (string, []string) {
+	return RouteDomain(text, kind, speed, "")
+}
+
+// riskyWithout is the risky list minus the words a domain noun names as a whole word (secret or secrets).
+func riskyWithout(domain string) []string {
+	var nouns []string
+	for _, d := range strings.Split(strings.ToLower(domain), ",") {
+		if d = strings.TrimSpace(d); d != "" {
+			nouns = append(nouns, d)
+		}
+	}
+	var out []string
+	for _, w := range risky {
+		keep := true
+		for _, d := range nouns {
+			if d == w || d == w+"s" || d+"s" == w {
+				keep = false
+			}
+		}
+		if keep {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// RouteDomain is Route where the comma list domain names the product's nouns, which never count as risk.
+func RouteDomain(text, kind, speed, domain string) (string, []string) {
+	risky := riskyWithout(domain)
 	low := strings.ToLower(text)
 	criteria := len(criteriaRe.FindAllString(text, -1))
 	files := section(filesRe, text, pathRe)
@@ -145,7 +176,7 @@ func AgentKind(agent string) (string, bool) {
 		name = dir[strings.LastIndex(dir, "/")+1:]
 	}
 	switch name {
-	case "spec-check", "standards", "security", "builder":
+	case "reviewer", "spec-check", "standards", "security", "builder":
 		return "review", true
 	case "adversary", "regression", "property", "mutation", "e2e", "hostile":
 		return "test", true
@@ -155,6 +186,25 @@ func AgentKind(agent string) (string, bool) {
 		return name, true
 	}
 	return "", false
+}
+
+// AgentFloor is the lowest tier an agent may run on: a cheap adversary missed a planted bug,
+// and security review is risky by nature, so both run on at least mid.
+func AgentFloor(agent string) string {
+	name := strings.TrimSuffix(agent[strings.LastIndex(agent, "/")+1:], ".md")
+	if name == "adversary" || name == "security" {
+		return "mid"
+	}
+	return ""
+}
+
+func tierIndex(t string) int {
+	for i, x := range Tiers {
+		if x == t {
+			return i
+		}
+	}
+	return 0
 }
 
 func oneOf(s string, opts ...string) bool {
@@ -193,7 +243,7 @@ func RouteMain(args []string) int {
 	}
 	for i, a := range args {
 		switch a {
-		case "--file", "--text", "--kind", "--agent", "--speed":
+		case "--file", "--text", "--kind", "--agent", "--speed", "--domain":
 			if i+1 >= len(args) || strings.HasPrefix(args[i+1], "--") {
 				fmt.Fprintf(os.Stderr, "smithy route: %s needs a value\n", a)
 				return 2
@@ -218,6 +268,7 @@ func RouteMain(args []string) int {
 		text += "\n" + string(b)
 	}
 	kind, _ := opt("--kind")
+	floor := ""
 	if a, ok := opt("--agent"); ok {
 		k, known := AgentKind(a)
 		if !known {
@@ -225,6 +276,7 @@ func RouteMain(args []string) int {
 			return 2
 		}
 		kind = k
+		floor = AgentFloor(a)
 	}
 	if kind == "" {
 		kind = "ship"
@@ -237,7 +289,15 @@ func RouteMain(args []string) int {
 		fmt.Fprintln(os.Stderr, "smithy route: give --file or --text")
 		return 2
 	}
-	tier, reasons := Route(text, kind, speed)
+	domain, ok := opt("--domain")
+	if !ok {
+		domain = config.Get("route.domain", "")
+	}
+	tier, reasons := RouteDomain(text, kind, speed, domain)
+	if floor != "" && tierIndex(tier) < tierIndex(floor) {
+		tier = floor
+		reasons = append(reasons, "this agent needs at least "+floor)
+	}
 	model, _ := config.Model(tier)
 	if has("--json") {
 		var m *string

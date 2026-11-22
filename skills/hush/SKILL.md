@@ -1,6 +1,6 @@
 ---
 name: hush
-description: Runs the given task end to end with no narration or questions and ends with a short done line. Use when the user asks for no talk or no questions, and for every agent another skill launches; composes with other skills (hush + smelt build).
+description: Use when the user asks for no talk or no questions, and for every agent another skill launches; composes with other skills (hush + smelt build).
 argument-hint: "<task, or empty to run what was just agreed>"
 ---
 
@@ -41,8 +41,10 @@ without acting on one.
 
 ## Stop only for
 
-What is the user's alone: scope, public API, money, prod, client data, security, irreversible or destructive
-actions, a credential/login, or the same obstacle hit twice after a real fix attempt. Then send
+What is the user's alone: scope, public API or schema, customer-visible behavior, money, prod,
+client or personal data, security, credentials or logins, irreversible or destructive actions,
+pushing, merging; or the same
+obstacle hit twice after a real fix attempt. Then send
 one line and stop: `blocked: <why>`.
 
 ## End

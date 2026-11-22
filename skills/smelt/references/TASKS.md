@@ -1,18 +1,16 @@
 # Tasks
 
 Contents: Where it lives · Splitting · Task file — `NN-<slug>.md` · Commands · After the list is written
-
-The task list is the hand-off between planning and building, and between smelt and warden.
-Whoever wrote it, either skill (or you, by hand) can pick it up. `smithy tasks` reads and
-updates it; never hand-edit status lines when the script can.
+The task list is the hand-off between planning and building, smelt and warden. `smithy tasks`
+reads and updates it; use it instead of hand-editing status lines.
 
 ## Where it lives
 
-Run `smithy task-dir <slug>`: it reads the user's settings, creates the dir and prints it.
-When it exits 3 it prints `ask <key>: <question>`: ask the user that (your recommendation first;
-with nobody to ask, under hush or in a launched session, pick `true` and say so at the end),
-save the answer for this repo with `smithy config set --repo <key> <value>`, run it again.
-It asks at most twice per repo, ever:
+An agreed spec in a folder of its own: that folder is the task dir (no second folder). A spec at the repo root stays there: make the task dir with `smithy task-dir` and point `Spec:` at it. Otherwise run
+`smithy task-dir <slug>`: it reads the user's settings, creates the dir and prints it.
+Exit 3 prints `ask <key>: <question> (default: <value> → <dir>)`: ask the user (recommendation first; nobody
+to ask, hush or a launched session: take `<value>`, say so at the end), save it with `smithy config set --repo <key> <value>`, rerun.
+It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `git rm --cached` it if committed):
 
 1. `tasks.commit` — commit the specs and tasks to git? `true` → `docs/specs/<slug>/`, reviewed
    with the code. `false` → `.docs/specs/<slug>/`, next to the code but out of git.
@@ -45,18 +43,18 @@ spec stays in the repo or local dir and the issues link to it.
 - **Width over tidiness:** tasks run in parallel, so the wall time is the longest chain, not the
   task count. Shape the split so the chain is short: one shared foundation first (skeleton, CI,
   a schema or interface), then as many independent tasks as possible, each coding against the
-  agreed interface rather than waiting for its implementation. A chain longer than 2 is a
-  finding: say so with the list and how to shorten it. Parallel only pays when at least two
-  independent tasks are each big (more than ~15 minutes of agent work).
+  agreed interface rather than waiting for its implementation. A chain longer than 2 (3 if
+  the first is a skeleton/CI task shipped as its own PR) is a finding: say so with the list
+  and how to shorten it. Parallel only pays when at least two independent tasks are each big (more than ~15 minutes of agent work).
 - **Self-review** before showing it:
   1. Coverage: every acceptance criterion of the spec lands in exactly one task.
   2. Interfaces line up: each `Consumes` is `Produces`d by a blocker or already exists.
-  3. Collisions: tasks without a `Blocked by` between them don't modify the same files.
+  3. Collisions: unblocked tasks share no file, test files too (each task gets its own).
   4. Proportion: no task is a horizontal layer, none is bigger than a day, none is trivial
-     enough to merge into its neighbour.
+     enough to merge into its neighbour. A test of a stub never asserts the stub's output.
   5. Width: the longest `Blocked by` chain, and each task's speed (its `Speed:` line: fast
-     unless it holds logic that earns normal or full).
-- Show the list (number, title, one line, blocked by) and wait for approval before writing.
+     unless it holds logic; a task file defaults to fast, a smelt session to normal).
+- Show the list (number, title, one line, blocked by); wait for approval (else SKILL.md Always).
 
 ## Task file — `NN-<slug>.md`
 
@@ -102,21 +100,21 @@ smithy tasks next  [dir]          # first todo whose blockers are done
 smithy tasks ready [dir]          # every todo that can start now (what warden launches)
 smithy tasks set <file> status=doing|done pr=<url>
 smithy tasks where                # task dirs for this repo (repo and local)
-smithy tasks add [dir] "<title>" [--blocked-by 01] [--key PROJ-12]   # next NN file from the template
+smithy tasks add [dir] "<title>" [--blocked-by 01] [--key K] [--speed fast|normal|full]  # next NN file
 smithy tasks board [--all]        # one line per task list and batch: this repo, or every repo
 ```
 
 ## After the list is written
 
-Ask how to run it, recommendation first, only offering what is installed. Recommend **here**
-unless at least two independent tasks are each big (more than ~15 minutes of agent work): for a
-small list or a long chain, one session building in order is faster and several times cheaper
-than parallel workers (trial 4, `docs/trials`).
+Ask how to run it (nobody to ask: SKILL.md Always), recommendation first, only offering what is
+installed. Recommend **here** unless at least two independent tasks are each big (more than ~15
+minutes of agent work): for a small list or a long chain, one session building in order is
+faster and several times cheaper than parallel workers.
 - **Here, all of it:** smelt `build all`: built in order, one check wave on the whole branch at
   the end.
 - **Here, one at a time:** smelt `build next` (e.g. `/smelt build next`; repeat until `smithy tasks next` says all done).
-- **In parallel:** warden on the task dir (workers build at `fast`; warden checks the batch once at its speed) (read the SKILL.md `smithy skills warden` prints) when
-  it is installed (it is listed among
-  your skills, or `<skill-dir>/../warden/SKILL.md` exists). Mixing is fine: build some here,
+- **In parallel:** warden on the task dir (workers build at `fast`; warden checks the batch once
+  at its speed; read the SKILL.md `smithy skills warden` prints) when it is installed (listed
+  among your skills, or `<skill-dir>/../warden/SKILL.md` exists). Mixing is fine: build some here,
   hand the rest over; both read and write the same status lines.
 - **Later:** stop here; the list waits.

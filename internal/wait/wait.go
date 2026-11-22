@@ -121,10 +121,10 @@ func summarize(rollup []check) checks {
 }
 
 type prState struct {
-	url, state, mergeable, review, head string
-	num, comments, reviews              int
-	checks                              checks
-	fp                                  string
+	url, state, mergeable, review, head, branch string
+	num, comments, reviews                      int
+	checks                                      checks
+	fp                                          string
 }
 
 type prWatcher struct {
@@ -146,6 +146,7 @@ func (w *prWatcher) read() (*prState, error) {
 		Mergeable         string
 		ReviewDecision    string
 		HeadRefOid        string
+		HeadRefName       string
 		StatusCheckRollup []check
 		Comments          []json.RawMessage
 		Reviews           []json.RawMessage
@@ -154,7 +155,7 @@ func (w *prWatcher) read() (*prState, error) {
 		return nil, err
 	}
 	return &prState{url: p.URL, num: p.Number, state: p.State, mergeable: p.Mergeable, review: p.ReviewDecision, head: p.HeadRefOid,
-		comments: len(p.Comments), reviews: len(p.Reviews), checks: summarize(p.StatusCheckRollup), fp: fingerprint(p.StatusCheckRollup)}, nil
+		comments: len(p.Comments), reviews: len(p.Reviews), checks: summarize(p.StatusCheckRollup), fp: fingerprint(p.StatusCheckRollup), branch: p.HeadRefName}, nil
 }
 
 func checksLine(s *prState) string {
@@ -173,6 +174,10 @@ func (w *prWatcher) poll() ([]string, error) {
 		return nil, err
 	}
 	var out []string
+	if pushedAhead(s) {
+		// Right after a push GitHub may still report the old head and its checks.
+		s.checks = checks{state: "pending"}
+	}
 	o, last := w.o, w.last
 	if last != nil && s.head != last.head && last.fp != "" {
 		w.stale = last.fp
@@ -719,4 +724,20 @@ func Main(args []string) int {
 	}
 	fmt.Printf("heartbeat: nothing within %gm\n", max)
 	return 4
+}
+
+// pushedAhead reports whether this checkout's origin/<branch> is strictly ahead of the PR head
+// GitHub shows: a push it hasn't processed yet. A head this checkout doesn't have (a fork, another
+// repo) or a ref behind the head is never ahead.
+func pushedAhead(s *prState) bool {
+	if s.branch == "" || s.state != "OPEN" {
+		return false
+	}
+	sha, err := ghx.Run("git", "rev-parse", "--verify", "-q", "refs/remotes/origin/"+s.branch)
+	sha = strings.TrimSpace(sha)
+	if err != nil || sha == "" || s.head == "" || sha == s.head {
+		return false
+	}
+	_, err = ghx.Run("git", "merge-base", "--is-ancestor", s.head, sha)
+	return err == nil
 }

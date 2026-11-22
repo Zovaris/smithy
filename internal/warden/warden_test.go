@@ -100,7 +100,7 @@ func TestWaitTurn(t *testing.T) {
 		{"slot limit by max", `{"max":1,` + items + `}`, map[string]string{"a": "merged", "c": "working"}, "b", 4, "waiting b", "waiting", "waiting", ""},
 		{"slot free under max", `{"max":2,` + items + `}`, map[string]string{"a": "merged", "c": "working"}, "b", 0, "go b", "working", "start", ""},
 		{"max zero never starts", `{"max":0,` + items + `}`, nil, "c", 4, "waiting c", "waiting", "waiting", ""},
-		{"default max is three", `{` + items + `}`, map[string]string{"a": "working", "x": "working", "y": "working"}, "c", 4, "waiting c", "waiting", "waiting", ""},
+		{"default max is five", `{` + items + `}`, map[string]string{"a": "working", "x": "working", "y": "working", "z": "working", "w": "working"}, "c", 4, "waiting c", "waiting", "waiting", ""},
 		{"non-working cards free the slot", `{"max":1,` + items + `}`, map[string]string{"a": "merged", "x": "pr_open", "y": "waiting"}, "b", 0, "go b", "working", "start", ""},
 	}
 	for _, c := range cases {

@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -206,6 +207,16 @@ func TestSkills(t *testing.T) {
 	}
 }
 
+func TestExtractBlock(t *testing.T) {
+	doc := "# Setup\n\n<!-- use-smithy:start -->\n## Agent skills\n<!-- use-smithy:end -->\nafter\n"
+	if got := ExtractBlock(doc); got != "<!-- use-smithy:start -->\n## Agent skills\n<!-- use-smithy:end -->\n" {
+		t.Fatalf("extract: %q", got)
+	}
+	if ExtractBlock("no block") != "" || ExtractBlock("<!-- use-smithy:start -->\nopen") != "" {
+		t.Fatal("extract without a closed block must be empty")
+	}
+}
+
 func TestBlock(t *testing.T) {
 	blk := "<!-- use-smithy:start -->\nhi\n<!-- use-smithy:end -->\n"
 	once := AddBlock("# Rules\n", blk)
@@ -231,7 +242,7 @@ func TestBlock(t *testing.T) {
 
 func TestAgentKind(t *testing.T) {
 	for in, want := range map[string]string{
-		"spec-check": "review", "skills/smelt/agents/security.md": "review",
+		"spec-check": "review", "skills/smelt/agents/reviewer.md": "review", "skills/smelt/agents/security.md": "review",
 		"hostile.md": "test", "adversary": "test", "implementer": "ship",
 		"skills/tend/SKILL.md": "tend", "scout": "scout",
 	} {
@@ -244,6 +255,24 @@ func TestAgentKind(t *testing.T) {
 	}
 	if tier, _ := Route("", "test", "normal"); tier != "mid" {
 		t.Errorf("test agent tier %s, want mid", tier)
+	}
+}
+
+func TestAgentFloorLiftsAdversaryAndSecurity(t *testing.T) {
+	for _, a := range []string{"adversary", "skills/smelt/agents/security.md"} {
+		r, w, _ := os.Pipe()
+		old := os.Stdout
+		os.Stdout = w
+		code := RouteMain([]string{"--agent", a, "--speed", "fast"})
+		w.Close()
+		os.Stdout = old
+		out, _ := io.ReadAll(r)
+		if code != 0 || !strings.HasPrefix(string(out), "mid ") {
+			t.Errorf("route --agent %s --speed fast = %d %q, want mid", a, code, out)
+		}
+	}
+	if AgentFloor("reviewer") != "" {
+		t.Error("reviewer got a floor")
 	}
 }
 
@@ -368,5 +397,21 @@ func TestRouteNotDoesNotNegateRisk(t *testing.T) {
 		if tier, why := Route(text, "ship", "normal"); tier != "strong" {
 			t.Errorf("%q → %s %v", text, tier, why)
 		}
+	}
+}
+
+func TestRouteDomainNounsAreNotRisk(t *testing.T) {
+	text := "Scan files for secrets and print each secret masked"
+	if tier, _ := Route(text, "ship", "normal"); tier != "strong" {
+		t.Errorf("no domain: %s, want strong", tier)
+	}
+	if tier, why := RouteDomain(text, "ship", "normal", "secrets, rule"); tier != "mid" {
+		t.Errorf("domain secrets: %s %v, want mid", tier, why)
+	}
+	if tier, _ := RouteDomain(text+" behind auth", "ship", "normal", "secret"); tier != "strong" {
+		t.Errorf("other risk still counts: %s", tier)
+	}
+	if tier, _ := RouteDomain("Fix the auth check", "ship", "normal", "au"); tier != "strong" {
+		t.Errorf("short noun au must not drop auth: %s", tier)
 	}
 }

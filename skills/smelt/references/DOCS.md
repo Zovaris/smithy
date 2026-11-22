@@ -7,7 +7,7 @@ Files are created only when there is something to write in them.
 | Domain terms | `docs/GLOSSARY.md` | everyone, phase 0 |
 | Hard decisions | `docs/adr/NNNN-<slug>.md` | phase 0 when relevant |
 | Specs and tasks | `docs/specs/<slug>/`, `.docs/specs/<slug>/` (out of git) or `~/.smithy/plans/<repo>/<slug>/` (`smithy task-dir` decides) | build, review |
-| Judgement rules for agents | `docs/agents/STANDARDS.md` | standards reviewer |
+| Judgement rules for agents | `docs/agents/STANDARDS.md` | reviewer (Standards) |
 | Mechanical rules | lint rules, hooks, scripts | CI, hooks |
 | Facts about the user, their preferences | the harness's memory | every session |
 
@@ -30,21 +30,9 @@ term, alphabetical, no implementation detail. Update inline the moment a term is
 Write one only when all three hold: **hard to reverse**, **surprising without context**, and a
 **real trade-off** was made. Otherwise a line in the spec's Decisions is enough.
 
-`smithy adr "<title>"` creates the next numbered file:
-
-```markdown
-# NNNN · <title>
-Status: proposed | accepted | superseded by NNNN
-Date: YYYY-MM-DD
-
-<Context and decision in one or two paragraphs: what forced the choice, what we chose.>
-
-## Considered options
-<only if useful: option — why not>
-
-## Consequences
-<only if useful: what gets easier, what gets harder>
-```
+`smithy adr "<title>"` creates the next numbered file; the format is ledger's
+`references/FORMATS.md` (`smithy skills ledger`). Without ledger: a title, Status, Date, then context
+and decision in a paragraph or two.
 
 Superseding: new ADR, then set the old one's status line. Never edit an accepted ADR's decision.
 
@@ -67,5 +55,5 @@ skill owns (its `references/STANDARDS-FORMAT.md`); without ledger:
 
 `<evidence>` is a receipt, a failing test, a review finding, a `file:line` or a ruling from
 `rulings.md`. With the ledger skill installed (`smithy skills ledger`), follow its STANDARDS
-rules (budget, retire) instead of restating them here. Write only what the user accepted; under
-hush, list the proposed lines in the report and write nothing.
+rules (budget, retire) instead of restating them here. Write only what the user accepted; with
+nobody to ask, follow the lesson rule in `references/SHIP.md`.

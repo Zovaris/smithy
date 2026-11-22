@@ -5,6 +5,83 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.12.0 — 2026-11-22
+
+- **Full audit fixes.** `warden.max` falls back to 5 in `smithy wait-turn`, matching the
+  config default and docs. Skills: use-smithy owns the stop list (smelt points to it; hush keeps a copy since it installs alone),
+  impact levels, merge and wait rules live in one place each, VERIFY allows working-tree
+  receipts before ship, smelt README phases and speeds match SKILL.md, ADR format points to
+  ledger, tend's inbox is `smithy task-dir inbox`, scout reports go to `<batch-dir>/<id>/report.md`,
+  use-smithy's `references/SCRIPTS.md` is now `SAVE-SCRIPTS.md`; `route.domain` is documented.
+
+- **A/B trial frictions (r7, full speed).** `smithy wait pr:` reports checks as pending while
+  this checkout's `origin/<branch>` is strictly ahead of the PR head GitHub shows (a push it
+  hasn't seen).
+  Skills: the property agent writes a seeded generator loop when there is no PBT library, a red
+  CI caused by this change is fixed in place, a table of cases for one rule is one red test, the
+  holdout receipt may sit behind later fixes.
+
+- **A/B trial frictions (r6).** `smithy stack` reports `python3 -m unittest` for stdlib-only
+  Python repos (test files importing unittest, no packaging file). Skills: a finding is declined as spec-ambiguous
+  only by quoting both readings (with the declined test ids), a refused to-do tool falls back to
+  the final message.
+
+- **A/B trial frictions (r5).** `smithy stack` reports `node --test <file>` as the single-file
+  command when the test script is `node --test`. Skills: create the work branch in phase 0, the
+  security agent comes on top of the speed's agents, rulings state their exact boundary, a spec
+  at the repo root stays there, the holdout receipt may sit one commit behind, `verify` runs only
+  after `smithy wait pr:`. README: the speeds section is gone.
+
+- **A/B trial frictions (r4).** `smithy tasks add` defaults to `Speed: fast`. Skills: re-review
+  covers every spec-check row that was missing, partial or wrong plus Standards blocking, reads
+  the exact commit sha, and closes a departure recorded in `rulings.md` as "deferred to user";
+  a user-answer `partial` with nobody to ask becomes a ruling; read-only agents ignore `zz_*`
+  files, which move to the system temp dir for typecheck and lint; adversary expected values
+  are re-derived; declined holdout tests may be dropped; another ref is reviewed in a detached
+  worktree; rebase-proof uses the no-tests flag and runs only for more than one source commit;
+  `status=done pr=` lands in a follow-up commit; check `smithy commit`'s exit code; single-file
+  test runs skip pretest hooks. `docs/trials/2026-11-v012-rounds.md` summarises the v0.12 rounds.
+- **A/B trial frictions (r3).** `smithy verify` counts `checks=none` as pending when the repo
+  has a workflow file; `smithy route --domain` (config `route.domain`) takes the product's nouns,
+  which never count as risk; `smithy task-dir`'s ask line prints the default it would take;
+  `smithy tasks add` writes the full template and takes `--speed`. Skills: `smithy:allow` markers
+  pass the comment policy; read-only agents never switch branches (`git show <ref>:<file>`);
+  re-reviews answer only the blocking findings; the batch check diff starts before a foundation
+  task and warden writes the fix PR's dispositions; conflicting green PRs merge one at a time
+  with `gh pr update-branch`; workers get a "Read <brief> and follow it" prompt; any existing
+  batch dir gets a suffix; an agreed spec's folder is the task dir; split self-review catches
+  stub-output tests and a shared test file; `rebase -x` exempts skeleton, docs and tooling commits.
+- **A/B trial frictions (r2).** smelt: fast lists a security agent when risky and puts its
+  Spec-check table in the PR body; e2e means UI or served HTTP endpoints; an agreed spec still
+  gets the builder check; SHIP proves each commit with `git rebase -x`; CHECK names each agent's
+  `smithy route` tier, full's seven strong contexts, own-`zz`-file runs, mutation as a second step and holdout moves; hostile scratch
+  goes in the system temp dir; adversary and property write no explanatory comments; TDD stubs
+  the export for red; a 3-link chain is fine after a skeleton PR. use-smithy shows
+  `smithy names branch <key|-> "<title>" [type]`. `smithy names branch`
+  rejects a type word as key; `smithy task-dir` excludes `.smithy/config.json` before it asks.
+- **Skill diet.** Skills load fewer tokens and work in any harness. The top-session read set for
+  a `normal` smelt build drops from ~9.5k to ~5.5k tokens. Shared rules live once, in a
+  use-smithy table; descriptions are trigger-only; phases end in "Done when". Merged references:
+  smelt `TESTING.md` + `REVIEW.md` → `CHECK.md`, smelt agents `spec-check.md` + `standards.md`
+  → `reviewer.md`, scout `FORMAT.md` → `INVESTIGATOR.md`, tend alerts, issues and base recipes →
+  `ACTIONS.md` (receiving points at smelt's), use-smithy `AGENTS-BLOCK.md` → `SETUP.md`
+  (`smithy setup block add` reads the block between its markers), ledger ADR and glossary
+  formats → `FORMATS.md`. Vendor tool names live only in warden's `references/harness.md`.
+  `tests/skills.sh` fails on a SKILL.md over 80 lines (smelt 100), a reference over 120, or a
+  vendor tool name outside harness.md.
+- **A/B trial frictions (r1).** smelt: one "nobody to ask" rule (hush or a launched session takes
+  its recommendation for list approval, how to run it and lessons, and records it); the exact
+  `smithy commit "<msg>" <path>...` shape; rerun `smithy stack` once a new repo has a skeleton; a
+  skeleton/CI task may ship as its own PR first; holdout runs as a single-file receipt, and a
+  spec-ambiguous decline closes it in one line. The reviewer treats the agreed spec as the
+  contract (task-file drift is advisory), defines `partial`, and skips split advice on `build
+  all`. Property tests may follow unit-tested code. `smithy comments` in CI only where smithy is
+  installed.
+- **smithy.** `route --agent` runs the adversary and security on at least mid; `task-dir` adds an
+  untracked `.smithy/config.json` to `.git/info/exclude`; `stack` prints coverage only when a
+  vitest coverage provider is installed; `receipt list` shows a one-string command bare; a failed
+  `smithy commit` ends with its error line.
+
 ## v0.11.0 — 2026-11-21
 
 - **Trial 7 frictions.** `smithy comments` no longer reads a JS regex literal (`/^b\//`) as a

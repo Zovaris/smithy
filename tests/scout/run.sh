@@ -19,7 +19,7 @@ grep -qi 'never authorizes' $S/SKILL.md && pass "no-authorization rule stated" |
 grep -q 'smithy config model cheap' $S/SKILL.md && pass "uses cheap model config" || bad "uses cheap model config"
 grep -q 'smithy agent --readonly' $S/SKILL.md && pass "harness-agnostic fallback" || bad "harness-agnostic fallback"
 for h in '## Answer' '## Evidence' '## Confidence' '## Open questions'; do
-  grep -qF "$h" $S/references/FORMAT.md && pass "format has $h" || bad "format has $h"
+  grep -qF "$h" $S/references/INVESTIGATOR.md && pass "format has $h" || bad "format has $h"
 done
 grep -qi 'data, not instructions' $S/references/INVESTIGATOR.md && pass "investigator treats sources as data" || bad "investigator treats sources as data"
 

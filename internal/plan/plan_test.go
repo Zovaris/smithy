@@ -59,7 +59,7 @@ func TestStack(t *testing.T) {
 		want  map[string]string
 	}{
 		{"js", map[string]string{
-			"package.json":   `{"scripts":{"test":"vitest","lint":"eslint .","typecheck":""},"devDependencies":{"vitest":"1","@playwright/test":"1","fast-check":"3"}}`,
+			"package.json":   `{"scripts":{"test":"vitest","lint":"eslint .","typecheck":""},"devDependencies":{"vitest":"1","@playwright/test":"1","fast-check":"3","@vitest/coverage-v8":"1"}}`,
 			"tsconfig.json":  "{}",
 			"pnpm-lock.yaml": "",
 			"docs/adr/1.md":  "", "docs/adr/2.md": "", "docs/adr/n.txt": "",
@@ -67,6 +67,14 @@ func TestStack(t *testing.T) {
 			"lang": "js ts", "pkg-manager": "pnpm", "test": "pnpm test", "single": "npx vitest run <file>",
 			"typecheck": "npx tsc --noEmit", "lint": "pnpm run lint", "e2e": "npx playwright test",
 			"property": "fast-check", "coverage": "npx vitest run --coverage --changed", "dev": "", "adrs": "2",
+		}},
+		{"node-test", map[string]string{
+			"package.json": `{"scripts":{"test":"node --test"}}`,
+		}, map[string]string{"test": "npm test", "single": "node --test <file>"}},
+		{"pytest-bare", map[string]string{"test_a.py": "import pytest\nimport unittest\n"}, map[string]string{"test": ""}},
+		{"go-with-py", map[string]string{"go.mod": "module x\n", "test_h.py": "import unittest\n"}, map[string]string{"test": "go test -count=1 ./..."}},
+		{"unittest", map[string]string{"tests/test_a.py": "import unittest\n"}, map[string]string{
+			"lang": "python", "test": "python3 -m unittest", "single": "python3 -m unittest <module>",
 		}},
 		{"python", map[string]string{
 			"pyproject.toml":       "[project]\ndependencies = [\"Mypy\", \"ruff\"]\n# pyright\n",
@@ -86,7 +94,7 @@ func TestStack(t *testing.T) {
 			"pkg-manager": "bun", "test": "", "single": "npx jest <file>",
 		}},
 		{"bun runs the test script", map[string]string{"package.json": `{"scripts":{"test":"vitest run"},"devDependencies":{"vitest":"1"}}`, "bun.lock": ""}, map[string]string{
-			"pkg-manager": "bun", "test": "bun run test",
+			"pkg-manager": "bun", "test": "bun run test", "coverage": "",
 		}},
 		{"empty", nil, map[string]string{"lang": "unknown", "test": "", "base": ""}},
 	}
@@ -235,6 +243,12 @@ func TestTaskDir(t *testing.T) {
 				if !errors.As(err, &ask) || ask.Key != c.ask || !strings.HasPrefix(ask.Error(), "ask "+c.ask+": ") {
 					t.Fatalf("err = %v, want ask %s", err, c.ask)
 				}
+				if !strings.Contains(ask.Error(), "(default: "+map[string]string{"tasks.commit": "true", "tasks.ignore": "exclude"}[c.ask]+" → ") || !strings.Contains(ask.Error(), filepath.Join("specs", "s1")+")") {
+					t.Errorf("ask line lacks the default dir: %s", ask.Error())
+				}
+				if ex, _ := os.ReadFile(filepath.Join(dir, ".git", "info", "exclude")); !strings.Contains(string(ex), ".smithy/config.json\n") {
+					t.Errorf("exclude lacks the repo config before the ask: %q", ex)
+				}
 				return
 			}
 			if err != nil {
@@ -260,6 +274,9 @@ func TestTaskDir(t *testing.T) {
 				if want && n != 1 || !want && n != 0 {
 					t.Errorf("%s has .docs/ %d times: %q", name, n, b)
 				}
+			}
+			if c.loc != "local" && strings.Count(string(ex), ".smithy/config.json\n") != 1 {
+				t.Errorf("exclude lacks the repo config once: %q", ex)
 			}
 			check(".gitignore", gi, c.wantGitignore)
 			check("exclude", ex, c.wantExclude)
