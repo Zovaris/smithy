@@ -59,7 +59,7 @@ func TestStack(t *testing.T) {
 		want  map[string]string
 	}{
 		{"js", map[string]string{
-			"package.json":   `{"scripts":{"test":"vitest","lint":"eslint .","typecheck":""},"devDependencies":{"vitest":"1","@playwright/test":"1","fast-check":"3"}}`,
+			"package.json":   `{"scripts":{"test":"vitest","lint":"eslint .","typecheck":""},"devDependencies":{"vitest":"1","@playwright/test":"1","fast-check":"3","@vitest/coverage-v8":"1"}}`,
 			"tsconfig.json":  "{}",
 			"pnpm-lock.yaml": "",
 			"docs/adr/1.md":  "", "docs/adr/2.md": "", "docs/adr/n.txt": "",
@@ -86,7 +86,7 @@ func TestStack(t *testing.T) {
 			"pkg-manager": "bun", "test": "", "single": "npx jest <file>",
 		}},
 		{"bun runs the test script", map[string]string{"package.json": `{"scripts":{"test":"vitest run"},"devDependencies":{"vitest":"1"}}`, "bun.lock": ""}, map[string]string{
-			"pkg-manager": "bun", "test": "bun run test",
+			"pkg-manager": "bun", "test": "bun run test", "coverage": "",
 		}},
 		{"empty", nil, map[string]string{"lang": "unknown", "test": "", "base": ""}},
 	}
@@ -260,6 +260,9 @@ func TestTaskDir(t *testing.T) {
 				if want && n != 1 || !want && n != 0 {
 					t.Errorf("%s has .docs/ %d times: %q", name, n, b)
 				}
+			}
+			if c.loc != "local" && strings.Count(string(ex), ".smithy/config.json\n") != 1 {
+				t.Errorf("exclude lacks the repo config once: %q", ex)
 			}
 			check(".gitignore", gi, c.wantGitignore)
 			check("exclude", ex, c.wantExclude)

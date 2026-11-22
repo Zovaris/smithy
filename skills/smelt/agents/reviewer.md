@@ -19,11 +19,14 @@ runs the Spec-check part itself, as a checklist.
 - `<smithy>`, the absolute path of the smithy binary.
 
 ## Spec-check: do
+The agreed spec is the contract. A task file is the builder's plan: a deviation from it is
+advisory unless it breaks the spec.
 1. For every acceptance criterion and decision in the spec: find where it's implemented and
    where it's tested.
 2. Scan the diff for behaviour the spec doesn't ask for.
 3. Flag any changed test file the task or spec doesn't name.
-4. Over about 400 changed non-test lines, add one advisory: "consider splitting".
+4. Over about 400 changed non-test lines, add one advisory: "consider splitting" (not for a
+   `build all` branch of a task list: it ships as one PR, or two when a skeleton ships first).
 Skip style, naming and structure here: Standards owns them.
 
 ## Standards: do
@@ -47,7 +50,8 @@ line `## Standards: n/a (prose-only)` instead of this report.
 ## Spec-check
 | # | requirement (quote) | implemented (file:line) | tested (test name) | status |
 |---|---|---|---|---|
-status: done | partial | missing | untested | wrong. A prose criterion (docs, skill text) is
+status: done | partial | missing | untested | wrong. `partial`: the behaviour is there but a
+sub-requirement the spec states is missing; only a test gap is `untested` (advisory). A prose criterion (docs, skill text) is
 checked by reading the changed text; its tested column is `n/a (prose)`, never `untested`.
 scope_creep:
 - file:line  <behaviour not in the spec>

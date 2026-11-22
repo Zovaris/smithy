@@ -196,7 +196,7 @@ func Markdown(rs []Receipt, head string, dirtyNow bool) string {
 			c += " (" + s + ")"
 		}
 		fmt.Fprintf(&b, "| %s | `%s` | %d | %s | %s |\n",
-			cell(r.Claim), cell(Redact(Quote(r.Command))), r.Exit, c, r.Digest)
+			cell(r.Claim), cell(Redact(Shown(r.Command))), r.Exit, c, r.Digest)
 	}
 	return b.String()
 }
@@ -211,6 +211,16 @@ func (r Receipt) State(head string, dirtyNow bool) string {
 		return "dirty"
 	}
 	return "fresh"
+}
+
+// Shown is a receipt's command as typed: one command line that came in as a single string
+// prints bare, since the shell split it, unless it names an existing path (a program with a
+// space in its name); anything else is quoted like Quote.
+func Shown(argv []string) string {
+	if len(argv) == 1 && strings.ContainsAny(argv[0], " \t") && !exists(argv[0]) {
+		return argv[0]
+	}
+	return Quote(argv)
 }
 
 // Quote joins argv the way a shell would read it back.
@@ -357,7 +367,7 @@ func ReceiptMain(args []string) int {
 			return 0
 		}
 		for _, r := range rs {
-			fmt.Printf("%s\texit %d\t%s\t%s\t%s\n", short(r.Commit), r.Exit, r.State(sha, dirtyNow), r.Claim, Redact(Quote(r.Command)))
+			fmt.Printf("%s\texit %d\t%s\t%s\t%s\n", short(r.Commit), r.Exit, r.State(sha, dirtyNow), r.Claim, Redact(Shown(r.Command)))
 		}
 		return 0
 	case "clear":
@@ -370,3 +380,5 @@ func ReceiptMain(args []string) int {
 	fmt.Fprintln(os.Stderr, receiptUsage)
 	return 2
 }
+
+func exists(p string) bool { _, err := os.Stat(p); return err == nil }

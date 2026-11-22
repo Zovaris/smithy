@@ -13,7 +13,7 @@ import (
 const routeUsage = `Model router: picks the cheapest model tier that can do a task well, from the task itself.
   smithy route [--file <task.md>] [--text "<task words>"] [--kind ship|scout|review|fix|tend|test]
                [--agent <agent file or name>] [--speed fast|normal|full] [--json]
---agent picks the kind from a smelt agent: reviewer, security and builder are review;
+--agent picks the kind from a smelt agent (adversary and security run on at least mid): reviewer, security and builder are review;
 adversary, regression, property, mutation, e2e and hostile are test; implementer is ship (give
 the task with --file or --text); tend and scout (or their SKILL.md) are their own kind.
 Prints ` + "`<tier> <model>  # reasons`" + `, or JSON with --json. <model> is the user's model for that
@@ -157,6 +157,25 @@ func AgentKind(agent string) (string, bool) {
 	return "", false
 }
 
+// AgentFloor is the lowest tier an agent may run on: a cheap adversary missed a planted bug,
+// and security review is risky by nature, so both run on at least mid.
+func AgentFloor(agent string) string {
+	name := strings.TrimSuffix(agent[strings.LastIndex(agent, "/")+1:], ".md")
+	if name == "adversary" || name == "security" {
+		return "mid"
+	}
+	return ""
+}
+
+func tierIndex(t string) int {
+	for i, x := range Tiers {
+		if x == t {
+			return i
+		}
+	}
+	return 0
+}
+
 func oneOf(s string, opts ...string) bool {
 	for _, o := range opts {
 		if s == o {
@@ -218,6 +237,7 @@ func RouteMain(args []string) int {
 		text += "\n" + string(b)
 	}
 	kind, _ := opt("--kind")
+	floor := ""
 	if a, ok := opt("--agent"); ok {
 		k, known := AgentKind(a)
 		if !known {
@@ -225,6 +245,7 @@ func RouteMain(args []string) int {
 			return 2
 		}
 		kind = k
+		floor = AgentFloor(a)
 	}
 	if kind == "" {
 		kind = "ship"
@@ -238,6 +259,10 @@ func RouteMain(args []string) int {
 		return 2
 	}
 	tier, reasons := Route(text, kind, speed)
+	if floor != "" && tierIndex(tier) < tierIndex(floor) {
+		tier = floor
+		reasons = append(reasons, "this agent needs at least "+floor)
+	}
 	model, _ := config.Model(tier)
 	if has("--json") {
 		var m *string

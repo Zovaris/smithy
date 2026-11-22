@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -254,6 +255,24 @@ func TestAgentKind(t *testing.T) {
 	}
 	if tier, _ := Route("", "test", "normal"); tier != "mid" {
 		t.Errorf("test agent tier %s, want mid", tier)
+	}
+}
+
+func TestAgentFloorLiftsAdversaryAndSecurity(t *testing.T) {
+	for _, a := range []string{"adversary", "skills/smelt/agents/security.md"} {
+		r, w, _ := os.Pipe()
+		old := os.Stdout
+		os.Stdout = w
+		code := RouteMain([]string{"--agent", a, "--speed", "fast"})
+		w.Close()
+		os.Stdout = old
+		out, _ := io.ReadAll(r)
+		if code != 0 || !strings.HasPrefix(string(out), "mid ") {
+			t.Errorf("route --agent %s --speed fast = %d %q, want mid", a, code, out)
+		}
+	}
+	if AgentFloor("reviewer") != "" {
+		t.Error("reviewer got a floor")
 	}
 }
 

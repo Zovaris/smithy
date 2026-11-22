@@ -15,6 +15,18 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   formats → `FORMATS.md`. Vendor tool names live only in warden's `references/harness.md`.
   `tests/skills.sh` fails on a SKILL.md over 80 lines (smelt 100), a reference over 120, or a
   vendor tool name outside harness.md.
+- **A/B trial frictions (r1).** smelt: one "nobody to ask" rule (hush or a launched session takes
+  its recommendation for list approval, how to run it and lessons, and records it); the exact
+  `smithy commit "<msg>" <path>...` shape; rerun `smithy stack` once a new repo has a skeleton; a
+  skeleton/CI task may ship as its own PR first; holdout runs as a single-file receipt, and a
+  spec-ambiguous decline closes it in one line. The reviewer treats the agreed spec as the
+  contract (task-file drift is advisory), defines `partial`, and skips split advice on `build
+  all`. Property tests may follow unit-tested code. `smithy comments` in CI only where smithy is
+  installed.
+- **smithy.** `route --agent` runs the adversary and security on at least mid; `task-dir` adds an
+  untracked `.smithy/config.json` to `.git/info/exclude`; `stack` prints coverage only when a
+  vitest coverage provider is installed; `receipt list` shows a one-string command bare; a failed
+  `smithy commit` ends with its error line.
 
 ## v0.11.0 — 2026-11-21
 

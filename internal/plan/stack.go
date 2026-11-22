@@ -152,7 +152,10 @@ func Stack(dir string) []Line {
 			}
 		}
 		if r.dep("vitest") {
-			single, cov = "npx vitest run <file>", "npx vitest run --coverage --changed"
+			single = "npx vitest run <file>"
+			if r.dep("@vitest/coverage-v8") || r.dep("@vitest/coverage-istanbul") {
+				cov = "npx vitest run --coverage --changed"
+			}
 		} else if r.dep("jest") {
 			single, cov = "npx jest <file>", "npx jest --coverage --changedSince=<base>"
 		}

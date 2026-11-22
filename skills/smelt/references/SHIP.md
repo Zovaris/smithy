@@ -53,5 +53,6 @@ else update the docs the change touched (`references/DOCS.md`). Then:
   code, a test or the repo's docs.
   A lesson that can be a lint rule, a test or a script is proposed as that, not as prose. Each
   goes through the retro rules (`references/DOCS.md`) and nothing is written without the user's
-  yes; under hush the lessons are only listed in the report. Nothing with evidence → say
+  yes; with nobody to ask (hush included) they are listed in the report and "Decided without
+  you", and nothing is written. Nothing with evidence → say
   "no lesson".
