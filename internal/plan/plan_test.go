@@ -68,6 +68,9 @@ func TestStack(t *testing.T) {
 			"typecheck": "npx tsc --noEmit", "lint": "pnpm run lint", "e2e": "npx playwright test",
 			"property": "fast-check", "coverage": "npx vitest run --coverage --changed", "dev": "", "adrs": "2",
 		}},
+		{"node-test", map[string]string{
+			"package.json": `{"scripts":{"test":"node --test"}}`,
+		}, map[string]string{"test": "npm test", "single": "node --test <file>"}},
 		{"python", map[string]string{
 			"pyproject.toml":       "[project]\ndependencies = [\"Mypy\", \"ruff\"]\n# pyright\n",
 			"requirements-dev.txt": "hypothesis\ncosmic-ray\n",

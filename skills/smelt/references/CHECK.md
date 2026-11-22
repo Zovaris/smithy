@@ -54,7 +54,7 @@ implementer): fix from the finding (input, expected, actual), re-deriving its ex
 before writing the red test (the adversary can be wrong). After the fixes, run it once on the
 final tree: `smithy receipt run --claim holdout -- <single-file command from smithy stack>
 <zz file>`. Failing it is blocking, unless its finding was declined as spec-ambiguous: then
-one line in the PR's dispositions closes it, and its declined tests may be dropped. Copies of
+one line in the PR's dispositions closes it, and its declined tests may be dropped. The holdout receipt stays on that commit (one behind the copies); it still goes in the PR table. Copies of
 its cases are written only after that run (copy the rest as is, with type and lint fix-ups).
 During check, typecheck and lint receipts run with the `zz_` files moved to the system temp
 dir, never anywhere inside the repo (runners scan dot dirs too); before commit they are deleted.

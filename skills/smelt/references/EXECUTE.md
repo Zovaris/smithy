@@ -62,6 +62,6 @@ Decisions that come up without the user, by impact:
   irreversible): the user decides.
 
 Every decision made without the user is one line in `<dir>/rulings.md`:
-`- NN · <question> → <choice> (why)`. Rulings bind later tasks (pass the relevant ones in each
+`- NN · <question> → <choice> (why)`, with its exact boundary ("multi-column rows only"): agents grade against the words. Rulings bind later tasks (pass the relevant ones in each
 brief) and become the PR's "Decided without you". A ruling that turns out to be the user's call
 goes to them before ship.

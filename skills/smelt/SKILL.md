@@ -50,7 +50,7 @@ Say the speed and phases in one line first (a launched agent: in its report).
 | Docs | ADR only if forced | glossary/ADR when they apply | + retro |
 
 **Risky** (auth, money, personal data, input parsing, file or shell access, secrets) adds the
-security agent at any speed; it never raises the speed. A prose-only change (docs, skill text)
+security agent at any speed, on top of the speed's agents; it never raises the speed. A prose-only change (docs, skill text)
 gets no test agents: its seam is the doc lint, its review is Spec-check alone. Property and mutation
 need a tool `smithy stack` shows, else "not applicable".
 
@@ -58,7 +58,7 @@ need a tool `smithy stack` shows, else "not applicable".
 
 | Phase | Do | Done when |
 |---|---|---|
-| **0 context** (always) | Read AGENTS.md / CLAUDE.md, CONTRIBUTING.md, `docs/GLOSSARY.md`, ADR titles, `docs/agents/STANDARDS.md`, the spec (ledger's context rules if installed). Run `smithy stack` once and use its commands (new repo: run it again once the skeleton exists). Note if you're in a worktree. Run the suite once as baseline. | you can name the seams and the baseline result (pre-existing failures named) |
+| **0 context** (always) | Read AGENTS.md / CLAUDE.md, CONTRIBUTING.md, `docs/GLOSSARY.md`, ADR titles, `docs/agents/STANDARDS.md`, the spec (ledger's context rules if installed). Run `smithy stack` once and use its commands (new repo: run it again once the skeleton exists). Note if you're in a worktree; on the default branch, create the work branch now (`smithy names branch`). Run the suite once as baseline. | you can name the seams and the baseline result (pre-existing failures named) |
 | **plan** | At plan: read `references/BRAINSTORM.md`, then `references/GRILLING.md`. Why → 2–3 approaches the user picks → design → remaining decisions. Facts via scout; ADR candidates go to ledger's `adr` mode once the user confirms (else `references/DOCS.md`). | the user approved the design and decisions |
 | **spec** | At spec: read `references/SPEC.md`, then `references/TASKS.md`. Spec with agreed seams; > 8 criteria or open questions → `agents/builder.md`. Tracer-bullet tasks; ask: here all, here one at a time, warden, or later. | spec + tasks written, each fits one fresh context; the user chose |
 | **build** | At build: read `references/TDD.md`. From a task file: `smithy tasks set <file> status=doing`. One test at a time; single files while working, full suite at the end. | VERIFY: suite, typecheck, lint green; every criterion has a test |
