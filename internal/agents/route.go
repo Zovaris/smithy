@@ -14,7 +14,8 @@ import (
 const routeUsage = `Model router: picks the cheapest model tier that can do a task well, from the task itself.
   smithy route [--file <task.md>] [--text "<task words>"] [--board <owner/repo#n>] [--batch] [--kind ship|scout|review|fix|tend|test]
                [--agent <agent file or name>] [--speed fast|normal|full] [--domain "<nouns>"] [--json]
---board reads the issue's title and body with gh, so its own words (money, auth) count; --batch
+--board reads the issue's title and body with gh, so its own words (money, auth) count (without gh:
+a warning, then --text/--file only); --batch
 is the warden's batch check: never below mid.
 --domain is a comma list of the product's own nouns (secret for a secret scanner) that never
 count as risk; config key route.domain (smithy config set --repo route.domain "...") is the default.
@@ -29,7 +30,7 @@ Tiers: cheap (mechanical, read-only, small), mid (most feature work), strong (ri
 cross-cutting, or the last fix round).`
 
 var (
-	risky   = []string{"auth", "login", "password", "secret", "access token", "auth token", "api token", "api key", "permission", "security", "payment", "billing", "money", "invoice", "migration", "schema", "database", "concurren", "race condition", "lock contention", "deadlock", "mutex", "crypto", "encrypt", "data loss", "delete user", "production", "public api", "injection", "untrusted"}
+	risky   = []string{"auth", "login", "password", "secret", "access token", "auth token", "api token", "api key", "permission", "security", "payment", "billing", "money", "invoice", "migration", "schema", "database", "concurren", "race condition", "lock contention", "deadlock", "mutex", "crypto", "encrypt", "data loss", "delete user", "production", "public api", "sql injection", "command injection", "prompt injection", "formula injection", "untrusted", "personal data", "pii", "input parsing", "file access", "file upload", "path traversal", "shell access", "shell command"}
 	hard    = []string{"architecture", "redesign", "refactor", "performance", "investigate", "root cause", "why does", "ambiguous", "trade-off", "cross-cutting", "rewrite", "remake", "protocol", "parser", "compiler", "algorithm"}
 	prose   = []string{"doc", "docs", "documentation", "readme", "contributing", "changelog", "guide", "adr", "wording"}
 	trivial = []string{"typo", "copy change", "wording", "rename", "bump", "version", "color", "colour", "style tweak", "readme", "comment", "lint", "format"}
@@ -44,7 +45,13 @@ var (
 // Tiers are the model tiers, cheapest first.
 var Tiers = []string{"cheap", "mid", "strong"}
 
+// whole are risky words that must not match longer words (auth, not author).
+var whole = map[string]string{"auth": `(?:n|z|entication|enticate|orization|orize)?\b`, "pii": `\b`}
+
 func suffix(w string) string {
+	if t, ok := whole[w]; ok {
+		return t
+	}
 	for _, p := range prose {
 		if p == w {
 			return `s?\b`
@@ -60,7 +67,11 @@ var negated = regexp.MustCompile(`(?i)\b(no|without|never|zero)\s+(\w+\s+){0,1}$
 func matches(low string, words []string) []string {
 	var out []string
 	for _, w := range words {
-		re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(w) + suffix(w) + `\w*`)
+		tail := `\w*`
+		if _, ok := whole[w]; ok {
+			tail = ""
+		}
+		re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(w) + suffix(w) + tail)
 		for _, loc := range re.FindAllStringIndex(low, -1) {
 			if negated.MatchString(low[:loc[0]]) {
 				continue
@@ -283,12 +294,11 @@ func RouteMain(args []string) int {
 			fmt.Fprintf(os.Stderr, "smithy route: --board %q is not owner/repo#n\n", b)
 			return 2
 		}
-		body, err := issueText(m[1], m[2])
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "smithy route: cannot read", b+":", err)
-			return 1
+		if body, err := issueText(m[1], m[2]); err != nil {
+			fmt.Fprintln(os.Stderr, "smithy route: warning: cannot read", b, "(gh missing or signed out?); routing on --text/--file only")
+		} else {
+			text += "\n" + body
 		}
-		text += "\n" + body
 	}
 	kind, _ := opt("--kind")
 	floor := ""
@@ -313,7 +323,7 @@ func RouteMain(args []string) int {
 	if speed == "" {
 		speed = "normal"
 	}
-	if _, isAgent := opt("--agent"); strings.TrimSpace(text) == "" && !isAgent {
+	if _, isAgent := opt("--agent"); strings.TrimSpace(text) == "" && !isAgent && !has("--board") {
 		fmt.Fprintln(os.Stderr, routeUsage)
 		return 2
 	}
