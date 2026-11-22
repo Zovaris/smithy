@@ -288,10 +288,19 @@ func contains(l []string, s string) bool {
 	return false
 }
 
+const taskTemplate = "\n## What\n\n## Acceptance criteria\n- [ ] \n\n## Files\n- create:  · modify:  · test: \n\n## Interfaces\n- Consumes: \n- Produces: \n\n## Notes\n"
+
 // Add writes the next NN task file from the template and returns its path.
-func Add(dir, title, blockedBy, key string) (string, error) {
+// speed is fast, normal or full ("" means normal).
+func Add(dir, title, blockedBy, key, speed string) (string, error) {
 	if blockedBy == "" {
 		blockedBy = "none"
+	}
+	if speed == "" {
+		speed = "normal"
+	}
+	if speed != "fast" && speed != "normal" && speed != "full" {
+		return "", fmt.Errorf("unknown speed %q (fast, normal, full)", speed)
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
@@ -312,14 +321,14 @@ func Add(dir, title, blockedBy, key string) (string, error) {
 	}
 	file := filepath.Join(dir, nn+"-"+slug+".md")
 	var b strings.Builder
-	fmt.Fprintf(&b, "# %s · %s\nStatus: todo\nBlocked by: %s\nPR: -\n", nn, title, blockedBy)
+	fmt.Fprintf(&b, "# %s · %s\nStatus: todo\nBlocked by: %s\nSpeed: %s\nPR: -\n", nn, title, blockedBy, speed)
 	if key != "" {
 		fmt.Fprintf(&b, "Key: %s\n", key)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "spec.md")); err == nil {
 		b.WriteString("Spec: ./spec.md\n")
 	}
-	b.WriteString("\n## What\n\n## Acceptance criteria\n- [ ] \n")
+	b.WriteString(taskTemplate)
 	if err := os.WriteFile(file, []byte(b.String()), 0o644); err != nil {
 		return "", err
 	}
@@ -444,7 +453,7 @@ const usage = `usage: smithy tasks <command>
   next  [dir]                       first todo task whose blockers are done (exit 3 if none)
   ready [dir]                       every todo task whose blockers are done
   set   <file> key=value...         update header lines (Status, PR, Owner...)
-  add   [dir] "<title>" [--blocked-by 01,02] [--key PROJ-12]   next NN file from the template
+  add   [dir] "<title>" [--blocked-by 01,02] [--key PROJ-12] [--speed fast|normal|full]   next NN file from the full template
   board [--all]                     one line per task list and warden batch: this repo, or every repo
   where                             task dirs found for this repo
 Status: todo | doing | done | dropped. Blocked by: 01, 03 | none. PR: <url> | -`
@@ -520,7 +529,7 @@ func Main(args []string) int {
 		fmt.Println(string(b))
 	case "add":
 		var rest []string
-		blocked, key := "", ""
+		blocked, key, speed := "", "", ""
 		for i := 1; i < len(args); i++ {
 			switch args[i] {
 			case "--blocked-by":
@@ -529,12 +538,15 @@ func Main(args []string) int {
 			case "--key":
 				i++
 				key = arg(i)
+			case "--speed":
+				i++
+				speed = arg(i)
 			default:
 				rest = append(rest, args[i])
 			}
 		}
 		if len(rest) == 0 {
-			fmt.Fprintln(os.Stderr, `usage: smithy tasks add [dir] "<title>" [--blocked-by 01,02] [--key K]`)
+			fmt.Fprintln(os.Stderr, `usage: smithy tasks add [dir] "<title>" [--blocked-by 01,02] [--key K] [--speed fast|normal|full]`)
 			return 2
 		}
 		title := rest[len(rest)-1]
@@ -548,7 +560,7 @@ func Main(args []string) int {
 		if err != nil {
 			return fail(err)
 		}
-		f, err := Add(dir, title, blocked, key)
+		f, err := Add(dir, title, blocked, key, speed)
 		if err != nil {
 			return fail(err)
 		}
