@@ -5,6 +5,18 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **One check wave per batch, not per task (trial 4).** Warden workers build at smelt `fast` with
+  no agents; once the items merge, warden runs one wave at the batch's speed on the combined diff
+  and turns blocking findings into one `fix` item. `warden.mode` now defaults to `smelt normal`
+  and names that wave's speed. `build all` does the same on the branch, and builds three tasks or
+  fewer without implementer subagents.
+- **Fewer, bigger tasks; build here unless parallel pays.** TASKS.md splits only where it buys
+  parallel time, adds a `Speed:` line, and recommends building here unless two independent tasks
+  are each over ~15 minutes of agent work.
+- **Agent test files use the runner's suffix** (`zz_adversary.test.ts`), so vitest and jest pick
+  them up; receipts ignore them too.
+- **`wait-turn` runs in the background for session workers** and in the foreground only for
+  subagent workers.
 - **`route` no longer sends lockfile work to the strong tier.** `lock` matched `lockfile`; it is now
   `lock contention`, `deadlock` and `mutex`.
 - **`smithy cleanup` deletes the merged remote branch**, including when the local branch is already gone.
@@ -56,7 +68,6 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   in a row disable it until `decide.enabled` is set true again. Answers go to `~/.smithy/decide.log`.
 - `smithy pr-state` prints `action` (cleanup, fix-ci, sync-base, answer-review, wait, done); tend
   follows it.
-- smelt normal runs mutation on core logic when the repo has a mutation tool.
 - smelt VERIFY: an "it runs" check (start it once, hit the changed path) for changes to something
   that starts. Trimmed always-loaded text in smelt, worker briefs and use-smithy (setup moves to
   `references/SETUP.md`).

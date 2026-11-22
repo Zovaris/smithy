@@ -11,9 +11,10 @@ What workers are:
   those files and follow them, which works in any harness.
 - Silent: their only outputs are the status card and one closing line; they never address the
   user.
-- Mode `smelt <speed>`: they follow smelt's build phases at that speed (a `(full)` item overrides
-  it). Mode `plain`: the repo's agent instructions, else just the brief. A trivial change (copy, a
-  button, a style tweak) runs smelt `fast`: one test and the verify gate, then the PR.
+- Mode `smelt <speed>`: every worker builds at smelt `fast` (scripts and its own spec check, no
+  test or review agents); the batch's speed sets the one check wave warden runs on the combined
+  diff once the items merge (`references/acting.md`, batch check). Mode `plain`: the repo's agent
+  instructions, else just the brief.
 - Effort: `agent.effort` (default and cap medium); a harder item gets a stronger model, not more effort.
 - The prompt you spawn with is this brief's full text, never a pointer to the file.
 
@@ -46,10 +47,11 @@ requirements from the intent and the code"; out of scope if the user named it>
 ## How
 - Read <hush-skill> once if the path is set.
 - Workflow: <mode smelt: "read <smelt-skill> and follow it yourself from the build phase to ship
-  at speed <speed>, every phase in order (build test-first, the speed's test agents, review with
-  its fresh agents, verify with `smithy receipt run`, `smithy scan --base <base>`, PR body with `smithy receipt
-  list --md`); skipping a phase the speed lists is a failed task, not a shortcut; its references/,
-  agents/ and scripts/ paths are relative to its folder.
+  at speed fast, every phase in order (build test-first, check the diff against its
+  agents/spec-check.md yourself, verify with `smithy receipt run`, `smithy scan --base <base>`, PR
+  body with `smithy receipt list --md`). Launch no test or review agents: the warden runs one
+  check wave on the whole batch after the merges. Skipping a phase is a failed task, not a
+  shortcut; its references/, agents/ and scripts/ paths are relative to its folder.
   Don't try to invoke it as a slash command." | mode plain: "work the way the repo's agent instructions
   (AGENTS.md / CLAUDE.md) say: tests for what you change, typecheck and lint green.">
 <committed repo task file (docs/specs): "- In your branch, set the task file's `Status: done` and `PR: <url>`
@@ -58,8 +60,10 @@ requirements from the intent and the code"; out of scope if the user named it>
   its folder between calls, so start every command with `cd <worktree> &&`. Then check `pwd -P` and `git rev-parse --show-toplevel` equal <worktree> and the branch
   is <branch>. If not: state=blocked note=wrong-worktree, stop.
 <has prereqs or the batch is full: "- Then wait for your turn: run `<warden-dir>/scripts/smithy wait-turn
-  <batch> <id> 9` in the foreground (a subagent can't be woken from the background; see `references/harness.md`) and wait for it to end (no tokens while it waits; never
-  poll); exit 4 means run it again, exit 0 means go. When it says go, set `state=working`,
+  <batch> <id> <50 for a session worker | 9 for a subagent worker>` <session worker: "in the
+  background" | subagent worker: "in the foreground (a subagent can't be woken from the
+  background)"> and wait for it to end (no tokens while it waits; never poll); exit 4 means run
+  it again, exit 0 means go. When it says go, set `state=working`,
   `git fetch origin && git merge origin/<base>` (or the prereq's branch when stacked) so you
   start from the merged prereqs.">
 <relaunch: "- This is a relaunch. Read <batch-dir>/<id>.inbox.md first if it exists. Before any

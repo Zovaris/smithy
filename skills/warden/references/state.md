@@ -5,12 +5,16 @@ feature slug). No secrets or client data in it.
 
 ## batch.json (yours)
 
-`{"batch","repo","max","stack","production","mode","merge","cleanup","tasks_dir","items":[{"id","title","kind",
+`{"batch","repo","max","stack","production","mode","base_sha","merge","cleanup","tasks_dir","items":[{"id","title","kind",
 "intent","source","speed","model","base","prereqs","merge","branch","worktree","session","hold",
 "launches"}]}`
 
 - `intent`: the user's own words for the task, verbatim, never rewritten or enriched (for a task
   file or board item: its path or key, which the worker reads). Later asks are appended verbatim.
+- `base_sha`: `{"<base>": "<sha>"}`, each base's `origin/<base>` commit at launch; the batch
+  check reviews everything after it.
+- `speed`: the item's smelt speed as asked (`(full)`); workers still build at `fast`, and the
+  batch check runs at the highest speed among the items.
 - `stack`: boolean, default false (wait for the prereq to merge); see SKILL.md Defaults.
 - `production`: the production branch name, from the user's answer to the plan-line question or
   an obvious repo convention; `""` when no base in the batch is production.

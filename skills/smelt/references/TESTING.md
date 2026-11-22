@@ -2,8 +2,9 @@
 
 Launch each as a fresh **subagent**: prompt = the agent file's text, a `## You get` block with
 exactly what the file lists, and the report contract below. Agents that write tests work in
-your tree, in new files named `zz_<agent>_test.*` (or the language's equivalent) next to the
-existing tests: no WIP commit, no extra worktree. Their tests are input, not files to ship: move
+your tree, in new files named `zz_<agent>` plus the suffix the repo's test runner picks up by
+default (`zz_<agent>_test.go`, `zz_<agent>_test.py`, `zz_<agent>.test.ts` for vitest or jest) next to the
+existing tests: no WIP commit, no extra worktree (warden's batch check gives them a fresh worktree of the base). Their tests are input, not files to ship: move
 the cases worth keeping into the repo's existing test files in its own naming, drop the rest and
 any reference to the agent or its spec, and never commit an agent's file as is. The adversary's
 file is the holdout (below): keep it untouched until its final run; cases you keep are copies

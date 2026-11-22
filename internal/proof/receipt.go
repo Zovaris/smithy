@@ -52,7 +52,7 @@ func receiptsPath(root string) string { return filepath.Join(root, ".smelt", "re
 
 func head(root string) (string, bool) {
 	sha, _ := ghx.Run("git", "-C", root, "rev-parse", "HEAD")
-	st, _ := ghx.Run("git", "-C", root, "status", "--porcelain", "--", ".", ":(exclude).smelt", ":(exclude).smithy/config.json", ":(exclude,glob)**/zz_*_test.*", ":(exclude,glob)**/zz_*_test")
+	st, _ := ghx.Run("git", "-C", root, "status", "--porcelain", "--", ".", ":(exclude).smelt", ":(exclude).smithy/config.json", ":(exclude,glob)**/zz_*_test.*", ":(exclude,glob)**/zz_*_test", ":(exclude,glob)**/zz_*.test.*", ":(exclude,glob)**/zz_*.spec.*")
 	return sha, st != ""
 }
 
