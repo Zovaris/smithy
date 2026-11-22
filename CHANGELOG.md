@@ -5,8 +5,10 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.12.0 — 2026-11-22
+
 - **Full audit fixes.** `warden.max` falls back to 5 in `smithy wait-turn`, matching the
-  config default and docs. Skills: use-smithy owns the stop list (hush and smelt point to it),
+  config default and docs. Skills: use-smithy owns the stop list (smelt points to it; hush keeps a copy since it installs alone),
   impact levels, merge and wait rules live in one place each, VERIFY allows working-tree
   receipts before ship, smelt README phases and speeds match SKILL.md, ADR format points to
   ledger, tend's inbox is `smithy task-dir inbox`, scout reports go to `<batch-dir>/<id>/report.md`,

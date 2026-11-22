@@ -47,25 +47,6 @@ Pick every skill (at least `use-smithy`) and the agents to install to. Then, in 
 
 ![How the smithy skills work together](docs/flow.svg)
 
-One change, end to end:
-
-```mermaid
-flowchart LR
-    idea([Your idea]) --> route{use-smithy}
-    route -->|one task| spec[smelt: plan and spec<br/>you approve]
-    route -->|many tasks| tasks[Task list<br/>NN-slug.md]
-    spec --> tasks
-    tasks -->|one at a time| build[smelt: failing test first,<br/>then the code]
-    tasks -->|in parallel, after your yes| warden[warden: one silent worker<br/>per task, own worktree]
-    warden --> build
-    build --> check[Independent checks:<br/>adversary tests, reviewer,<br/>security when risky]
-    check --> proof[Receipts and secret scan]
-    proof --> pr[Pull request]
-    pr --> tend[tend: CI, rebases,<br/>review threads]
-    tend --> merge([Merged, worktree removed])
-    merge --> lessons[Up to 3 lessons,<br/>kept only with your yes]
-```
-
 - **use-smithy** is loaded by the agent on its own and routes each piece of work to the skill that
   fits.
 - **smelt** and **warden** share one task list (`NN-<slug>.md` files with status, blockers and PR),
@@ -158,7 +139,7 @@ them, with defaults, are in [docs/settings.md](docs/settings.md).
 
 ```bash
 npx skills add Zovaris/smithy -g -y --skill '*' -a claude-code -a codex   # no prompts
-npx skills add Zovaris/smithy@v0.11.0 -g                                   # pin a release
+npx skills add Zovaris/smithy@v0.12.0 -g                                   # pin a release
 npx skills update -g                                                      # update
 ```
 
