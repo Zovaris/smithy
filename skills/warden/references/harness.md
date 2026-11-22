@@ -3,8 +3,8 @@
 The only file in these skills that names vendor tools. The loop uses five operations;
 `smithy harness` prints the adapter (`any`, `cli` or `desktop`). If you clearly have tools it
 didn't detect, use the matching row. State lives in the batch dir and git, so any harness can
-pick up a batch. Always write the brief to `<batch-dir>/<id>.brief.md` before spawning: a respawn
-reuses it.
+pick up a batch. Always render the brief (`smithy brief <batch> <id>`, writing `<batch-dir>/<id>.brief.md`)
+before spawning: a respawn reuses it; a relaunch renders it again (`references/acting.md`, stuck).
 
 ## Default: any harness
 
@@ -36,13 +36,13 @@ When **spawn** is refused and no headless CLI is signed in (`smithy agent --bg` 
 run each worker as a background subagent of this session with the prompt `Read
 <batch-dir>/<id>.brief.md and follow it exactly.` Cards stay the channel; **tell** is a message to that subagent, **end** its stop.
 Workers die with this session: say so in the plan line. Such a worker can't be woken from the
-background, so its brief runs `smithy wait-turn` in the foreground.
+background, so render its brief with `smithy brief <batch> <id> --subagent` (wait-turn in the foreground).
 
 ## Per-harness details
 
 | Harness | spawn · tell · end | wake | channel line | Notes |
 |---|---|---|---|---|
-| Claude Code CLI | `claude --bg -n "warden <batch> <id>" [--model <m>] "<brief>"` · `SendMessage` to its address · `claude stop <id>` + `claude rm <id>` | `smithy wait` with `run_in_background` | "Send it to the warden with SendMessage, to: <name>." | Your name: `ListAgents` prints "This session is <name>"; the brief's channel line is "Send it to the warden with SendMessage, to: <name>". Launch from the workspace root with this session's `--permission-mode`. `claude agents --json` lists workers. Subagent: Agent tool. No PR auto-fix (verify on each wake). Unattended flag: `claude -p --permission-mode auto` |
+| Claude Code CLI | `claude --bg -n "warden <batch> <id>" [--model <m>] "<brief>"` · `SendMessage` to its address · `claude stop <id>` + `claude rm <id>` | `smithy wait` with `run_in_background` | "Send it to the warden with SendMessage, to: <name>." | Your name: `ListAgents` prints "This session is <name>"; render briefs with `smithy brief <batch> <id> --to <name>`. Launch from the workspace root with this session's `--permission-mode`. `claude agents --json` lists workers. Subagent: Agent tool. No PR auto-fix (verify on each wake). Unattended flag: `claude -p --permission-mode auto` |
 | Claude Code desktop (optional) | `start_session` · `SendMessage` to its `local_…` id · `archive_session` | `smithy wait` with `run_in_background` | "Put it in the card's note." | Below |
 | Codex | `codex exec` (git dir writable, network on) · resume (`codex exec resume <id>`) untested | foreground | "Put it in the card's note." | subagent: `spawn_agent` |
 | OpenCode | `opencode run --standalone --auto` | resumes on background exit | "Put it in the card's note." | has subagents |

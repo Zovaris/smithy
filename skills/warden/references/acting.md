@@ -34,8 +34,8 @@ yourself: `smithy cards set <batch> <id> state=working decision_key=`. Log low a
   `gh pr update-branch <pr>` when its worker has finished, else (or on a conflict) **tell** its worker to merge the base, then verify them again. Refused → list
   it with the doctor's permission hint.
   Production without that yes, or merge manual → card `state=ready`, listed for the user.
-- `pending`: wait on every pending PR of the batch in one call, `smithy wait pr:<a> pr:<b> …`
-  (no tokens while it waits), then verify the ones it names.
+- `pending`: nothing to start; the running `smithy wait batch:<batch>` also wakes when a card's
+  PR turns green, red or conflicting, then verify the ones it names.
 - A `ready` card with `note=no-github-pr` has no PR to verify: list its branch for the user.
 - `draft`: green but still a draft; list it for the user, never merge it.
 - `unpushed` or `red`: **tell** the worker in one line (a red check names its failing job); a
@@ -94,8 +94,8 @@ line each, grouped as **Decisions** and **Followups**, each with the PR it came 
 Recovery ladder, one rung per wake:
 1. Answer from the intent if the note asks something it settles.
 2. One corrective line to the worker (**tell**).
-3. Relaunch in the **same worktree** with the brief's relaunch line, only while the item's
-   `launches` is below 3 (first launch included).
+3. Relaunch in the **same worktree**, only while the item's `launches` is below 3 (first launch
+   included): bump `launches`, then `smithy brief <batch> <id>` again (it adds the relaunch line).
 4. At the cap, set the card `state=blocked` and tell the user
    with the `note`; the item stays listed as blocked until they act.
 

@@ -97,3 +97,63 @@ func SkillsMain(args []string) int {
 	fmt.Println(p)
 	return 0
 }
+
+// HarnessSkillDirs lists the folders the harness h loads skills from: its user folders first,
+// then the repo at top (each harness reads its own repo folders, not every one); nil when the
+// harness is unknown.
+func HarnessSkillDirs(h, top, home string, getenv func(string) string) []string {
+	agents := filepath.Join(home, ".agents", "skills")
+	var user, repo []string
+	switch h {
+	case "claude-cli", "claude-desktop":
+		user, repo = []string{filepath.Join(home, ".claude", "skills")}, []string{".claude"}
+	case "codex":
+		user, repo = []string{agents, filepath.Join(home, ".codex", "skills")}, []string{".agents"}
+	case "opencode":
+		user = []string{filepath.Join(envOr(getenv, "XDG_CONFIG_HOME", filepath.Join(home, ".config")), "opencode", "skills"), filepath.Join(home, ".claude", "skills"), agents}
+		repo = []string{".opencode", ".claude", ".agents"}
+	case "gemini":
+		user, repo = []string{filepath.Join(home, ".gemini", "skills"), agents}, []string{".gemini", ".agents"}
+	case "cursor":
+		user, repo = []string{filepath.Join(home, ".cursor", "skills"), agents}, []string{".cursor", ".agents"}
+	case "pi":
+		user, repo = []string{filepath.Join(envOr(getenv, "PI_CODING_AGENT_DIR", filepath.Join(home, ".pi", "agent")), "skills"), agents}, []string{".pi", ".agents"}
+	case "dsh":
+		user, repo = []string{filepath.Join(envOr(getenv, "DSH_HOME", filepath.Join(home, ".dsh")), "skills"), agents}, []string{".agents"}
+	default:
+		return nil
+	}
+	if top != "" {
+		for _, r := range repo {
+			user = append(user, filepath.Join(top, r, "skills"))
+		}
+	}
+	return user
+}
+
+// MissingInHarness returns the skills installed somewhere (FindSkill) that the harness h can't
+// load, with the folder to link them into; dir is "" when h is unknown.
+func MissingInHarness(h string) (missing []string, dir string) {
+	cwd, _ := os.Getwd()
+	home := os.Getenv("HOME")
+	if home == "" {
+		home, _ = os.UserHomeDir()
+	}
+	dirs := HarnessSkillDirs(h, ghx.RepoRoot(cwd), home, os.Getenv)
+	if dirs == nil {
+		return nil, ""
+	}
+	for _, s := range Known {
+		if _, ok := FindSkill(s); !ok {
+			continue
+		}
+		seen := false
+		for _, d := range dirs {
+			seen = seen || isFile(filepath.Join(d, s, "SKILL.md"))
+		}
+		if !seen {
+			missing = append(missing, s)
+		}
+	}
+	return missing, dirs[0]
+}

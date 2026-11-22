@@ -757,3 +757,49 @@ func TestPRWatcherLegacyStatusesAreNotHeldBack(t *testing.T) {
 		t.Errorf("got %v", got)
 	}
 }
+
+func TestBatchWatcherPRs(t *testing.T) {
+	e := sandbox(t)
+	prEvery = 0
+	t.Cleanup(func() { prEvery = 30 * time.Second })
+	e.put(t, "pr.json", prFixture{rollup: green}.json())
+	writeCard(t, "b1", "a", `{"state":"pr_open","pr":"u5","updated":"`+stamp(0)+`"}`)
+	writeCard(t, "b1", "m", `{"state":"merged","pr":"u9","updated":"`+stamp(0)+`"}`)
+	w, err := newBatch("b1", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := w.poll(); got != nil {
+		t.Fatalf("a PR's state at the first read must not wake: %v", got)
+	}
+	if _, ok := w.prs["u9"]; ok {
+		t.Error("a final card's PR was watched")
+	}
+	e.put(t, "pr.json", prFixture{rollup: red}.json())
+	if got, _ := w.poll(); !reflect.DeepEqual(got, []string{"batch b1 a pr 5 checks=red failed=unit-tests u5"}) {
+		t.Errorf("red: %q", got)
+	}
+	e.put(t, "pr.json", prFixture{rollup: red, mergeable: "CONFLICTING"}.json())
+	if got, _ := w.poll(); !reflect.DeepEqual(got, []string{"batch b1 a pr 5 conflict u5"}) {
+		t.Errorf("conflict: %q", got)
+	}
+	e.put(t, "fail-pr-view", "")
+	if got, err := w.poll(); got != nil || err != nil {
+		t.Errorf("a PR read error must not end the wait: %q %v", got, err)
+	}
+	e.rm("fail-pr-view")
+	e.put(t, "pr.json", prFixture{rollup: green, mergeable: "CONFLICTING"}.json())
+	writeCard(t, "b1", "c", `{"state":"working","pr":"u7","updated":"`+stamp(0)+`"}`)
+	got, _ := w.poll()
+	if !reflect.DeepEqual(got, []string{"batch b1 a pr 5 checks=green u5", "batch b1 c pr 5 checks=green u5", "batch b1 c pr 5 conflict u5"}) {
+		t.Errorf("a PR first seen during the wait reports its state: %q", got)
+	}
+	if got, _ := w.poll(); got != nil {
+		t.Errorf("unchanged after the first sighting: %q", got)
+	}
+	e.put(t, "signedout", "")
+	off, _ := newBatch("b1", false)
+	if off.gh {
+		t.Error("signed out: PRs must not be watched")
+	}
+}
