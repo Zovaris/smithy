@@ -8,7 +8,7 @@ never reused: add `-2`, `-3` to the name.
 
 `{"batch","repo","max","stack","production","mode","base_sha","merge","cleanup","tasks_dir","items":[{"id","title","kind",
 "intent","source","speed","model","base","prereqs","merge","branch","worktree","session","hold",
-"launches"}]}`
+"launches","route","risky"}]}`
 
 - `intent`: the user's own words for the task, verbatim, never rewritten or enriched (for a task
   file or board item: its path or key, which the worker reads). Later asks are appended verbatim.
@@ -19,6 +19,8 @@ never reused: add `-2`, `-3` to the name.
 - `stack`: boolean, default false (wait for the prereq to merge); see SKILL.md Defaults.
 - `production`: the production branch name, from the user's answer to the plan-line question or
   an obvious repo convention; `""` when no base in the batch is production.
+- `route`: `debug` for a bug report (`references/intake.md`), else absent; `risky`: true when the
+  item is risky (smelt's SKILL.md), so its brief requires the security agent.
 - `launches`: starts so far, first included; at most 3 (see `acting.md`).
 - `hold`: set when the user says wait/stop for an item, cleared only by the user. A held item is
   never launched, relaunched or nudged.
