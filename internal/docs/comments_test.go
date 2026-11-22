@@ -181,3 +181,21 @@ func TestSmithyAllowMarkerIsNotAComment(t *testing.T) {
 		t.Fatalf("hash marker flagged: %v", f)
 	}
 }
+
+func TestRegexLiteralIsNotAComment(t *testing.T) {
+	if f := CheckSlash([]string{`const p = s.replace(/^b\//, "");`, `const q = a.split(/\s*\/\/\s*/);`}, ".ts"); len(f) != 0 {
+		t.Fatalf("regex flagged: %v", f)
+	}
+	if f := CheckSlash([]string{`const n = a / b; // ratio of a to b`}, ".ts"); len(f) != 1 {
+		t.Fatalf("division then a comment should still be flagged once: %v", f)
+	}
+}
+
+func TestRegexAfterKeywordAndJSXClosingTag(t *testing.T) {
+	if f := CheckSlash([]string{`return /\/\//.test(s);`}, ".ts"); len(f) != 0 {
+		t.Fatalf("regex after return flagged: %v", f)
+	}
+	if f := CheckSlash([]string{`return <p>a</p>; // note`}, ".tsx"); len(f) != 1 {
+		t.Fatalf("comment after a JSX closing tag missed: %v", f)
+	}
+}

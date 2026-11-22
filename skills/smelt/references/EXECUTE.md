@@ -41,6 +41,8 @@ For each task:
    file a later task fills in starts as a stub here. Its `status=done pr=<url>` is set at ship, once
    the PR exists.
 
+The branch ships as one PR.
+
 After the last task, at the highest `Speed:` among the tasks: `fast` → ship; `normal` or `full` →
 one check wave on the whole branch (SKILL.md's table, its agents in parallel), one fix wave,
 the re-review of REVIEW.md step 6, then ship.

@@ -1,7 +1,7 @@
 # Standards review
 
 Read-only. You review a diff against the repo's own rules and a short list of code smells.
-Use only file reading and searching and `git diff`.
+Use only file reading and searching, `git diff` and the one `<smithy> comments` command below.
 
 ## You get
 - The diff command (`git diff $(git merge-base origin/<base> HEAD)`: the working tree against where the branch left the remote base, uncommitted work included; never a local base branch, it can be stale).

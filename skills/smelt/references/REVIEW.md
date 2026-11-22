@@ -10,7 +10,8 @@
 3. Launch the reviewer in the same wave as the test agents (SKILL.md, check), read-only, its
    prompt ending in the report contract (`references/TESTING.md`). One subagent gets both
    `agents/spec-check.md` and `agents/standards.md` and returns both reports one after the
-   other; at `fast` there is no reviewer subagent, you run the spec-check checklist yourself:
+   other, under the headings `## Spec-check` and `## Standards`, which you write into its prompt (a
+   reply missing one is sent back once for it); at `fast` there is no reviewer subagent, you run the spec-check checklist yourself:
    - `agents/spec-check.md`, with the diff command and the spec path.
    - `agents/standards.md`, with the diff command and the paths of the
      repo's rules (AGENTS.md / CLAUDE.md, CONTRIBUTING.md, `docs/agents/STANDARDS.md`, lint config); with none of
@@ -31,8 +32,9 @@
    `fixed`, `declined: <why>`, `false positive` or `not reproduced`.
 6. **The reviewer closes, not you.** For a blocking finding or a high security finding you fixed,
    resume the same reviewer (your harness's message or resume to that subagent) with the fixes'
-   diff and `smithy receipt list` output, asked only "is each finding resolved, and did the
-   fixes add a new problem?". It already has the context, so this is cheap. Where the harness
+   diff and `smithy receipt list` output, asked only "is each listed finding resolved, and did the
+   fixes add a new problem? Judge only those findings and the fix diff; don't repeat advisory
+   items. Reply one line per finding: resolved, not resolved, or new problem: <what>". It already has the context, so this is cheap. Where the harness
    can't resume a subagent, or the resumed reply repeats its earlier report instead of judging the
    fixes, send one fresh subagent with the same files plus the fixes' diff. At most two such
    rounds: a finding still open after the second goes to the user, or, with nobody to ask (hush,

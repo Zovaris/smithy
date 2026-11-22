@@ -28,7 +28,7 @@ The slash form is one example: the same words in plain text work in any harness 
 | `/smelt brainstorm <idea>` | `references/BRAINSTORM.md` only: the why, approaches, a draft design |
 | `/smelt plan <idea>` | brainstorm → grill → spec → builder check (more than 8 criteria, or open questions left) → task list → ask how to run it. A spec the user already agreed skips brainstorm, grill and the builder check: straight to the task list |
 | `/smelt build next [dir]` | `smithy tasks next`, mark it `doing`, build it to `ship`, mark it `done` |
-| `/smelt build all [dir]` | `references/EXECUTE.md`: every task here in order, one check wave on the whole branch at the end |
+| `/smelt build all [dir]` | `references/EXECUTE.md`: every task here in order, one check wave on the whole branch at the end (none at `fast`) |
 | `/smelt <phase> <task>` | that phase only: `spec`, `build`, `test`, `review`, `ship`, `retro` |
 | `/smelt from <phase> <task>` | that phase to the end, e.g. `from test` on code you already wrote |
 | `/smelt debug <bug>` | `references/DEBUG.md` → build (fix) → test (`agents/regression.md`) → review → ship |
@@ -141,8 +141,8 @@ listed; the rest are named as dropped.
 - No claim without fresh evidence (`references/VERIFY.md`): every "passes" names the command
   and its result; every "an agent did it" comes with its diff.
 - Never `--no-verify`, never skip or delete a failing test to go green.
-- Keep a short task list of the phases you're running (your harness's to-do tool if it has
-  one) and tick it as you go; it is the user's progress view.
+- The top session keeps a short task list of the phases it runs (the harness's to-do tool if it
+  has one) and ticks it as it goes; it is the user's progress view.
 
 ## Red flags
 
