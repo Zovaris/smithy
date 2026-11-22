@@ -1,5 +1,7 @@
 # Grilling
 
+Nobody to ask: write the decisions straight into the spec's Decisions, and list the behaviours the request left open there, so agents treat them as settled.
+
 After the brainstorm settled the why and the approach, close the remaining decisions.
 Treat the plan as a design tree. Each round:
 

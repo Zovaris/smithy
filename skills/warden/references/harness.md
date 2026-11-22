@@ -57,6 +57,7 @@ background, so its brief runs `smithy wait-turn` in the foreground.
 |---|---|
 | Launch only in the user's turn | The app refuses `start_session` in a turn an event started (watcher exit, worker message, CI); a `PermissionRequest` hook removes the approval click, not this rule. So every worker launches in the user's turn and dependents wait in `smithy wait-turn`. |
 | Later work | A follow-up item or a third-rung relaunch from an event turn is proposed as a card (`initiation "own_initiative"`, same brief); prefer **tell**. When the user starts it, find its id with `list_sessions {"linked": true}` and record it in `batch.json`. |
+| Loading `start_session` | It may be a deferred tool: load it with the harness's tool search first. Can't load it → the subagent fallback above. The plan line says which spawn path is used. |
 | `start_session` fields | `initiation "user_asked"`, `context "fresh"`, `use_worktree false`, no `cwd`, `name` = id, `model` = routed model (omit when `-`), `wake_when_done true`, `prompt` = `Read <batch-dir>/<id>.brief.md and follow it exactly.` (full text if the harness can't read files), `background` = the batch goal; all launches in one message; record each session id. |
 | Approval hook | A `PermissionRequest` hook (matcher `mcp__ccd_session__start_session`, allow) removes the approval card; doctor checks it. |
 | Auto-end | The worker turns on the app's auto-archive for its PR; workers still `ready` at finish end when the PR closes. |

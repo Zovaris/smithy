@@ -15,8 +15,8 @@ else update the docs the change touched (`references/DOCS.md`). Then:
   `git add -A`, never `--no-verify`. Prove it before the PR, on a clean tree:
   `git rebase -x "<typecheck> && <test>" origin/<base>`, with the runner's no-tests flag in
   `<test>` (`--passWithNoTests` or its equivalent); run it only when more than one commit
-  touches source. Docs-only commits before the build file exists: start the command with
-  `[ -f <build file> ] || exit 0;`. A red commit gets a fixup, then re-run.
+  touches source. Commit a task file's status change first (a dirty tree stops the rebase). Docs-only commits before the build file exists: start the command with
+  `[ -f <build file> ] || exit 0;`, or `[ -d tests ] || exit 0;` for a language without a build file. A red commit gets a fixup, then re-run.
   A skeleton task lands as one buildable commit, so it passes too.
 - **Scan** with `smithy scan --base <base>` (a branch name resolves to `origin/<base>`) before
   anything leaves the machine: a finding is removed (and the secret rotated if it was ever pushed)
@@ -45,7 +45,7 @@ else update the docs the change touched (`references/DOCS.md`). Then:
   origin is another forge or a local repo): commit, branch, receipts and scan as above, then
   skip the PR and the wait, and say so in the final
   message (a warden worker: `state=ready note=no-github-pr`).
-- **Clean up** once merged or discarded (if `<branch>` is checked out in the main checkout,
+- **Clean up** once merged or discarded (stop any background `smithy wait` you started; if `<branch>` is checked out in the main checkout,
   `git switch <base>` there first): `smithy cleanup <repo> <branch> [<worktree>]`,
   only for worktrees and branches smelt created. It keeps work that is on no remote and no other branch; never force it.
   The merge usually comes later, from the user: `smithy cleanup` then, and it never removes a

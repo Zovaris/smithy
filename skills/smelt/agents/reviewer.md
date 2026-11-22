@@ -24,13 +24,13 @@ advisory unless it breaks the spec.
 1. For every acceptance criterion and decision in the spec: find where it's implemented and
    where it's tested.
 2. Scan the diff for behaviour the spec doesn't ask for.
-3. Flag any changed test file the task or spec doesn't name.
+3. Flag any changed test file the task or spec doesn't name; packaging, config and test-helper files that carry no behaviour are not flagged.
 4. Over about 400 changed non-test lines, add one advisory: "consider splitting" (not for a
    `build all` branch of a task list: it ships as one PR, or two when a skeleton ships first).
 Skip style, naming and structure here: Standards owns them.
 
 ## Standards: do
-1. Check the diff against every rule in the rule files. The repo's rules win over general taste.
+1. Check the diff against every rule in the rule files. The repo's rules win over general taste. Report only violations of written repo rules and correctness, never style preferences.
 2. Then these smells, only where they make the code harder to change or easier to break:
    duplicated logic, long function doing several things, shallow module, feature envy,
    primitive obsession on domain values (money, ids, dates), boolean flag parameters, hidden

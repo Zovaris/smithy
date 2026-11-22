@@ -23,10 +23,8 @@ It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `g
 (GitHub Issues via `gh` when installed, or Linear/Jira through the harness's tools) and keeps the spec where
 `tasks.commit` says. `smithy config list` shows the current values.
 
-Other places: list them in `$SMELT_TASKS_DIRS` (colon-separated) so `smithy tasks` finds them.
-
-Board tasks still get the same fields (status, blocked by, PR) in the issue body or labels; the
-spec stays in the repo or local dir and the issues link to it.
+Other places: list them in `$SMELT_TASKS_DIRS` (colon-separated). Board tasks keep the same fields
+(status, blocked by, PR) in the issue body or labels; the spec stays in the repo or local dir.
 
 ## Splitting
 
@@ -37,7 +35,7 @@ spec stays in the repo or local dir and the issues link to it.
 - **Fewest tasks that work.** One task per part that can be built and tested on its own; a
   CLI or a feature one agent builds in under an hour is 1 to 3 tasks, not one per file. Each task
   costs a warden worker and a PR (or a slice of `build all`'s one PR), so split only where it buys real parallel time.
-- Each fits one fresh context window; split anything bigger than ~1 day of human work.
+- Each fits one fresh context window (nothing bigger than ~1 day of human work).
 - `Blocked by` only for real dependencies (one task needs another's code or schema). Tasks that
   merely touch nearby files are not blocked; tasks that would edit the same lines are.
 - **Width over tidiness:** tasks run in parallel, so the wall time is the longest chain, not the
@@ -52,8 +50,7 @@ spec stays in the repo or local dir and the issues link to it.
   3. Collisions: unblocked tasks share no file, test files too (each task gets its own).
   4. Proportion: no task is a horizontal layer, none is bigger than a day, none is trivial
      enough to merge into its neighbour. A test of a stub never asserts the stub's output.
-  5. Width: the longest `Blocked by` chain, and each task's speed (its `Speed:` line: fast
-     unless it holds logic; a task file defaults to fast, a smelt session to normal).
+  5. Width: the longest `Blocked by` chain and each task's `Speed:`.
 - Show the list (number, title, one line, blocked by); wait for approval (else SKILL.md Always).
 
 ## Task file — `NN-<slug>.md`
@@ -83,8 +80,10 @@ Spec: <relative path to the spec: ./spec.md, or the agreed spec where it already
 <seams, risks>
 ```
 
-Files and Interfaces are what lets a fresh implementer (or a warden worker) start without
-reading the whole plan, and what tells you two tasks would collide.
+`Speed:` defaults to fast (a smelt session: normal): each task is small, and the check wave runs
+once, on the branch or batch, at the highest `Speed:` in the list (`build all`) or the batch's
+mode (warden). Set normal or full only on a task that holds logic. Files and Interfaces let a
+fresh implementer start without reading the plan and show where two tasks would collide.
 
 Status moves `todo → doing → done` (or `dropped` with a line saying why). Whoever starts a task
 sets `doing`; whoever lands it sets `done` and `PR`. In a repo task dir the `done` + `PR` change is

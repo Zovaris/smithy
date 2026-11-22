@@ -47,7 +47,7 @@ yourself: `smithy cards set <batch> <id> state=working decision_key=`. Log low a
 
 ## merged
 
-After `smithy verify` says `merged`: `smithy cleanup`, **end** the worker, update the source. Its
+Only after `smithy verify` says `merged` (never chain merge, cleanup and `cards set merged` without that check): `smithy cleanup`, **end** the worker, update the source. Its
 dependents are already waiting and start on their own. A `followup: <file>` in the note is work
 found after the merge: small and inside the intent → add it as an item (spawn it if this harness
 can from here, else propose it); bigger → a scope question for the user, with the other decisions.
@@ -62,7 +62,7 @@ smelt's `references/CHECK.md`) in one wave of parallel fresh-context agents on:
   task such as a skeleton shipped before the batch, `base_sha` = the commit before it), plus each
   `ready` item's `gh pr diff`;
 - the spec: the task dir's spec, else every item's intent.
-Add the security agent when any item is risky (smelt's SKILL.md). Test agents work in a fresh worktree of `origin/<base>`, never in a
+Add the security agent when any item is risky (smelt's SKILL.md). The reviewer's prompt includes the full `<smithy>` path so it can run `<smithy> comments`. Test agents work in a fresh worktree of `origin/<base>`, never in a
 worker's.
 Findings follow smelt's `references/RECEIVING.md`. The blocking ones become one new `fix` item: one worker
 (same brief, speed `fast`, intent = the findings verbatim, branch from `smithy names branch -
