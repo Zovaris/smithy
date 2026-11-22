@@ -43,7 +43,7 @@ Say the speed and phases in one line first (a launched agent: in its report).
 | For | small or clear changes, warden workers | most features and fixes | money, auth, data loss, public APIs, or asked |
 | Plan | criteria from the task | spec if none exists | brainstorm, grill, spec, builder check, tasks |
 | Build | TDD on the criteria | TDD on every behaviour | same |
-| Scripts | suite, typecheck, lint, `smithy scan` | + property tests you write if the repo has a PBT library | + the mutation tool |
+| Scripts | suite, typecheck, lint, `smithy scan` | + property tests you write (`agents/property.md`) | + the mutation tool |
 | Agents, one parallel wave | none, a security agent if risky (you run `agents/reviewer.md`, Spec-check section, yourself; its table goes in the PR body's agents section) | adversary (runtime logic; regression for a reported bug) + reviewer | adversary, property, reviewer, security, e2e if UI or served HTTP endpoints (not outbound calls); mutation as a second step, after fixes; hostile last if it runs |
 | Re-review | none | fixed blocking findings (spec rows missing/partial/wrong + Standards blocking) only, ≤ 2 rounds (`references/RECEIVING.md` step 5) | same |
 | Target | ~5 min | ~10–15 min, 2–3 agents | ~6 agents |
@@ -51,8 +51,8 @@ Say the speed and phases in one line first (a launched agent: in its report).
 
 **Risky** (auth, money, personal data, input parsing, file or shell access, secrets) adds the
 security agent at any speed, on top of the speed's agents; it never raises the speed. A prose-only change (docs, skill text)
-gets no test agents: its seam is the doc lint, its review is Spec-check alone. Property and mutation
-need a tool `smithy stack` shows, else "not applicable".
+gets no test agents: its seam is the doc lint, its review is Spec-check alone. Mutation needs a tool
+`smithy stack` shows, else "not applicable".
 
 ## Phases
 
