@@ -460,6 +460,9 @@ type batchWatcher struct {
 	seen                     map[string]string
 	prs                      map[string]*prWatcher
 	prNext                   time.Time
+	merge                    map[string]string
+	reported                 map[string]bool
+	pending                  []string
 }
 
 // prEvery spaces the PR reads of a batch wait apart; card reads stay at the batch interval.
@@ -469,10 +472,11 @@ var prEvents = opts{events: map[string]bool{"checks": true, "conflict": true, "m
 
 var final = map[string]bool{"merged": true, "reported": true, "dropped": true}
 
-// prLines polls the PR of every non-final card. PRs already on the cards when the wait started
-// are a silent baseline (a green PR left for the user must not wake every new wait); a PR first
-// seen later is reported at once when it is already green, red, conflicting, merged or closed.
-func (w *batchWatcher) prLines(rows []cards.Row) []string {
+// prLines polls the PR of every non-final card. A PR read for the first time reports a state it
+// already has (green, red, conflicting, merged, closed), unless a previous wait of this batch
+// reported it at the same head, or (at the start of the wait) the card is `ready` or its merge
+// mode isn't auto: a green PR left for the user must not wake every new wait.
+func (w *batchWatcher) prLines(rows []cards.Row, start bool) []string {
 	if !w.gh || time.Now().Before(w.prNext) {
 		return nil
 	}
@@ -485,17 +489,71 @@ func (w *batchWatcher) prLines(rows []cards.Row) []string {
 		pw, known := w.prs[r.PR]
 		if !known {
 			pw = newPR(r.PR, prEvents)
-			w.prs[r.PR] = pw
 		}
 		lines, err := pw.poll()
 		if err != nil {
 			continue
 		}
-		if !known && pw.last.mergeable == "CONFLICTING" && pw.last.state == "OPEN" {
-			lines = append(lines, fmt.Sprintf("pr %d conflict %s", pw.last.num, pw.last.url))
+		w.prs[r.PR] = pw
+		if !known {
+			lines = w.firstSight(r, pw, lines, start)
 		}
-		for _, l := range lines {
-			out = append(out, fmt.Sprintf("batch %s %s %s", w.name, r.ID, l))
+		out = append(out, w.record(r.ID, pw, lines)...)
+	}
+	return out
+}
+
+// firstSight filters the lines of a PR's first read and adds a conflict it doesn't report itself.
+func (w *batchWatcher) firstSight(r cards.Row, pw *prWatcher, lines []string, start bool) []string {
+	if start && (r.State == "ready" || w.merge[r.ID] != "auto") {
+		return nil
+	}
+	if pw.last.mergeable == "CONFLICTING" && pw.last.state == "OPEN" {
+		lines = append(lines, fmt.Sprintf("pr %d conflict %s", pw.last.num, pw.last.url))
+	}
+	var out []string
+	for _, l := range lines {
+		if !w.reported[r.ID+" "+pw.last.head+" "+l] {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// record prefixes lines with the batch and card and saves them in the batch's wait-seen.json,
+// so a relaunched wait doesn't report them again.
+func (w *batchWatcher) record(id string, pw *prWatcher, lines []string) []string {
+	var out []string
+	for _, l := range lines {
+		w.reported[id+" "+pw.last.head+" "+l] = true
+		out = append(out, fmt.Sprintf("batch %s %s %s", w.name, id, l))
+	}
+	if len(lines) > 0 {
+		keys := make([]string, 0, len(w.reported))
+		for k := range w.reported {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		if b, err := json.Marshal(keys); err == nil {
+			_ = os.WriteFile(filepath.Join(cards.Home(), w.name, "wait-seen.json"), b, 0o644)
+		}
+	}
+	return out
+}
+
+// mergeModes reads each item's merge mode (its own, else the batch's) from batch.json.
+func mergeModes(name string) map[string]string {
+	var bt struct {
+		Merge string
+		Items []struct{ ID, Merge string }
+	}
+	out := map[string]string{}
+	if b, err := os.ReadFile(filepath.Join(cards.Home(), name, "batch.json")); err == nil && json.Unmarshal(b, &bt) == nil {
+		for _, it := range bt.Items {
+			out[it.ID] = it.Merge
+			if it.Merge == "" {
+				out[it.ID] = bt.Merge
+			}
 		}
 	}
 	return out
@@ -534,16 +592,17 @@ func newBatch(name string, all bool) (*batchWatcher, error) {
 		seen[r.ID] = mark(r)
 	}
 	w := &batchWatcher{name: name, since: time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), stuckBefore: stuck(rows), all: all, seen: seen,
-		gh: ghx.Ready() == nil, prs: map[string]*prWatcher{}}
-	if w.gh {
-		for _, r := range rows {
-			if r.PR != "" && !final[r.State] {
-				pw := newPR(r.PR, prEvents)
-				if _, err := pw.poll(); err == nil {
-					w.prs[r.PR] = pw
-				}
-			}
+		gh: ghx.Ready() == nil, prs: map[string]*prWatcher{}, merge: mergeModes(name), reported: map[string]bool{}}
+	if b, err := os.ReadFile(filepath.Join(cards.Home(), name, "wait-seen.json")); err == nil {
+		var ks []string
+		_ = json.Unmarshal(b, &ks)
+		for _, k := range ks {
+			w.reported[k] = true
 		}
+	}
+	if w.gh {
+		w.pending = w.prLines(rows, true)
+		w.prNext = time.Time{}
 	}
 	return w, nil
 }
@@ -553,13 +612,15 @@ func (w *batchWatcher) poll() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var out []string
+	out := w.pending
+	w.pending = nil
 	for _, r := range rows {
-		if r.Updated != nil && *r.Updated > w.since && (w.all || (act[r.Stage] && w.seen[r.ID] != mark(r))) {
+		// A card the warden itself set to merged is not news.
+		if r.Updated != nil && *r.Updated > w.since && (w.all || (act[r.Stage] && r.State != "merged" && w.seen[r.ID] != mark(r))) {
 			out = append(out, fmt.Sprintf("batch %s %s  %s  %s  %s  %s", w.name, r.ID, r.Stage, r.Phase, r.Progress, r.Text))
 		}
 	}
-	out = append(out, w.prLines(rows)...)
+	out = append(out, w.prLines(rows, false)...)
 	if len(out) > 0 {
 		return out, nil
 	}
@@ -579,7 +640,9 @@ Targets (any mix):
   prs[:<label>]       a PR opened or updated: yours, a warden batch's, or with the label
   issues[:<label>]    an issue opened or updated with the label (default agent)
   batch:<name>        a warden card needs the warden (--all: any card change), or a card's PR
-                      turned green/red, conflicts, merged or closed; polls cards every 10 s, PRs every 30 s
+                      turned green/red, conflicts, merged or closed (already so at the start: only for
+                      merge-auto cards not ready; events in the batch's wait-seen.json are skipped);
+                      polls cards every 10 s, PRs every 30 s
   actions[:<branch>]  a workflow run on the branch (default: origin's default) finished red,
                       push, schedule or manual
   base[:<branch>]     the branch (default: origin's default) moved on origin
