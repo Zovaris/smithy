@@ -35,7 +35,8 @@ Headless workers are one-shot and can't receive messages mid-run:
 When **spawn** is refused and no headless CLI is signed in (`smithy agent --bg` fails at start),
 run each worker as a background subagent of this session with the prompt `Read
 <batch-dir>/<id>.brief.md and follow it exactly.` Cards stay the channel; **tell** is a message to that subagent, **end** its stop.
-Workers die with this session: say so in the plan line. Such a worker can't be woken from the
+Workers die with this session: doctor prints `workers: subagent fallback; they end with this
+session`; put it in the plan line. A launched session (no user turn, `start_session` refused) uses this fallback too. Such a worker can't be woken from the
 background, so render its brief with `smithy brief <batch> <id> --subagent` (wait-turn in the foreground).
 
 ## Per-harness details

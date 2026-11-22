@@ -97,11 +97,11 @@ func TestBriefRenders(t *testing.T) {
 		"PR target: main. Merge mode: auto.\n",
 		"make A work",
 		filepath.Join(e.wt, "docs", "specs", "01-a.md") + " (in your worktree; read it first",
-		"## Rulings (settled; follow them)\n- a: keep the API\n- a uses JSON\n",
+		"## Rulings (settled; follow them)\n- a: keep the API\n- b: other\n- a uses JSON\n",
 		"skills/smelt/SKILL.md and follow it",
 		"tasks set docs/specs/01-a.md status=done",
 		"`cd " + e.wt + " &&`",
-		"skills/warden/scripts/smithy cards set b1 a key=value",
+		"skills/warden/scripts/smithy' cards set b1 a key=value",
 		"Put it in the card's note.",
 		`"done: a PR <url>"`,
 	} {
@@ -109,7 +109,7 @@ func TestBriefRenders(t *testing.T) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
 	}
-	for _, bad := range []string{"{{", "[if", "[end]", "wait-turn", "relaunch", "Stacked", "- b: other", "ab: not"} {
+	for _, bad := range []string{"{{", "[if", "[end]", "wait-turn", "relaunch", "Stacked", "ab: not"} {
 		if strings.Contains(got, bad) {
 			t.Errorf("unexpected %q in:\n%s", bad, got)
 		}
@@ -131,7 +131,8 @@ func TestBriefWaitRelaunchStack(t *testing.T) {
 	got := string(b)
 	for _, want := range []string{
 		"Merge mode: auto. Stacked on a: merge only after it has merged.",
-		"wait-turn b1 b 9` in the\n  foreground",
+		"`'" + filepath.Join(skillsDir(t), "warden", "scripts", "smithy") + "' wait-turn b1 b 9`, one run per shell call",
+		"a call killed without an exit code: run it again in a new call; 0: go.\n  Exit 5 or any other: the card is blocked; end your turn. When it says go",
 		"git merge origin/feat/a`",
 		"git merge origin/main` (`origin/feat/a`\n  instead until a has merged)",
 		"Read requirements from the intent and the code.",
@@ -141,8 +142,25 @@ func TestBriefWaitRelaunchStack(t *testing.T) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
 	}
-	if strings.Contains(got, "## Rulings") || strings.Contains(got, "in the background") {
+	if strings.Contains(got, "## Rulings") || strings.Contains(got, "in the background") || strings.Contains(got, "done: b waiting") {
 		t.Errorf("unexpected:\n%s", got)
+	}
+}
+
+func skillsDir(t *testing.T) string {
+	d, _ := filepath.Abs(filepath.Join("..", "..", "skills"))
+	return d
+}
+
+func TestBriefWaitBackground(t *testing.T) {
+	e := newBrief(t, oneItem)
+	git(t, e.repo, "worktree", "add", "-q", "-b", "feat/b", e.wt+"2")
+	t.Setenv("WARDEN_HARNESS", "codex")
+	o, er, c := brief(t, "b1", "b")
+	b, _ := os.ReadFile(o)
+	got := string(b)
+	if c != 0 || !strings.Contains(got, "smithy' wait-turn b1 b 50` in the background") || !strings.Contains(got, "0: go.\n  Exit 5") || !strings.Contains(got, `"done: b waiting"`) || strings.Contains(got, "one run per shell call") {
+		t.Errorf("%d %s\n%s", c, er, got)
 	}
 }
 
@@ -188,5 +206,33 @@ func TestBriefUncommittedTaskFile(t *testing.T) {
 	got := string(b)
 	if c != 0 || !strings.Contains(got, filepath.Join(e.repo, "docs", "specs", "02-new.md")+" (read-only reference outside your worktree") || strings.Contains(got, "tasks set") {
 		t.Errorf("%d %s\n%s", c, er, got)
+	}
+}
+
+func TestBriefTaskFileIntent(t *testing.T) {
+	e := newBrief(t, strings.Replace(oneItem, `"intent":"make A work","source":"docs/specs/01-a.md"`, `"intent":"docs/specs/01-a.md"`, 1))
+	writeFile(t, filepath.Join(e.wt, "docs", "specs", "01-a.md"), "# 01\nSpec: ./spec.md\n")
+	writeFile(t, filepath.Join(e.wt, "docs", "specs", "spec.md"), "the spec")
+	writeFile(t, filepath.Join(e.repo, "docs", "specs", "rulings.md"), "- every task: stdlib only\n")
+	t.Setenv("WARDEN_HARNESS", "codex")
+	o, er, c := brief(t, "b1", "a")
+	b, _ := os.ReadFile(o)
+	got := string(b)
+	for _, want := range []string{
+		"The task's spec: " + filepath.Join(e.wt, "docs", "specs", "spec.md"),
+		"- every task: stdlib only",
+		"tasks set docs/specs/01-a.md status=done pr=",
+	} {
+		if c != 0 || !strings.Contains(got, want) {
+			t.Errorf("%d %s: missing %q in:\n%s", c, er, want, got)
+		}
+	}
+	writeFile(t, filepath.Join(e.wt, "docs", "specs", "01-a.md"), "# 01\nSpec: ./gone.md\n")
+	if _, er, c := brief(t, "b1", "a"); c != 2 || !strings.Contains(er, "gone.md") {
+		t.Errorf("a Spec: line to nothing: %d %s", c, er)
+	}
+	newBrief(t, strings.Replace(oneItem, "docs/specs/01-a.md", "docs/specs/09-none.md", 1))
+	if _, er, c := brief(t, "b1", "a"); c != 2 || !strings.Contains(er, "09-none.md") {
+		t.Errorf("a task file that resolves to nothing: %d %s", c, er)
 	}
 }

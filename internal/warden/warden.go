@@ -67,7 +67,8 @@ A launched worker whose item can't start yet waits here, inside its own session,
 prereqs are merged (or pr_open/ready with stack) and a slot is free under the batch's max.
 Then it claims the slot (state=working) and prints "go <id>".
 Exit 0 = go; 4 = still waiting after max-min (call it again: one blocking call per turn,
-under the 10-minute tool limit); 2 = usage or unknown item.`
+under the 10-minute tool limit); 5 = a prereq was dropped (card set blocked); 2 = usage or
+unknown item.`
 
 // WaitTurn runs `smithy wait-turn`.
 func WaitTurn(args []string) int {
@@ -121,7 +122,7 @@ func WaitTurn(args []string) int {
 			st := cardState(dir, pr)
 			if st == "dropped" {
 				set("state=blocked", "note=prereq "+pr+" was dropped")
-				return 0
+				return 5
 			}
 			if !(st == "merged" || p.Stack && (st == "pr_open" || st == "ready")) {
 				ready = false
@@ -258,6 +259,14 @@ func Doctor(args []string) int {
 		r.bad("no headless agent CLI on PATH (needed to spawn workers here)", "install one (claude, codex, opencode, gemini, cursor agent, pi, dsh) or set AGENT_CMD")
 	default:
 		r.warn("no headless agent CLI on PATH (only consult needs it here)", "optional: install one or set AGENT_CMD")
+	}
+	if (adapter == "any" && cli == "") || (adapter != "any" && !have("claude")) {
+		why := "no agent CLI to spawn them"
+		if adapter == "desktop" {
+			why = "no claude CLI; start_session if it loads"
+		}
+		r.warn("workers: subagent fallback; they end with this session ("+why+")",
+			"say it in the plan line; install a headless agent CLI for workers that outlive this session")
 	}
 	for _, s := range []string{"smelt", "hush", "scout", "tend", "use-smithy"} {
 		if p, ok := findSkill(s); ok {

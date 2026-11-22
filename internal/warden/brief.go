@@ -187,6 +187,39 @@ func rulingLines(id string, files ...string) []string {
 	return out
 }
 
+// pathLike says a source or intent names a file: one word with a slash or ending in .md.
+func pathLike(s string) bool {
+	s = strings.TrimSpace(s)
+	return s != "" && !strings.ContainsAny(s, " \t\n") && (strings.Contains(s, "/") || strings.HasSuffix(s, ".md"))
+}
+
+// specLine is the value of a task file's `Spec:` line ("" when absent or "-").
+func specLine(file string) string {
+	b, _ := os.ReadFile(file)
+	for _, l := range strings.Split(string(b), "\n") {
+		if v, ok := strings.CutPrefix(strings.TrimSpace(l), "Spec:"); ok {
+			if v = strings.TrimSpace(v); v != "-" {
+				return v
+			}
+		}
+	}
+	return ""
+}
+
+// allLines are the non-blank lines of the files: a task dir's rulings all bind its tasks.
+func allLines(files ...string) []string {
+	var out []string
+	for _, f := range files {
+		b, _ := os.ReadFile(f)
+		for _, l := range strings.Split(string(b), "\n") {
+			if l = strings.TrimSpace(l); l != "" {
+				out = append(out, l)
+			}
+		}
+	}
+	return out
+}
+
 // Brief runs `smithy brief`.
 func Brief(args []string) int {
 	var pos []string
@@ -302,27 +335,8 @@ func Brief(args []string) int {
 		smelt = p
 	}
 	source, spec, taskfile := it.Source, "", false
-	switch {
-	case source == "" || source == it.Intent:
-		spec = "Read requirements from the intent and the code."
-	case strings.Contains(source, "/") || strings.HasSuffix(source, ".md"):
-		if !filepath.IsAbs(source) {
-			source = filepath.Join(bt.Repo, source)
-		}
-		spec = source + " (read it first: its acceptance criteria are the spec)"
-		if rel, err := filepath.Rel(realPath(bt.Repo), realPath(source)); err == nil && !strings.HasPrefix(rel, "..") {
-			taskfile = exec.Command("git", "-C", bt.Repo, "cat-file", "-e", "origin/"+it.Base+":"+filepath.ToSlash(rel)).Run() == nil
-			if inWT := filepath.Join(it.Worktree, rel); isFile(inWT) {
-				spec = inWT + " (in your worktree; read it first: its acceptance criteria are the spec)"
-			} else {
-				spec = source + " (read-only reference outside your worktree, not on your branch; read it first: its acceptance criteria are the spec)"
-			}
-			if taskfile {
-				source = rel
-			}
-		}
-	default:
-		spec = "Board item " + source + " (read it first: its acceptance criteria are the spec)."
+	if source == "" && pathLike(it.Intent) {
+		source = it.Intent
 	}
 	var ruleFiles []string
 	if bt.TasksDir != "" {
@@ -332,7 +346,51 @@ func Brief(args []string) int {
 		}
 		ruleFiles = append(ruleFiles, filepath.Join(td, "rulings.md"))
 	}
-	rulings := rulingLines(id, append(ruleFiles, filepath.Join(dir, "decisions.md"))...)
+	switch {
+	case source == "" || source == it.Intent && !pathLike(source):
+		spec = "Read requirements from the intent and the code."
+	case pathLike(source):
+		if !filepath.IsAbs(source) {
+			source = filepath.Join(bt.Repo, source)
+		}
+		read := source
+		spec = source + " (read it first: its acceptance criteria are the spec)"
+		if rel, err := filepath.Rel(realPath(bt.Repo), realPath(source)); err == nil && !strings.HasPrefix(rel, "..") {
+			taskfile = exec.Command("git", "-C", bt.Repo, "cat-file", "-e", "origin/"+it.Base+":"+filepath.ToSlash(rel)).Run() == nil
+			if inWT := filepath.Join(it.Worktree, rel); isFile(inWT) {
+				read = inWT
+				spec = inWT + " (in your worktree; read it first: its acceptance criteria are the spec)"
+			} else {
+				spec = source + " (read-only reference outside your worktree, not on your branch; read it first: its acceptance criteria are the spec)"
+			}
+			if taskfile {
+				source = rel
+			}
+		}
+		if !isFile(read) {
+			return fail("task file %s not found (commit it, or fix source in batch.json)", read)
+		}
+		if ref := specLine(read); ref != "" {
+			if !filepath.IsAbs(ref) {
+				ref = filepath.Join(filepath.Dir(read), ref)
+			}
+			if !isFile(ref) {
+				return fail("the Spec: line of %s points at %s, which doesn't exist", read, ref)
+			}
+			spec += "\nThe task's spec: " + ref + " (read it too)."
+		}
+		if taskfile && len(ruleFiles) == 0 {
+			ruleFiles = append(ruleFiles, filepath.Join(filepath.Dir(read), "rulings.md"))
+		}
+	default:
+		spec = "Board item " + source + " (read it first: its acceptance criteria are the spec)."
+	}
+	var rulings []string
+	if taskfile {
+		rulings = append(allLines(ruleFiles...), rulingLines(id, filepath.Join(dir, "decisions.md"))...)
+	} else {
+		rulings = rulingLines(id, append(ruleFiles, filepath.Join(dir, "decisions.md"))...)
+	}
 	max := 5
 	if bt.Max != nil {
 		max = *bt.Max

@@ -104,7 +104,7 @@ func TestWaitTurn(t *testing.T) {
 		{"stack accepts pr_open", `{"stack":true,` + items + `}`, map[string]string{"a": "pr_open"}, "b", 0, "go b", "working", "start", ""},
 		{"stack accepts ready", `{"stack":true,` + items + `}`, map[string]string{"a": "ready"}, "b", 0, "go b", "working", "start", ""},
 		{"stack still waits on working", `{"stack":true,` + items + `}`, map[string]string{"a": "working"}, "b", 4, "waiting b", "waiting", "waiting", ""},
-		{"dropped prereq blocks", `{` + items + `}`, map[string]string{"a": "dropped"}, "d", 0, "", "blocked", "waiting", "prereq a was dropped"},
+		{"dropped prereq blocks", `{` + items + `}`, map[string]string{"a": "dropped"}, "d", 5, "", "blocked", "waiting", "prereq a was dropped"},
 		{"slot limit by max", `{"max":1,` + items + `}`, map[string]string{"a": "merged", "c": "working"}, "b", 4, "waiting b", "waiting", "waiting", ""},
 		{"slot free under max", `{"max":2,` + items + `}`, map[string]string{"a": "merged", "c": "working"}, "b", 0, "go b", "working", "start", ""},
 		{"max zero never starts", `{"max":0,` + items + `}`, nil, "c", 4, "waiting c", "waiting", "waiting", ""},

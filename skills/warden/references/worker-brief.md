@@ -15,8 +15,8 @@ What workers are:
 
 Template: `{{x}}` is filled, `[if x]`…`[end]` kept only when x holds (`!x`: when not); `intent`
 is copied verbatim, never summarized or given added requirements, plans or criteria; rulings
-never go to reviewers; `rulings`: lines of the task dir's `rulings.md` and
-`<batch-dir>/decisions.md` naming the id; `taskfile`: the source is a file committed on the base; `wait`: prereqs, or past `max`
+never go to reviewers; `rulings`: every line of the task dir's `rulings.md` when the source (or a path intent) is a
+committed task file, else its lines naming the id, plus `<batch-dir>/decisions.md` lines naming the id; `taskfile`: that committed file (its `Spec:` line goes into Spec); `wait`: prereqs, or past `max`
 among items without prereqs on a first launch; `relaunch`: `launches` > 0.
 
 ```
@@ -54,7 +54,7 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
 [if !smelt]- Workflow: the repo's agent instructions (AGENTS.md / CLAUDE.md), else just this brief: tests for what you change, typecheck and lint green.
 [end][if taskfile]
 - In your branch, set the task file's `Status: done` and `PR: <url>`
-  (`{{smithy}} tasks set {{source}} status=done pr=<url>`) once the PR exists, as a follow-up
+  (`'{{smithy}}' tasks set {{source}} status=done pr=<url>`) once the PR exists, as a follow-up
   commit on the PR branch.
 [end]
 - First step: `cd {{worktree}}`. Your session may start in another folder and the shell may reset
@@ -63,11 +63,11 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
   state=blocked note=wrong-worktree, stop. A fresh worktree has no dependencies: install them with
   the lockfile command (`npm ci`, `go mod download`, `uv sync`) so a red test fails for the right reason.
 [if wait]
-- Then wait for your turn: run `{{smithy}} wait-turn {{batch}} {{id}} {{minutes}}` [if !subagent]in the background[end][if subagent]in the
-  foreground with your shell tool's longest timeout (an in-session worker can't be woken from
-  the background)[end] and wait for it to end (no tokens while it waits; never poll); exit 4 means run it again, exit 0
-  means go. When it says go, set `state=working`, `git fetch origin && git merge origin/{{from}}`
-  so you start from the merged prereqs.
+[if !subagent]- Then wait for your turn: run `'{{smithy}}' wait-turn {{batch}} {{id}} {{minutes}}` in the background and wait
+  for it to end (no tokens while it waits; never poll); exit 4: run it again; 0: go.[end][if subagent]- Then wait for your turn: `'{{smithy}}' wait-turn {{batch}} {{id}} {{minutes}}`, one run per shell call, in the
+  foreground (never background: nothing can wake you). Exit 4, or a call killed without an exit code: run it again in a new call; 0: go.[end]
+  Exit 5 or any other: the card is blocked; end your turn. When it says go, set
+  `state=working`, `git fetch origin && git merge origin/{{from}}` so you start from the merged prereqs.
 [end]
 [if relaunch]
 - This is a relaunch. Read {{batchdir}}/{{id}}.inbox.md first if it exists. Before any outside
@@ -76,9 +76,9 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
 [end]
 - Stay current with the base: `git fetch origin && git merge origin/{{base}}`[if stack] (`origin/{{from}}`
   instead until {{prereq}} has merged)[end] (resolve, run the tests) before opening the PR. Other PRs merge into the same base while you work.
-- Commits: `{{smithy}} commit style` once, then one atomic commit per concern with
-  `{{smithy}} commit "<msg>" <paths>` in that style. PR: `{{smithy}} pr template`; fill every
-  heading of the template if there is one, then `{{smithy}} pr create --base {{base}} --title "<t>"
+- Commits: `'{{smithy}}' commit style` once, then one atomic commit per concern with
+  `'{{smithy}}' commit "<msg>" <paths>` in that style. PR: `'{{smithy}}' pr template`; fill every
+  heading of the template if there is one, then `'{{smithy}}' pr create --base {{base}} --title "<t>"
   --body-file <f>`. Write the PR body file inside {{worktree}}/.smelt/ or the system temp dir,
   never next to the worktree. Never `git add -A` or `--no-verify`; skip any preview, nobody answers.
 - Scope: stop only when the change would break callers, change what a module is responsible
@@ -88,7 +88,7 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
   Do not create worktrees or issues; never start, fork or hand off sessions.
 
 ## Status card
-`{{smithy}} cards set {{batch}} {{id}} key=value…` at every phase change and before
+`'{{smithy}}' cards set {{batch}} {{id}} key=value…` at every phase change and before
 every end of turn. `state` is one of: waiting, working, needs_decision, blocked, failed, pr_open,
 ready, merged, dropped, reported. Keep `progress` as <done>/<total> of your task list and `phase`
 as the current step.
@@ -101,7 +101,7 @@ as the current step.
   never merge: the warden waits on every PR's CI at once, merges, and comes back to you only
   if CI goes red or the base moves. A draft or unfinished PR is state=blocked, never pr_open.
 - Work found after your PR merged: small and inside this task's intent (a missed case, a typo, a
-  failing edge test) → fix it yourself in a follow-up PR from a new branch `{{smithy}} names branch <key> "<title>" fix`, same
+  failing edge test) → fix it yourself in a follow-up PR from a new branch `'{{smithy}}' names branch <key> "<title>" fix`, same
   rules. Anything bigger or outside the intent → write it as a new task file `NN-<slug>.md` in
   the task dir (or `{{batchdir}}/followups/` without one), keep your card `merged`, and name it in
   the note: `followup: <file>`. The warden decides whether it becomes a task.
@@ -116,5 +116,5 @@ as the current step.
 {{channel}}
 End each turn with exactly one line and nothing else:
 "done: {{id}} PR <url>" | "done: {{id}} ready <url or branch>" | "done: {{id}} reported" |
-"done: {{id}} decide: <question>" | "done: {{id}} blocked: <why>".
+"done: {{id}} decide: <question>" | "done: {{id}} blocked: <why>"[if wait][if !subagent] | "done: {{id}} waiting" (parked in wait-turn)[end][end].
 ```

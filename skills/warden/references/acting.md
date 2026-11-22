@@ -64,10 +64,14 @@ smelt's `references/CHECK.md`) in one wave of parallel fresh-context agents on:
 - the spec: the task dir's spec, else every item's intent.
 Add the security agent when any item is risky (smelt's SKILL.md). The reviewer's prompt includes the full `<smithy>` path so it can run `<smithy> comments`. Test agents work in a fresh worktree of `origin/<base>`, never in a
 worker's.
+A whole batch is never a cheap review: route each agent with `smithy route --agent <agent> --text
+"<batch goal>" --speed <batch speed>` and run the reviewer on at least `mid`; every prompt
+names the repo's test command (from AGENTS.md / CI) so findings come with a failing run.
 Findings follow smelt's `references/RECEIVING.md`. The blocking ones become one new `fix` item: one worker
 (same brief, speed `fast`, intent = the findings verbatim, branch from `smithy names branch -
 "<batch> review" fix`), one PR, merged like the others; then smelt's re-review (smelt's `references/RECEIVING.md`, step 5)
-at the fix's commit. You write the fix PR's dispositions (every finding, including declined
+at the fix's commit. Before merging the fix PR, run any `zz_` holdout test in a fresh
+worktree of `origin/<fix-branch>`. You write the fix PR's dispositions (every finding, including declined
 ones and why) in its body. A high security finding also goes to the user. Non-blocking ones
 go under **Followups**.
 
@@ -90,6 +94,9 @@ line each, grouped as **Decisions** and **Followups**, each with the PR it came 
 `smithy cleanup`, **end** the worker.
 
 ## stuck (`blocked`, `failed`, or no card update for 45 min)
+
+A session (background) worker whose closing line is `done: <id> waiting` is parked in `smithy wait-turn`: its stage is
+`waiting`, not stuck; nothing to do until its turn comes.
 
 Recovery ladder, one rung per wake:
 1. Answer from the intent if the note asks something it settles.
