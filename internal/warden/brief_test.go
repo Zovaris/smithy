@@ -101,7 +101,7 @@ func TestBriefRenders(t *testing.T) {
 		"skills/smelt/SKILL.md and follow it",
 		"tasks set docs/specs/01-a.md status=done",
 		"`cd " + e.wt + " &&`",
-		"skills/warden/scripts/smithy cards set b1 a key=value",
+		"skills/warden/scripts/smithy' cards set b1 a key=value",
 		"Put it in the card's note.",
 		`"done: a PR <url>"`,
 	} {
@@ -131,9 +131,8 @@ func TestBriefWaitRelaunchStack(t *testing.T) {
 	got := string(b)
 	for _, want := range []string{
 		"Merge mode: auto. Stacked on a: merge only after it has merged.",
-		"ONE foreground shell call",
-		"rc=4; while [ $rc -eq 4 ]; do " + filepath.Join(skillsDir(t), "warden", "scripts", "smithy") + " wait-turn b1 b 9; rc=$?; done; echo rc=$rc`",
-		"note=wait-turn-rc. When it says go",
+		"`'" + filepath.Join(skillsDir(t), "warden", "scripts", "smithy") + "' wait-turn b1 b 9`, one run per shell call",
+		"a call killed without an exit code: run it again in a new call; 0: go.\n  Exit 5 or any other: the card is blocked; end your turn. When it says go",
 		"git merge origin/feat/a`",
 		"git merge origin/main` (`origin/feat/a`\n  instead until a has merged)",
 		"Read requirements from the intent and the code.",
@@ -143,7 +142,7 @@ func TestBriefWaitRelaunchStack(t *testing.T) {
 			t.Errorf("missing %q in:\n%s", want, got)
 		}
 	}
-	if strings.Contains(got, "## Rulings") || strings.Contains(got, "in the background") {
+	if strings.Contains(got, "## Rulings") || strings.Contains(got, "in the background") || strings.Contains(got, "done: b waiting") {
 		t.Errorf("unexpected:\n%s", got)
 	}
 }
@@ -160,7 +159,7 @@ func TestBriefWaitBackground(t *testing.T) {
 	o, er, c := brief(t, "b1", "b")
 	b, _ := os.ReadFile(o)
 	got := string(b)
-	if c != 0 || !strings.Contains(got, "wait-turn b1 b 50` in the background") || !strings.Contains(got, "exit 0 means go. When it says go, set") || strings.Contains(got, "rc=4") {
+	if c != 0 || !strings.Contains(got, "smithy' wait-turn b1 b 50` in the background") || !strings.Contains(got, "0: go.\n  Exit 5") || !strings.Contains(got, `"done: b waiting"`) || strings.Contains(got, "one run per shell call") {
 		t.Errorf("%d %s\n%s", c, er, got)
 	}
 }
