@@ -72,8 +72,8 @@ gets no test agents: its seam is the doc lint, its review is Spec-check alone. M
   worker asks warden) and record it in the PR's "Decided without you".
 - **Nobody to ask** (hush, or a launched session): an approval or a choice (how to run a task
   list) → take your recommendation; record it in `rulings.md` (task dir; a single task:
-  `.smelt/rulings.md`) and the PR's "Decided without you". Not for security, money, personal
-  data, production, push/merge or `smithy:allow` on a real secret: stop with a `blocked:` line.
+  `.smelt/rulings.md`) and the PR's "Decided without you". Not for use-smithy's stop list (scope, public API, money, prod,
+  data, security, credentials, irreversible actions, push/merge) or `smithy:allow` on a real secret: stop with a `blocked:` line.
   Lessons: `references/SHIP.md`.
 - Command shapes: `smithy receipt run --claim "<c>" -- <cmd> <args>`; commit with
   `smithy commit "<msg>" <path>...` (never `git add` first: it wants a clean index; subject

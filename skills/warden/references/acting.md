@@ -29,7 +29,7 @@ yourself: `smithy cards set <batch> <id> state=working decision_key=`. Log low a
   usual merge method; a rebase merge refused because the branch has merge commits → a merge
   commit, never a force-push. Not mergeable (the base moved) → **tell** the worker to merge the base and push.
   Several green PRs that conflict once the first merges: merge one; for each of the rest,
-  `gh pr update-branch <pr>` when its worker has finished, else (or on a conflict) **tell** its worker to merge the base;, then verify them again. Refused → list
+  `gh pr update-branch <pr>` when its worker has finished, else (or on a conflict) **tell** its worker to merge the base, then verify them again. Refused → list
   it with the doctor's permission hint.
   Production without that yes, or merge manual → card `state=ready`, listed for the user.
 - `pending`: wait on every pending PR of the batch in one call, `smithy wait pr:<a> pr:<b> …`
