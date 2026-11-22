@@ -80,15 +80,46 @@ func TestStack(t *testing.T) {
 		{"pytest-bare", map[string]string{"test_a.py": "import pytest\nimport unittest\n"}, map[string]string{"test": ""}},
 		{"go-with-py", map[string]string{"go.mod": "module x\n", "test_h.py": "import unittest\n"}, map[string]string{"test": "go test -count=1 ./..."}},
 		{"unittest", map[string]string{"tests/test_a.py": "import unittest\n"}, map[string]string{
-			"lang": "python", "test": "python3 -m unittest", "single": "python3 -m unittest <module>",
+			"lang": "python", "test": "python3 -m unittest discover -s tests", "single": "python3 -m unittest <module>",
 		}},
 		{"python", map[string]string{
 			"pyproject.toml":       "[project]\ndependencies = [\"Mypy\", \"ruff\"]\n# pyright\n",
 			"requirements-dev.txt": "hypothesis\ncosmic-ray\n",
 			"poetry.lock":          "",
 		}, map[string]string{
-			"lang": "python", "test": "poetry run pytest -q", "typecheck": "poetry run mypy .",
+			"lang": "python", "test": "poetry run python3 -m unittest discover", "typecheck": "poetry run mypy .",
 			"lint": "poetry run ruff check .", "mutation": "poetry run cosmic-ray (see its config)", "property": "hypothesis",
+		}},
+		{"py-requirements-no-pytest", map[string]string{"requirements.txt": "flask\n"}, map[string]string{
+			"test": "python3 -m unittest discover", "single": "python3 -m unittest <module>",
+		}},
+		{"py-unittest-poetry", map[string]string{"pyproject.toml": "[project]\nname = \"x\"\n", "poetry.lock": ""}, map[string]string{
+			"test": "poetry run python3 -m unittest discover", "single": "poetry run python3 -m unittest <module>",
+		}},
+		{"py-unittest-tests-dir", map[string]string{"requirements.txt": "flask\n", "tests/test_a.py": "import unittest\n"}, map[string]string{
+			"test": "python3 -m unittest discover -s tests",
+		}},
+		{"py-description-mentions-pytest", map[string]string{"pyproject.toml": "[project]\ndescription = \"a pytest-free tool\"\n"}, map[string]string{
+			"test": "python3 -m unittest discover",
+		}},
+		{"py-tox-pytest-section", map[string]string{"setup.py": "", "tox.ini": "[pytest]\naddopts = -q\n"}, map[string]string{"test": "pytest -q"}},
+		{"py-tox-deps", map[string]string{"setup.py": "", "tox.ini": "[testenv]\ndeps =\n    pytest\n"}, map[string]string{"test": "pytest -q"}},
+		{"py-test-conftest", map[string]string{"setup.py": "", "test/conftest.py": ""}, map[string]string{"test": "pytest -q"}},
+		{"py-poetry-pytest", map[string]string{"pyproject.toml": "[project]\ndependencies = [\"pytest\"]\n", "poetry.lock": ""}, map[string]string{
+			"test": "poetry run pytest -q", "single": "poetry run pytest -q <file>",
+		}},
+		{"py-pytest-dep", map[string]string{"requirements.txt": "flask\npytest>=8\n"}, map[string]string{
+			"test": "pytest -q", "single": "pytest -q <file>",
+		}},
+		{"py-pytest-ini", map[string]string{"pyproject.toml": "[project]\nname = \"x\"\n", "pytest.ini": "[pytest]\n"}, map[string]string{
+			"test": "pytest -q",
+		}},
+		{"py-pytest-pyproject", map[string]string{"pyproject.toml": "[tool.pytest.ini_options]\naddopts = \"-q\"\n"}, map[string]string{
+			"test": "pytest -q",
+		}},
+		{"py-conftest", map[string]string{"setup.py": "", "conftest.py": ""}, map[string]string{"test": "pytest -q"}},
+		{"py-pyproject-no-pytest", map[string]string{"pyproject.toml": "[project]\nname = \"x\"\n"}, map[string]string{
+			"test": "python3 -m unittest discover",
 		}},
 		{"rust", map[string]string{"Cargo.toml": "[dev-dependencies]\nproptest = \"1\"\n"}, map[string]string{
 			"lang": "rust", "test": "cargo test", "lint": "cargo clippy", "property": "proptest",

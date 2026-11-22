@@ -1,5 +1,7 @@
 # Brainstorm
 
+Nobody to ask: decide per SKILL.md Always; also list behaviours the request leaves open in the spec's Decisions so agents treat them as settled.
+
 Find out what the user actually wants, and why, before designing anything. Your belief about
 what they want is usually thinner than it feels.
 

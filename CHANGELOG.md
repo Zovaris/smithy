@@ -5,6 +5,20 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- **A/B trial frictions (r10 warden, r11 smelt from a vague idea).** `smithy stack` reports
+  `pytest -q` for Python only when pytest is a dependency or configured (`pytest.ini`,
+  `conftest.py`, `[tool.pytest`), else `python3 -m unittest discover`; `smithy route` with
+  neither `--file` nor `--text` prints its usage. warden: `start_session` may need loading
+  through the tool search (else the subagent fallback, named in the plan line), an item is
+  `merged` only after `smithy verify` says so, a committed task dir must be pushed to the base
+  before launch, the batch reviewer gets the `<smithy>` path, and briefs carry a `<rulings>` slot.
+  smelt: task files default to `Speed: fast` with one stated rule, "nobody to ask" opens
+  brainstorm and grilling, DEBUG needs a red reproduction first, TDD stops on a third identical
+  failure or a diff outside the task's files, the reviewer skips behaviour-free files and style
+  preferences, unittest repos name adversary and property tests `test_zz_*.py`, and ship's rebase
+  guard covers languages without a build file, commits status changes first and stops background
+  waits. The v0.12 trial doc gains a Skills column and R10-R11.
+
 - **A/B trial frictions (r9, Haiku at every speed).** `smithy tasks add --speed` works (the flag
   was missing from the CLI's flag table, so every call failed with "unknown option"). `smithy
   stack` reports `node --test <file>` when the test script runs `node --test` after a build

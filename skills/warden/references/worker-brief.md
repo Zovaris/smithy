@@ -1,8 +1,8 @@
 # Worker brief
 Contents: what workers are · slot table · the brief (work silently, intent, spec, how, status card, closing line).
 
-Fill the `<…>` slots and drop the lines that don't apply (table below). `<intent>` is copied verbatim from
-`batch.json`: never summarize it or add requirements, plans or acceptance criteria to it.
+Fill the `<…>` slots, drop the lines that don't apply (table below). `<intent>` is copied verbatim from
+`batch.json`: never summarize it or add requirements, plans or acceptance criteria.
 `<warden-dir>` is this skill's folder (workers run `<warden-dir>/scripts/smithy`, never a bare
 `smithy`), `<batch-dir>` is `~/.smithy/warden/<batch>/` and `<repo>` the repo's absolute path.
 
@@ -10,21 +10,20 @@ What workers are:
 - They don't start skills by command (harnesses differ). `<hush-skill>` and
   `<smelt-skill>` are the absolute paths `scripts/smithy skills hush|smelt` prints: workers read
   those files and follow them, which works in any harness.
-- Silent: their only outputs are the status card and one closing line; they never address the
-  user.
+- Silent: their only outputs are the status card and one closing line; they never address the user.
 - Mode `smelt <speed>`: every worker builds at smelt `fast` (scripts and its own spec check, no
   test or review agents); the batch's speed sets the one check wave warden runs on the combined
   diff once the items merge (`references/acting.md`, batch check). Mode `plain`: the repo's agent
   instructions, else just the brief.
 - Effort: `agent.effort` (default and cap medium); a harder item gets a stronger model, not more effort.
-- The prompt you spawn with is `Read <batch-dir>/<id>.brief.md and follow it exactly.` (the file
-  exists for respawns); a harness that can't read files gets the full text.
+- Spawn prompt: `Read <batch-dir>/<id>.brief.md and follow it exactly.` (the file exists for respawns; full text if the harness can't read files).
 
 | Slot | Value | Drop the line when |
 |---|---|---|
 | `<stack: …>` | the sentence, with the prereq's id | `stack` is false or the item has no prereqs |
-| `<committed repo task file …>` | the line, with the file path | no task file, or it isn't committed (`docs/specs`) |
+| `<committed repo task file …>` | the line, with the file path | no task file, or it isn't on `<base>` (`docs/specs`) |
 | `<has prereqs or the batch is full: …>` | the wait-turn line | no prereqs and a free running slot |
+| `<rulings: …>` | rulings touching this item, one line each, from the task dir's `rulings.md` and `<batch-dir>/decisions.md`; reviewers never get it | none touch it (drop the heading too) |
 | `<relaunch: …>` | the relaunch line | first launch |
 | `<warden channel: …>` | the "channel line" column of `references/harness.md` for this harness | never |
 
@@ -46,6 +45,7 @@ PR target: <base>. Merge mode: <auto|manual>.<stack: " Stacked on <prereq>: merg
 <absolute task file path, or board key (read it first: its acceptance criteria are the spec), or "read
 requirements from the intent and the code"; out of scope if the user named it>
 
+<rulings: "## Rulings (settled; follow them)\n<lines>">
 ## How
 - Read <hush-skill> once if the path is set.
 - Workflow: <mode smelt: "read <smelt-skill> and follow it yourself at speed fast: phase 0, then build to ship

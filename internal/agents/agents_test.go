@@ -151,6 +151,9 @@ func TestRouteMainRejectsBadFlags(t *testing.T) {
 		{"--text", "x", "--speed", "turbo"},
 		{"--text", "x", "--kind"},
 		{"--text"},
+		{},
+		{"--kind", "review"},
+		{"--json"},
 		{"--text", "x", "--speed", "--json"},
 	} {
 		if got := RouteMain(args); got != 2 {

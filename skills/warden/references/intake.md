@@ -37,7 +37,7 @@ other in id order (the later one waits for the merge), unless the user said `sta
 says which items overlap, on what, and whether it chose wait or stack. An item that adds or
 changes CI is a prereq of the others when the repo has none yet: their PRs get no checks until it
 merges. Specs out of git (`.docs/specs`, `~/.smithy/plans`) aren't in worktrees: briefs give
-their absolute paths.
+their absolute paths. A committed task dir must be on `<base>` (pushed) before launch, or workers get absolute paths to it.
 
 ## Worker mode
 

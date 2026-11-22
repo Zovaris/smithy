@@ -2,7 +2,7 @@
 
 Phases with gates; don't skip ahead. No fix before a root cause.
 
-1. **Reproduce.** Get one fast command that fails on this exact bug, every time. No theories
+1. **Reproduce.** Get one fast command that fails on this exact bug, every time: a failing reproduction taken from the report, run and confirmed red before any change, at every speed. No theories
    until it exists. Can't reproduce → collect what's missing (logs, input, env) and say so.
 2. **Shrink.** Make the repro as small and fast as possible (smallest input, single test file).
 3. **Locate.** In a multi-component path (UI → API → service → DB, or build → package → run),

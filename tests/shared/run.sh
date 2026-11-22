@@ -133,7 +133,7 @@ t "router: typo is cheap" '[ "$($S/smithy route --text "fix typo in README" | cu
 t "router: auth is strong" '[ "$($S/smithy route --text "add OAuth login with tokens" | cut -d" " -f1)" = strong ]'
 t "router: plain feature is mid, model from config" '[ "$($S/smithy route --text "add CSV export to reports" | cut -d" " -f1-2)" = "mid midm" ]'
 t "router: full speed is strong" '[ "$($S/smithy route --text "add CSV export" --speed full | cut -d" " -f1)" = strong ]'
-t "router: review is cheap" '[ "$($S/smithy route --kind review | cut -d" " -f1)" = cheap ]'
+t "router: review is cheap" '[ "$($S/smithy route --kind review --text x | cut -d" " -f1)" = cheap ]'
 t "router: unset tier prints -" '[ "$($S/smithy route --text "add OAuth login" | cut -d" " -f2)" = - ]'
 t "router: needs input" '$S/smithy route; [ $? -eq 2 ]'
 
