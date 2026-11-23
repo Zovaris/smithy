@@ -610,15 +610,23 @@ func IssueList(label string, v any) error {
 	})
 }
 
+var (
+	issueLimit           = 1000
+	issuePage            = 100
+	issueWarn  io.Writer = os.Stderr
+)
+
 // IssueListFull lists open issues (with the label, or all when label is "") with number, url,
-// title, body, labels and updatedAt; labels are [{"name": ...}] as gh prints them.
+// title, body, labels and updatedAt; labels are [{"name": ...}] as gh prints them. It reads at
+// most 1000 issues and prints one warning on stderr when there may be more.
 func IssueListFull(label string, v any) error {
-	return via(func() error {
-		args := []string{"issue", "list", "--state", "open", "--limit", "100", "--json", "number,url,title,body,labels,updatedAt"}
+	var out []json.RawMessage
+	err := via(func() error {
+		args := []string{"issue", "list", "--state", "open", "--limit", strconv.Itoa(issueLimit), "--json", "number,url,title,body,labels,updatedAt"}
 		if label != "" {
 			args = append(args, "--label", label)
 		}
-		return GH(v, args...)
+		return GH(&out, args...)
 	}, func() error {
 		repo, err := RepoName()
 		if err != nil {
@@ -628,35 +636,50 @@ func IssueListFull(label string, v any) error {
 		if err != nil {
 			return err
 		}
-		var raw []struct {
-			Number      int                     `json:"number"`
-			HTMLURL     string                  `json:"html_url"`
-			Title       string                  `json:"title"`
-			Body        string                  `json:"body"`
-			Labels      []struct{ Name string } `json:"labels"`
-			UpdatedAt   string                  `json:"updated_at"`
-			PullRequest json.RawMessage         `json:"pull_request"`
-		}
-		q := url.Values{"state": {"open"}, "per_page": {"100"}}
-		if label != "" {
-			q.Set("labels", label)
-		}
-		if err := call("GET", "/repos/"+o+"/"+n+"/issues?"+q.Encode(), nil, &raw); err != nil {
-			return err
-		}
-		out := []map[string]any{}
-		for _, i := range raw {
-			if len(i.PullRequest) > 0 {
-				continue
+		for page := 1; len(out) < issueLimit; page++ {
+			var raw []struct {
+				Number      int                     `json:"number"`
+				HTMLURL     string                  `json:"html_url"`
+				Title       string                  `json:"title"`
+				Body        string                  `json:"body"`
+				Labels      []struct{ Name string } `json:"labels"`
+				UpdatedAt   string                  `json:"updated_at"`
+				PullRequest json.RawMessage         `json:"pull_request"`
 			}
-			ls := []map[string]string{}
-			for _, l := range i.Labels {
-				ls = append(ls, map[string]string{"name": l.Name})
+			q := url.Values{"state": {"open"}, "per_page": {strconv.Itoa(issuePage)}, "page": {strconv.Itoa(page)}}
+			if label != "" {
+				q.Set("labels", label)
 			}
-			out = append(out, map[string]any{"number": i.Number, "url": i.HTMLURL, "title": i.Title, "body": i.Body, "labels": ls, "updatedAt": i.UpdatedAt})
+			if err := call("GET", "/repos/"+o+"/"+n+"/issues?"+q.Encode(), nil, &raw); err != nil {
+				return err
+			}
+			for _, i := range raw {
+				if len(i.PullRequest) > 0 || len(out) >= issueLimit {
+					continue
+				}
+				ls := []map[string]string{}
+				for _, l := range i.Labels {
+					ls = append(ls, map[string]string{"name": l.Name})
+				}
+				b, _ := json.Marshal(map[string]any{"number": i.Number, "url": i.HTMLURL, "title": i.Title, "body": i.Body, "labels": ls, "updatedAt": i.UpdatedAt})
+				out = append(out, b)
+			}
+			if len(raw) < issuePage {
+				break
+			}
 		}
-		return reshape(out, v)
+		return nil
 	})
+	if err != nil {
+		return err
+	}
+	if len(out) >= issueLimit {
+		fmt.Fprintf(issueWarn, "smithy: read only the first %d open issues; narrow with a label\n", issueLimit)
+	}
+	if out == nil {
+		out = []json.RawMessage{}
+	}
+	return reshape(out, v)
 }
 
 // IssueComment adds a comment to issue number in this repo.
