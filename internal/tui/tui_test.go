@@ -92,6 +92,9 @@ func newTest(w, h int, load func(time.Time) Snapshot) Model {
 	m.width, m.height = w, h
 	m.opener = func(string) error { return nil }
 	m.pauser = func(bool) error { return nil }
+	m.loadSys = demoSystem
+	m.confirm = func(int) error { return nil }
+	m.reject = func(int, string) error { return nil }
 	return m
 }
 
@@ -191,9 +194,11 @@ func TestGolden(t *testing.T) {
 	for _, g := range []struct {
 		w, h int
 		v    view
-	}{{160, 48, vOverview}, {160, 48, vAgents}, {100, 30, vOverview}, {100, 30, vAgents}, {70, 24, vNeeds}} {
+	}{{160, 48, vOverview}, {160, 48, vAgents}, {100, 30, vOverview}, {100, 30, vAgents}, {70, 24, vNeeds}, {160, 48, vDone}, {160, 48, vSystem}} {
 		m := demo(t, g.w, g.h)
 		m.view = g.v
+		s := demoSystem()
+		m.sys = &s
 		got := ansi.Strip(m.View().Content)
 		lines := strings.Split(got, "\n")
 		if len(lines) != g.h {
@@ -255,7 +260,7 @@ func TestKeys(t *testing.T) {
 	if m, _ = press(m, "shift+tab"); m.view != vOverview {
 		t.Fatalf("shift+tab -> %v", m.view)
 	}
-	if m, _ = press(m, "shift+tab"); m.view != vPlans {
+	if m, _ = press(m, "shift+tab"); m.view != vSystem {
 		t.Fatalf("shift+tab wraps -> %v", m.view)
 	}
 	if m, _ = press(m, "1"); m.view != vOverview {
@@ -267,8 +272,8 @@ func TestKeys(t *testing.T) {
 	if m, _ = press(m, "down"); m.sel[vOverview] != 4 {
 		t.Fatalf("down on Overview -> card %d", m.sel[vOverview])
 	}
-	if m, _ = press(m, "enter"); m.view != vActivity {
-		t.Fatalf("enter on the Lead time card -> %v", m.view)
+	if m, _ = press(m, "enter"); m.view != vDone {
+		t.Fatalf("enter on the How long it takes card -> %v", m.view)
 	}
 	m, _ = press(m, "2")
 	if m, _ = press(m, "j"); m.sel[vAgents] != 1 || m.view != vAgents {
@@ -293,7 +298,7 @@ func TestKeys(t *testing.T) {
 		t.Fatal("l did not open the log")
 	}
 	m, _ = press(m, "esc")
-	m, _ = press(m, "5")
+	m, _ = press(m, "6")
 	if m, _ = press(m, "t"); activityTypes[m.actType] != "poll" {
 		t.Fatal("t did not switch the type")
 	}
@@ -307,7 +312,11 @@ func TestKeys(t *testing.T) {
 	if m, cmd := press(m, "y"); cmd == nil || !strings.Contains(m.status, "smithy decisions confirm 1") {
 		t.Fatalf("y: %q", m.status)
 	}
-	m, _ = press(m, "7")
+	m, _ = press(m, "8")
+	if m, _ = press(m, "enter"); !m.textOpen || !strings.Contains(ansi.Strip(m.render()), "Concepts") {
+		t.Fatal("enter on a plan did not open its spec")
+	}
+	m, _ = press(m, "esc")
 	m, _ = press(m, "right")
 	if m, _ = press(m, "enter"); !m.textOpen || !strings.Contains(ansi.Strip(m.render()), "Done when") {
 		t.Fatal("enter on a task did not open its file")
@@ -621,5 +630,167 @@ func TestNoColor(t *testing.T) {
 				t.Fatalf("%s: ASCII mode drew %q", viewNames[v], r)
 			}
 		}
+	}
+}
+
+func TestDecisionActions(t *testing.T) {
+	m := demo(t, 160, 48)
+	var got []string
+	m.confirm = func(n int) error { got = append(got, fmt.Sprint("confirm ", n)); return nil }
+	m.reject = func(n int, why string) error { got = append(got, fmt.Sprint("reject ", n, " ", why)); return nil }
+	m, _ = press(m, "4")
+	m, _ = press(m, "j")
+	m, cmd := press(m, "a")
+	nm, _ := m.Update(cmd())
+	if m = nm.(Model); len(got) != 1 || got[0] != "confirm 2" || !strings.Contains(m.toast, "accepted decision 2") {
+		t.Fatalf("accept: %v %q", got, m.toast)
+	}
+	m, _ = press(m, "x")
+	if !m.prompting || !strings.Contains(ansi.Strip(m.render()), "why reject?") {
+		t.Fatal("x did not ask for a reason")
+	}
+	if m, cmd = press(m, "enter"); cmd != nil || !m.prompting {
+		t.Fatal("an empty reason was accepted")
+	}
+	for _, r := range "too risky" {
+		m, _ = press(m, string(r))
+	}
+	m, cmd = press(m, "enter")
+	nm, _ = m.Update(cmd())
+	if m = nm.(Model); len(got) != 2 || got[1] != "reject 2 too risky" || !strings.Contains(m.toast, "decisions pending") {
+		t.Fatalf("reject: %v %q", got, m.toast)
+	}
+	m.sel[vNeeds] = 3
+	if m, _ = press(m, "a"); !strings.Contains(m.status, "not one") {
+		t.Fatalf("a on a PR row: %q", m.status)
+	}
+	m, _ = press(m, "enter")
+	out := ansi.Strip(m.render())
+	for _, want := range []string{"never merges from here", "o open", "y copy command"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("PR modal lacks %q", want)
+		}
+	}
+	demoM := New(true, true)
+	demoM.width, demoM.height = 160, 48
+	demoM, _ = press(demoM, "4")
+	if demoM, _ = press(demoM, "a"); !strings.Contains(demoM.toast, "demo: would run smithy decisions confirm 1") {
+		t.Fatalf("demo accept toast %q", demoM.toast)
+	}
+	events.Off = false
+}
+
+func TestDecisionModalExplains(t *testing.T) {
+	m := demo(t, 160, 48)
+	m, _ = press(m, "4")
+	m, _ = press(m, "enter")
+	out := ansi.Strip(m.render())
+	for _, want := range []string{"Decision 1", "decide", "after nobody answered in time", "a accepts it", "x rejects it", "smithy decisions pending", "a accept", "x reject"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("decision modal lacks %q:\n%s", want, out)
+		}
+	}
+	if rs := m.rows(vNeeds); rs[2].chip != "rejected" {
+		t.Fatalf("a rejected decision shows %q", rs[2].chip)
+	}
+}
+
+func TestDone(t *testing.T) {
+	m := demo(t, 160, 48)
+	rs := m.rows(vDone)
+	results := map[string]int{}
+	for _, r := range rs {
+		results[r.cells[3].s]++
+	}
+	for _, want := range []string{"merged", "ready", "closed", "blocked"} {
+		if results[want] == 0 {
+			t.Errorf("Done lacks %s: %v", want, results)
+		}
+	}
+	m.filter[vDone] = "closed"
+	for _, r := range m.rows(vDone) {
+		if r.cells[3].s != "closed" && !strings.Contains(strings.ToLower(r.cells[1].s), "closed") {
+			t.Fatalf("filter let %v through", r.cells)
+		}
+	}
+	fixture(t)
+	f := model(160, 48)
+	if rs := f.rows(vDone); len(rs) == 0 || rs[0].cells[3].s != "ready" || rs[0].cells[4].s != "1h10m" {
+		t.Fatalf("fixture Done = %+v", rs)
+	}
+}
+
+func TestSystemView(t *testing.T) {
+	m := demo(t, 160, 48)
+	m, cmd := press(m, "9")
+	if cmd == nil || m.view != vSystem || !strings.Contains(ansi.Strip(m.render()), "Running smithy doctor") {
+		t.Fatal("System did not start loading")
+	}
+	nm, _ := m.Update(cmd())
+	m = nm.(Model)
+	out := ansi.Strip(m.render())
+	for _, want := range []string{"Versions", "Doctor", "auto.*", "linear.*", "warden.*", "****9f2c", "events.jsonl", "Read-only"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("System lacks %q", want)
+		}
+	}
+	if _, cmd := press(m, "8"); cmd != nil {
+		t.Fatal("leaving System reloads it")
+	}
+	if strings.Contains(out, "9f2c3") {
+		t.Fatal("auth key not masked")
+	}
+	fixture(t)
+	s := loadSystem()
+	if len(s.Doctor) != 0 {
+		t.Fatal("loadSystem ran a binary that is not smithy")
+	}
+	if len(s.Settings) == 0 || !strings.HasPrefix(s.Settings[0][0], "auto.") {
+		t.Fatalf("settings = %v", s.Settings)
+	}
+}
+
+func TestPillBadgeInside(t *testing.T) {
+	m := demo(t, 160, 48)
+	m.view = vNeeds
+	n := len(m.rows(vNeeds))
+	if l := m.tabLabel(vNeeds); !strings.HasSuffix(l, fmt.Sprintf("%d ", n)) || !strings.HasPrefix(l, " 4 Needs you") {
+		t.Fatalf("pill = %q", l)
+	}
+	_, tabY, _, _ := m.frame()
+	bar := strings.Split(ansi.Strip(m.render()), "\n")[tabY]
+	if !strings.Contains(bar, fmt.Sprintf(" 4 Needs you %d   5 Done", n)) {
+		t.Fatalf("tab bar = %q", bar)
+	}
+}
+
+func TestWorkChart(t *testing.T) {
+	if niceTop(13) != 20 || niceTop(5) != 5 || niceTop(51) != 100 || niceTop(0) != 1 {
+		t.Fatal("niceTop")
+	}
+	m := demo(t, 160, 48)
+	lines, _ := m.cardThroughput(49, 18)
+	out := ansi.Strip(strings.Join(lines, "\n"))
+	for _, want := range []string{"launched", "ready/merged", "20┤", "0┼", "-12h", "-6h", "now", "·"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("chart lacks %q:\n%s", want, out)
+		}
+	}
+	small, _ := m.cardThroughput(40, 6)
+	if !strings.Contains(ansi.Strip(strings.Join(small, "\n")), "up ") {
+		t.Fatal("no compact fallback under 48 columns")
+	}
+}
+
+func TestMarkdownReaderFromFile(t *testing.T) {
+	fixture(t)
+	dir := Load(fixedNow).Tasks[0].Dir
+	write(t, filepath.Join(dir, "spec.md"), "# The spec\n\n## Why\nBecause.\n\u001b]52;c;aGk=\u0007")
+	m := model(160, 48)
+	m, _ = press(m, "8")
+	m, _ = press(m, "enter")
+	out := m.render()
+	if !m.textOpen || !strings.Contains(ansi.Strip(out), "The spec") || strings.Contains(out, "]52;") {
+		t.Fatal("spec.md not rendered, or its escapes reached the screen")
 	}
 }

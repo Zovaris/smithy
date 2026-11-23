@@ -14,7 +14,9 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/glamour/v2"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/decisions"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/charmbracelet/colorprofile"
@@ -24,9 +26,10 @@ import (
 // Usage is the text for `smithy tui --help`.
 const Usage = `usage: smithy tui [--no-anim] [--demo]
 A live dashboard of the autonomous forge. Views: Overview, Agents, Incoming, Needs you,
-Activity, Worktrees, Plans. It refreshes every 2 s from local files only (no network).
-Keys: tab/shift+tab or 1-7 switch views; up/down (j/k) move inside a view; left/right switch
-panes or cards; enter details; esc close; o open; l log; c copy; y copy the action command;
+Done, Activity, Worktrees, Plans, System. It refreshes every 2 s from local files only (no network).
+Keys: tab/shift+tab or 1-9 switch views; up/down (j/k) move inside a view; left/right switch
+panes or cards; enter details or read; esc close; o open; l log; c copy; y copy the action command;
+a accept / x reject a decision (Needs you);
 s sort (Agents); t event type (Activity); p pause/resume intake (auto.paused); / filter;
 r refresh; ? help; q quit. Mouse: click, double-click, wheel.
 --demo shows a rich fake world (reads and writes nothing); --no-anim (or
@@ -45,13 +48,15 @@ const (
 	vAgents
 	vIncoming
 	vNeeds
+	vDone
 	vActivity
 	vWorktrees
 	vPlans
+	vSystem
 	nViews
 )
 
-var viewNames = [nViews]string{"Overview", "Agents", "Incoming", "Needs you", "Activity", "Worktrees", "Plans"}
+var viewNames = [nViews]string{"Overview", "Agents", "Incoming", "Needs you", "Done", "Activity", "Worktrees", "Plans", "System"}
 
 // meaning is what each view holds, for empty states and the help overlay.
 var meaning = [nViews]string{
@@ -59,13 +64,15 @@ var meaning = [nViews]string{
 	"Every worker: issue, repo, branch, model, stage, CI, PR, heartbeat; a timeline and log preview.",
 	"Issues waiting to start, the ones recently skipped and why, and each source's status.",
 	"Decisions taken without you, PRs ready for review or merge, blocked work.",
+	"Finished work: issue, title, PR, result, how long it took and when.",
 	"Every event, newest first: polls, queued, skipped, launches, stages, CI, reports, merges.",
 	"Every smithy worktree on disk: branch, item, age, dirty, ahead/behind, orphaned.",
-	"Task lists and their progress; enter opens a task file.",
+	"Task lists and their progress; enter reads the plan's spec or a task.",
+	"Read-only health: doctor, settings, auth, versions and paths.",
 }
 
 type keyMap struct {
-	Next, Prev, Up, Down, Left, Right, Jump, Enter, Close, Open, Log, Copy, Cmd, Sort, Type, Pause, Filter, Refresh, Help, Quit key.Binding
+	Next, Prev, Up, Down, Left, Right, Jump, Enter, Close, Open, Log, Copy, Cmd, Sort, Type, Pause, Filter, Refresh, Help, Quit, Accept, Reject key.Binding
 }
 
 var keys = keyMap{
@@ -75,7 +82,9 @@ var keys = keyMap{
 	Down:    key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
 	Left:    key.NewBinding(key.WithKeys("left"), key.WithHelp("←→", "pane")),
 	Right:   key.NewBinding(key.WithKeys("right"), key.WithHelp("→", "pane")),
-	Jump:    key.NewBinding(key.WithKeys("1", "2", "3", "4", "5", "6", "7"), key.WithHelp("1-7", "view")),
+	Jump:    key.NewBinding(key.WithKeys("1", "2", "3", "4", "5", "6", "7", "8", "9"), key.WithHelp("1-9", "view")),
+	Accept:  key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "accept")),
+	Reject:  key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reject")),
 	Enter:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "details")),
 	Close:   key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
 	Open:    key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open")),
@@ -92,7 +101,7 @@ var keys = keyMap{
 }
 
 // context is the footer's keys for a view.
-func context(v view) []key.Binding {
+func viewKeys(v view) []key.Binding {
 	switch v {
 	case vOverview:
 		return []key.Binding{keys.Up, keys.Enter}
@@ -101,13 +110,39 @@ func context(v view) []key.Binding {
 	case vIncoming:
 		return []key.Binding{keys.Up, keys.Left, keys.Enter, keys.Open, keys.Copy, keys.Pause, keys.Filter}
 	case vNeeds:
-		return []key.Binding{keys.Up, keys.Enter, keys.Open, keys.Cmd, keys.Filter}
+		return []key.Binding{keys.Up, keys.Enter, keys.Accept, keys.Reject, keys.Open, keys.Cmd}
+	case vDone:
+		return []key.Binding{keys.Up, keys.Enter, keys.Open, keys.Copy, keys.Filter}
+	case vSystem:
+		return []key.Binding{keys.Refresh}
 	case vActivity:
 		return []key.Binding{keys.Up, keys.Enter, keys.Open, keys.Type, keys.Filter}
 	case vWorktrees:
 		return []key.Binding{keys.Up, keys.Enter, keys.Copy, keys.Filter}
 	}
 	return []key.Binding{keys.Up, keys.Left, keys.Enter, keys.Copy}
+}
+
+// actionKeys is what the modal footer offers for the selected row.
+func (m Model) actionKeys() []key.Binding {
+	r, _ := m.selected()
+	var bs []key.Binding
+	if r.decision > 0 {
+		bs = append(bs, keys.Accept, keys.Reject)
+	}
+	if r.url != "" && r.url != "-" {
+		bs = append(bs, keys.Open)
+	}
+	if r.cmd != "" {
+		bs = append(bs, keys.Cmd)
+	}
+	if r.logPath != "" || r.logTail != nil {
+		bs = append(bs, keys.Log)
+	}
+	if r.copy != "" {
+		bs = append(bs, keys.Copy)
+	}
+	return append(bs, keys.Close)
 }
 
 var activityTypes = []string{"all", "poll", "queued", "skipped", "launched", "stage", "ci", "report", "merged"}
@@ -122,6 +157,11 @@ type pausedMsg struct {
 	paused bool
 	err    error
 }
+type decidedMsg struct {
+	what string
+	err  error
+}
+type systemMsg System
 
 // Model is the dashboard's Bubble Tea model.
 type Model struct {
@@ -137,6 +177,14 @@ type Model struct {
 	textOpen  bool
 	text      viewport.Model
 	textTitle string
+	prompting bool // reading a reject reason
+	promptN   int
+	reason    textinput.Model
+	sys       *System
+	sysBusy   bool
+	loadSys   func() System
+	confirm   func(n int) error
+	reject    func(n int, why string) error
 	filtering bool
 	input     textinput.Model
 	filter    [nViews]string
@@ -180,7 +228,10 @@ type options struct {
 func newModel(o options) Model {
 	m := Model{width: 120, height: 40, dark: o.dark, profile: o.profile, unicode: o.unicode, motion: o.motion,
 		now: o.now, load: o.load, opener: openURL, pauser: setPaused, fx: newFX(o.seed),
-		spring: harmonica.NewSpring(harmonica.FPS(fps), 4.0, 0.95), input: textinput.New()}
+		spring: harmonica.NewSpring(harmonica.FPS(fps), 4.0, 0.95), input: textinput.New(), reason: textinput.New(),
+		loadSys: loadSystem, confirm: decisions.Confirm, reject: decisions.Reject}
+	m.reason.Prompt = "why reject? "
+	m.reason.Placeholder = "one line the agent will read"
 	m.input.Prompt = "/ "
 	m.input.Placeholder = "filter this view"
 	m.th = newTheme(m.dark, m.profile, m.unicode)
@@ -219,6 +270,8 @@ func New(noAnim, demo bool) Model {
 		seed: uint64(time.Now().UnixNano()), now: time.Now, load: load})
 	if demo {
 		m.pauser = func(bool) error { return fmt.Errorf("demo: intake is not real") }
+		m.confirm, m.reject = nil, nil
+		m.loadSys = demoSystem
 	}
 	return m
 }
@@ -350,6 +403,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.status = "open: " + msg.err.Error()
 		}
+	case decidedMsg:
+		if msg.err != nil {
+			m.status = msg.what + ": " + msg.err.Error()
+			return m, nil
+		}
+		m.say(msg.what)
+		m.modal, m.loading = false, true
+		return m, m.reload()
+	case systemMsg:
+		s := System(msg)
+		m.sys, m.sysBusy = &s, false
 	case pausedMsg:
 		if msg.err != nil {
 			m.status = "pause: " + msg.err.Error()
@@ -415,7 +479,64 @@ func (m *Model) move(d int) {
 	m.sel[v] = max(min(m.sel[v]+d, n-1), 0)
 }
 
+// say shows a toast for 4 s.
+func (m *Model) say(s string) {
+	m.toast, m.toastTill = s, m.now().Add(4*time.Second)
+}
+
+// show switches to a view, loading the System report the first time it opens.
+func (m *Model) show(v view) tea.Cmd {
+	m.view = v
+	if v == vSystem && m.sys == nil && !m.sysBusy {
+		m.sysBusy = true
+		load := m.loadSys
+		return func() tea.Msg { return systemMsg(load()) }
+	}
+	return nil
+}
+
+// decide accepts or rejects pending decision n; in demo mode it only says what it would run.
+func (m Model) decide(n int, accept bool, why string) (tea.Model, tea.Cmd) {
+	cmd := fmt.Sprintf("smithy decisions confirm %d", n)
+	if !accept {
+		cmd = fmt.Sprintf("smithy decisions reject %d %q", n, why)
+	}
+	if (accept && m.confirm == nil) || (!accept && m.reject == nil) {
+		m.say("demo: would run " + cmd)
+		return m, nil
+	}
+	confirm, reject := m.confirm, m.reject
+	return m, func() tea.Msg {
+		if accept {
+			return decidedMsg{fmt.Sprintf("accepted decision %d", n), confirm(n)}
+		}
+		return decidedMsg{fmt.Sprintf("rejected decision %d: the agent sees it in smithy decisions pending", n), reject(n, why)}
+	}
+}
+
 func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.prompting {
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "esc":
+			m.prompting = false
+			m.reason.Blur()
+			return m, nil
+		case "enter":
+			why := strings.TrimSpace(m.reason.Value())
+			if why == "" {
+				m.status = "type a reason, or esc to cancel"
+				return m, nil
+			}
+			m.prompting = false
+			m.reason.Blur()
+			return m.decide(m.promptN, false, why)
+		}
+		var cmd tea.Cmd
+		m.reason, cmd = m.reason.Update(msg)
+		return m, cmd
+	}
 	if m.filtering {
 		switch msg.String() {
 		case "ctrl+c":
@@ -474,13 +595,25 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.copyField(true)
 	case key.Matches(msg, keys.Log):
 		return m.openLog()
+	case key.Matches(msg, keys.Accept, keys.Reject) && v == vNeeds:
+		r, ok := m.selected()
+		if !ok || r.decision == 0 {
+			m.status = "a and x act on decisions; this row is not one"
+			return m, nil
+		}
+		if key.Matches(msg, keys.Accept) {
+			return m.decide(r.decision, true, "")
+		}
+		m.prompting, m.promptN = true, r.decision
+		m.reason.SetValue("")
+		return m, m.reason.Focus()
 	case m.modal:
 	case key.Matches(msg, keys.Jump):
-		m.view = view(msg.String()[0] - '1')
+		return m, m.show(view(msg.String()[0] - '1'))
 	case key.Matches(msg, keys.Next):
-		m.view = (v + 1) % nViews
+		return m, m.show((v + 1) % nViews)
 	case key.Matches(msg, keys.Prev):
-		m.view = (v + nViews - 1) % nViews
+		return m, m.show((v + nViews - 1) % nViews)
 	case key.Matches(msg, keys.Up):
 		if v == vOverview {
 			m.move(-3)
@@ -535,20 +668,38 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m Model) enter() (tea.Model, tea.Cmd) {
 	v := m.view
 	if v == vOverview {
-		m.view = []view{vActivity, vAgents, vIncoming, vAgents, vActivity, vNeeds}[m.sel[vOverview]]
+		return m, m.show([]view{vActivity, vAgents, vIncoming, vAgents, vDone, vNeeds}[m.sel[vOverview]])
+	}
+	if v == vSystem {
 		return m, nil
 	}
-	if v == vPlans && m.pane[v] == 1 {
-		rs := m.rows2(v)
-		if i := m.sel2[v]; i < len(rs) {
-			m.showText(rs[i].title, rs[i].text)
-		}
+	if r, ok := m.selected(); ok && r.md != "" {
+		m.showMarkdown(r.mdTitle, r.md)
 		return m, nil
 	}
 	if _, ok := m.selected(); ok {
 		m.modal = true
 	}
 	return m, nil
+}
+
+// showMarkdown opens the reader with markdown rendered by glamour (plain text without color).
+func (m *Model) showMarkdown(title, src string) {
+	w := max(min(m.width-8, 140), 20)
+	style := "dark"
+	switch {
+	case m.th.plain || !m.unicode:
+		style = "ascii"
+	case !m.dark:
+		style = "light"
+	}
+	out := src
+	if r, err := glamour.NewTermRenderer(glamour.WithStandardStyle(style), glamour.WithWordWrap(w-4)); err == nil {
+		if s, err := r.Render(src); err == nil {
+			out = s
+		}
+	}
+	m.showText(title, strings.Split(strings.TrimRight(out, "\n"), "\n"))
 }
 
 func (m *Model) showText(title string, lines []string) {
@@ -561,13 +712,12 @@ func (m *Model) showText(title string, lines []string) {
 
 // click: a tab switches views, a row selects (a second click on it opens), elsewhere closes overlays.
 func (m Model) click(mm tea.Mouse) (tea.Model, tea.Cmd) {
-	if m.modal || m.helpOpen || m.textOpen {
-		m.modal, m.helpOpen, m.textOpen = false, false, false
+	if m.modal || m.helpOpen || m.textOpen || m.prompting {
+		m.modal, m.helpOpen, m.textOpen, m.prompting = false, false, false, false
 		return m, nil
 	}
 	if v, ok := m.tabAt(mm.X, mm.Y); ok {
-		m.view = v
-		return m, nil
+		return m, m.show(v)
 	}
 	if i, ok := m.rowAt(mm.X, mm.Y); ok {
 		v := m.view

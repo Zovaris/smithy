@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/colorprofile"
 )
 
-var cardTitles = []string{"Throughput", "Agents now", "Daily cap", "CI health", "Lead time", "Needs you"}
+var cardTitles = []string{"Work per hour", "Agents now", "Daily cap", "CI health", "How long it takes", "Needs you"}
 
 // overview is the dashboard: six equal cards.
 func (m Model) overview() []*lipgloss.Layer {
@@ -43,6 +44,24 @@ func (m Model) overview() []*lipgloss.Layer {
 	return out
 }
 
+// niceTop rounds a maximum up to 1, 2 or 5 times a power of ten.
+func niceTop(v int) int {
+	if v <= 1 {
+		return 1
+	}
+	for p := 1; ; p *= 10 {
+		for _, k := range []int{1, 2, 5} {
+			if k*p >= v {
+				return k * p
+			}
+		}
+	}
+}
+
+// cardThroughput is a mirrored bar chart of the last 24 h, one column per hour on a shared
+// baseline: launched grows up, PRs ready or merged hang down, on one "nice" scale labelled top
+// and bottom, dotted gridlines on empty cells, x labels every 6 h and a gradient from the
+// baseline (dim) to the tip (bright). Under 48 columns it is a pair of sparklines.
 func (m Model) cardThroughput(w, h int) ([]string, string) {
 	t := m.th
 	a, b := throughput(m.snap.Events, m.snap.At)
@@ -54,17 +73,163 @@ func (m Model) cardThroughput(w, h int) ([]string, string) {
 		return n
 	}
 	mut := t.fg(t.muted)
-	legend := t.fg(t.accent).Render(t.g.bar+" launched "+fmt.Sprint(sum(a))) + "   " + t.fg(t.ok).Render(t.g.bar+" ready or merged "+fmt.Sprint(sum(b)))
-	if sum(a)+sum(b) == 0 {
-		return []string{legend, "", mut.Italic(true).Render("No launches or PRs in the last 24 h.")}, "24 h"
+	upC, downC := t.forge[2], t.ok
+	if t.plain {
+		upC = nil
 	}
-	ch := max(h-3, 1)
-	lines := []string{legend}
-	lines = append(lines, braille2(a, b, w, ch, t.accent, t.ok, t)...)
-	axis := "-24h"
-	axis += strings.Repeat(" ", max(w-len(axis)-3, 1)) + "now"
-	lines = append(lines, mut.Render(axis))
-	return lines, "per hour, 24 h"
+	up, down := "▇", "▇"
+	if !t.g.unicode {
+		up, down = "^", "v"
+	}
+	legend := t.fg(upC).Render("launched "+up) + " " + t.fg(t.text).Bold(!t.plain).Render(fmt.Sprint(sum(a))) + "   " +
+		t.fg(downC).Render("ready/merged "+down) + " " + t.fg(t.text).Bold(!t.plain).Render(fmt.Sprint(sum(b)))
+	if sum(a)+sum(b) == 0 {
+		return []string{legend, "", mut.Italic(true).Render("No launches or PRs in the last 24 h.")}, "last 24 h"
+	}
+	top := 1
+	for i := range a {
+		top = max(top, a[i], b[i])
+	}
+	top = niceTop(top)
+	ys := fmt.Sprint(top)
+	axisW := len(ys) + 1
+	if w < 48 || h < 7 {
+		return []string{legend,
+			mut.Render("up   ") + t.fg(upC).Render(sparkline(a, w-12, t.g.ticks)),
+			mut.Render("down ") + t.fg(downC).Render(sparkline(b, w-12, t.g.ticks)),
+			mut.Render("     -24h" + strings.Repeat(" ", max(w-21, 1)) + "now")}, "last 24 h"
+	}
+	step := 2
+	cols := min(24, (w-axisW)/step)
+	a, b = a[24-cols:], b[24-cols:]
+	ch := h - 3
+	hu := (ch - 1) / 2
+	hd := ch - 1 - hu
+	blocks := []string{" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"}
+	ascii := !t.g.unicode
+	if ascii {
+		blocks = []string{" ", ".", ".", ":", ":", "|", "|", "#", "#"}
+	}
+	rich := !t.plain && m.profile >= colorprofile.ANSI256
+	upRamp := []color.Color{upC}
+	downRamp := []color.Color{downC}
+	if rich {
+		upRamp = lipgloss.Blend1D(max(hu, 2), t.forge[0], t.forge[1], t.forge[2])
+		downRamp = lipgloss.Blend1D(max(hd, 2), lipgloss.Color("#1F5A36"), t.ok)
+	}
+	grid := mut.Render("·")
+	if ascii {
+		grid = mut.Render(".")
+	}
+	vl, tk, cross, hz, corner, tick := "│", "┤", "┼", "─", "└", "┬"
+	if ascii {
+		vl, tk, cross, hz, corner, tick = "|", "+", "+", "-", "+", "+"
+	}
+	var lines []string
+	lines = append(lines, legend)
+	// up half: row 0 is the top
+	for r := 0; r < hu; r++ {
+		lab := strings.Repeat(" ", axisW-1) + vl
+		if r == 0 {
+			lab = fmt.Sprintf("%*s", axisW-1, ys) + tk
+		}
+		var sb strings.Builder
+		sb.WriteString(mut.Render(lab))
+		for i := 0; i < cols; i++ {
+			v := a[i]
+			lvl := v*hu*8/top - (hu-1-r)*8
+			if v > 0 && r == hu-1 {
+				lvl = max(lvl, 1)
+			}
+			lvl = max(min(lvl, 8), 0)
+			cell := " "
+			switch {
+			case lvl > 0:
+				cell = t.fg(upRamp[min(hu-1-r, len(upRamp)-1)]).Render(blocks[lvl])
+			case r == 0:
+				cell = grid
+			}
+			sb.WriteString(cell)
+			if step == 2 {
+				sb.WriteString(" ")
+			}
+		}
+		lines = append(lines, sb.String())
+	}
+	base := fmt.Sprintf("%*s", axisW-1, "0") + cross + strings.Repeat(hz, cols*step)
+	lines = append(lines, mut.Render(base))
+	// down half: row 0 hangs right under the baseline
+	for d := 0; d < hd; d++ {
+		lab := strings.Repeat(" ", axisW-1) + vl
+		if d == hd-1 {
+			lab = fmt.Sprintf("%*s", axisW-1, ys) + tk
+		}
+		var sb strings.Builder
+		sb.WriteString(mut.Render(lab))
+		for i := 0; i < cols; i++ {
+			v := b[i]
+			lvl := v*hd*8/top - d*8
+			if v > 0 && d == 0 {
+				lvl = max(lvl, 1)
+			}
+			lvl = max(min(lvl, 8), 0)
+			c := downRamp[min(d, len(downRamp)-1)]
+			cell := " "
+			switch {
+			case lvl == 8:
+				cell = t.fg(c).Render(blocks[8])
+			case lvl > 0 && ascii:
+				cell = t.fg(c).Render(blocks[lvl])
+			case lvl > 0 && t.plain:
+				cell = "▀"
+				if lvl < 4 {
+					cell = "▔"
+				}
+			case lvl > 0:
+				cell = lipgloss.NewStyle().Foreground(c).Reverse(true).Render(blocks[8-lvl])
+			case d == hd-1:
+				cell = grid
+			}
+			sb.WriteString(cell)
+			if step == 2 {
+				sb.WriteString(" ")
+			}
+		}
+		lines = append(lines, sb.String())
+	}
+	axis := []rune(strings.Repeat(hz, cols*step))
+	labels := []rune(strings.Repeat(" ", cols*step+6))
+	type mark struct {
+		i   int
+		lab string
+	}
+	marks := []mark{{0, fmt.Sprintf("-%dh", cols)}}
+	for _, k := range []int{18, 12, 6} {
+		if i := cols - 1 - k; i > 3 {
+			marks = append(marks, mark{i, fmt.Sprintf("-%dh", k)})
+		}
+	}
+	marks = append(marks, mark{cols - 1, "now"})
+	for k, mk := range marks {
+		x := mk.i * step
+		if x < len(axis) {
+			axis[x] = []rune(tick)[0]
+		}
+		at := max(x-1, 0)
+		if k == 0 {
+			at = x
+		}
+		if k == len(marks)-1 {
+			at = x - len(mk.lab) + 1
+		}
+		for i, r := range mk.lab {
+			if at+i >= 0 && at+i < len(labels) {
+				labels[at+i] = r
+			}
+		}
+	}
+	lines = append(lines, mut.Render(strings.Repeat(" ", axisW-1)+corner+string(axis)), mut.Render(strings.Repeat(" ", axisW)+strings.TrimRight(string(labels), " ")))
+	return lines, "last 24 h"
 }
 
 func (m Model) cardAgents(w, h int) ([]string, string) {
@@ -216,16 +381,17 @@ func (m Model) cardLead(w, h int) ([]string, string) {
 	mut := t.fg(t.muted)
 	row := func(name string, ds []time.Duration) []string {
 		if len(ds) == 0 {
-			return []string{t.fg(t.text).Render(name), mut.Render("  no data yet")}
+			return []string{t.fg(t.text).Bold(!t.plain).Render(name) + mut.Render(": no data yet")}
 		}
-		return []string{t.fg(t.text).Render(name) + mut.Render(fmt.Sprintf("  %d items", len(ds))),
-			mut.Render("  median ") + t.fg(t.text).Bold(!t.plain).Render(fmt.Sprintf("%-7s", dur(percentile(ds, 0.5)))) +
-				mut.Render(" p90 ") + t.fg(t.text).Render(fmt.Sprintf("%-7s", dur(percentile(ds, 0.9)))) + "  " +
-				t.fg(t.accent).Render(sparkline(histogram(ds, 10), 10, t.g.ticks))}
+		return []string{
+			t.fg(t.text).Bold(!t.plain).Render(name) + mut.Render(": median ") + t.fg(t.text).Bold(!t.plain).Render(dur(percentile(ds, 0.5))) +
+				mut.Render(" (slowest 10%: ") + t.fg(t.text).Render(dur(percentile(ds, 0.9))) + mut.Render(")"),
+			mut.Render("  spread, fast → slow  ") + t.fg(t.accent).Render(sparkline(histogram(ds, 12), 12, t.g.ticks)) + mut.Render(fmt.Sprintf("  %d items", len(ds))),
+		}
 	}
-	lines := append(row("queued → PR ready", toReady), "")
+	lines := append(row("issue → PR ready", toReady), "")
 	lines = append(lines, row("PR ready → merged", toMerge)...)
-	return lines, "7 days"
+	return lines, "last 7 days"
 }
 
 func (m Model) cardNeeds(w, h int) ([]string, string) {

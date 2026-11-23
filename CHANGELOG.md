@@ -7,15 +7,19 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 - Added: `smithy tui`, a live dashboard (Bubble Tea v2): a dithered animated anvil header with
   the watcher, daily cap, agents and PRs; full-size views behind a tab bar (Overview charts of
-  throughput, agents by stage, the cap, CI health and lead time; Agents with a timeline and log
-  preview; Incoming with skipped issues and source status; Needs you; Activity; Worktrees;
-  Plans), details, logs, copy, filter, sort and mouse; reads local files only;
+  work per hour, agents by stage, the cap, CI health and how long work takes; Agents with a
+  timeline and log preview; Incoming with ignored issues and source status; Needs you, where `a`
+  accepts and `x` rejects a decision; Done; Activity; Worktrees; Plans, whose specs and tasks
+  open in a markdown reader; System, a read-only health report), details, logs, copy, filter,
+  sort and mouse; reads local files only;
   `smithy tui --demo` shows a rich fake world; `--no-anim`, `SMITHY_REDUCE_MOTION` and
   `NO_COLOR` are honored.
 - Added: `~/.smithy/events.jsonl`, a bounded event log (rotates at 5 MB, keeps one old file)
   written by `smithy auto` (poll, queued, skipped with the reason, launched, report) and
   `smithy cards set` (stage, CI, merged); never issue bodies or keys. The Linear source records
   its rate-limit headroom in the auto state.
+- Added: `smithy decisions reject <n> "<why>"`: the entry stays pending with `rejected: <why>`,
+  so the agent sees it and decides again.
 - Added: `auto.paused` (`p` in `smithy tui`): `smithy auto take` launches nothing while true.
   `internal/tui` is the one package allowed non-stdlib deps (Charm v2, latest).
 - Added: `smithy auto poll|take|report|status` and `smithy wait auto`: GitHub issues labeled

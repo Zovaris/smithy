@@ -2,11 +2,12 @@
  ╚═╗║║║║ ║ ╠═╣╚╦╝                                                     
  ╚═╝╩ ╩╩ ╩ ╩ ╩ ╩                                                      
  ● watching github, linear (TES) · next poll 35s                      
-  1   2   3   4 Needs you 7   5   6   7                               
-╭─ Needs you · 7 ────────────────────────────────────────────────────╮
+  1   2   3   4 Needs you 8   5   6   7   8   9                       
+╭─ Needs you · 8 ────────────────────────────────────────────────────╮
 │       what                                where                    │
 │ ▸ ?   Keep this decision? Retry the exp…  decided by timeout       │
 │   ?   Keep this decision? Split billing…  decided by self          │
+│   ?   Rejected, waiting for the agent: …  decided by consult       │
 │   ✓   Review PR #2009: Add SSO for admi…  auto-2026-11-23-1/TES…   │
 │   ✗   Unblock TES-212: Postgres or SQLi…  auto-2026-11-23-1/TES…   │
 │   ✓   Review PR #2010: Speed up cold st…  auto-2026-11-23-2/TES…   │
@@ -19,6 +20,5 @@
 │                                                                    │
 │                                                                    │
 │                                                                    │
-│                                                                    │
 ╰────────────────────────────────────────────────────────────────────╯
- ↑↓ move  enter details  o open  y copy command  / filter      ? help 
+ ↑↓ move  enter details  a accept  x reject  o open  y copy command ?…

@@ -47,7 +47,7 @@ func Demo(now time.Time) Snapshot {
 			t := day0.Add(-time.Duration(h)*time.Hour + time.Duration(r.IntN(60))*time.Minute)
 			add(events.Event{T: t, Kind: "queued", Source: src, ID: id, Detail: titles[n%len(titles)]})
 			t = t.Add(time.Duration(3+r.IntN(40)) * time.Minute)
-			add(events.Event{T: t, Kind: "launched", Source: src, ID: id, Batch: batch, Item: item})
+			add(events.Event{T: t, Kind: "launched", Source: src, ID: id, Batch: batch, Item: item, Detail: titles[n%len(titles)]})
 			t = t.Add(2 * time.Minute)
 			add(events.Event{T: t, Kind: "stage", Batch: batch, Item: item, Detail: "working"})
 			t = t.Add(time.Duration(20+r.IntN(90)) * time.Minute)
@@ -59,6 +59,13 @@ func Demo(now time.Time) Snapshot {
 				ci = "red"
 			}
 			add(events.Event{T: t, Kind: "ci", Batch: batch, Item: item, PR: pr, Detail: ci})
+			if ci == "red" {
+				end := "blocked"
+				if n%2 == 0 {
+					end = "dropped"
+				}
+				add(events.Event{T: t.Add(9 * time.Minute), Kind: "stage", Batch: batch, Item: item, PR: pr, Detail: end})
+			}
 			if ci == "green" {
 				t = t.Add(time.Duration(5+r.IntN(30)) * time.Minute)
 				add(events.Event{T: t, Kind: "stage", Batch: batch, Item: item, PR: pr, Detail: "ready"})
@@ -210,6 +217,12 @@ func Demo(now time.Time) Snapshot {
 			tl.Text[f] = fmt.Sprintf("# %02d · %s\nStatus: %s\nSpeed: normal\n\n## Goal\n%s, with a test that fails first.\n\n## Done when\n- go test ./... is green\n- the CHANGELOG has a line", j+1, titles[(j+k*3)%len(titles)], st, titles[(j+k*3)%len(titles)])
 		}
 		tl.Total = len(tl.Tasks)
+		if k != 3 {
+			tl.Text["spec.md"] = fmt.Sprintf("# %s\n\n## Why\nShip %s without breaking the nightly runs. Users asked for it in three issues.\n\n"+
+				"## Concepts\n- **Worker**: one agent on one task, in its own worktree.\n- **Gate**: CI must be green before review.\n\n"+
+				"## Plan\n| step | owner | status |\n|---|---|---|\n| design | agent | done |\n| build | agent | doing |\n| review | you | todo |\n\n"+
+				"## Done when\n1. `go test ./...` is green\n2. the CHANGELOG has a line\n3. a reviewer approved the PR\n\n```sh\nsmithy warden status\n```\n", name, name)
+		}
 		lists = append(lists, tl)
 	}
 
@@ -237,6 +250,7 @@ func Demo(now time.Time) Snapshot {
 		Decisions: []string{
 			"2026-11-23 · timeout · Retry the export with backoff? → yes, 3 tries · keeps the API polite · ref: https://github.com/acme/atlas/pull/2004",
 			"2026-11-23 · self · Split billing into two services? → not yet · too risky this week",
+			"2026-11-23 · consult · Pin Go 1.27 in CI? → yes · matches go.mod · ref: https://github.com/acme/smithy/pull/2012 · rejected: wait for the 1.27.5 security fix",
 		}}
 	return sanitize(snap)
 }

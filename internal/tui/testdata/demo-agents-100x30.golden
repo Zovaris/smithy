@@ -4,7 +4,7 @@
     ▄▀▀▀▀▀▀▀▄       DEMO  autonomous forge · dev · smithy                                           
  ● watching github, linear (TES) · next poll 35s   ███████████░░  69 / 80 launched                  
  5 working · 0 waiting · 2 stuck   3 ready for you · 1 CI running                                   
-  1 Overview   2 Agents   3 Incoming   4 Needs you 7   5 Activity   6 Worktrees   7 Plans           
+  1   2 Agents   3   4 8   5   6   7   8   9                                                        
 ╭─ Agents · 14 · sort stage ───────────────────────────────────────────────────────────────────────╮
 │   issue       title                      model   speed   stage     CI         PR      beat       │
 │ ▸ TES-212     Show CI time per PR        cheap   normal  blocked   -          -       2m ago     │

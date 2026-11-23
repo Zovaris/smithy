@@ -4,12 +4,12 @@
     ▄▀▀▀▀▀▀▀▄       DEMO  autonomous forge · dev · smithy                                           
  ● watching github, linear (TES) · next poll 35s   ███████████░░  69 / 80 launched                  
  5 working · 0 waiting · 2 stuck   3 ready for you · 1 CI running                                   
-  1 Overview   2 Agents   3 Incoming   4 Needs you 7   5 Activity   6 Worktrees   7 Plans           
-╭─ Throughput · per hour, 24 h ──────────────────╮╭─ Agents now · 13 live ─────────────────────────╮
-│ ━ launched 104   ━ ready or merged 162         ││ ██████████████████████████████████████████████ │
-│        ⢀⣀⡠⢤⡄   ⡠⠤⢄⣀⡀ ⢀⣀⡠⠴⠎⢻⡇     ⢀⣀⡀ ⢀⣀⡀ ⣠⣤⡤⣤⡄ ││                                                │
-│ ⠛⠳⠶⠶⠶⠮⠽⠏⠙⠣⠤⠕⠒⠲⠾⠗⠒⠒⠚⠛⠛⠓⠒⠒⠒⠒⠲⢧⣴⡞⠛⠓⠚⠓⠒⠚⠛⠣⠬⠕⠚⠃ ⠈⠉⢓ ││ ● 2 queued   ● 3 building   ● 2 checking       │
-│ -24h                                       now ││ ● 2 pr_open   ● 2 ready   ● 2 blocked          │
+  1 Overview   2   3   4 8   5   6   7   8   9                                                      
+╭─ Work per hour · last 24 h ────────────────────╮╭─ Agents now · 13 live ─────────────────────────╮
+│ launched ▇ 104   ready/merged ▇ 162            ││ ██████████████████████████████████████████████ │
+│ up   ▃▄▂▂▅▂▃▂▃▃▅▃▃▃▁▄▃▃▃▂▃█▇▁                  ││                                                │
+│ down ▄▂▃▄▅▆▃▃▆▅▃▅▆█▂▄▃▅▄▅▃▅▄▃                  ││ ● 2 queued   ● 3 building   ● 2 checking       │
+│      -24h                         now          ││ ● 2 pr_open   ● 2 ready   ● 2 blocked          │
 │                                                ││                                                │
 ╰────────────────────────────────────────────────╯╰────────────────────────────────────────────────╯
 ╭─ Daily cap · 86% ──────────────────────────────╮╭─ CI health · 20 runs ──────────────────────────╮
@@ -19,12 +19,12 @@
 │ 7 days  ▄▃▃▄▃▃█  30 21 24 30 23 26 69          ││ median CI time 9m   p90 14m                    │
 │ hours   any time                               ││                                                │
 ╰────────────────────────────────────────────────╯╰────────────────────────────────────────────────╯
-╭─ Lead time · 7 days ───────────────────────────╮╭─ Needs you · 7 ────────────────────────────────╮
-│ queued → PR ready  98 items                    ││ 7 items wait for you                           │
-│   median 1h57m   p90 2h42m    ▁▁▂▃▆▆█▅▅▃       ││                                                │
+╭─ How long it takes · last 7 days ──────────────╮╭─ Needs you · 8 ────────────────────────────────╮
+│ issue → PR ready: median 1h57m (slowest 10%: … ││ 8 items wait for you                           │
+│   spread, fast → slow  ▁▁▁▂▃▅▆█▅▄▆▃  98 items  ││                                                │
 │                                                ││ ? Keep this decision? Retry the export with b… │
-│ PR ready → merged  90 items                    ││ ? Keep this decision? Split billing into two … │
-│   median 1h44m   p90 3h03m    ▁▆▇▅█▅▅▅▄▃       ││ ✓ Review PR #2009: Add SSO for admins          │
-│                                                ││ +4 more · enter or 4 for the list              │
+│ PR ready → merged: median 1h44m (slowest 10%:… ││ ? Keep this decision? Split billing into two … │
+│   spread, fast → slow  ▁▄▄█▃█▃▅▄▄▃▃  90 items  ││ ? Rejected, waiting for the agent: Pin Go 1.2… │
+│                                                ││ +5 more · enter or 4 for the list              │
 ╰────────────────────────────────────────────────╯╰────────────────────────────────────────────────╯
  ↑↓ move  enter details                                                   tab views  ? help  q quit 

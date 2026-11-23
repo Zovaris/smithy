@@ -39,6 +39,12 @@ type row struct {
 	logTail  []string
 	text     []string
 	timeline [][2]string
+	decision int    // pending decision number (Needs you), 0 otherwise
+	md       string // markdown the reader shows on enter
+	mdTitle  string
+	chip     string // status shown in the modal title
+	chipC    color.Color
+	explain  []string // what the row means and what the keys do, for the modal
 }
 
 func (m Model) cols(v view) []col {
@@ -50,7 +56,9 @@ func (m Model) cols(v view) []col {
 	case vIncoming:
 		return []col{{"issue", 9, false, 0}, {"title", 0, true, 0}, {"source", 7, false, 2}, {"model", 6, false, 1}, {"speed", 6, false, 3}, {"queued", 8, false, 1}}
 	case vNeeds:
-		return []col{{"", 2, false, 0}, {"what", 0, true, 0}, {"where", 22, false, 1}, {"y copies", 26, false, 2}}
+		return []col{{"", 2, false, 0}, {"what", 0, true, 0}, {"where", 22, false, 1}, {"keys", 22, false, 2}}
+	case vDone:
+		return []col{{"issue", 10, false, 0}, {"title", 0, true, 0}, {"PR", 7, false, 1}, {"result", 8, false, 0}, {"took", 8, false, 1}, {"when", 9, false, 2}}
 	case vActivity:
 		return []col{{"when", 8, false, 0}, {"kind", 9, false, 0}, {"what", 0, true, 0}, {"where", 22, false, 1}}
 	case vWorktrees:
@@ -71,6 +79,8 @@ func (m Model) rows(v view) []row {
 		rs = m.incomingRows()
 	case vNeeds:
 		rs = m.needRows()
+	case vDone:
+		rs = m.doneRows()
 	case vActivity:
 		rs = m.activityRows()
 	case vWorktrees:
@@ -109,7 +119,8 @@ func (m Model) rows2(v view) []row {
 			}
 			reason, title, _ := strings.Cut(e.Detail, ": ")
 			out = append(out, row{cells: []cell{{s: e.ID, c: t.muted}, {s: title, c: t.text}, {s: reason, c: t.warn}, {s: ago(m.snap.At.Sub(e.T)), c: t.muted}},
-				title: "Skipped " + e.ID, detail: [][2]string{{"issue", e.Source + " " + e.ID}, {"title", title}, {"why", reason}, {"seen", e.T.Local().Format("2006-01-02 15:04")}}})
+				title: "Ignored " + e.ID, chip: "ignored", chipC: t.muted,
+				explain: []string{"Seen by smithy auto but not started: " + reason + ".", "Add the auto label (auto.label) or change the filters to start it."}, detail: [][2]string{{"issue", e.Source + " " + e.ID}, {"title", title}, {"why", reason}, {"seen", e.T.Local().Format("2006-01-02 15:04")}}})
 		}
 		return out
 	case vPlans:
@@ -127,7 +138,7 @@ func (m Model) rows2(v view) []row {
 				text = readLines(tk.File, 400)
 			}
 			out = append(out, row{cells: []cell{{s: tk.NN, c: t.muted}, {s: "[" + tk.Status + "]", c: c, bold: true}, {s: tk.Title, c: t.text}},
-				title: tk.NN + " · " + tk.Title, text: text, copy: tk.File})
+				title: tk.NN + " · " + tk.Title, text: text, copy: tk.File, md: strings.Join(text, "\n"), mdTitle: home(tk.File)})
 		}
 		return out
 	}
@@ -343,6 +354,7 @@ func (m Model) agentRows() []row {
 			cells: []cell{{s: issue, c: t.text, bold: true}, {s: or(it.Title), c: t.text}, {s: or(it.Repo), c: t.muted}, {s: or(branch), c: t.muted},
 				{s: it.Model, c: t.muted}, {s: or(it.Speed), c: t.muted}, {s: st, c: m.stageColor(st), bold: true}, m.ciCell(it.CI),
 				{s: pr, c: t.accent}, {s: beat, c: bc}, {s: it.Age, c: t.muted}},
+			chip: st, chipC: m.stageColor(st),
 			search: it.Batch + " " + it.Branch, url: it.PR, copy: firstNonDash(it.PR, it.Worktree, it.Branch), title: it.Batch + "/" + it.ID,
 			detail: m.itemDetail(it), logPath: logPath, logTail: it.LogTail, timeline: m.timeline(it),
 			cmd: "smithy cards get " + it.Batch + " " + it.ID})
@@ -376,7 +388,7 @@ func (m Model) incomingRows() []row {
 		if len(body) > 8 {
 			body = append(body[:8], "…")
 		}
-		d := [][2]string{{"issue", q.Source + " " + q.ID}, {"title", q.Title}, {"model", or(q.Model)},
+		d := [][2]string{{"source", q.Source}, {"key", or(q.Key)}, {"issue", q.ID}, {"title", q.Title}, {"model", or(q.Model)},
 			{"speed", or(q.Speed)}, {"queued", q.QueuedAt.Local().Format("2006-01-02 15:04")}, {"url", q.URL}, {"", ""}}
 		for i, l := range body {
 			k := ""
@@ -387,7 +399,8 @@ func (m Model) incomingRows() []row {
 		}
 		out = append(out, row{cells: []cell{{s: q.ID, c: t.text, bold: true}, {s: q.Title, c: t.text}, {s: q.Source, c: t.muted},
 			{s: or(q.Model), c: t.muted}, {s: or(q.Speed), c: t.muted}, {s: ago(m.snap.At.Sub(q.QueuedAt)), c: t.muted}},
-			url: q.URL, copy: q.URL, title: "Issue " + q.ID, detail: d})
+			url: q.URL, copy: q.URL, title: q.ID + " · " + q.Title, detail: d, chip: "queued", chipC: t.accent,
+			explain: []string{"Waits for the daily cap and the hours window; smithy auto take starts it."}})
 	}
 	return out
 }
@@ -397,30 +410,53 @@ func (m Model) needRows() []row {
 	var out []row
 	for n, d := range m.snap.Decisions {
 		f := strings.Split(d, " · ")
-		q := d
-		if len(f) >= 3 {
-			q = f[2]
-		}
-		names := []string{"date", "by", "decision", "why", "ref"}
-		var det [][2]string
-		ref := ""
+		q, by, why, ref, rejected := d, "self", "", "", ""
 		for j, v := range f {
-			name := "field"
-			if j < len(names) {
-				name = names[j]
+			switch {
+			case j == 1:
+				by = strings.TrimPrefix(v, "by ")
+			case j == 2:
+				q = v
+			case strings.HasPrefix(v, "why: "):
+				why = strings.TrimPrefix(v, "why: ")
+			case strings.HasPrefix(v, "ref: "):
+				ref = strings.TrimPrefix(v, "ref: ")
+			case strings.HasPrefix(v, "rejected: "):
+				rejected = strings.TrimPrefix(v, "rejected: ")
+			case j == 3:
+				why = v
 			}
-			if r, ok := strings.CutPrefix(v, "ref: "); ok {
-				v, ref = r, r
-			}
-			det = append(det, [2]string{name, v})
 		}
-		where := "decision"
-		if len(f) >= 2 {
-			where = "decided by " + f[1]
+		question, choice, _ := strings.Cut(q, " → ")
+		byWord := map[string]string{"timeout": "the agent, after nobody answered in time", "self": "the agent on its own",
+			"consult": "the agent, after asking smithy consult"}[by]
+		if byWord == "" {
+			byWord = by
+		}
+		chip, chipC, what := "decide", t.warn, "Keep this decision? "+q
+		if rejected != "" {
+			chip, chipC, what = "rejected", t.err, "Rejected, waiting for the agent: "+q
 		}
 		cmd := fmt.Sprintf("smithy decisions confirm %d", n+1)
-		out = append(out, row{cells: []cell{{s: "?", c: t.warn, bold: true}, {s: "Keep this decision? " + q, c: t.text}, {s: where, c: t.muted}, {s: cmd, c: t.accent}},
-			url: ref, copy: q, cmd: cmd, title: "Decision", detail: det, search: "decision"})
+		det := [][2]string{{"question", question}, {"decided", or(choice)}, {"by", byWord}, {"why", or(why)}}
+		if ref != "" {
+			det = append(det, [2]string{"ref", ref})
+		}
+		if rejected != "" {
+			det = append(det, [2]string{"you said", rejected})
+		}
+		if len(f) > 0 {
+			det = append(det, [2]string{"date", f[0]})
+		}
+		out = append(out, row{cells: []cell{{s: "?", c: chipC, bold: true}, {s: what, c: t.text}, {s: "decided by " + by, c: t.muted}, {s: "a accept · x reject", c: t.accent}},
+			url: ref, copy: q, cmd: cmd, title: "Decision " + fmt.Sprint(n+1) + ": " + question, detail: det, search: "decision " + chip,
+			decision: n + 1, chip: chip, chipC: chipC,
+			explain: []string{
+				"An agent had to choose without you and went on with: " + or(choice) + ".",
+				"a accepts it (smithy decisions confirm " + fmt.Sprint(n+1) + "): nothing changes, the entry is closed.",
+				"x rejects it with one line of why: the entry stays pending with your reason, and the agent",
+				"that took it sees it in smithy decisions pending and decides again.",
+			}})
 	}
 	for _, it := range m.items() {
 		switch st := stageOf(it); st {
@@ -430,13 +466,22 @@ func (m Model) needRows() []row {
 			}
 			cmd := "gh pr merge " + it.PR
 			out = append(out, row{cells: []cell{{s: t.g.pass, c: t.ok, bold: true}, {s: "Review PR " + shortPR(it.PR) + ": " + or(it.Title), c: t.text},
-				{s: it.Batch + "/" + it.ID, c: t.muted}, {s: cmd, c: t.accent}},
-				url: it.PR, copy: it.PR, cmd: cmd, title: "PR " + shortPR(it.PR), detail: m.itemDetail(it), logTail: it.LogTail, search: "pr review merge"})
+				{s: it.Batch + "/" + it.ID, c: t.muted}, {s: "o open · y merge cmd", c: t.accent}},
+				url: it.PR, copy: it.PR, cmd: cmd, title: "PR " + shortPR(it.PR) + " · " + or(it.Title), detail: m.itemDetail(it), logTail: it.LogTail,
+				search: "pr review merge", chip: "ready for review", chipC: t.ok,
+				explain: []string{"CI is " + it.CI + ". Review it on GitHub (o), then merge there or with the command y copies:",
+					cmd, "smithy never merges from here."}})
 		case "blocked":
-			cmd := "smithy cards get " + it.Batch + " " + it.ID
+			cmd := fmt.Sprintf("smithy cards set %s %s state=working note=\"unblocked: <what changed>\"", it.Batch, it.ID)
+			logPath := it.Log
+			if m.snap.Demo {
+				logPath = ""
+			}
 			out = append(out, row{cells: []cell{{s: t.g.fail, c: t.err, bold: true}, {s: "Unblock " + it.ID + ": " + or(it.Text), c: t.text},
-				{s: it.Batch + "/" + it.ID, c: t.muted}, {s: cmd, c: t.accent}},
-				url: it.PR, copy: it.ID, cmd: cmd, title: it.Batch + "/" + it.ID, detail: m.itemDetail(it), logTail: it.LogTail, search: "blocked stuck"})
+				{s: it.Batch + "/" + it.ID, c: t.muted}, {s: "l log · y resume cmd", c: t.accent}},
+				url: it.PR, copy: or(it.Worktree), cmd: cmd, title: it.Batch + "/" + it.ID + " · " + or(it.Title), detail: m.itemDetail(it),
+				logPath: logPath, logTail: it.LogTail, search: "blocked stuck", chip: it.Stage, chipC: t.err,
+				explain: []string{"The worker stopped: " + or(it.Text) + ".", "Fix the cause (worktree " + or(it.Worktree) + "), then resume it with the command y copies."}})
 		}
 	}
 	return out
@@ -548,7 +593,7 @@ func (m Model) worktreeRows() []row {
 		}
 		out = append(out, row{cells: []cell{{s: home(w.Path), c: t.text}, {s: or(w.Branch), c: t.muted}, {s: or(w.Item), c: t.muted},
 			{s: age, c: t.muted}, dirty, {s: ab, c: t.muted}, state},
-			copy: w.Path, cmd: "git worktree remove " + w.Path, title: "Worktree", detail: d})
+			copy: w.Path, cmd: "git worktree remove " + w.Path, title: home(w.Path), detail: d, chip: state.s, chipC: state.c})
 	}
 	return out
 }
@@ -573,8 +618,114 @@ func (m Model) planRows() []row {
 		for _, s := range statuses(tl.Counts) {
 			d = append(d, [2]string{s, fmt.Sprint(tl.Counts[s])})
 		}
+		spec, ok := tl.Text["spec.md"]
+		if !ok && tl.Text == nil {
+			if b, err := os.ReadFile(filepath.Join(tl.Dir, "spec.md")); err == nil {
+				spec = strings.Join(cleanAll(strings.Split(string(b), "\n")), "\n")
+			}
+		}
+		if spec == "" {
+			var b strings.Builder
+			fmt.Fprintf(&b, "# %s\n\nNo spec.md in %s. Its tasks:\n\n", filepath.Base(tl.Dir), tl.Dir)
+			for _, tk := range tl.Tasks {
+				fmt.Fprintf(&b, "- **%s** %s · %s\n", tk.NN, tk.Title, tk.Status)
+			}
+			spec = b.String()
+		}
 		out = append(out, row{cells: []cell{{s: filepath.Base(tl.Dir), c: t.text, bold: true}, {s: bar, c: c}, {s: fmt.Sprintf("%d/%d", done, tl.Total), c: t.muted}},
-			copy: tl.Dir, title: "Plan " + filepath.Base(tl.Dir), detail: d})
+			copy: tl.Dir, title: "Plan " + filepath.Base(tl.Dir), detail: d, md: spec, mdTitle: home(filepath.Join(tl.Dir, "spec.md"))})
 	}
 	return out
+}
+
+// doneRows is finished work, newest first: from the event log, plus finished cards it lacks.
+func (m Model) doneRows() []row {
+	t := m.th
+	type job struct {
+		issue, title, pr, result, batch, item string
+		start, end                            time.Time
+	}
+	titles := map[string]string{}
+	issues := map[string]string{}
+	starts := map[string]time.Time{}
+	jobs := map[string]*job{}
+	var order []string
+	for _, e := range m.snap.Events {
+		k := e.Batch + "/" + e.Item
+		switch {
+		case e.Kind == "queued":
+			titles[e.Source+":"+e.ID] = e.Detail
+		case e.Kind == "launched":
+			starts[k] = e.T
+			issues[k] = e.ID
+			if tt := titles[e.Source+":"+e.ID]; tt != "" {
+				titles[k] = tt
+			} else if e.Detail != "" {
+				titles[k] = e.Detail
+			}
+		case e.Kind == "merged" || (e.Kind == "stage" && (e.Detail == "ready" || e.Detail == "blocked" || e.Detail == "dropped" || e.Detail == "failed")):
+			res := map[string]string{"merged": "merged", "ready": "ready", "blocked": "blocked", "failed": "blocked", "dropped": "closed"}[e.Detail]
+			if e.Kind == "merged" {
+				res = "merged"
+			}
+			j, ok := jobs[k]
+			if !ok {
+				j = &job{batch: e.Batch, item: e.Item}
+				jobs[k] = j
+				order = append(order, k)
+			}
+			j.result, j.end = res, e.T
+			if e.PR != "" {
+				j.pr = e.PR
+			}
+		}
+	}
+	for _, it := range m.items() {
+		k := it.Batch + "/" + it.ID
+		res := map[string]string{"merged": "merged", "reported": "merged", "dropped": "closed"}[it.Stage]
+		if _, ok := jobs[k]; ok || res == "" || it.Updated == nil {
+			continue
+		}
+		end, _ := time.Parse(time.RFC3339, *it.Updated)
+		jobs[k] = &job{batch: it.Batch, item: it.ID, result: res, end: end, pr: it.PR}
+		order = append(order, k)
+	}
+	var js []*job
+	for _, k := range order {
+		j := jobs[k]
+		j.issue, j.title, j.start = issues[k], titles[k], starts[k]
+		for _, it := range m.items() {
+			if it.Batch == j.batch && it.ID == j.item && j.title == "" {
+				j.title = it.Title
+			}
+		}
+		js = append(js, j)
+	}
+	sort.SliceStable(js, func(a, b int) bool { return js[a].end.After(js[b].end) })
+	var out []row
+	for _, j := range js {
+		took := "-"
+		if !j.start.IsZero() && j.end.After(j.start) {
+			took = dur(j.end.Sub(j.start))
+		}
+		c := map[string]color.Color{"merged": t.ok, "ready": t.accent, "closed": t.muted, "blocked": t.err}[j.result]
+		issue := or(j.issue)
+		if issue == "-" {
+			issue = j.item
+		}
+		pr := shortPR(or(j.pr))
+		out = append(out, row{cells: []cell{{s: issue, c: t.text, bold: true}, {s: or(j.title), c: t.text}, {s: pr, c: t.accent},
+			{s: j.result, c: c, bold: true}, {s: took, c: t.muted}, {s: ago(m.snap.At.Sub(j.end)), c: t.muted}},
+			url: j.pr, copy: firstNonDash(j.pr, j.batch+"/"+j.item), title: issue + " · " + or(j.title), chip: j.result, chipC: c,
+			detail: [][2]string{{"issue", issue}, {"title", or(j.title)}, {"batch", j.batch}, {"item", j.item}, {"pr", or(j.pr)},
+				{"result", j.result}, {"started", stampOr(j.start)}, {"finished", stampOr(j.end)}, {"took", took}}})
+	}
+	return out
+}
+
+func stampOr(t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	return t.Local().Format("2006-01-02 15:04")
 }

@@ -215,6 +215,13 @@ func (m Model) body() []*lipgloss.Layer {
 	if v == vOverview {
 		return m.overview()
 	}
+	if v == vSystem {
+		_, _, b, _ := m.frame()
+		lw := b.w / 2
+		l, r := m.systemLines(lw - 4)
+		lr, rr := rect{b.x, b.y, lw, b.h}, rect{b.x + lw, b.y, b.w - lw, b.h}
+		return []*lipgloss.Layer{layer(m.box("Health", "read-only", false, nil, lr, l), lr), layer(m.box("Settings", "auto · linear · warden", false, nil, rr, r), rr)}
+	}
 	ps := m.panes()
 	var out []*lipgloss.Layer
 	if r, ok := ps["top"]; ok {
@@ -247,9 +254,10 @@ func (m Model) body() []*lipgloss.Layer {
 			lines = m.preview(r.w-4, r.h-2)
 		case vIncoming:
 			rs := m.rows2(v)
-			title, badge = "Recently skipped", fmt.Sprint(len(rs))
-			lines, _ = m.table([]col{{"issue", 9, false, 0}, {"title", 0, true, 0}, {"why", 24, false, 1}, {"seen", 8, false, 2}}, rs, m.sel2[v], m.pane[v] == 1, r.w-4, r.h-2,
-				[]string{"", t.fg(t.muted).Italic(true).Render("Nothing skipped lately: every issue seen passed the filters.")})
+			title, badge = "Ignored", fmt.Sprint(len(rs))
+			lines, _ = m.table([]col{{"issue", 9, false, 0}, {"title", 0, true, 0}, {"why", 24, false, 1}, {"seen", 8, false, 2}}, rs, m.sel2[v], m.pane[v] == 1, r.w-4, r.h-3,
+				[]string{"", t.fg(t.muted).Italic(true).Render("Nothing ignored lately: every issue seen was started or queued.")})
+			lines = append([]string{t.fg(t.muted).Italic(true).Render("Seen but not started: not labeled " + "auto" + ", or outside the filters.")}, lines...)
 		case vPlans:
 			rs := m.rows2(v)
 			title = "Tasks"
@@ -283,6 +291,8 @@ func (m Model) empty(v view) []string {
 		return []string{"", mut.Render("No events yet. smithy auto and smithy cards set write ~/.smithy/events.jsonl.")}
 	case vWorktrees:
 		return []string{"", mut.Render("No worktrees: running workers' worktrees appear here.")}
+	case vDone:
+		return []string{"", mut.Render("Nothing finished yet: merged, ready, closed and blocked work lands here."), mut.Render("It reads ~/.smithy/events.jsonl and the cards.")}
 	}
 	return []string{"", mut.Render(meaning[v]), cmd(`smithy tasks add <dir> "<title>"`)}
 }
@@ -465,11 +475,16 @@ func (m Model) sourceLines(w int) []string {
 }
 
 func (m Model) tabLabel(v view) string {
-	label := fmt.Sprintf(" %d %s ", v+1, viewNames[v])
-	if m.compactTabs() && v != m.view {
-		label = fmt.Sprintf(" %d ", v+1)
+	badge := ""
+	if v == vNeeds {
+		if n := len(m.rows(vNeeds)); n > 0 {
+			badge = fmt.Sprintf(" %d", n)
+		}
 	}
-	return label
+	if m.compactTabs() && v != m.view {
+		return fmt.Sprintf(" %d%s ", v+1, badge)
+	}
+	return fmt.Sprintf(" %d %s%s ", v+1, viewNames[v], badge)
 }
 
 func (m Model) compactTabs() bool {
@@ -501,9 +516,6 @@ func (m Model) tabbar(w int) string {
 		default:
 			b.WriteString(t.fg(t.muted).Render(l))
 		}
-		if v == vNeeds && needs > 0 {
-			b.WriteString(t.fg(t.warn).Bold(!t.plain).Render(fmt.Sprintf("%d ", needs)))
-		}
 		b.WriteString(" ")
 	}
 	return pad(b.String(), w)
@@ -514,7 +526,6 @@ func (m Model) tabAt(x, y int) (view, bool) {
 	if y != tabY {
 		return 0, false
 	}
-	needs := len(m.rows(vNeeds))
 	pos := 1
 	for v := view(0); v < nViews; v++ {
 		wd := lipgloss.Width(m.tabLabel(v))
@@ -522,9 +533,6 @@ func (m Model) tabAt(x, y int) (view, bool) {
 			return v, true
 		}
 		pos += wd + 1
-		if v == vNeeds && needs > 0 {
-			pos += len(fmt.Sprint(needs)) + 1
-		}
 	}
 	return 0, false
 }
@@ -550,6 +558,9 @@ func (m Model) footer(w int) string {
 	if m.filtering {
 		return pad(" "+m.input.View()+lbl.Render("   enter keep "+t.g.dot+" esc clear"), w)
 	}
+	if m.prompting {
+		return pad(" "+t.fg(t.err).Render(fmt.Sprintf("reject decision %d ", m.promptN))+m.reason.View()+lbl.Render("   enter reject "+t.g.dot+" esc cancel"), w)
+	}
 	render := func(bs []key.Binding) string {
 		var parts []string
 		for _, b := range bs {
@@ -563,9 +574,9 @@ func (m Model) footer(w int) string {
 	case m.textOpen:
 		left = kst.Render("↑↓ pgup pgdn") + " " + lbl.Render("scroll") + "  " + render([]key.Binding{keys.Close})
 	case m.modal:
-		left = render([]key.Binding{keys.Close, keys.Open, keys.Copy, keys.Cmd, keys.Log})
+		left = render(m.actionKeys())
 	default:
-		left = render(context(m.view))
+		left = render(viewKeys(m.view))
 	}
 	if m.status != "" {
 		left = t.fg(t.warn).Render(m.status)
@@ -584,9 +595,23 @@ func (m Model) modalBox(w, h int) string {
 	if !ok {
 		return ""
 	}
-	bw := min(w-6, 100)
+	bw := min(w-6, 104)
 	inner := bw - 4
-	lines := []string{t.fg(t.accent).Bold(true).Render(r.title), ""}
+	title := t.fg(t.accent).Bold(true).Render(short(r.title, inner-20))
+	if r.chip != "" {
+		st := lipgloss.NewStyle().Bold(true).Reverse(true)
+		if !t.plain {
+			st = lipgloss.NewStyle().Bold(true).Foreground(t.surface).Background(r.chipC)
+		}
+		title += "  " + st.Render(" "+r.chip+" ")
+	}
+	lines := []string{title, ""}
+	for _, e := range r.explain {
+		lines = append(lines, t.fg(t.text).Italic(!t.plain).Render(short(e, inner)))
+	}
+	if len(r.explain) > 0 {
+		lines = append(lines, "")
+	}
 	kw := 0
 	for _, kv := range r.detail {
 		kw = max(kw, len(kv[0]))
@@ -599,9 +624,15 @@ func (m Model) modalBox(w, h int) string {
 		}
 		lines = append(lines, ansi.Truncate(k+v, inner, "…"))
 	}
-	if len(lines) > h-2 {
-		lines = append(lines[:max(h-3, 1)], t.fg(t.muted).Render("…"))
+	var acts []string
+	for _, b := range m.actionKeys() {
+		acts = append(acts, t.fg(t.accent).Render(b.Help().Key)+" "+t.fg(t.muted).Render(b.Help().Desc))
 	}
+	foot := []string{"", t.fg(t.border).Render(strings.Repeat("─", inner)), strings.Join(acts, "   ")}
+	if len(lines)+len(foot) > h-2 {
+		lines = append(lines[:max(h-3-len(foot), 1)], t.fg(t.muted).Render("…"))
+	}
+	lines = append(lines, foot...)
 	st := m.panelStyle(t.accent).Width(bw)
 	if !t.plain {
 		st = st.Background(t.surface)
@@ -625,7 +656,7 @@ func (m Model) helpBox(w, h int) string {
 	k, l := t.fg(t.accent), t.fg(t.muted)
 	lines := []string{t.fg(t.accent).Bold(true).Render("smithy tui " + t.g.dot + " help"), ""}
 	for _, b := range []key.Binding{keys.Next, keys.Prev, keys.Jump, keys.Up, keys.Left, keys.Enter, keys.Close, keys.Open,
-		keys.Log, keys.Copy, keys.Cmd, keys.Sort, keys.Type, keys.Pause, keys.Filter, keys.Refresh, keys.Help, keys.Quit} {
+		keys.Log, keys.Copy, keys.Cmd, keys.Accept, keys.Reject, keys.Sort, keys.Type, keys.Pause, keys.Filter, keys.Refresh, keys.Help, keys.Quit} {
 		lines = append(lines, k.Render(fmt.Sprintf("%-9s", b.Help().Key))+l.Render(b.Help().Desc))
 	}
 	lines = append(lines, k.Render(fmt.Sprintf("%-9s", "mouse"))+l.Render("click a tab or a row, double-click opens, wheel moves"), "")

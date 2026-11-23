@@ -5,7 +5,7 @@
               ▀▀▀▀▀▀▀              DEMO  autonomous forge · dev · smithy                               PRs      3 ready for you · 1 CI running                  
          ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                                                     14:30:00                                        
-  1 Overview   2 Agents   3 Incoming   4 Needs you 7   5 Activity   6 Worktrees   7 Plans                                                                       
+  1 Overview   2 Agents   3 Incoming   4 Needs you 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System                                                   
 ╭─ Agents · 14 · sort stage ────────────────────────────────────────────────────────────────────────────╮╭─ Preview ───────────────────────────────────────────╮
 │   issue       title                       repo        model   stage     CI         PR      beat       ││ auto-2026-11-23-1/TES-212                           │
 │ ▸ TES-212     Show CI time per PR         smithy      cheap   blocked   -          -       2m ago     ││ Show CI time per PR                                 │
