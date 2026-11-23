@@ -34,6 +34,9 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - Added: worker heartbeat: `smithy cards beat <batch> <id>` (and every `cards set`) stamps
   `last_beat`; the board shows a `beat` column and `wait batch`'s `stale:` line its age. A working
   item is stuck after `warden.stuck_minutes` (default 15, was 45 min of no update) without a beat.
+- Changed: tend `AUTO.md` says unattended runs need workers that outlive the session (CLI
+  `claude --bg`, Codex, `smithy agent` CLIs or desktop sessions, not the subagent fallback), and
+  reports issues by their `Ref:` or `linear:TES-1`.
 
 - Added: tend `auto` mode (`references/AUTO.md`): waits on `smithy wait auto`, takes the queue
   into a task dir, runs warden on it with batch values pre-answered and reports each issue
