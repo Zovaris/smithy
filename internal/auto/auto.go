@@ -103,6 +103,9 @@ func Requeue(dir string) (requeued int, gaveUp []string, err error) {
 	if len(ts) == 0 {
 		return 0, nil, nil
 	}
+	if batchStarted(dir) {
+		return 0, nil, nil
+	}
 	files := map[string]string{}
 	for _, t := range ts {
 		if t.Status != "todo" {
@@ -788,4 +791,48 @@ func bodyLines(s string) []string {
 		out[i] = stripEscapes(l, true)
 	}
 	return out
+}
+
+// batchStarted reports whether a warden batch over dir has a card past queued: its workers
+// started even if nobody moved the task files off todo.
+func batchStarted(dir string) bool {
+	home := os.Getenv("SMITHY_HOME")
+	if home == "" {
+		h, err := os.UserHomeDir()
+		if err != nil {
+			return false
+		}
+		home = filepath.Join(h, ".smithy")
+	}
+	want, _ := filepath.EvalSymlinks(dir)
+	batches, _ := os.ReadDir(filepath.Join(home, "warden"))
+	for _, b := range batches {
+		bd := filepath.Join(home, "warden", b.Name())
+		raw, err := os.ReadFile(filepath.Join(bd, "batch.json"))
+		if err != nil {
+			continue
+		}
+		var bt struct {
+			TasksDir string `json:"tasks_dir"`
+		}
+		if json.Unmarshal(raw, &bt) != nil || bt.TasksDir == "" {
+			continue
+		}
+		if got, _ := filepath.EvalSymlinks(bt.TasksDir); got != want {
+			continue
+		}
+		cs, _ := os.ReadDir(bd)
+		for _, c := range cs {
+			if c.Name() == "batch.json" || filepath.Ext(c.Name()) != ".json" {
+				continue
+			}
+			var card struct {
+				State string `json:"state"`
+			}
+			if raw, err := os.ReadFile(filepath.Join(bd, c.Name())); err == nil && json.Unmarshal(raw, &card) == nil && card.State != "" && card.State != "queued" {
+				return true
+			}
+		}
+	}
+	return false
 }
