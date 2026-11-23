@@ -5,6 +5,12 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Fixed: when a serve orchestrator ends with every task file of its dir still `todo`, serve puts
+  those issues back in the queue (`requeued N issue(s): orchestrator started nothing (log …)`), at
+  most twice per issue (`requeued` in state.json); after that it logs `giving up on <id>`.
+- Added: the TUI Agents view and Overview "Agents now" show the running serve orchestrator as its
+  own row (kind orchestrator: agent, pid, elapsed, task dir, session log; `l` opens its log), read
+  from `serve.json` or `orchestrator.json`.
 - Added: `smithy auto serve [--agent <cli>] [--once] [--max-hours <n>]`, the unattended loop
   outside the LLM: polls every `auto.every`, and when `auto take` yields a task dir starts one
   headless orchestrator (`smithy agent --bg --profile auto`) that runs `tend auto once <dir>`; one

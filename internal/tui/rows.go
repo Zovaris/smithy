@@ -330,6 +330,9 @@ func (m Model) agentRows() []row {
 		return indexOf(stageOrder, stageOf(a)) < indexOf(stageOrder, stageOf(b))
 	})
 	var out []row
+	if r, ok := m.orchestratorRow(); ok {
+		out = append(out, r)
+	}
 	for _, it := range its {
 		st := stageOf(it)
 		issue := it.Source
@@ -360,6 +363,39 @@ func (m Model) agentRows() []row {
 			cmd: "smithy cards get " + sh(it.Batch) + " " + sh(it.ID)})
 	}
 	return out
+}
+
+// orchestratorRow is the running serve orchestrator (kind orchestrator), from serve.json or
+// orchestrator.json; ok is false when none runs.
+func (m Model) orchestratorRow() (row, bool) {
+	t := m.th
+	sv := m.snap.Watcher.Serve
+	if !sv.SessionOn || sv.SessionPID <= 0 {
+		return row{}, false
+	}
+	elapsed := "-"
+	if !sv.SessionAt.IsZero() {
+		elapsed = dur(m.snap.At.Sub(sv.SessionAt))
+	}
+	dir := filepath.Base(sv.SessionDir)
+	if sv.SessionDir == "" {
+		dir = "-"
+	}
+	logPath := sv.SessionLog
+	if m.snap.Demo {
+		logPath = ""
+	}
+	return row{
+		cells: []cell{{s: "serve", c: t.text, bold: true}, {s: fmt.Sprintf("orchestrator · %s · pid %d · %s", or(sv.Agent), sv.SessionPID, dir), c: t.text},
+			{s: "-", c: t.muted}, {s: "-", c: t.muted}, {s: "-", c: t.muted}, {s: "-", c: t.muted},
+			{s: "orchestr", c: t.accent, bold: true}, {s: "-", c: t.muted}, {s: "-", c: t.muted}, {s: "-", c: t.muted}, {s: elapsed, c: t.muted}},
+		chip: "orchestrator", chipC: t.accent, search: "orchestrator serve " + sv.SessionDir, copy: sv.SessionLog,
+		title: "orchestrator pid " + fmt.Sprint(sv.SessionPID),
+		detail: [][2]string{{"kind", "orchestrator"}, {"agent", or(sv.Agent)}, {"pid", fmt.Sprint(sv.SessionPID)}, {"elapsed", elapsed},
+			{"task dir", or(home(sv.SessionDir))}, {"session log", or(home(sv.SessionLog))}},
+		logPath: logPath,
+		explain: []string{"The headless session smithy auto serve started to run tend auto once on the task dir.",
+			"l opens its session log. Stopping serve never stops it."}}, true
 }
 
 func firstNonDash(ss ...string) string {

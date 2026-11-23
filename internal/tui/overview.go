@@ -249,7 +249,19 @@ func (m Model) cardAgents(w, h int) ([]string, string) {
 		}
 	}
 	order := []string{"queued", "building", "checking", "pr_open", "ready", "blocked"}
+	var orch string
+	if sv := m.snap.Watcher.Serve; sv.SessionOn && sv.SessionPID > 0 {
+		el := ""
+		if !sv.SessionAt.IsZero() {
+			el = " " + t.g.dot + " " + dur(m.snap.At.Sub(sv.SessionAt))
+		}
+		orch = t.fg(t.accent).Render(t.g.on) + " " + t.fg(t.text).Render("orchestrator") +
+			t.fg(t.muted).Render(short(fmt.Sprintf("  %s pid %d%s", or(sv.Agent), sv.SessionPID, el), max(w-14, 10)))
+	}
 	if total == 0 {
+		if orch != "" {
+			return []string{orch, "", t.fg(t.muted).Italic(true).Render("No workers yet.")}, "1 live"
+		}
 		return []string{"", t.fg(t.muted).Italic(true).Render("No workers right now."), t.fg(t.accent).Render("$ smithy warden status")}, "0"
 	}
 	var bar strings.Builder
@@ -276,6 +288,9 @@ func (m Model) cardAgents(w, h int) ([]string, string) {
 		leg = append(leg, t.fg(m.stageColor(st)).Render(t.g.on)+" "+t.fg(t.text).Render(fmt.Sprintf("%d", counts[st]))+" "+t.fg(t.muted).Render(st))
 	}
 	lines = append(lines, strings.Join(leg[:3], "   "), strings.Join(leg[3:], "   "), "")
+	if orch != "" {
+		lines = append(lines, orch)
+	}
 	sort.SliceStable(live, func(i, j int) bool { return m.beatAge(live[i]) < m.beatAge(live[j]) })
 	spin := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 	if !t.g.unicode {

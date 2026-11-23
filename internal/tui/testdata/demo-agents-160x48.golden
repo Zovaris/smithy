@@ -6,23 +6,23 @@
          ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
   1 Overview   2 Agents   3 Incoming   4 Needs you 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System                                                   
-╭─ Agents · 14 · sort stage ────────────────────────────────────────────────────────────────────────────╮╭─ Preview ───────────────────────────────────────────╮
-│   issue       title                       repo        model   stage     CI         PR      beat       ││ auto-2026-11-23-1/TES-212                           │
-│ ▸ TES-212     Show CI time per PR         smithy      cheap   blocked   -          -       2m ago     ││ Show CI time per PR                                 │
-│   TES-211     Typed config loader         ledger-web  strong  blocked   ✗ red      #2011   38m ago    ││                                                     │
-│   TES-209     Add SSO for admins          smithy      cheap   ready     ✓ green    #2009   1m ago     ││ timeline                                            │
-│   TES-210     Speed up cold start         atlas       mid     ready     ✓ green    #2010   2m ago     ││ ├─ 11:50  queued                                    │
-│   TES-207     Upgrade to Go 1.27          atlas       mid     pr_open   ◐ running  #2007   1m ago     ││ ├─ 12:02  launched                                  │
-│   TES-208     Drop the legacy CSV impor…  ledger-web  strong  pr_open   ✓ green    #2008   1m ago     ││ ├─ 12:04  stage working                             │
-│   TES-206     Split the billing service   smithy      cheap   checking  -          -       1m ago     ││ └─ 12:40  stage needs_decision                      │
+╭─ Agents · 15 · sort stage ────────────────────────────────────────────────────────────────────────────╮╭─ Preview ───────────────────────────────────────────╮
+│   issue       title                       repo        model   stage     CI         PR      beat       ││ orchestrator pid 5150                               │
+│ ▸ serve       orchestrator · claude · p…  -           -       orchestr  -          -       -          ││ orchestrator · claude · pid 5150 · auto-2026-11-23… │
+│   TES-212     Show CI time per PR         smithy      cheap   blocked   -          -       2m ago     ││                                                     │
+│   TES-211     Typed config loader         ledger-web  strong  blocked   ✗ red      #2011   38m ago    ││ timeline                                            │
+│   TES-209     Add SSO for admins          smithy      cheap   ready     ✓ green    #2009   1m ago     ││ no events yet                                       │
+│   TES-210     Speed up cold start         atlas       mid     ready     ✓ green    #2010   2m ago     ││                                                     │
+│   TES-207     Upgrade to Go 1.27          atlas       mid     pr_open   ◐ running  #2007   1m ago     ││ log  l opens it all                                 │
+│   TES-208     Drop the legacy CSV impor…  ledger-web  strong  pr_open   ✓ green    #2008   1m ago     ││ no log yet                                          │
+│   TES-206     Split the billing service   smithy      cheap   checking  -          -       1m ago     ││                                                     │
 │   TES-205     Retry webhooks with backo…  ledger-web  strong  checking  -          -       1m ago     ││                                                     │
-│   TES-203     Cache board queries         smithy      cheap   building  -          -       53s ago    ││ log  l opens it all                                 │
-│   TES-204     Paginate the audit log      atlas       mid     building  -          -       1m ago     ││ [smelt] reading the task and the code it touches    │
-│   TES-202     Rate-limit the export API   ledger-web  strong  building  -          -       42s ago    ││ [smelt] plan: 3 steps, test first                   │
-│   TES-200     Add dark mode to the repo…  smithy      cheap   queued    -          -       -          ││ [go] go test ./internal/... (1 failing as expected) │
-│   TES-201     Fix flaky login test        atlas       mid     queued    -          -       -          ││ [edit] internal/smithy/handler.go                   │
-│   TES-213     Archive stale branches      atlas       mid     merged    ✓ green    #2013   2m ago     ││ [go] go test ./... ok (2.4s)                        │
-│                                                                                                       ││ [git] commit: feat: Show CI time per PR             │
+│   TES-203     Cache board queries         smithy      cheap   building  -          -       53s ago    ││                                                     │
+│   TES-204     Paginate the audit log      atlas       mid     building  -          -       1m ago     ││                                                     │
+│   TES-202     Rate-limit the export API   ledger-web  strong  building  -          -       42s ago    ││                                                     │
+│   TES-200     Add dark mode to the repo…  smithy      cheap   queued    -          -       -          ││                                                     │
+│   TES-201     Fix flaky login test        atlas       mid     queued    -          -       -          ││                                                     │
+│   TES-213     Archive stale branches      atlas       mid     merged    ✓ green    #2013   2m ago     ││                                                     │
 │                                                                                                       ││                                                     │
 │                                                                                                       ││                                                     │
 │                                                                                                       ││                                                     │

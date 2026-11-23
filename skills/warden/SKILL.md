@@ -55,10 +55,9 @@ Production-branch PRs follow use-smithy **Merges**; here such a PR stays `manual
    the open questions (merge mode, stack, "is <base> production?").
    Done when the user said yes and doctor says ready.
 2. **Launch everything now**, in this turn, every item without a `hold` (dependents and those
-   past `max` wait in `smithy wait-turn`; subagent fallback: dependents launch after their prereq merges, `references/harness.md`). Per item: `git -C <repo> fetch origin && git -C
-   <repo> worktree add --no-track -b <branch> <worktree> origin/<from>` (a later item, like the batch check's `fix`: `smithy batch add`; `<branch>` = `smithy
-   names branch <key> "<title>"`; `<worktree>` = `smithy names worktree <branch> <repo>`, never
-   inside the repo; `<from>` = base, or the prereq's branch when stacked). Render the brief with
+   past `max` wait in `smithy wait-turn`; subagent fallback: dependents launch after their prereq merges, `references/harness.md`). Per item: `smithy worktree add <repo> <branch>
+   <from>` (prints `<worktree>`; a later item, like the batch check's `fix`: `smithy batch add`; `<branch>` = `smithy
+   names branch <key> "<title>"`; never inside the repo; `<from>` = base, or the prereq's branch when stacked). Render the brief with
    `smithy brief <batch> <id>` (plus `--to <your name>` where `references/harness.md` says so) and **spawn** each with the prompt
    `Read <batch-dir>/<id>.brief.md and follow it exactly.` (full text if the harness can't read files); no tend at launch: start `tend batch <batch>` only for a PR whose worker has ended (`references/acting.md`: red CI, a conflict, review comments; never for green PRs); it then stays until the batch's PRs merge, stops each at green and never merges (you merge when merge is auto; otherwise the user does). Record session id or pid, bump `launches`, record `origin/<base>`'s commit with `smithy batch set <batch> base_sha=<base>:<sha>`. Done when every item has a recorded running worker.
 3. **Watch.** One `smithy wait batch:<batch>` in the background (cards, and each card's PR going

@@ -71,6 +71,7 @@ type Options struct {
 	Timeout    time.Duration
 	Profile    string
 	SmithyBins []string // absolute paths of the smithy binary and launcher, allowed under --profile auto
+	AddDirs    []string // directories outside the working dir the agent may use (--add-dir), set under --profile auto
 }
 
 // ProfileEnv carries --profile to every smithy agent an agent starts, so workers under an
@@ -90,10 +91,13 @@ func AutoTools(smithy []string) []string {
 	for _, g := range []string{"pr create", "pr view", "pr checks", "pr list", "pr comment", "pr diff", "issue view", "issue comment", "run view", "run list"} {
 		t = append(t, "Bash(gh "+g+" *)")
 	}
-	t = append(t, "Bash(go test *)", "Bash(go vet *)", "Bash(npm test *)", "Bash(npm run test *)")
+	for _, c := range []string{"ls", "pwd", "cat", "head", "tail", "wc", "grep", "rg", "find", "which", "echo", "cd", "sort", "uniq", "diff", "test", "true", "sed -n", "basename", "dirname", "realpath", "date", "jq"} {
+		t = append(t, "Bash("+c+")", "Bash("+c+" *)")
+	}
+	t = append(t, "Bash(go test *)", "Bash(go vet *)", "Bash(go build *)", "Bash(gofmt -l *)", "Bash(go fmt *)", "Bash(npm test *)", "Bash(npm run test *)")
 	for _, b := range smithy {
 		if filepath.IsAbs(b) {
-			t = append(t, "Bash("+b+" *)")
+			t = append(t, "Bash("+b+" *)", "Bash('"+b+"' *)", "Bash(\""+b+"\" *)")
 		}
 	}
 	return t
@@ -103,15 +107,18 @@ func AutoTools(smithy []string) []string {
 // credential commands, network fetchers, secrets on disk and files that run code later.
 func AutoDenied(smithy []string) []string {
 	d := []string{"Bash(git -c *)", "Bash(git config *)", "Bash(gh api *)", "Bash(gh auth *)", "Bash(gh gist *)", "Bash(gh alias *)",
-		"Bash(gh extension *)", "Bash(smithy auth *)", "Bash(smithy config *)", "Bash(curl *)", "Bash(wget *)",
+		"Bash(gh extension *)", "Bash(smithy auth *)", "Bash(smithy config set *)", "Bash(smithy config set-model *)", "Bash(curl *)", "Bash(wget *)",
 		// remote-exec and URL options of fetch/push, and file output of any git command
 		"Bash(git * --upload-pack*)", "Bash(git * --receive-pack*)", "Bash(git * --exec*)", "Bash(git * --repo*)", "Bash(git * --output*)",
 		"Bash(git push * http*)", "Bash(git push * git@*)", "Bash(git push * ssh*)", "Bash(git push * file*)", "Bash(git checkout * -- /*)",
 		// every shell redirect and tee: workers write files with Edit/Write, never through the shell
-		"Bash(*>*)", "Bash(* | tee *)", "Bash(*|tee *)"}
+		"Bash(*>*)", "Bash(* | tee *)", "Bash(*|tee *)",
+		// shell readers must not reach the secrets the Read rules protect
+		"Bash(*auth.json*)", "Bash(*.ssh*)", "Bash(*.config/gh*)", "Bash(*.aws*)", "Bash(*.netrc*)", "Bash(*.git-credentials*)",
+		"Bash(find * -exec*)", "Bash(find * -delete*)", "Bash(sed -n *w *)"}
 	for _, b := range smithy {
 		if filepath.IsAbs(b) {
-			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config *)")
+			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config set *)", "Bash("+b+" config set-model *)")
 		}
 	}
 	for _, f := range []string{"~/.smithy/auth.json", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
@@ -120,7 +127,7 @@ func AutoDenied(smithy []string) []string {
 	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
 		"~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile", "~/.zshenv", "~/.claude/**",
 		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json"} {
-		d = append(d, "Edit("+f+")", "Write("+f+")")
+		d = append(d, "Edit("+f+")") // Edit rules cover every file-editing tool, Write included
 	}
 	return d
 }
@@ -295,6 +302,10 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if o.Profile == "auto" && !o.ReadOnly {
 			a = append(append(a, "--allowedTools"), AutoTools(o.SmithyBins)...)
 			a = append(append(a, "--disallowedTools"), AutoDenied(o.SmithyBins)...)
+			a = append(a, "--append-system-prompt", AutoNote)
+			for _, d := range o.AddDirs {
+				a = append(a, "--add-dir", d)
+			}
 		}
 		opt("--model")
 		if o.Effort != "" {
@@ -467,6 +478,7 @@ func Run(o Options) int {
 	}
 	if o.Profile == "auto" {
 		o.SmithyBins = SmithyPaths()
+		o.AddDirs = AutoDirs(o.SmithyBins)
 	}
 	gitDir := ""
 	if Kind(cli) == "codex" && !o.ReadOnly {
@@ -685,14 +697,81 @@ func isFile(p string) bool {
 // SmithyPaths are the absolute paths of this smithy binary and the use-smithy launcher.
 func SmithyPaths() []string {
 	var out []string
+	seen := map[string]bool{}
+	add := func(p string) {
+		if p != "" && !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
 	if exe, err := os.Executable(); err == nil {
 		if r, err := filepath.EvalSymlinks(exe); err == nil {
 			exe = r
 		}
-		out = append(out, exe)
+		add(exe)
 	}
-	if p, ok := FindSkill("use-smithy"); ok {
-		out = append(out, filepath.Join(filepath.Dir(p), "scripts", "smithy"))
+	// Every skill's launcher: skills say `smithy` for `<skill-dir>/scripts/smithy`, so an
+	// orchestrator following tend or warden runs their launcher, not use-smithy's.
+	var roots []string
+	if d := os.Getenv("SMITHY_SKILL_DIR"); d != "" {
+		roots = append(roots, filepath.Dir(filepath.Dir(d)))
+	}
+	for _, s := range []string{"use-smithy", "tend", "warden", "smelt", "scout", "ledger", "hush"} {
+		if p, ok := FindSkill(s); ok {
+			add(filepath.Join(filepath.Dir(p), "scripts", "smithy"))
+			roots = append(roots, filepath.Dir(filepath.Dir(p)))
+		}
+	}
+	for _, r := range roots {
+		ents, _ := os.ReadDir(r)
+		for _, e := range ents {
+			l := filepath.Join(r, e.Name(), "scripts", "smithy")
+			if fi, err := os.Stat(l); err == nil && !fi.IsDir() {
+				add(l)
+			}
+		}
 	}
 	return out
 }
+
+// AutoDirs lists what an unattended agent needs outside its working dir: smithy's home (plans,
+// batches, cards; secrets there stay behind the Read/Edit deny rules), each skills root, and the
+// parent of the repo, where sibling worktrees are created. Claude Code otherwise refuses any
+// Bash or file access outside the working dir in dontAsk mode.
+func AutoDirs(bins []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(d string) {
+		if d != "" && d != "/" && !seen[d] {
+			if fi, err := os.Stat(d); err == nil && fi.IsDir() {
+				seen[d] = true
+				out = append(out, d)
+			}
+		}
+	}
+	home := os.Getenv("SMITHY_HOME")
+	if home == "" {
+		if h, err := os.UserHomeDir(); err == nil {
+			home = filepath.Join(h, ".smithy")
+		}
+	}
+	add(home)
+	for _, b := range bins {
+		if filepath.Base(filepath.Dir(b)) == "scripts" {
+			add(filepath.Dir(filepath.Dir(filepath.Dir(b))))
+		}
+	}
+	if wd, err := os.Getwd(); err == nil {
+		if top, err := exec.Command("git", "-C", wd, "rev-parse", "--show-toplevel").Output(); err == nil {
+			add(filepath.Dir(strings.TrimSpace(string(top))))
+		}
+	}
+	return out
+}
+
+// AutoNote tells an unattended agent how to live with the allow-list instead of giving up.
+const AutoNote = "Unattended run: shell access is limited by policy. If a command is denied, " +
+	"use the Read, Grep and Glob tools for files, split chained commands into single ones, and " +
+	"use smithy commands (smithy worktree add, smithy commit, smithy pr) instead of raw git or gh " +
+	"where they exist. Report blocked only when a git, gh, test or smithy step your task needs " +
+	"is denied in its simplest form."

@@ -5,9 +5,10 @@
  ● watching github, linear (TES) · next poll 35s · serve pid 4242 claude   ███████████░░  69 / 80 l…
  5 working · 0 waiting · 2 stuck   3 ready for you · 1 CI running                                   
   1   2 Agents   3   4 8   5   6   7   8   9                                                        
-╭─ Agents · 14 · sort stage ───────────────────────────────────────────────────────────────────────╮
+╭─ Agents · 15 · sort stage ───────────────────────────────────────────────────────────────────────╮
 │   issue       title                      model   speed   stage     CI         PR      beat       │
-│ ▸ TES-212     Show CI time per PR        cheap   normal  blocked   -          -       2m ago     │
+│ ▸ serve       orchestrator · claude · …  -       -       orchestr  -          -       -          │
+│   TES-212     Show CI time per PR        cheap   normal  blocked   -          -       2m ago     │
 │   TES-211     Typed config loader        strong  fast    blocked   ✗ red      #2011   38m ago    │
 │   TES-209     Add SSO for admins         cheap   normal  ready     ✓ green    #2009   1m ago     │
 │   TES-210     Speed up cold start        mid     full    ready     ✓ green    #2010   2m ago     │
@@ -21,7 +22,6 @@
 │   TES-200     Add dark mode to the rep…  cheap   normal  queued    -          -       -          │
 │   TES-201     Fix flaky login test       mid     full    queued    -          -       -          │
 │   TES-213     Archive stale branches     mid     full    merged    ✓ green    #2013   2m ago     │
-│                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │

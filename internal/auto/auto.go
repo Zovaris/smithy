@@ -85,7 +85,107 @@ type State struct {
 	Queue    []Queued             `json:"queue"`
 	Launched map[string][]Launch  `json:"launched"`
 	LastPoll map[string]time.Time `json:"last_poll"`
-	Rate     map[string]int       `json:"rate,omitempty"` // API requests left in the window, per source that reports it
+	Rate     map[string]int       `json:"rate,omitempty"`     // API requests left in the window, per source that reports it
+	Requeued map[string]int       `json:"requeued,omitempty"` // "<source>:<key>": times put back after an orchestrator started nothing
+}
+
+// MaxRequeues is how often one issue goes back to the queue after an orchestrator started nothing.
+const MaxRequeues = 2
+
+// Requeue puts dir's launched issues back at the head of the queue when none of its tasks
+// started (every task file still todo). An issue already requeued MaxRequeues times stays
+// launched and is returned in gaveUp. Requeued task files are removed, and dir with them once empty.
+func Requeue(dir string) (requeued int, gaveUp []string, err error) {
+	if dir == "" {
+		return 0, nil, nil
+	}
+	ts := tasks.Load(dir)
+	if len(ts) == 0 {
+		return 0, nil, nil
+	}
+	files := map[string]string{}
+	for _, t := range ts {
+		if t.Status != "todo" {
+			return 0, nil, nil
+		}
+		files[t.NN] = t.File
+	}
+	err = update(func(st *State) error {
+		if st.Requeued == nil {
+			st.Requeued = map[string]int{}
+		}
+		var back []Queued
+		for d, ls := range st.Launched {
+			keep := ls[:0:0]
+			for _, l := range ls {
+				k := l.Source + ":" + l.Key
+				if l.Dir != dir {
+					keep = append(keep, l)
+					continue
+				}
+				if st.Requeued[k] >= MaxRequeues {
+					gaveUp = append(gaveUp, l.ID)
+					keep = append(keep, l)
+					continue
+				}
+				st.Requeued[k]++
+				q := Queued{Source: l.Source, Key: l.Key, ID: l.ID, Title: l.Title, URL: l.URL, QueuedAt: l.At}
+				if f := files[l.Item]; f != "" {
+					q.Body, q.Model, q.Speed = fromTask(f)
+					os.Remove(f)
+				}
+				back = append(back, q)
+			}
+			if len(keep) == 0 {
+				delete(st.Launched, d)
+			} else {
+				st.Launched[d] = keep
+			}
+		}
+		sort.SliceStable(back, func(i, j int) bool { return back[i].QueuedAt.Before(back[j].QueuedAt) })
+		st.Queue = append(back, st.Queue...)
+		requeued = len(back)
+		return nil
+	})
+	if left, _ := os.ReadDir(dir); err == nil && len(left) == 0 {
+		os.Remove(dir)
+	}
+	sort.Strings(gaveUp)
+	return requeued, gaveUp, err
+}
+
+// fromTask reads back the body, model and speed writeTask put in a task file.
+func fromTask(file string) (body, model, speed string) {
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return "", "", ""
+	}
+	var quoted []string
+	in := false
+	for _, l := range strings.Split(string(b), "\n") {
+		switch {
+		case strings.HasPrefix(l, "Model: "):
+			model = strings.TrimSpace(strings.TrimPrefix(l, "Model: "))
+		case strings.HasPrefix(l, "Speed: "):
+			speed = strings.TrimSpace(strings.TrimPrefix(l, "Speed: "))
+		case strings.HasPrefix(l, "## What"):
+			in = true
+		case strings.HasPrefix(l, "## "):
+			in = false
+		case in && strings.HasPrefix(l, ">"):
+			quoted = append(quoted, strings.TrimPrefix(strings.TrimPrefix(l, ">"), " "))
+		}
+	}
+	if model == "route" {
+		model = ""
+	}
+	if speed == "route" {
+		speed = ""
+	}
+	if body = strings.Join(quoted, "\n"); body == "(no description)" {
+		body = ""
+	}
+	return body, model, speed
 }
 
 // Rater is a Source that reports its API rate-limit headroom after a poll.
@@ -627,14 +727,28 @@ type ServeStatus struct {
 	Loop       string    `json:"loop,omitempty"` // idle, polling or orchestrating
 	SessionLog string    `json:"session_log,omitempty"`
 	SessionPID int       `json:"session_pid,omitempty"`
+	SessionAt  time.Time `json:"session_at,omitzero"`
+	SessionDir string    `json:"session_dir,omitempty"`
+	SessionOn  bool      `json:"session_running,omitempty"` // the orchestrator process is alive
 }
 
-// ServeOf summarizes the heartbeat at t.
+// ServeOf summarizes the heartbeat at t. The orchestrator comes from the heartbeat, else from
+// orchestrator.json, which outlives serve.
 func ServeOf(t time.Time) ServeStatus {
 	hb, _ := ReadServe()
 	out := ServeStatus{State: hb.Health(t)}
 	if hb != nil {
-		out.PID, out.Agent, out.LastCycle, out.Loop, out.SessionLog, out.SessionPID = hb.PID, hb.Agent, hb.LastCycle, hb.State, hb.SessionLog, hb.SessionPID
+		out.PID, out.Agent, out.LastCycle, out.Loop = hb.PID, hb.Agent, hb.LastCycle, hb.State
+		out.SessionLog, out.SessionPID, out.SessionAt, out.SessionDir = hb.SessionLog, hb.SessionPID, hb.SessionAt, hb.SessionDir
+		out.SessionOn = hb.SessionRunning()
+	}
+	if !out.SessionOn {
+		if l := ReadLock(); l != nil && l.PID > 0 && AliveAs(l.PID, l.Start) {
+			out.SessionLog, out.SessionPID, out.SessionAt, out.SessionDir, out.SessionOn = l.Log, l.PID, l.At, l.Dir, true
+			if out.Agent == "" {
+				out.Agent = DefaultAgent()
+			}
+		}
 	}
 	return out
 }
