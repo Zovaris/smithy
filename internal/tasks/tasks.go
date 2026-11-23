@@ -640,6 +640,14 @@ func Main(args []string) int {
 		}
 		ts := Load(dir)
 		u := Unblocked(ts)
+		if len(ts) == 0 {
+			hint := ""
+			if lists, _ := filepath.Glob(filepath.Join(dir, "*.md")); len(lists) > 0 {
+				hint = "; a single task list? smithy tasks import <file>"
+			}
+			fmt.Fprintf(os.Stderr, "no task files in %s%s\n", dir, hint)
+			return 3
+		}
 		if len(u) == 0 {
 			if args[0] == "next" {
 				allDone := true
