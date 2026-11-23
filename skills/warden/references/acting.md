@@ -11,7 +11,7 @@ do it on the user's yes.
 By `impact`, with the levels of smelt's `references/EXECUTE.md` (Rulings); you may raise it, never
 lower it; `impact_by=decide` means the decision model raised it:
 - **low**: decide on the merits.
-- **medium**: `smithy consult` with the worker's question and options (neutral, per use-smithy **Decisions**, step 3; fails → its safest rule; log with `smithy decisions add`).
+- **medium**: use-smithy **Decisions** steps 3-4 with the worker's question and options.
   `NEED-INFO` goes back to the worker; `ESCALATE` makes it high.
 - **high** (also: the same kind of finding recurring): the user's. One
   message with all of them; each gives the intent, the proposed change, the smallest alternative
@@ -30,12 +30,12 @@ before (`blocked`, `failed`, `pr_open`, `ready` stay open); how: `references/har
 
 Before merging a risky item, `smithy cards gate <batch> <id>` (exit 1 without `security=ran`): never merge it; unset → **tell** its worker to run the security agent; `not-run:<reason>` → list it for the user with the reason. Else `smithy verify <repo> <branch> <pr-url>` prints one verdict:
 - `green`: merge auto, and `production` is `false` or a branch other than the PR's base (`""`
-  counts as production), or the user approved a production merge for this batch → `smithy pr merge <pr>` (workers never merge: the merge permission is
+  counts as production), or the user gave use-smithy **Merges**' production yes for this batch → `smithy pr merge <pr>` (workers never merge: the merge permission is
   the user's, given to you, and a permission check would refuse it from a worker). Use the repo's
   usual merge method; a rebase merge refused because the branch has merge commits → a merge
   commit, never a force-push. Not mergeable (the base moved) → **tell** the worker to merge the base and push.
   Several green PRs that conflict once the first merges: merge one; for each of the rest,
-  `gh pr update-branch <pr>` when its worker has finished, else (or on a conflict) **tell** its worker to merge the base, then verify them again. Refused → list
+  **tell** its worker to merge the base and push (works in token mode too), then verify them again. Refused → list
   it with the doctor's permission hint.
   Production without that yes, or merge manual → card `state=ready`, listed for the user.
 - `pending`: nothing to start; the running `smithy wait batch:<batch>` also wakes when a card's
@@ -101,8 +101,7 @@ line each, grouped as **Decisions** and **Followups**, each with the PR it came 
 
 `reported`: read the report's first lines, then `smithy cleanup`. `dropped`: `smithy cleanup`.
 ## stuck (`blocked`, `failed`, or `working` with no `last_beat` for `warden.stuck_minutes`)
-The heartbeat comes from `smithy cards beat` and every `cards set`; the board's `beat` column
-and `wait batch`'s `stale:` line show its age (default limit 15 min). A session (background) worker whose closing line is `done: <id> waiting` is parked in `smithy wait-turn`: its stage is
+Heartbeat: `references/state.md` (`last_beat`). A session (background) worker whose closing line is `done: <id> waiting` is parked in `smithy wait-turn`: its stage is
 `waiting`, not stuck; nothing to do until its turn comes.
 
 Recovery ladder, one rung per wake:

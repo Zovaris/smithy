@@ -70,10 +70,9 @@ gets no test agents: its seam is the doc lint, its review is Spec-check alone. M
 ## Always
 - Keep a task list of your phases (the harness's to-do tool if any; refused, as in a subagent: don't call it again, list them in your final message) and tick it.
 - An agent's open question comes back in its report; answer it by the shared rule (a warden
-  worker asks warden) and record it in the PR's "Decided without you".
-- **Nobody to ask** (hush, or a launched session) or no answer in time: use-smithy's **Decisions**
-  (`smithy:allow` on a real secret is its hard floor too). Record each in `rulings.md` (task dir;
-  a single task: `.smelt/rulings.md`) and the PR's "Decided without you", and `smithy decisions add` (use-smithy **Decisions** step 4).
+  worker asks warden). Nobody to ask or no answer in time: use-smithy's **Decisions** (logging
+  included; `smithy:allow` on a real secret is its hard floor too), plus `rulings.md` (task dir;
+  a single task: `.smelt/rulings.md`).
 - Lessons: `references/SHIP.md`.
 - Receipts: `smithy receipt run --claim "<c>" -- <cmd> <args>`.
 - Commits: `smithy commit "<msg>" <path>...`, subject under 72 characters. Never `git add`

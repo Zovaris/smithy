@@ -37,7 +37,8 @@ Fields: `state`, `phase`, `progress` (`3/7`, the worker's own task list), `branc
 `decision_key`, `question`, `options`, `recommendation`, `impact` (`impact_by=decide` when the
 decision model raised it), `tests_run`, `risks`,
 `review_rounds`, `security` (risky items: `ran` or `not-run:<reason>`), `note`, `last_beat`
-(heartbeat: `smithy cards beat <batch> <id>` or any `cards set`).
+(the heartbeat's one home: `smithy cards beat <batch> <id>` or any `cards set`; the board's `beat`
+column and `wait batch`'s `stale:` line show its age; older than `warden.stuck_minutes` → stuck).
 
 | State | Meaning |
 |---|---|
