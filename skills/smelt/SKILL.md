@@ -41,7 +41,7 @@ Say the speed and phases in one line first (a launched agent: in its report).
 | | fast | normal (default) | full |
 |---|---|---|---|
 | For | small or clear changes, warden workers | most features and fixes | money, auth, data loss, public APIs, or asked |
-| Plan | criteria from the task | spec if none exists | brainstorm, grill, spec, builder check, tasks (nobody to ask and testable criteria: spec from them) |
+| Plan | criteria from the task | spec if none exists | brainstorm, grill, spec, builder check, tasks |
 | Build | TDD on the criteria | TDD on every behaviour | same |
 | Scripts | suite, typecheck, lint, `smithy scan` | + property tests you write yourself, no agent (`agents/property.md` as the guide) | + the mutation tool |
 | Agents, one parallel wave | none, a security agent if risky (you run `agents/reviewer.md`, Spec-check section, yourself; its table goes in the PR body's agents section) | adversary (runtime logic; regression for a reported bug) + reviewer | adversary, property, reviewer, security, e2e if UI or served HTTP endpoints (not outbound calls); mutation as a second step, after fixes; hostile last if it runs |

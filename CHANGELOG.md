@@ -10,11 +10,11 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - `smithy batch init --risky <id,id>` marks risky items (security agent required).
 
 ### Fixed
-- `smithy commit` accepts a staged `git mv` rename (both paths named) and refuses only staged
-  files outside the given paths.
+- `smithy commit` accepts a staged `git mv` rename (both paths named), refuses paths outside the
+  repo, and checks earlier staging against repo-root paths (also from a subfolder, and for `.`).
 - Skill text: Decisions define "safest" outside security (most reversible, least new surface);
   debug re-runs the repro receipt on the final HEAD; SHIP's per-commit rebase starts after the red
-  repro commit; smelt full writes the spec straight from testable criteria when nobody can answer.
+  repro commit, which goes first on the branch.
 - `smithy verify`: an open PR whose mergeable is still UNKNOWN is `pending`, not green.
 - `smithy brief`: a `Spec:` line takes only its first token; `batch init` stores an absolute
   intent when the task file isn't committed on the base.
