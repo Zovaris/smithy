@@ -21,6 +21,27 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   separators; one misconfigured source no longer stops the others; Linear polls cap pages, read
   only the last 7 days on the first poll, overlap the last poll by 2 minutes, uppercase team keys
   and reject unknown state types.
+- Fixed: `smithy auto take` writes its task dir to `~/.smithy/plans/<repo>/` whatever
+  `tasks.commit` says, so intake never leaves files in the target repo.
+- Fixed: auto task files use the issue's human id: file `NN-tes-1-<slug>.md`, `Key: TES-1`
+  (so branches read `feat/TES-1-…`); the stable id moves to `Ref: <source>:<uuid>`.
+  `smithy auto report` takes `linear:TES-1`, `linear:<uuid>` or a bare id it launched.
+- Fixed: `smithy batch init` on an `auto-*` task dir takes merge from `auto.merge`, each item's
+  `model` from its `Model:` header and `speed: route` from the mode, and records `production`
+  (the base when it is the default branch or the default can't be found from origin/HEAD, gh or
+  ls-remote, else `false`). `""` production blocks a merge like a production base.
+  The gh and ls-remote lookups time out after 10 s (then production=base).
+  `batch.json` writes are atomic; `batch set` and `batch add` lock it and checks `production` is `false` or an
+  existing branch and `base_sha`'s base is in the batch. Card writes and beats take the card lock.
+  A bare id in `smithy auto report` that two sources launched exits 2 naming both refs.
+- Added: `smithy batch set <batch> key=value…` sets `merge`, `production`, `cleanup`, `mode` and
+  `base_sha` with validation; warden's docs use it instead of hand edits.
+- Added: worker heartbeat: `smithy cards beat <batch> <id>` (and every `cards set`) stamps
+  `last_beat`; the board shows a `beat` column and `wait batch`'s `stale:` line its age. A working
+  item is stuck after `warden.stuck_minutes` (default 15, was 45 min of no update) without a beat.
+- Changed: tend `AUTO.md` says unattended runs need workers that outlive the session (CLI
+  `claude --bg`, Codex, `smithy agent` CLIs or desktop sessions, not the subagent fallback), and
+  reports issues by their `Ref:` or `linear:TES-1`.
 
 - Added: tend `auto` mode (`references/AUTO.md`): waits on `smithy wait auto`, takes the queue
   into a task dir, runs warden on it with batch values pre-answered and reports each issue

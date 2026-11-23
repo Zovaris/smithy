@@ -638,6 +638,17 @@ func stuck(rows []cards.Row) string {
 	return strings.Join(ids, ",")
 }
 
+// stuckBeats lists the stuck items with their last heartbeat age.
+func stuckBeats(rows []cards.Row) string {
+	var ids []string
+	for _, r := range rows {
+		if r.Stage == "stuck" {
+			ids = append(ids, r.ID+" (last beat "+r.Beat+")")
+		}
+	}
+	return strings.Join(ids, ", ")
+}
+
 func newBatch(name string, all bool) (*batchWatcher, error) {
 	if name == "" {
 		b := cards.Batches()
@@ -680,7 +691,7 @@ func (w *batchWatcher) poll() ([]string, error) {
 	out = append(out, w.prLines(rows, false)...)
 	if len(out) == 0 {
 		if s := stuck(rows); s != "" && s != w.stuckBefore {
-			out = []string{fmt.Sprintf("batch %s stale: %s", w.name, s)}
+			out = []string{fmt.Sprintf("batch %s stale: %s", w.name, stuckBeats(rows))}
 		}
 	}
 	return out, nil

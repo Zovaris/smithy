@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBatchInitAdd(t *testing.T) {
@@ -212,5 +213,133 @@ func TestBatchInitSettingsDefaults(t *testing.T) {
 		if _, _, c := init(bad...); c != 2 {
 			t.Errorf("%v must be refused: %d", bad, c)
 		}
+	}
+}
+
+func autoRepo(t *testing.T) (root, repo, td string) {
+	root, _ = filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("WARDEN_HOME", filepath.Join(root, "warden"))
+	t.Setenv("HOME", root)
+	repo = filepath.Join(root, "repo")
+	td = filepath.Join(root, "plans", "repo", "auto-2026-01-01-1")
+	os.MkdirAll(td, 0o755)
+	os.MkdirAll(repo, 0o755)
+	git(t, repo, "init", "-q", "-b", "main")
+	git(t, repo, "commit", "-q", "--allow-empty", "-m", "x")
+	git(t, repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+	writeFile(t, filepath.Join(td, "01-tes-1-add-pagination.md"), "# 01 · Add pagination\nStatus: todo\nBlocked by: none\nSpeed: full\nModel: cheap\nPR: -\nSource: https://linear.app/x/TES-1\nKey: TES-1\nRef: linear:uuid-1\n")
+	writeFile(t, filepath.Join(td, "02-tes-2-list-view.md"), "# 02 · List view\nStatus: todo\nBlocked by: none\nSpeed: route\nModel: route\nPR: -\nKey: TES-2\nRef: linear:uuid-2\n")
+	return root, repo, td
+}
+
+func TestBatchInitAutoTaskDir(t *testing.T) {
+	root, repo, td := autoRepo(t)
+	cfg := filepath.Join(root, "config.json")
+	t.Setenv("SMITHY_CONFIG", cfg)
+	writeFile(t, cfg, `{"auto":{"merge":"auto"}}`)
+	git(t, repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+	git(t, repo, "update-ref", "refs/remotes/origin/release/x", "HEAD")
+	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo, "--base", "release/x"}) })
+	if c != 0 {
+		t.Fatalf("%d %s", c, er)
+	}
+	raw, _ := os.ReadFile(filepath.Join(strings.TrimSpace(o), "batch.json"))
+	var m struct {
+		Merge      string `json:"merge"`
+		Production any    `json:"production"`
+		Items      []struct{ Speed, Model, Branch string }
+	}
+	if err := json.Unmarshal(raw, &m); err != nil || m.Merge != "auto" || m.Production != false || len(m.Items) != 2 {
+		t.Fatalf("%v %s", err, raw)
+	}
+	a, b := m.Items[0], m.Items[1]
+	if a.Speed != "full" || a.Model != "cheap" || !strings.Contains(a.Branch, "TES-1") {
+		t.Errorf("item 1: %+v", a)
+	}
+	if b.Speed != "normal" || b.Model != "" || strings.Contains(string(raw), `"model": "route"`) {
+		t.Errorf("item 2: %+v\n%s", b, raw)
+	}
+}
+
+func TestBatchInitAutoOnProductionBase(t *testing.T) {
+	root, repo, td := autoRepo(t)
+	t.Setenv("SMITHY_CONFIG", filepath.Join(root, "none.json"))
+	git(t, repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo}) })
+	if c != 0 {
+		t.Fatalf("%d %s", c, er)
+	}
+	raw, _ := os.ReadFile(filepath.Join(strings.TrimSpace(o), "batch.json"))
+	if !strings.Contains(string(raw), `"production": "main"`) || !strings.Contains(string(raw), `"merge": "manual"`) {
+		t.Errorf("%s", raw)
+	}
+}
+
+func TestBatchInitAutoUnknownDefaultIsProduction(t *testing.T) {
+	root, repo, td := autoRepo(t)
+	cfg := filepath.Join(root, "config.json")
+	t.Setenv("SMITHY_CONFIG", cfg)
+	writeFile(t, cfg, `{"auto":{"merge":"auto"}}`)
+	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo}) })
+	if c != 0 {
+		t.Fatalf("%d %s", c, er)
+	}
+	raw, _ := os.ReadFile(filepath.Join(strings.TrimSpace(o), "batch.json"))
+	if !strings.Contains(string(raw), `"production": "main"`) {
+		t.Errorf("unknown default branch must fail safe to production=base: %s", raw)
+	}
+}
+
+func TestKnownDefaultTimesOut(t *testing.T) {
+	_, repo, _ := autoRepo(t)
+	bin := t.TempDir()
+	writeFile(t, filepath.Join(bin, "gh"), "#!/bin/sh\nexec sleep 5\n")
+	os.Chmod(filepath.Join(bin, "gh"), 0o755)
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	defer func(d time.Duration) { lookupTimeout = d }(lookupTimeout)
+	lookupTimeout = 200 * time.Millisecond
+	start := time.Now()
+	if d := knownDefault(repo); d != "" {
+		t.Errorf("knownDefault = %q, want \"\" (fail safe)", d)
+	}
+	if el := time.Since(start); el > 3*time.Second {
+		t.Errorf("lookup took %v; the timeout did not stop gh", el)
+	}
+}
+
+func TestBatchSet(t *testing.T) {
+	root, repo, td := autoRepo(t)
+	t.Setenv("SMITHY_CONFIG", filepath.Join(root, "none.json"))
+	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo}) })
+	if c != 0 {
+		t.Fatalf("%d %s", c, er)
+	}
+	name := filepath.Base(strings.TrimSpace(o))
+	if _, er, c := capture(t, func() int {
+		return Batch([]string{"set", name, "merge=auto", "production=main", "cleanup=ask", "mode=smelt full", "base_sha=main:abc123"})
+	}); c != 0 {
+		t.Fatalf("set: %d %s", c, er)
+	}
+	raw, _ := os.ReadFile(filepath.Join(root, "warden", name, "batch.json"))
+	var m map[string]any
+	json.Unmarshal(raw, &m)
+	if m["merge"] != "auto" || m["production"] != "main" || m["cleanup"] != "ask" || m["mode"] != "smelt full" {
+		t.Errorf("%s", raw)
+	}
+	if bs, _ := m["base_sha"].(map[string]any); bs["main"] != "abc123" {
+		t.Errorf("base_sha: %s", raw)
+	}
+	capture(t, func() int { return Batch([]string{"set", name, "production=false"}) })
+	raw, _ = os.ReadFile(filepath.Join(root, "warden", name, "batch.json"))
+	if !strings.Contains(string(raw), `"production": false`) {
+		t.Errorf("production=false: %s", raw)
+	}
+	for _, bad := range [][]string{{"merge=yes"}, {"cleanup=never"}, {"mode=turbo"}, {"base_sha=main"}, {"base_sha=other:abc"}, {"production=no-such-branch"}, {"items=[]"}, {"merge"}, {}} {
+		if _, _, c := capture(t, func() int { return Batch(append([]string{"set", name}, bad...)) }); c != 2 {
+			t.Errorf("set %v must be refused: %d", bad, c)
+		}
+	}
+	if _, _, c := capture(t, func() int { return Batch([]string{"set", "nope", "merge=auto"}) }); c != 2 {
+		t.Errorf("unknown batch: %d", c)
 	}
 }

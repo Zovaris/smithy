@@ -19,17 +19,17 @@ Autonomous intake (settings auto.*; state in ~/.smithy/auto/state.json).
   poll    polls each source in auto.sources once and queues new qualified issues, one line each:
           auto <source> <id> queued <model|-> <speed|-> <url>
   take    moves the issues the daily cap (auto.max_per_day) and window (auto.hours) allow into a
-          new task dir (smithy task-dir auto-<date>-<n>); prints "<dir> <count>" or "auto none: <why>"
+          new task dir out of git (~/.smithy/plans/<repo>/auto-<date>-<n>); prints "<dir> <count>" or
+          "auto none: <why>"
   report  writes back to the issue: started, completed or blocked (GitHub: a comment; Linear: a comment,
-          the workflow state and the PR attached)
+          the workflow state and the PR attached); the issue is <source>:<id> (linear:TES-1 or
+          linear:<uuid>) or a bare id taken by auto take
   status  queue, today's count and cap, hours, last poll per source, watcher alive or stale
 Exit 2 = bad usage or settings, 3 = no access to a source.`
 
-// taskDir makes the task dir for take; tests replace it.
-var taskDir = func(slug string) (string, error) {
-	d, _, err := plan.TaskDirDefault(slug)
-	return d, err
-}
+// taskDir makes the task dir for take, always out of git (~/.smithy/plans/<repo>/<slug>), so
+// intake never leaves files in the target repo; tests replace it.
+var taskDir = plan.LocalTaskDir
 
 // Main runs `smithy auto`.
 func Main(args []string) int {
@@ -108,6 +108,9 @@ func Main(args []string) int {
 			}
 			if errors.Is(err, ghx.ErrNoGitHub) || errors.Is(err, ErrNoAccess) {
 				return 3
+			}
+			if errors.Is(err, ErrAmbiguous) {
+				return 2
 			}
 			return 1
 		}
