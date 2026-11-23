@@ -2,6 +2,7 @@
 name: warden
 description: Use when several tasks should run at once (a task list, a task dir, board ids or an idea), or for status, cleanup or doctor of a batch; start a batch only after the user says yes, since each task costs one session.
 argument-hint: "<tasks, one per line | task dir or .md | board ids | an idea> | status [batch|all] | cleanup [batch] | doctor"
+compatibility: "Needs git; gh (or GH_TOKEN) for GitHub steps; its launcher installs the smithy binary only with gh build attestation or SMITHY_ALLOW_UNATTESTED=1."
 ---
 
 # warden

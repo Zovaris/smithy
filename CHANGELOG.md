@@ -11,6 +11,10 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - `smithy batch init --risky <id,id>` marks risky items (security agent required).
 
 ### Fixed
+- `smithy verify`: checks that are all skipped or neutral are `none` (no proof), not green.
+- tend reads a foreign PR's agent instructions from the base, never from the PR head.
+- Skills that ship the launcher declare a `compatibility` line (git, gh or GH_TOKEN, attestation);
+  `tests/skills.sh` limits the SKILL.md body, not the frontmatter.
 - `smithy tasks next|ready` on a folder with no task files says so and points to
   `smithy tasks import` when a `## NN` list is there (`next` printed "all done").
 - Skill text: use-smithy routes a single `tasks.md` through `smithy tasks import` to warden and

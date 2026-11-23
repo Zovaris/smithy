@@ -1,6 +1,7 @@
 ---
 name: use-smithy
 description: Use at the start of building, changing, fixing, reviewing or documenting code in a repo, or when asked which smithy skill fits; not for chats without code.
+compatibility: "Needs git; gh (or GH_TOKEN) for GitHub steps; its launcher installs the smithy binary only with gh build attestation or SMITHY_ALLOW_UNATTESTED=1."
 ---
 
 # use-smithy

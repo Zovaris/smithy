@@ -2,6 +2,7 @@
 name: smelt
 description: Use when planning, building, fixing, reviewing or shipping a code change, from any phase and at a chosen speed (fast, normal, full), whether the user asks or use-smithy routes the work here; not for a typo or one-line change.
 argument-hint: "[brainstorm|plan|spec|build [next|all]|check|ship|debug|adr|retro|init | from <phase>] [fast|full] <task or path>"
+compatibility: "Needs git; gh (or GH_TOKEN) for GitHub steps; its launcher installs the smithy binary only with gh build attestation or SMITHY_ALLOW_UNATTESTED=1."
 ---
 
 # smelt

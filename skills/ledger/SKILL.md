@@ -2,6 +2,7 @@
 name: ledger
 description: "Use to record a decision (ADR), document a module, keep the glossary or codebase map, sync docs with code, enforce the no-explanatory-comments policy, or search past project decisions."
 argument-hint: "[init|adr <title>|standard <rule>|module <path>|map|sync [base]|comments [paths]|search <query>]"
+compatibility: "Needs git; gh (or GH_TOKEN) for GitHub steps; its launcher installs the smithy binary only with gh build attestation or SMITHY_ALLOW_UNATTESTED=1."
 ---
 
 # ledger
