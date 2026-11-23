@@ -513,3 +513,10 @@ func TestConsultModelUsesTheCLIsOwnHarness(t *testing.T) {
 		}
 	}
 }
+
+func TestConsultPromptEscalatesOnlyTheHardFloor(t *testing.T) {
+	p := ConsultPrompt("Cap amount digits?", "18, 28", "")
+	if !strings.Contains(p, "ESCALATE: <why> only when") || !strings.Contains(p, "moves or charges real money") || strings.Contains(p, "product owner") {
+		t.Fatalf("prompt:\n%s", p)
+	}
+}

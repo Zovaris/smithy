@@ -15,7 +15,7 @@ import (
 const consultUsage = `One cheap, tool-less call to the user's strongest model to settle a decision without the user.
   smithy consult "<question>" "<options, verbatim and in neutral order>" [--context <file>]
 Prints the answer (≤5 lines). It may start with NEED-INFO: <what> (send the question back with
-that) or ESCALATE: <why> (the user decides). Callers log what they decided and why.
+that) or ESCALATE: <why> (only the hard floor: the user decides). Callers log what they decided and why.
 Model: $CONSULT_MODEL, else the judge tier (the smartest model you have, optional), else strong,
 else the CLI default.
 CLI: $CONSULT_CMD (prompt on stdin) if set; else the CLI of the harness you're in (smithy harness),
@@ -32,8 +32,10 @@ func ConsultPrompt(q, o, ctx string) string {
 		b.WriteString("Context:\n" + ctx + "\n")
 	}
 	b.WriteString("Pick one option and give the reason in at most 5 lines. If none fits or you need more\n")
-	b.WriteString("information, answer NEED-INFO: <what>. If a product owner should decide (customer-visible\n")
-	b.WriteString("behaviour, money, data, security, public API, production, irreversible), answer ESCALATE: <why>.\n")
+	b.WriteString("information, answer NEED-INFO: <what>. Answer ESCALATE: <why> only when the choice itself\n")
+	b.WriteString("merges or deploys to production, deletes or irreversibly rewrites user data, handles real\n")
+	b.WriteString("credentials or secrets, or moves or charges real money; code that only computes money,\n")
+	b.WriteString("security or data is yours to pick (the safest option when unsure).\n")
 	b.WriteString("Do not use tools.\n")
 	return b.String()
 }
