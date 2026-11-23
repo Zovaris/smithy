@@ -642,8 +642,12 @@ func Main(args []string) int {
 		u := Unblocked(ts)
 		if len(ts) == 0 {
 			hint := ""
-			if lists, _ := filepath.Glob(filepath.Join(dir, "*.md")); len(lists) > 0 {
-				hint = "; a single task list? smithy tasks import <file>"
+			lists, _ := filepath.Glob(filepath.Join(dir, "*.md"))
+			for _, l := range lists {
+				if b, err := os.ReadFile(l); err == nil && regexp.MustCompile(`(?m)^## \d+`).Match(b) {
+					hint = "; a single task list? smithy tasks import " + l
+					break
+				}
 			}
 			fmt.Fprintf(os.Stderr, "no task files in %s%s\n", dir, hint)
 			return 3

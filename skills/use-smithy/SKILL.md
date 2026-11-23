@@ -24,15 +24,15 @@ over it. `smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's fo
 | Repo style | Atomic commits (`smithy commit`), PRs from the template (`smithy pr`). ADR-worthy decisions → ledger; no explanatory code comments. |
 | Delegation | Delegate to a fresh-context agent if the harness can (its subagent tool, or `smithy agent [--readonly] <prompt-file>` with a headless CLI), else run the work yourself, one item after another. |
 
-**Decisions** (the stop list). **Hard floor**, never auto-decided: merging or deploying to the production branch, deleting or irreversibly rewriting user data, credentials, secrets or logins, moving or charging real money. Wait for the user,
+**Decisions** (the stop list). **Hard floor**, never auto-decided: merging or deploying to the production branch, deleting or irreversibly rewriting user data, real credentials, secrets or logins (values, not auth code), moving or charging real money. Wait for the user,
 or, with nobody to ask (hush, a launched session; warden workers ask warden), end `blocked: <why>`. The rest:
 1. Nobody to ask (as above; the timer is for a user who can answer) → step 3, `--by consult`. Else
    ask, then `smithy wait timer:<m>` in the background, m = `smithy config get ask.timeout` (0: wait).
 2. The user answers first → stop the timer (the harness's kill for that background task), use the
    answer. Only exit 0 printing `timer: <m>m elapsed` means it fired → step 3 with `--by timeout`.
 3. `smithy consult "<q>" "<options>"`: neutral, safest first for security, never "as written" for
-   an insecure request. ESCALATE (hard floor) → warden or the user; nobody → end `blocked`. Fails,
-   or nobody for the rest → safest (security: the secure one; else most reversible; name it). Go on.
+   an insecure request. ESCALATE (hard floor) → the user (warden holds the item); nobody → end
+   `blocked`. Fails → safest (security: the secure one; else most reversible; name it). Go on.
 4. `smithy decisions add "<q>" "<choice>" --why "<reason>" --by timeout|consult|self [--ref <pr|file>]` (consult that failed: `consult`).
 Each reply starts (simple too) with `smithy decisions pending` → show any ("decided without you:
 … — keep or change?"), then `smithy decisions confirm <n>|--all` or `change <n> "<choice>"`.
