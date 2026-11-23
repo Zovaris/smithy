@@ -949,7 +949,22 @@ func Main(args []string) int {
 		time.Sleep(step)
 	}
 	fmt.Printf("heartbeat: nothing within %gm\n", max)
+	for _, l := range noCILines(ws, max) {
+		fmt.Println(l)
+	}
 	return 4
+}
+
+// noCILines names PRs whose head never got a check during the wait, so "still pending" and "CI
+// never ran" (Actions off, out of minutes, workflow not triggered) read differently.
+func noCILines(ws []watcher, max float64) []string {
+	var out []string
+	for _, w := range ws {
+		if p, ok := w.(*prWatcher); ok && p.last != nil && p.last.state == "OPEN" && p.last.checks.state == "none" {
+			out = append(out, fmt.Sprintf("pr %d no-ci: no check ran in %gm; check the repo's Actions settings and minutes %s", p.last.num, max, p.last.url))
+		}
+	}
+	return out
 }
 
 // pushedAhead reports whether this checkout's origin/<branch> is strictly ahead of the PR head
