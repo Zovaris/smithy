@@ -185,7 +185,7 @@ func TestTakeCapHoursAndTaskFiles(t *testing.T) {
 		t.Errorf("cap: %+v", r)
 	}
 	st, _ := Load()
-	if len(st.Queue) != 1 || len(st.Launched["2026-01-01"]) != 2 || st.Launched["2026-01-01"][0].Item != "01" {
+	if len(st.Queue) != 1 || len(st.Launched["2026-01-01"]) != 2 || st.Launched["2026-01-01"][0].Item != "01" || st.Launched["2026-01-01"][0].Title != "fix 1" || st.Launched["2026-01-01"][0].URL != "https://x/1" {
 		t.Errorf("state after take = %+v", st)
 	}
 	now = at("2026-01-02 01:00")
@@ -209,12 +209,12 @@ func TestStatusAndJSONShape(t *testing.T) {
 	}
 	s := defaults()
 	s.Sources = []string{"github"}
-	st := StatusOf(s)
+	st, _ := StatusOf(s)
 	if !st.Alive || st.Queued != 1 || st.Cap != 20 || st.Today != 0 {
 		t.Errorf("status = %+v", st)
 	}
 	now = func() time.Time { return at("2026-01-01 10:00")().Add(181 * time.Second) }
-	if StatusOf(s).Alive {
+	if st, _ := StatusOf(s); st.Alive {
 		t.Error("watcher should be stale after 3x every")
 	}
 	b, _ := os.ReadFile(StateFile())
@@ -243,5 +243,72 @@ func TestReportRoutesToSource(t *testing.T) {
 	}
 	if err := Report([]Source{src}, "linear:ENG-1", "started", ""); err == nil {
 		t.Error("unknown source accepted")
+	}
+}
+
+type lockProbe struct {
+	fakeSource
+	locked bool
+}
+
+func (l *lockProbe) Poll(since time.Time) ([]Issue, error) {
+	_, err := os.Stat(StateFile() + ".lock")
+	l.locked = err == nil
+	return l.fakeSource.Poll(since)
+}
+
+func TestPollFetchesOutsideTheLock(t *testing.T) {
+	home(t)
+	p := &lockProbe{fakeSource: fakeSource{name: "github"}}
+	if _, err := Poll(defaults(), []Source{p}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if p.locked {
+		t.Error("source polled while holding the state lock")
+	}
+}
+
+func TestSeenKeyedOnStableKey(t *testing.T) {
+	home(t)
+	src := &fakeSource{name: "linear", issues: []Issue{{Key: "uuid-1", ID: "ENG-1", Labels: []string{"auto"}}}}
+	if got, _ := Poll(defaults(), []Source{src}, &bytes.Buffer{}); len(got) != 1 || got[0].Key != "uuid-1" {
+		t.Fatalf("first = %+v", got)
+	}
+	src.issues[0].ID = "OPS-7"
+	if got, _ := Poll(defaults(), []Source{src}, &bytes.Buffer{}); len(got) != 0 {
+		t.Errorf("renamed identifier queued twice: %+v", got)
+	}
+}
+
+func TestStatusSurfacesCorruptState(t *testing.T) {
+	home(t)
+	os.MkdirAll(filepath.Dir(StateFile()), 0o755)
+	os.WriteFile(StateFile(), []byte("{nope"), 0o644)
+	if _, err := StatusOf(defaults()); err == nil {
+		t.Error("corrupt state.json not reported")
+	}
+}
+
+func TestTakeRemovesPartialFilesOnFailure(t *testing.T) {
+	home(t)
+	plans := t.TempDir()
+	mk := func(slug string) (string, error) { d := filepath.Join(plans, slug); return d, os.MkdirAll(d, 0o755) }
+	src := &fakeSource{name: "github", issues: []Issue{{ID: "1", Title: "a", Labels: []string{"auto"}}, {ID: "2", Title: "b", Labels: []string{"auto"}}}}
+	Poll(defaults(), []Source{src}, &bytes.Buffer{})
+	calls := 0
+	writeFile = func(name string, b []byte, m os.FileMode) error {
+		if calls++; calls == 2 {
+			return os.ErrPermission
+		}
+		return os.WriteFile(name, b, m)
+	}
+	defer func() { writeFile = os.WriteFile }()
+	if _, err := Take(defaults(), 0, mk); err == nil {
+		t.Fatal("take should fail")
+	}
+	ms, _ := filepath.Glob(filepath.Join(plans, "*", "*.md"))
+	st, _ := Load()
+	if len(ms) != 0 || len(st.Queue) != 2 {
+		t.Errorf("left files %v, queue %d", ms, len(st.Queue))
 	}
 }

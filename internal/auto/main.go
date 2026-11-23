@@ -113,7 +113,11 @@ func Main(args []string) int {
 		if len(pos) > 0 {
 			break
 		}
-		st := StatusOf(s)
+		st, err := StatusOf(s)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "smithy auto: state:", err)
+			return 1
+		}
 		if flags["--json"] != "" {
 			b, _ := json.MarshalIndent(st, "", "  ")
 			fmt.Println(string(b))

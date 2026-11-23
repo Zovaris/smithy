@@ -33,7 +33,7 @@ func (g GitHub) Poll(time.Time) ([]Issue, error) {
 	}
 	out := make([]Issue, 0, len(raw))
 	for _, r := range raw {
-		i := Issue{Source: "github", ID: strconv.Itoa(r.Number), Title: r.Title, URL: r.URL, Body: r.Body}
+		i := Issue{Source: "github", Key: strconv.Itoa(r.Number), ID: strconv.Itoa(r.Number), Title: r.Title, URL: r.URL, Body: r.Body}
 		for _, l := range r.Labels {
 			i.Labels = append(i.Labels, l.Name)
 		}

@@ -20,11 +20,17 @@ import (
 	"github.com/Zovaris/smithy/internal/tasks"
 )
 
-var now = time.Now
+var (
+	now       = time.Now
+	writeFile = os.WriteFile
+)
 
-// Issue is one issue a Source returns. ID is unique within its source ("42", "ENG-12").
+// Issue is one issue a Source returns. Key is its stable id within the source (a Linear
+// UUID, a GitHub number) and dedupes; ID is the display identifier ("42", "ENG-12"), which may
+// change. An empty Key falls back to ID.
 type Issue struct {
 	Source string   `json:"source"`
+	Key    string   `json:"key"`
 	ID     string   `json:"id"`
 	Title  string   `json:"title"`
 	URL    string   `json:"url"`
@@ -54,16 +60,19 @@ var ReportStates = []string{"started", "completed", "blocked"}
 //
 //	{
 //	  "version": 1,
-//	  "seen": {"github": ["42", "43"]},              // ids ever queued, per source
-//	  "queue": [{"source": "github", "id": "44", "title": "…", "url": "…", "body": "…",
+//	  "seen": {"github": ["42", "43"]},              // stable keys ever queued, per source
+//	  "queue": [{"source": "github", "key": "44", "id": "44", "title": "…", "url": "…", "body": "…",
 //	             "model": "cheap|mid|strong|", "speed": "fast|normal|full|",
 //	             "queued_at": "2026-01-01T10:00:00-05:00"}],
-//	  "launched": {"2026-01-01": [{"source": "github", "id": "42", "batch": "auto-2026-01-01-1",
-//	               "dir": "/abs/task/dir", "item": "01", "at": "2026-01-01T23:00:00-05:00"}]},
+//	  "launched": {"2026-01-01": [{"source": "github", "key": "42", "id": "42", "title": "…",
+//	               "url": "…", "batch": "auto-2026-01-01-1", "dir": "/abs/task/dir", "item": "01",
+//	               "at": "2026-01-01T23:00:00-05:00"}]},
 //	  "last_poll": {"github": "2026-01-01T10:00:00-05:00"}
 //	}
 //
-// Day keys of "launched" are local calendar dates (YYYY-MM-DD).
+// Day keys of "launched" are local calendar dates (YYYY-MM-DD). auto.max_per_day counts per
+// local calendar day, so an auto.hours window spanning midnight (22:00-07:00) can launch up to
+// twice the cap within one window: the cap before midnight and again after it.
 type State struct {
 	Version  int                  `json:"version"`
 	Seen     map[string][]string  `json:"seen"`
@@ -75,6 +84,7 @@ type State struct {
 // Queued is an issue waiting for the cap or the hours window.
 type Queued struct {
 	Source   string    `json:"source"`
+	Key      string    `json:"key"`
 	ID       string    `json:"id"`
 	Title    string    `json:"title"`
 	URL      string    `json:"url"`
@@ -87,7 +97,10 @@ type Queued struct {
 // Launch is an issue `smithy auto take` turned into a task file.
 type Launch struct {
 	Source string    `json:"source"`
+	Key    string    `json:"key"`
 	ID     string    `json:"id"`
+	Title  string    `json:"title"`
+	URL    string    `json:"url"`
 	Batch  string    `json:"batch"`
 	Dir    string    `json:"dir"`
 	Item   string    `json:"item"`
@@ -317,27 +330,45 @@ func day(t time.Time) string { return t.Format("2006-01-02") }
 // is queued at most once per source, whatever its labels do later. A failing source is
 // returned as an error after the others are recorded.
 func Poll(s Settings, srcs []Source, warn io.Writer) ([]Queued, error) {
-	var got []Queued
+	st, err := Load()
+	if err != nil {
+		return nil, err
+	}
+	type fetched struct {
+		name   string
+		issues []Issue
+		at     time.Time
+	}
+	var got []fetched
 	var errs []string
-	err := update(func(st *State) error {
-		for _, src := range srcs {
-			name := src.Name()
-			issues, err := src.Poll(st.LastPoll[name])
-			if err != nil {
-				errs = append(errs, name+": "+err.Error())
-				continue
+	for _, src := range srcs {
+		name := src.Name()
+		issues, err := src.Poll(st.LastPoll[name])
+		if err != nil {
+			errs = append(errs, name+": "+err.Error())
+			continue
+		}
+		got = append(got, fetched{name, issues, now()})
+	}
+	var queued []Queued
+	err = update(func(st *State) error {
+		for _, f := range got {
+			if f.at.After(st.LastPoll[f.name]) {
+				st.LastPoll[f.name] = f.at
 			}
-			st.LastPoll[name] = now()
-			for _, i := range issues {
-				i.Source = name
-				if contains(st.Seen[name], i.ID) || !s.Qualified(i) {
+			for _, i := range f.issues {
+				i.Source = f.name
+				if i.Key == "" {
+					i.Key = i.ID
+				}
+				if contains(st.Seen[f.name], i.Key) || !s.Qualified(i) {
 					continue
 				}
 				m, sp := s.Tier(i, warn)
-				q := Queued{Source: name, ID: i.ID, Title: i.Title, URL: i.URL, Body: i.Body, Model: m, Speed: sp, QueuedAt: now()}
+				q := Queued{Source: f.name, Key: i.Key, ID: i.ID, Title: i.Title, URL: i.URL, Body: i.Body, Model: m, Speed: sp, QueuedAt: f.at}
 				st.Queue = append(st.Queue, q)
-				st.Seen[name] = append(st.Seen[name], i.ID)
-				got = append(got, q)
+				st.Seen[f.name] = append(st.Seen[f.name], i.Key)
+				queued = append(queued, q)
 			}
 		}
 		return nil
@@ -346,9 +377,9 @@ func Poll(s Settings, srcs []Source, warn io.Writer) ([]Queued, error) {
 		return nil, err
 	}
 	if len(errs) > 0 {
-		return got, fmt.Errorf("%s", strings.Join(errs, "; "))
+		return queued, fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
-	return got, nil
+	return queued, nil
 }
 
 // TakeResult is what Take did: Dir and Count, or Why nothing was taken.
@@ -401,13 +432,21 @@ func Take(s Settings, max int, mkdir func(slug string) (string, error)) (TakeRes
 		if err != nil {
 			return err
 		}
+		var written []string
+		var launched []Launch
 		for k, q := range st.Queue[:n] {
 			nn := fmt.Sprintf("%02d", k+1)
-			if err := writeTask(dir, nn, q); err != nil {
+			f, err := writeTask(dir, nn, q)
+			if err != nil {
+				for _, w := range written {
+					os.Remove(w)
+				}
 				return err
 			}
-			st.Launched[day(t)] = append(st.Launched[day(t)], Launch{Source: q.Source, ID: q.ID, Batch: slug, Dir: dir, Item: nn, At: t})
+			written = append(written, f)
+			launched = append(launched, Launch{Source: q.Source, Key: q.Key, ID: q.ID, Title: q.Title, URL: q.URL, Batch: slug, Dir: dir, Item: nn, At: t})
 		}
+		st.Launched[day(t)] = append(st.Launched[day(t)], launched...)
 		st.Queue = append([]Queued{}, st.Queue[n:]...)
 		tasks.Load(dir)
 		r = TakeResult{Dir: dir, Count: n}
@@ -416,7 +455,7 @@ func Take(s Settings, max int, mkdir func(slug string) (string, error)) (TakeRes
 	return r, err
 }
 
-func writeTask(dir, nn string, q Queued) error {
+func writeTask(dir, nn string, q Queued) (string, error) {
 	title := strings.Join(strings.Fields(q.Title), " ")
 	if title == "" {
 		title = q.Source + " " + q.ID
@@ -437,7 +476,8 @@ func writeTask(dir, nn string, q Queued) error {
 		b.WriteString(strings.TrimRight("> "+l, " ") + "\n")
 	}
 	b.WriteString("\n## Acceptance criteria\n- [ ] the issue above is resolved\n")
-	return os.WriteFile(filepath.Join(dir, nn+"-"+slug+".md"), []byte(b.String()), 0o644)
+	f := filepath.Join(dir, nn+"-"+slug+".md")
+	return f, writeFile(f, []byte(b.String()), 0o644)
 }
 
 // orRoute is the header value for a missing label: smithy route decides.
@@ -485,10 +525,10 @@ type Status struct {
 
 // StatusOf summarizes the state. The watcher is alive when some source was polled within
 // 3x auto.every.
-func StatusOf(s Settings) Status {
+func StatusOf(s Settings) (Status, error) {
 	st, err := Load()
 	if err != nil {
-		st = &State{}
+		return Status{}, err
 	}
 	t := now()
 	open, _ := InHours(s.Hours, t)
@@ -502,5 +542,5 @@ func StatusOf(s Settings) Status {
 	if out.Queue == nil {
 		out.Queue = []Queued{}
 	}
-	return out
+	return out, nil
 }
