@@ -151,3 +151,15 @@ func TestSlug(t *testing.T) {
 		}
 	}
 }
+
+func TestAddBySelf(t *testing.T) {
+	setup(t)
+	if _, c := capture(t, func() int {
+		return Main([]string{"add", "Default retries?", "3", "--why", "issue says so", "--by", "self"})
+	}); c != 0 {
+		t.Fatalf("add --by self exit %d", c)
+	}
+	if out, _ := capture(t, func() int { return Main([]string{"pending"}) }); !strings.Contains(out, "by self · Default retries?") {
+		t.Fatalf("pending:\n%s", out)
+	}
+}

@@ -15,7 +15,7 @@ import (
 )
 
 // Usage is the text for `smithy decisions --help`.
-const Usage = `usage: smithy decisions add "<question>" "<choice>" --why "<reason>" [--by consult|timeout] [--ref <pr|file>]
+const Usage = `usage: smithy decisions add "<question>" "<choice>" --why "<reason>" [--by consult|timeout|self] [--ref <pr|file>]
        smithy decisions pending | list
        smithy decisions confirm <n>|--all
        smithy decisions change <n> "<new choice>"
@@ -186,8 +186,8 @@ func Main(args []string) int {
 		if len(pos) != 3 {
 			return bad(`add needs "<question>" "<choice>" --why "<reason>"`)
 		}
-		if by != "consult" && by != "timeout" {
-			return bad(fmt.Sprintf("--by must be consult or timeout, got %q", by))
+		if by != "consult" && by != "timeout" && by != "self" {
+			return bad(fmt.Sprintf("--by must be consult, timeout or self, got %q", by))
 		}
 		fields := []string{time.Now().Format("2006-01-02"), "by " + by}
 		var vals [4]string
