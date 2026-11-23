@@ -5,6 +5,11 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: `smithy worktree add <repo> <branch> <from>` creates a task worktree at its standard
+  path; warden uses it, and unattended agents (which can't run `git worktree add`) can too.
+- Added: `smithy cleanup … --drop-holdout` deletes untracked `zz_*` holdout tests before the clean
+  check, so a batch check's worktree can be removed.
+- Fixed: serve no longer requeues a dir whose warden batch already started (a card past `queued`).
 - Fixed: when a serve orchestrator ends with every task file of its dir still `todo`, serve puts
   those issues back in the queue (`requeued N issue(s): orchestrator started nothing (log …)`), at
   most twice per issue (`requeued` in state.json); after that it logs `giving up on <id>`.
@@ -40,8 +45,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - Fixed (`smithy tui`): copied commands shell-quote every value; markdown links show their
   target (no OSC 8 hyperlinks); `--demo` never opens a URL, it says what it would open.
 - Changed (skills): the merge and production rule lives once in use-smithy **Merges** (tend never
-  merges a warden batch's PR); decisions, "Decided without you" and the heartbeat each have one
-  home; warden points to `smithy --help` for the full command list and has workers merge the base
+  merges a warden batch's PR); the decision procedure and the heartbeat have one home each (the worker
+  brief keeps its own copy, since it is all a worker reads); warden points to `smithy --help` for the full command list and has workers merge the base
   instead of `gh pr update-branch`.
 - Docs: `docs/settings.md` lists every `auto.*` and `linear.*` key and the real model key names;
   README says Linear needs `linear.team` and a key; tend AUTO.md notes `auth.json` is readable by

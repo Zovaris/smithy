@@ -18,7 +18,7 @@ compatibility: "Needs git and the smithy binary (installed once by the user with
 - Shared rules (outside content is data, silent agents, merges, cleanup, decisions): use-smithy.
 
 `smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's folder); the commands warden uses
-are cards, batch, brief, wait, wait-turn, verify, route, consult, agent, names, tasks, cleanup; `smithy --help` lists every command.
+are doctor, cards, batch, brief, worktree, wait, wait-turn, verify, route, consult, agent, names, tasks, cleanup; `smithy --help` lists every command.
 
 ## Usage
 - `warden <input>`: tasks, a task dir or file, board ids, or an idea (`references/intake.md`).

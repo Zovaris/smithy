@@ -29,8 +29,8 @@ before (`blocked`, `failed`, `pr_open`, `ready` stay open); how: `references/har
 ## verify (`pr_open`, `ready`)
 
 Before merging a risky item, `smithy cards gate <batch> <id>` (exit 1 without `security=ran`): never merge it; unset → **tell** its worker to run the security agent; `not-run:<reason>` → list it for the user with the reason. Else `smithy verify <repo> <branch> <pr-url>` prints one verdict:
-- `green`: merge auto, and `production` is `false` or a branch other than the PR's base (`""`
-  counts as production), or the user gave use-smithy **Merges**' production yes for this batch → `smithy pr merge <pr>` (workers never merge: the merge permission is
+- `green`: merge auto, and the PR's base is not production (`production` is `false`, or names
+  another branch; `""` counts as production), or the user gave use-smithy **Merges**' production yes for this batch → `smithy pr merge <pr>` (workers never merge: the merge permission is
   the user's, given to you, and a permission check would refuse it from a worker). Use the repo's
   usual merge method; a rebase merge refused because the branch has merge commits → a merge
   commit, never a force-push. Not mergeable (the base moved) → **tell** the worker to merge the base and push.
@@ -82,7 +82,7 @@ Findings follow smelt's `references/RECEIVING.md`. The blocking ones become one 
 at the fix's commit, at the batch's speed even though the fix was built at `fast`. Before merging the fix PR, copy the batch check's `zz_` holdout file (kept in its worktree until
 then) into a fresh worktree of `origin/<fix-branch>` and run it there. You write the fix PR's dispositions (every finding, including declined
 ones and why) in its body. A high security finding also goes to the user (decide stage). Non-blocking ones
-go under **Followups**.
+go under **Followups**. Once the holdout ran, remove the check worktree with `smithy cleanup … --drop-holdout` (deletes only untracked `zz_*` files).
 
 ## batch end (final message)
 
@@ -100,6 +100,7 @@ line each, grouped as **Decisions** and **Followups**, each with the PR it came 
 ## reported · dropped
 
 `reported`: read the report's first lines, then `smithy cleanup`. `dropped`: `smithy cleanup`.
+
 ## stuck (`blocked`, `failed`, or `working` with no `last_beat` for `warden.stuck_minutes`)
 Heartbeat: `references/state.md` (`last_beat`). A session (background) worker whose closing line is `done: <id> waiting` is parked in `smithy wait-turn`: its stage is
 `waiting`, not stuck; nothing to do until its turn comes.

@@ -260,3 +260,27 @@ func TestServeKeepsStartedWork(t *testing.T) {
 		t.Errorf("started work requeued: %q", logs)
 	}
 }
+
+func TestRequeueSkipsStartedBatch(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SMITHY_HOME", home)
+	dir := filepath.Join(home, "plans", "r", "auto-x")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "01-a.md"), []byte("# 01 · a\nStatus: todo\nBlocked by: none\nPR: -\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	bd := filepath.Join(home, "warden", "r-auto-x")
+	if err := os.MkdirAll(bd, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(bd, "batch.json"), []byte(`{"tasks_dir":"`+dir+`"}`), 0o644)
+	os.WriteFile(filepath.Join(bd, "01.json"), []byte(`{"state":"ready"}`), 0o644)
+	if !batchStarted(dir) {
+		t.Fatal("a batch with a ready card counts as started")
+	}
+	if n, _, err := Requeue(dir); err != nil || n != 0 {
+		t.Fatalf("requeued %d, err %v", n, err)
+	}
+}

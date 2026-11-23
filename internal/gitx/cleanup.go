@@ -9,7 +9,7 @@ import (
 	"github.com/Zovaris/smithy/internal/ghx"
 )
 
-const cleanupUsage = "usage: smithy cleanup <repo> <branch> [<worktree>] [--force]\n  removes <worktree> only when it is passed, and never the folder it runs in; a branch checked\n  out in another worktree is kept; a clean local base branch behind origin is fast-forwarded"
+const cleanupUsage = "usage: smithy cleanup <repo> <branch> [<worktree>] [--force] [--drop-holdout]\n  --drop-holdout deletes untracked zz_* holdout test files (smelt's check) before the clean check\n  removes <worktree> only when it is passed, and never the folder it runs in; a branch checked\n  out in another worktree is kept; a clean local base branch behind origin is fast-forwarded"
 
 // WorktreeOf finds the worktree path that has branch checked out in `git worktree list --porcelain` output.
 func WorktreeOf(porcelain, branch string) string {
@@ -31,10 +31,12 @@ func CleanupMain(args []string) int {
 		fmt.Fprintln(os.Stderr, cleanupUsage)
 		return 2
 	}
-	repo, branch, wt, force := args[0], args[1], "", false
+	repo, branch, wt, force, holdout := args[0], args[1], "", false, false
 	for _, a := range args[2:] {
 		if a == "--force" {
 			force = true
+		} else if a == "--drop-holdout" {
+			holdout = true
 		} else {
 			wt = a
 		}
@@ -56,6 +58,13 @@ func CleanupMain(args []string) int {
 	}
 	removed := false
 	if fi, err := os.Stat(wt); wt != "" && err == nil && fi.IsDir() {
+		if holdout {
+			for _, f := range strings.Split(git("-C", wt, "ls-files", "--others", "--exclude-standard"), "\n") {
+				if strings.HasPrefix(filepath.Base(f), "zz_") {
+					_ = os.Remove(filepath.Join(wt, f))
+				}
+			}
+		}
 		if !force && git("-C", wt, "status", "--porcelain") != "" {
 			fmt.Printf("kept %s: uncommitted changes in %s\n", branch, wt)
 			return 1

@@ -178,8 +178,8 @@ Drop `-g` to install into the current project only. Requires the
 
 ## Roadmap
 
-smithy is GitHub-only today. Other forges (GitLab, Bitbucket) come later; there is no `glab`
-support now.
+GitHub is the only forge today (Linear is an issue source for autonomous mode, not a forge).
+Other forges (GitLab, Bitbucket) come later; there is no `glab` support now.
 
 ## Contributing
 
