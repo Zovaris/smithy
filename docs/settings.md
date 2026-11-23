@@ -12,15 +12,15 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 
 | Setting | Default | What it does |
 |---|---|---|
-| `models.<harness>.cheap` / `.mid` / `.strong` | ask | Stored per harness in your user config (`smithy config set-model <tier> <name>`); smithy ships no model names, so the first skill that needs a tier asks you to name it. The router (`smithy route`) picks a tier per task: cheap for small, mechanical or read-only work, mid for most features, strong for risky, hard or large work and the last fix round. |
-| `models.<harness>.judge` | unset (falls back to the strong model) | Optional fourth tier (`smithy config set-model judge <name>`): the model `smithy consult` uses for a decision's one-call pick; unset, consult uses `strong`. |
+| `models.<harness>.<tier>` (tier `cheap`, `mid`, `strong`; `smithy config list` shows them as `models.<tier>` for the current harness) | ask | Stored per harness in your user config only (`smithy config set-model <tier> <name>`); smithy ships no model names, so the first skill that needs a tier asks you to name it. The router (`smithy route`) picks a tier per task: cheap for small, mechanical or read-only work, mid for most features, strong for risky, hard or large work and the last fix round. |
+| `models.<harness>.judge` (`models.judge` in the list) | unset (falls back to the strong model) | Optional fourth tier (`smithy config set-model judge <name>`): the model `smithy consult` uses for a decision's one-call pick; unset, consult uses `strong`. |
 | `agent.effort` | `medium` | Reasoning effort for every agent smithy starts (`smithy agent`, `smithy consult`, warden workers): `low` or `medium`. It is also the cap: `high`, `xhigh` or `max` run at `medium`. Passed as `--effort` (Claude Code) or `-c model_reasoning_effort` (Codex) and as `$AGENT_EFFORT`; CLIs without an effort flag keep their own default. Speed (`fast`/`normal`/`full`) adds agents, never effort. |
 | `ask.timeout` | `10` | Minutes an agent waits for your answer to one of your decisions (use-smithy's stop list) before one `smithy consult` call picks. `0` = no timer: wait. Never applies to the hard floor. Auto-decisions go to `smithy decisions` (`~/.smithy/decisions/<owner>-<repo>.md`, from origin; the folder name without one); `smithy decisions pending` lists the ones you haven't kept or changed. |
 | `agent.timeout` | `90` | Minutes before `smithy agent` (warden workers, `--bg` runs too) kills the agent's whole process group (Unix; on Windows only the agent process), logs "timed out after Nm" and exits 124; `0` means no limit; a value that is not a number warns and uses 90. `--timeout <min>` overrides it for one run. |
 | `route.domain` | unset | Comma list of the product's own nouns (`secret` for a secret scanner) that never count as risk for `smithy route`. |
 | `warden.worker_model` | `route` | `route`: a tier per task; `session`: the parent's model; or one model name for every worker. |
-| `tasks.commit` | ask | Commit specs and tasks (`docs/specs/`) or keep them out of git (`.docs/specs/`). |
-| `tasks.ignore` | ask | When not committed: a committed `.gitignore` line, or `.git/info/exclude` (this machine only). |
+| `tasks.commit` | ask (no default: smelt `plan` asks once) | `true`: commit specs and tasks (`docs/specs/`); `false`: keep them out of git (`.docs/specs/`). |
+| `tasks.ignore` | ask (no default: asked once when `tasks.commit` is false) | `gitignore`: a committed `.gitignore` line; `exclude`: `.git/info/exclude` (this machine only). |
 | `tasks.location` | `repo` | `repo`, `local` (`~/.smithy/plans`) or `board`. |
 | `warden.merge` | unset (warden asks once per batch) | Merge mode only. Unset: warden asks once per batch in its plan line (auto or manual); `auto`: warden merges green PRs (workers never merge); `manual`: warden lists each green PR for you. A value you save counts as your words, except for the production branch (use-smithy **Merges**: only your yes). |
 | `warden.cleanup` | `auto` | End finished workers and remove their worktrees and branches without asking. |
@@ -29,6 +29,20 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `tend.watch` / `tend.label` | `prs` / `agent` | What `/tend watch` follows (comma list of `prs`, `issues`, `actions`, `base`, `alerts`, or `all`); the issue label it may queue. |
 | `stack.<key>` | unset | A command `smithy stack` can't detect (`stack.test`, `stack.single`, `stack.lint`, `stack.dev`…), set with `--repo`. Read from the default branch's committed config or the main checkout's local file, never a branch's own edit. |
 | `decide.url` / `decide.model` | unset (off) | Optional decision model for `smithy decide`, on once both are set. A URL ending in `/scores` uses Respan's behavior format; anything else System One (Jev, Kev local, Clef, span-02). `decide.key_env` names the env var with the key (never the key), `decide.timeout` is in ms (3000). Three failed calls in a row set `decide.enabled` false; set it `true` to turn it back on. |
+| `auto.sources` | `github` | Comma list of issue sources `smithy auto` polls: `github`, `linear`. |
+| `auto.mode` | `labeled` | `labeled`: only issues with the `auto.label` label; `all`: every issue that passes the source's filters. |
+| `auto.label` | `auto` | Label that opts an issue in (`auto.mode labeled`). |
+| `auto.model_prefix` / `auto.speed_prefix` | `model:` / `speed:` | Label prefixes for the worker tier (`model:cheap`…) and the smelt speed (`speed:fast`…). |
+| `auto.max_per_day` | `20` | Issues launched per local calendar day; the rest stay queued (an `auto.hours` window across midnight can launch up to 2x this overnight). |
+| `auto.hours` | unset (always) | Launch window `HH:MM-HH:MM` in local time (`22:00-07:00` wraps midnight). |
+| `auto.every` | `60` | Seconds between polls of each source. |
+| `auto.paused` | `false` | `true` holds `smithy auto take`: nothing launches until it is `false` again (`p` in `smithy tui`). |
+| `auto.merge` | `manual` | Merge mode for auto batches; the production branch stays yours (use-smithy **Merges**). |
+| `linear.team` | unset (required) | Linear team keys smithy may work in (e.g. `ENG,OPS`); empty, the Linear source refuses to poll. |
+| `linear.key_env` | `LINEAR_API_KEY` | Name of the env var holding the Linear personal API key (never the key); wins over `smithy auth set linear` (`~/.smithy/auth.json`). |
+| `linear.project` / `linear.milestone` / `linear.initiative` | unset | Name filters (project: a comma list; initiative via the issue's project). |
+| `linear.cycle` | unset | `current` or a cycle number. |
+| `linear.states` | `unstarted,backlog` | Linear workflow state types that count as new work. |
 | `git.branch` | `{type}/{key}-{slug}` | Branch names (`smithy names`); e.g. `agent/{key}-{slug}`. |
 | `git.worktree` | `{parent}/worktrees/{repo}-{branch}` | Where worktrees go. |
 | `watch.events` / `watch.every` / `watch.max` | `checks,merged,closed,conflict,review,comment,push,new,updated` / `30` / `50` | What wakes a waiting agent on `pr:` and list targets (`actions`, `base` and `alerts` always report), seconds between polls, minutes before a heartbeat. |
