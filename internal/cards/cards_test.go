@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/events"
 )
 
 func setup(t *testing.T) string {
@@ -16,7 +18,33 @@ func setup(t *testing.T) string {
 	h := t.TempDir()
 	t.Setenv("WARDEN_HOME", h)
 	t.Setenv("WARDEN_STALE_MIN", "")
+	t.Setenv("SMITHY_HOME", t.TempDir())
 	return h
+}
+
+func TestSetLogsEvents(t *testing.T) {
+	setup(t)
+	if _, err := Set("b1", "01", []string{"state=working"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Set("b1", "01", []string{"state=pr_open", "pr=https://x/pull/1", "ci=pending"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Set("b1", "01", []string{"note=hi"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Set("b1", "01", []string{"state=merged"}); err != nil {
+		t.Fatal(err)
+	}
+	es, err := events.Read(time.Time{}, 0)
+	var got []string
+	for _, e := range es {
+		got = append(got, e.Kind+":"+e.Detail)
+	}
+	want := []string{"stage:working", "stage:pr_open", "ci:pending", "merged:merged"}
+	if err != nil || !reflect.DeepEqual(got, want) || es[1].Batch != "b1" || es[1].PR != "https://x/pull/1" {
+		t.Fatalf("events = %v %v", got, err)
+	}
 }
 
 func capture(t *testing.T, f func() int) (string, string, int) {

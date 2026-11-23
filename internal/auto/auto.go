@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/names"
 	"github.com/Zovaris/smithy/internal/tasks"
@@ -83,6 +84,12 @@ type State struct {
 	Queue    []Queued             `json:"queue"`
 	Launched map[string][]Launch  `json:"launched"`
 	LastPoll map[string]time.Time `json:"last_poll"`
+	Rate     map[string]int       `json:"rate,omitempty"` // API requests left in the window, per source that reports it
+}
+
+// Rater is a Source that reports its API rate-limit headroom after a poll.
+type Rater interface {
+	Remaining() (int, bool)
 }
 
 // Queued is an issue waiting for the cap or the hours window.
@@ -353,6 +360,7 @@ func Poll(s Settings, srcs []Source, warn io.Writer) ([]Queued, error) {
 	}
 	var got []fetched
 	var errs []error
+	rates := map[string]int{}
 	for _, src := range srcs {
 		name := src.Name()
 		start := now()
@@ -362,19 +370,35 @@ func Poll(s Settings, srcs []Source, warn io.Writer) ([]Queued, error) {
 			continue
 		}
 		got = append(got, fetched{name, issues, start})
+		if r, ok := src.(Rater); ok {
+			if n, ok := r.Remaining(); ok {
+				rates[name] = n
+			}
+		}
 	}
 	var queued []Queued
+	var skipped []events.Event
 	err = update(func(st *State) error {
 		for _, f := range got {
 			if f.at.After(st.LastPoll[f.name]) {
 				st.LastPoll[f.name] = f.at
+			}
+			for k, v := range rates {
+				if st.Rate == nil {
+					st.Rate = map[string]int{}
+				}
+				st.Rate[k] = v
 			}
 			for _, i := range f.issues {
 				i.Source = f.name
 				if i.Key == "" {
 					i.Key = i.ID
 				}
-				if contains(st.Seen[f.name], i.Key) || !s.Qualified(i) {
+				if contains(st.Seen[f.name], i.Key) {
+					continue
+				}
+				if !s.Qualified(i) {
+					skipped = append(skipped, events.Event{T: f.at, Kind: "skipped", Source: f.name, ID: i.ID, Detail: "no " + s.Label + " label: " + i.Title})
 					continue
 				}
 				m, sp := s.Tier(i, warn)
@@ -388,6 +412,15 @@ func Poll(s Settings, srcs []Source, warn io.Writer) ([]Queued, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+	for _, f := range got {
+		events.Append(events.Event{T: f.at, Kind: "poll", Source: f.name, Detail: fmt.Sprintf("%d issues", len(f.issues))})
+	}
+	for _, e := range skipped {
+		events.Append(e)
+	}
+	for _, q := range queued {
+		events.Append(events.Event{T: q.QueuedAt, Kind: "queued", Source: q.Source, ID: q.ID, PR: q.URL, Detail: q.Title})
 	}
 	if len(errs) > 0 {
 		return queued, errors.Join(errs...)
@@ -463,6 +496,9 @@ func Take(s Settings, max int, mkdir func(slug string) (string, error)) (TakeRes
 			launched = append(launched, Launch{Source: q.Source, Key: q.Key, ID: q.ID, Title: q.Title, URL: q.URL, Batch: slug, Dir: dir, Item: nn, At: t})
 		}
 		st.Launched[day(t)] = append(st.Launched[day(t)], launched...)
+		for _, l := range launched {
+			events.Append(events.Event{T: t, Kind: "launched", Batch: l.Batch, Item: l.Item, Source: l.Source, ID: l.ID, PR: l.URL, Detail: l.Title})
+		}
 		st.Queue = append([]Queued{}, st.Queue[n:]...)
 		tasks.Load(dir)
 		r = TakeResult{Dir: dir, Count: n}
@@ -535,7 +571,11 @@ func Report(srcs []Source, ref, state, pr string) error {
 	}
 	for _, s := range srcs {
 		if s.Name() == name {
-			return s.Report(id, state, pr)
+			err := s.Report(id, state, pr)
+			if err == nil {
+				events.Append(events.Event{Kind: "report", Source: name, ID: id, PR: pr, Detail: state})
+			}
+			return err
 		}
 	}
 	return fmt.Errorf("source %q is not configured (auto.sources)", name)

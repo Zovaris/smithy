@@ -57,10 +57,12 @@ type Filters struct {
 
 // Source is the Linear source.
 type Source struct {
-	Settings auto.Settings
-	Filters  Filters
-	key      string
-	client   *http.Client
+	Settings     auto.Settings
+	Filters      Filters
+	key          string
+	client       *http.Client
+	remaining    int
+	hasRemaining bool
 }
 
 // Open reads the linear.* settings and the key. A missing team or key is an auto.ErrNoAccess
@@ -127,6 +129,9 @@ const issuesQuery = `query($first: Int!, $after: String, $filter: IssueFilter) {
 
 // Filter is the IssueFilter for the settings and since, less a short overlap. With no since
 // (the first poll) only issues updated in the last 7 days are read.
+// Remaining is the rate-limit headroom the last request reported (auto.Rater).
+func (s *Source) Remaining() (int, bool) { return s.remaining, s.hasRemaining }
+
 func (s *Source) Filter(since time.Time) map[string]any {
 	in := func(v []string) map[string]any { return map[string]any{"in": v} }
 	f := map[string]any{"team": map[string]any{"key": in(s.Filters.Teams)}}
@@ -294,7 +299,11 @@ func (s *Source) do(query string, vars map[string]any, out any) error {
 		return fmt.Errorf("linear: request failed: %s", auto.Clean(strings.ReplaceAll(err.Error(), s.key, "<key>")))
 	}
 	defer resp.Body.Close()
-	if r, err := strconv.Atoi(resp.Header.Get("X-RateLimit-Requests-Remaining")); err == nil && r < lowRemaining {
+	r, rerr := strconv.Atoi(resp.Header.Get("X-RateLimit-Requests-Remaining"))
+	if rerr == nil {
+		s.remaining, s.hasRemaining = r, true
+	}
+	if rerr == nil && r < lowRemaining {
 		warnOnce.Do(func() {
 			fmt.Fprintf(Warn, "linear: rate limit low: %d requests left in this window\n", r)
 		})

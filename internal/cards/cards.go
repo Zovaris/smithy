@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
 )
 
@@ -137,6 +138,7 @@ func set(file, id string, pairs []string) (map[string]any, error) {
 	if cur == nil {
 		cur = map[string]any{"id": id}
 	}
+	prevState, prevCI := s(cur, "state"), s(cur, "ci")
 	closing := false
 	for _, p := range pairs {
 		i := strings.IndexByte(p, '=')
@@ -189,7 +191,21 @@ func set(file, id string, pairs []string) (map[string]any, error) {
 	}
 	cur["updated"] = stampNow()
 	cur["last_beat"] = cur["updated"]
-	return cur, write(file, cur)
+	if err := write(file, cur); err != nil {
+		return cur, err
+	}
+	batch := filepath.Base(filepath.Dir(file))
+	if ns := s(cur, "state"); ns != "" && ns != prevState {
+		kind := "stage"
+		if ns == "merged" {
+			kind = "merged"
+		}
+		events.Append(events.Event{Kind: kind, Batch: batch, Item: id, PR: s(cur, "pr"), Detail: ns})
+	}
+	if nc := s(cur, "ci"); nc != "" && nc != prevCI {
+		events.Append(events.Event{Kind: "ci", Batch: batch, Item: id, PR: s(cur, "pr"), Detail: nc})
+	}
+	return cur, nil
 }
 
 // Row is one board line.
