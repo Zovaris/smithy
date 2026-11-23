@@ -120,7 +120,7 @@ func AutoDenied(smithy []string) []string {
 	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
 		"~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile", "~/.zshenv", "~/.claude/**",
 		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json"} {
-		d = append(d, "Edit("+f+")", "Write("+f+")")
+		d = append(d, "Edit("+f+")") // Edit rules cover every file-editing tool, Write included
 	}
 	return d
 }
@@ -685,14 +685,39 @@ func isFile(p string) bool {
 // SmithyPaths are the absolute paths of this smithy binary and the use-smithy launcher.
 func SmithyPaths() []string {
 	var out []string
+	seen := map[string]bool{}
+	add := func(p string) {
+		if p != "" && !seen[p] {
+			seen[p] = true
+			out = append(out, p)
+		}
+	}
 	if exe, err := os.Executable(); err == nil {
 		if r, err := filepath.EvalSymlinks(exe); err == nil {
 			exe = r
 		}
-		out = append(out, exe)
+		add(exe)
 	}
-	if p, ok := FindSkill("use-smithy"); ok {
-		out = append(out, filepath.Join(filepath.Dir(p), "scripts", "smithy"))
+	// Every skill's launcher: skills say `smithy` for `<skill-dir>/scripts/smithy`, so an
+	// orchestrator following tend or warden runs their launcher, not use-smithy's.
+	var roots []string
+	if d := os.Getenv("SMITHY_SKILL_DIR"); d != "" {
+		roots = append(roots, filepath.Dir(filepath.Dir(d)))
+	}
+	for _, s := range []string{"use-smithy", "tend", "warden", "smelt", "scout", "ledger", "hush"} {
+		if p, ok := FindSkill(s); ok {
+			add(filepath.Join(filepath.Dir(p), "scripts", "smithy"))
+			roots = append(roots, filepath.Dir(filepath.Dir(p)))
+		}
+	}
+	for _, r := range roots {
+		ents, _ := os.ReadDir(r)
+		for _, e := range ents {
+			l := filepath.Join(r, e.Name(), "scripts", "smithy")
+			if fi, err := os.Stat(l); err == nil && !fi.IsDir() {
+				add(l)
+			}
+		}
 	}
 	return out
 }

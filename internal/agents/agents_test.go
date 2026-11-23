@@ -572,3 +572,28 @@ func TestConsultPromptEscalatesOnlyTheHardFloor(t *testing.T) {
 		t.Fatalf("prompt:\n%s", p)
 	}
 }
+
+func TestSmithyPathsIncludesEverySkillLauncher(t *testing.T) {
+	root := t.TempDir()
+	for _, s := range []string{"tend", "warden", "use-smithy"} {
+		d := filepath.Join(root, s, "scripts")
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(d, "smithy"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("SMITHY_SKILL_DIR", filepath.Join(root, "tend", "scripts"))
+	got := strings.Join(SmithyPaths(), "\n")
+	for _, s := range []string{"tend", "warden", "use-smithy"} {
+		if !strings.Contains(got, filepath.Join(root, s, "scripts", "smithy")) {
+			t.Fatalf("missing %s launcher in %q", s, got)
+		}
+	}
+	for _, d := range AutoDenied(nil) {
+		if strings.HasPrefix(d, "Write(") {
+			t.Fatalf("Write deny rules are ignored by claude; use Edit: %s", d)
+		}
+	}
+}
