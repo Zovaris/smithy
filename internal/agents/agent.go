@@ -90,7 +90,7 @@ func AutoTools(smithy []string) []string {
 	for _, g := range []string{"pr create", "pr view", "pr checks", "pr list", "pr comment", "pr diff", "issue view", "issue comment", "run view", "run list"} {
 		t = append(t, "Bash(gh "+g+" *)")
 	}
-	t = append(t, "Bash(go test *)", "Bash(go vet *)", "Bash(npm test *)", "Bash(npm run test *)")
+	t = append(t, "Bash(ls)", "Bash(ls *)", "Bash(pwd)", "Bash(go test *)", "Bash(go vet *)", "Bash(npm test *)", "Bash(npm run test *)")
 	for _, b := range smithy {
 		if filepath.IsAbs(b) {
 			t = append(t, "Bash("+b+" *)")
@@ -103,7 +103,7 @@ func AutoTools(smithy []string) []string {
 // credential commands, network fetchers, secrets on disk and files that run code later.
 func AutoDenied(smithy []string) []string {
 	d := []string{"Bash(git -c *)", "Bash(git config *)", "Bash(gh api *)", "Bash(gh auth *)", "Bash(gh gist *)", "Bash(gh alias *)",
-		"Bash(gh extension *)", "Bash(smithy auth *)", "Bash(smithy config *)", "Bash(curl *)", "Bash(wget *)",
+		"Bash(gh extension *)", "Bash(smithy auth *)", "Bash(smithy config set *)", "Bash(smithy config set-model *)", "Bash(curl *)", "Bash(wget *)",
 		// remote-exec and URL options of fetch/push, and file output of any git command
 		"Bash(git * --upload-pack*)", "Bash(git * --receive-pack*)", "Bash(git * --exec*)", "Bash(git * --repo*)", "Bash(git * --output*)",
 		"Bash(git push * http*)", "Bash(git push * git@*)", "Bash(git push * ssh*)", "Bash(git push * file*)", "Bash(git checkout * -- /*)",
@@ -111,7 +111,7 @@ func AutoDenied(smithy []string) []string {
 		"Bash(*>*)", "Bash(* | tee *)", "Bash(*|tee *)"}
 	for _, b := range smithy {
 		if filepath.IsAbs(b) {
-			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config *)")
+			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config set *)", "Bash("+b+" config set-model *)")
 		}
 	}
 	for _, f := range []string{"~/.smithy/auth.json", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
