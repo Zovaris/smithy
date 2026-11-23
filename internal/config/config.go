@@ -59,6 +59,8 @@ var Known = []Setting{
 	{"auto.hours", "", "smithy auto", "launch window HH:MM-HH:MM in local time (22:00-07:00 wraps midnight); empty = always"},
 	{"auto.every", "60", "smithy auto", "seconds between polls of each source"},
 	{"auto.paused", "false", "smithy auto", "true holds smithy auto take: nothing launches until it is false again (p in smithy tui)"},
+	{"auto.agent", "", "smithy auto serve", "agent CLI for serve's orchestrator (claude, codex, opencode…); empty = the one smithy agent detects"},
+	{"auto.session_hours", "3", "smithy auto serve", "hours one orchestrator session may run before smithy agent ends it (its workers keep going)"},
 	{"auto.merge", "manual", "tend auto", "merge mode for auto batches (production stays the user's, always)"},
 	{"linear.key_env", "LINEAR_API_KEY", "smithy auto", "name of the env var holding the Linear personal API key (never the key); wins over smithy auth set linear (~/.smithy/auth.json)"},
 	{"linear.team", "", "smithy auto", "required: Linear team keys smithy may work in (e.g. ENG,OPS); empty, the Linear source refuses to poll"},

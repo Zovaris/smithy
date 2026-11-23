@@ -5,6 +5,19 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: `smithy auto serve [--agent <cli>] [--once] [--max-hours <n>]`, the unattended loop
+  outside the LLM: polls every `auto.every`, and when `auto take` yields a task dir starts one
+  headless orchestrator (`smithy agent --bg --profile auto`) that runs `tend auto once <dir>`; one
+  at a time (`~/.smithy/auto/orchestrator.json`), logs in `~/.smithy/auto/sessions/`, heartbeat in
+  `~/.smithy/auto/serve.json`. In a terminal a compact live view (Esc, q or Ctrl+C asks before
+  stopping); otherwise one line per event. Stopping never stops the orchestrator or its workers.
+  `smithy auto status`, the TUI header and System view (`l` opens the session log) show serve.
+- Added: `smithy agent --profile auto`: Claude Code with permission mode `dontAsk` and an
+  allowed-tools list (Read, Edit, Write, Glob, Grep; Bash for git, gh, go/npm test, smithy);
+  Codex with `approval_policy=never` in its workspace-write sandbox. Never a full bypass.
+- Added: settings `auto.agent` and `auto.session_hours` (default 3); `smithy doctor` warns when
+  `auto.agent` is missing or can't run headless. tend `auto once <dir>`; warden ends an `auto-*`
+  dir `blocked` when only the subagent fallback can launch workers.
 - Added: `smithy tui`, a live dashboard (Bubble Tea v2): a dithered animated anvil header with
   the watcher, daily cap, agents and PRs; full-size views behind a tab bar (Overview charts of
   work per hour, agents by stage, the cap, CI health and how long work takes; Agents with a

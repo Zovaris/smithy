@@ -14,7 +14,7 @@ import (
 )
 
 // Usage is the text for `smithy auto --help`.
-const Usage = `usage: smithy auto poll [--source <s>] | take [--max <n>] | report <source:id> <state> [--pr <url>] | status [--json]
+const Usage = `usage: smithy auto poll [--source <s>] | take [--max <n>] | report <source:id> <state> [--pr <url>] | status [--json] | serve [--agent <cli>] [--once] [--max-hours <n>]
 Autonomous intake (settings auto.*; state in ~/.smithy/auto/state.json).
   poll    polls each source in auto.sources once and queues new qualified issues, one line each:
           auto <source> <id> queued <model|-> <speed|-> <url>
@@ -24,7 +24,8 @@ Autonomous intake (settings auto.*; state in ~/.smithy/auto/state.json).
   report  writes back to the issue: started, completed or blocked (GitHub: a comment; Linear: a comment,
           the workflow state and the PR attached); the issue is <source>:<id> (linear:TES-1 or
           linear:<uuid>) or a bare id taken by auto take
-  status  queue, today's count and cap, hours, last poll per source, watcher alive or stale
+  status  queue, today's count and cap, hours, last poll per source, watcher alive or stale, serve
+  serve   the unattended loop in the foreground (smithy auto serve --help)
 Exit 2 = bad usage or settings, 3 = no access to a source.`
 
 // taskDir makes the task dir for take, always out of git (~/.smithy/plans/<repo>/<slug>), so
@@ -168,6 +169,14 @@ func printStatus(st Status) {
 		alive = "alive"
 	}
 	fmt.Printf("watcher: %s (every %ds)\n", alive, st.Every)
+	if sv := st.Serve; sv.State == "not running" {
+		fmt.Println("serve: not running (start: smithy auto serve)")
+	} else {
+		fmt.Printf("serve: %s (pid %d, agent %s, last cycle %s, %s)\n", sv.State, sv.PID, sv.Agent, sv.LastCycle.Format(time.RFC3339), sv.Loop)
+		if sv.SessionLog != "" {
+			fmt.Printf("  orchestrator pid %d, log %s\n", sv.SessionPID, sv.SessionLog)
+		}
+	}
 	for _, src := range st.Sources {
 		last := "never"
 		if t, ok := st.LastPoll[src]; ok {

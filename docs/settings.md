@@ -57,3 +57,5 @@ skills don't need to call `gh pr merge` themselves.
 | Hook | Harness | Does |
 |---|---|---|
 | `skills/smelt/scripts/smithy guard-tests` | any with a pre-edit hook | Blocks test-file edits during TDD's green phase. |
+| `auto.agent` | unset (the CLI `smithy agent` detects) | Agent CLI for `smithy auto serve`'s orchestrator session (`claude`, `codex`, `opencode`…). It runs with `smithy agent --profile auto`: never a full bypass (Claude Code: permission mode `dontAsk` with an allowed-tools list of Read/Edit/Write/Glob/Grep and Bash for git, gh, go/npm test and smithy; Codex: `--sandbox workspace-write`, `approval_policy=never`). `smithy doctor` warns when it is missing or can't run headless. |
+| `auto.session_hours` | `3` | Hours one serve orchestrator may run before `smithy agent` ends it; its workers keep going. |

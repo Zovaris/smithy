@@ -70,6 +70,7 @@ type Watcher struct {
 	Hourly   []int // launches per hour today, 0..23
 	Paused   bool
 	Team     string
+	Serve    auto.ServeStatus
 }
 
 // Batch is one warden batch and its items.
@@ -144,6 +145,8 @@ func Load(now time.Time) Snapshot {
 		}
 	}
 	w.Alive = w.Polled && now.Sub(w.LastPoll) <= time.Duration(3*s.Every)*time.Second
+	w.Serve = auto.ServeOf(now)
+	w.Serve.Agent, w.Serve.SessionLog, w.Serve.Loop = clean(w.Serve.Agent), clean(w.Serve.SessionLog), clean(w.Serve.Loop)
 	snap.Watcher = w
 	snap.Queue = st.Queue
 

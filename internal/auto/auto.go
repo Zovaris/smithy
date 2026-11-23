@@ -614,6 +614,28 @@ type Status struct {
 	Every    int                  `json:"every"`
 	Queued   int                  `json:"queued"`
 	Queue    []Queued             `json:"queue"`
+	Serve    ServeStatus          `json:"serve"`
+}
+
+// ServeStatus is smithy auto serve's health in Status.
+type ServeStatus struct {
+	State      string    `json:"state"` // running, stale or not running
+	PID        int       `json:"pid,omitempty"`
+	Agent      string    `json:"agent,omitempty"`
+	LastCycle  time.Time `json:"last_cycle,omitzero"`
+	Loop       string    `json:"loop,omitempty"` // idle, polling or orchestrating
+	SessionLog string    `json:"session_log,omitempty"`
+	SessionPID int       `json:"session_pid,omitempty"`
+}
+
+// ServeOf summarizes the heartbeat at t.
+func ServeOf(t time.Time) ServeStatus {
+	hb, _ := ReadServe()
+	out := ServeStatus{State: hb.Health(t)}
+	if hb != nil {
+		out.PID, out.Agent, out.LastCycle, out.Loop, out.SessionLog, out.SessionPID = hb.PID, hb.Agent, hb.LastCycle, hb.State, hb.SessionLog, hb.SessionPID
+	}
+	return out
 }
 
 // StatusOf summarizes the state. The watcher is alive when some source was polled within
@@ -626,7 +648,7 @@ func StatusOf(s Settings) (Status, error) {
 	t := now()
 	open, _ := InHours(s.Hours, t)
 	out := Status{LastPoll: st.LastPoll, Sources: s.Sources, Today: len(st.Launched[day(t)]), Cap: s.MaxPerDay,
-		Hours: s.Hours, OpenNow: open, Every: s.Every, Queued: len(st.Queue), Queue: st.Queue}
+		Hours: s.Hours, OpenNow: open, Every: s.Every, Queued: len(st.Queue), Queue: st.Queue, Serve: ServeOf(t)}
 	for _, p := range st.LastPoll {
 		if t.Sub(p) <= time.Duration(3*s.Every)*time.Second {
 			out.Alive = true
