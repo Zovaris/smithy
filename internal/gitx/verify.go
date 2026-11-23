@@ -12,7 +12,7 @@ import (
 	"github.com/Zovaris/smithy/internal/ghx"
 )
 
-const verifyUsage = "usage: smithy verify <repo-dir> <branch> [pr-url|number]\n  a PR URL is checked against <repo-dir>'s origin (exit 2 on a mismatch); prefer it over a number\n  <repo-dir> is the local checkout path (\".\" for here), not owner/name\nverdicts: green or merged (exit 0); draft, everything green but still a draft (exit 3);\nconflict, the PR can't merge into its base (exit 4: rebase or merge the base, then re-verify);\npending, red, unpushed, closed, no-pr (exit 1). checks= is green, red, pending or none;\nnone counts as pending when .github/workflows holds a workflow (CI has not registered yet)."
+const verifyUsage = "usage: smithy verify <repo-dir> <branch> [pr-url|number]\n  a PR URL is checked against <repo-dir>'s origin (exit 2 on a mismatch); prefer it over a number\n  <repo-dir> is the local checkout path (\".\" for here), not owner/name\nverdicts: green or merged (exit 0); draft, everything green but still a draft (exit 3);\nconflict, the PR can't merge into its base (exit 4: rebase or merge the base, then re-verify);\npending (checks running, or GitHub has not computed mergeable yet), red, unpushed, closed, no-pr (exit 1). checks= is green, red, pending or none;\nnone counts as pending when .github/workflows holds a workflow (CI has not registered yet)."
 
 var (
 	failRe    = regexp.MustCompile(`(?i)FAIL|ERROR|CANCEL|TIMED_OUT|ACTION_REQUIRED`)
@@ -136,7 +136,7 @@ func Verdict(state, checks, mergeable string, draft bool, local, head string, an
 		return "conflict"
 	case checks == "red":
 		return "red"
-	case checks == "pending":
+	case checks == "pending" || mergeable == "UNKNOWN":
 		return "pending"
 	case draft:
 		return "draft"
