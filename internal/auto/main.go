@@ -96,13 +96,16 @@ func Main(args []string) int {
 		if len(pos) != 2 {
 			break
 		}
-		srcs, err := s.Open("")
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "smithy auto:", err)
-			return openCode(err)
+		srcs, openErr := s.Open("")
+		if len(srcs) == 0 {
+			fmt.Fprintln(os.Stderr, "smithy auto:", openErr)
+			return openCode(openErr)
 		}
 		if err := Report(srcs, pos[0], pos[1], flags["--pr"]); err != nil {
-			fmt.Fprintln(os.Stderr, "smithy auto:", err)
+			fmt.Fprintln(os.Stderr, "smithy auto:", Clean(err.Error()))
+			if openErr != nil {
+				fmt.Fprintln(os.Stderr, "smithy auto:", Clean(openErr.Error()))
+			}
 			if errors.Is(err, ghx.ErrNoGitHub) || errors.Is(err, ErrNoAccess) {
 				return 3
 			}
@@ -134,10 +137,12 @@ func Main(args []string) int {
 // PollLines polls once (all sources, or only) and returns the queued lines and an exit code.
 // smithy wait auto uses it too.
 func PollLines(s Settings, only string) ([]string, int) {
-	srcs, err := s.Open(only)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "smithy auto:", err)
-		return nil, openCode(err)
+	srcs, openErr := s.Open(only)
+	if openErr != nil {
+		fmt.Fprintln(os.Stderr, "smithy auto:", Clean(openErr.Error()))
+	}
+	if len(srcs) == 0 {
+		return nil, openCode(openErr)
 	}
 	got, err := Poll(s, srcs, os.Stderr)
 	var lines []string
@@ -145,7 +150,7 @@ func PollLines(s Settings, only string) ([]string, int) {
 		lines = append(lines, q.Line())
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "smithy auto: poll:", err)
+		fmt.Fprintln(os.Stderr, "smithy auto: poll:", Clean(err.Error()))
 		if errors.Is(err, ErrNoAccess) || errors.Is(err, ghx.ErrNoGitHub) || strings.Contains(err.Error(), ghx.ErrNoGitHub.Error()) {
 			return lines, 3
 		}
@@ -182,9 +187,9 @@ func printStatus(st Status) {
 	}
 }
 
-// openCode is the exit code for a source that failed to open: 3 for no access, else 2.
+// openCode is the exit code when no source opened: 3 for no access, else 2.
 func openCode(err error) int {
-	if errors.Is(err, ErrNoAccess) {
+	if err == nil || errors.Is(err, ErrNoAccess) {
 		return 3
 	}
 	return 2

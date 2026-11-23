@@ -350,6 +350,48 @@ func TestTaskKeyHeaderUsesStableKey(t *testing.T) {
 	}
 }
 
+func TestTaskHeadersAndBodyStayQuoted(t *testing.T) {
+	q := Queued{Source: "linear", Key: "k\r\nStatus: done", ID: "ENG-1\u2028X: y", Title: "t\x1b[31m\rPR: z", URL: "https://u\nModel: strong",
+		Body: "a\r\nb\u2028c\u2029d\re"}
+	f, err := writeTask(t.TempDir(), "01", q)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(f)
+	s := string(b)
+	for _, bad := range []string{"\nStatus: done", "\nX: y", "\nPR: z", "\nModel: strong", "\x1b", "\r", "\u2028", "\u2029"} {
+		if strings.Contains(s, bad) {
+			t.Errorf("task contains %q:\n%s", bad, s)
+		}
+	}
+	for _, want := range []string{"> a\n> b\n> c\n> d\n> e\n"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("task lacks %q:\n%s", want, s)
+		}
+	}
+}
+
+func TestCleanStripsEscapes(t *testing.T) {
+	if got := Clean("bad\x1b[2J\x1b]0;x\x07 key\r\nnext\u2028"); got != "bad key next" {
+		t.Errorf("Clean = %q", got)
+	}
+}
+
+func TestOneBadSourceDoesNotStopOthers(t *testing.T) {
+	home(t)
+	good := &fakeSource{name: "good", issues: []Issue{{ID: "1", Labels: []string{"auto"}}}}
+	Sources["good"] = func(Settings) (Source, error) { return good, nil }
+	Sources["noaccess"] = func(Settings) (Source, error) { return nil, fmt.Errorf("x: %w", ErrNoAccess) }
+	defer delete(Sources, "good")
+	defer delete(Sources, "noaccess")
+	s := defaults()
+	s.Sources = []string{"noaccess", "good"}
+	lines, code := PollLines(s, "")
+	if len(lines) != 1 || code == 3 {
+		t.Errorf("lines %v code %d", lines, code)
+	}
+}
+
 func TestNoAccessExitsThree(t *testing.T) {
 	home(t)
 	Sources["noaccess"] = func(Settings) (Source, error) { return nil, fmt.Errorf("x: set y: %w", ErrNoAccess) }

@@ -1,5 +1,6 @@
 // Package linear is the Linear issue source for smithy auto: a GraphQL client over net/http
-// that reads a personal API key from the env var named by linear.key_env and never prints it.
+// with the personal API key from auth.Get("linear") (env var linear.key_env, else auth.json),
+// never printed.
 package linear
 
 import (
@@ -14,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/auto"
 	"github.com/Zovaris/smithy/internal/config"
 )
@@ -21,11 +23,27 @@ import (
 // Endpoint is the GraphQL URL; tests point it at a fake server.
 var Endpoint = "https://api.linear.app/graphql"
 
-// Warn receives the one low rate-limit warning.
+// Warn receives the low rate-limit and page-cap warnings.
 var Warn io.Writer = os.Stderr
 
-// lowRemaining is the X-RateLimit-Requests-Remaining level that triggers the warning.
-const lowRemaining = 100
+// warnOnce limits the rate-limit warning to one per process.
+var warnOnce = &sync.Once{}
+
+var now = time.Now
+
+const (
+	// lowRemaining is the X-RateLimit-Requests-Remaining level that triggers the warning.
+	lowRemaining = 100
+	// maxPages caps one poll at maxPages*50 issues.
+	maxPages = 40
+	// firstWindow bounds the very first poll (no last poll yet) to recently updated issues.
+	firstWindow = 7 * 24 * time.Hour
+	// overlap re-reads the minutes before the last poll; seen keys dedupe.
+	overlap = 2 * time.Minute
+)
+
+// stateTypes are Linear's workflow state types.
+var stateTypes = []string{"triage", "backlog", "unstarted", "started", "completed", "canceled"}
 
 func init() {
 	auto.Sources["linear"] = func(s auto.Settings) (auto.Source, error) { return Open(s) }
@@ -43,32 +61,45 @@ type Source struct {
 	Filters  Filters
 	key      string
 	client   *http.Client
-	warned   sync.Once
 }
 
 // Open reads the linear.* settings and the key. A missing team or key is an auto.ErrNoAccess
-// error naming the setting or env var, never the key.
+// error naming what to set, never the key.
 func Open(s auto.Settings) (*Source, error) {
 	f := Filters{
-		Teams:       list(config.Get("linear.team", "")),
+		Teams:       list(strings.ToUpper(config.Get("linear.team", ""))),
 		Projects:    list(config.Get("linear.project", "")),
 		Milestones:  list(config.Get("linear.milestone", "")),
 		Initiatives: list(config.Get("linear.initiative", "")),
-		States:      list(config.Get("linear.states", "unstarted,backlog")),
+		States:      list(config.Get("linear.states", "")),
 		Cycle:       strings.TrimSpace(config.Get("linear.cycle", "")),
 	}
 	if len(f.Teams) == 0 {
 		return nil, fmt.Errorf("linear: set linear.team (team keys smithy may work in, e.g. ENG): %w", auto.ErrNoAccess)
+	}
+	if len(f.States) == 0 {
+		f.States = []string{"unstarted", "backlog"}
+	}
+	for _, st := range f.States {
+		ok := false
+		for _, x := range stateTypes {
+			ok = ok || x == st
+		}
+		if !ok {
+			return nil, fmt.Errorf("linear.states: unknown state type %q (known: %s)", st, strings.Join(stateTypes, ", "))
+		}
 	}
 	if f.Cycle != "" && f.Cycle != "current" {
 		if _, err := strconv.Atoi(f.Cycle); err != nil {
 			return nil, fmt.Errorf("linear.cycle must be current or a cycle number, not %q", f.Cycle)
 		}
 	}
-	env := config.Get("linear.key_env", "LINEAR_API_KEY")
-	key := strings.TrimSpace(os.Getenv(env))
+	key, _, err := auth.Get("linear")
+	if err != nil {
+		return nil, fmt.Errorf("linear: %v: %w", err, auto.ErrNoAccess)
+	}
 	if key == "" {
-		return nil, fmt.Errorf("linear: env var %s is empty (Linear personal API key): %w", env, auto.ErrNoAccess)
+		return nil, fmt.Errorf("linear: no API key: run smithy auth set linear (key on stdin) or set %s: %w", auth.EnvVar("linear"), auto.ErrNoAccess)
 	}
 	return &Source{Settings: s, Filters: f, key: key, client: &http.Client{Timeout: 30 * time.Second}}, nil
 }
@@ -94,13 +125,12 @@ const issuesQuery = `query($first: Int!, $after: String, $filter: IssueFilter) {
   }
 }`
 
-// Filter is the IssueFilter for the settings and since (zero: no updatedAt bound).
+// Filter is the IssueFilter for the settings and since, less a short overlap. With no since
+// (the first poll) only issues updated in the last 7 days are read.
 func (s *Source) Filter(since time.Time) map[string]any {
 	in := func(v []string) map[string]any { return map[string]any{"in": v} }
 	f := map[string]any{"team": map[string]any{"key": in(s.Filters.Teams)}}
-	if len(s.Filters.States) > 0 {
-		f["state"] = map[string]any{"type": in(s.Filters.States)}
-	}
+	f["state"] = map[string]any{"type": in(s.Filters.States)}
 	project := map[string]any{}
 	if len(s.Filters.Projects) > 0 {
 		project["name"] = in(s.Filters.Projects)
@@ -121,9 +151,12 @@ func (s *Source) Filter(since time.Time) map[string]any {
 		n, _ := strconv.Atoi(c)
 		f["cycle"] = map[string]any{"number": map[string]any{"eq": n}}
 	}
-	if !since.IsZero() {
-		f["updatedAt"] = map[string]any{"gt": since.UTC().Format(time.RFC3339)}
+	if since.IsZero() {
+		since = now().Add(-firstWindow)
+	} else {
+		since = since.Add(-overlap)
 	}
+	f["updatedAt"] = map[string]any{"gt": since.UTC().Format(time.RFC3339)}
 	return f
 }
 
@@ -133,12 +166,13 @@ type node struct {
 	Team                                    struct{ Key string }
 }
 
-// Poll lists the issues passing the filters updated after since, page by page. An issue from a
-// team outside linear.team is dropped even if the API returns it.
+// Poll lists the issues passing the filters updated after since, page by page (at most
+// maxPages, stopping when the cursor does not advance). An issue from a team outside
+// linear.team is dropped even if the API returns it.
 func (s *Source) Poll(since time.Time) ([]auto.Issue, error) {
 	var out []auto.Issue
 	after := ""
-	for {
+	for page := 1; ; page++ {
 		vars := map[string]any{"first": 50, "filter": s.Filter(since)}
 		if after != "" {
 			vars["after"] = after
@@ -165,24 +199,32 @@ func (s *Source) Poll(since time.Time) ([]auto.Issue, error) {
 			}
 			out = append(out, i)
 		}
-		if !data.Issues.PageInfo.HasNextPage || data.Issues.PageInfo.EndCursor == "" {
+		next := data.Issues.PageInfo.EndCursor
+		if !data.Issues.PageInfo.HasNextPage || next == "" || next == after {
 			return out, nil
 		}
-		after = data.Issues.PageInfo.EndCursor
+		if page >= maxPages {
+			fmt.Fprintf(Warn, "linear: stopped after %d pages; the rest are read on the next poll\n", maxPages)
+			return out, nil
+		}
+		after = next
 	}
 }
 
 func (s *Source) allowed(team string) bool {
+	team = strings.ToUpper(team)
 	for _, t := range s.Filters.Teams {
-		if strings.EqualFold(t, team) {
+		if t == team {
 			return true
 		}
 	}
 	return false
 }
 
-// Report comments on issue id (identifier or UUID), moves it to the team's first started or
-// completed workflow state, and attaches the PR url. Issues outside linear.team are refused.
+// Report moves issue id (identifier or UUID) to the team's started or completed workflow
+// state with the lowest position, attaches the PR url, then comments; the comment goes last so
+// a retry after a failed move or attachment does not post it twice. Issues outside linear.team
+// are refused.
 func (s *Source) Report(id, state, pr string) error {
 	var is struct {
 		Issue struct {
@@ -200,25 +242,23 @@ func (s *Source) Report(id, state, pr string) error {
 		return fmt.Errorf("linear: issue %s is in team %s, not in linear.team", id, is.Issue.Team.Key)
 	}
 	uid := is.Issue.ID
-	if err := s.do(`mutation($input: CommentCreateInput!) { commentCreate(input: $input) { success } }`,
-		map[string]any{"input": map[string]any{"issueId": uid, "body": auto.Comment(state, pr)}}, nil); err != nil {
-		return err
-	}
 	if state == "started" || state == "completed" {
 		var ws struct {
 			WorkflowStates struct {
-				Nodes []struct{ ID, Name, Type string }
+				Nodes []struct {
+					ID, Name, Type string
+					Position       float64
+				}
 			}
 		}
-		if err := s.do(`query($team: String!) { workflowStates(filter: { team: { key: { eq: $team } } }) { nodes { id name type } } }`,
+		if err := s.do(`query($team: String!) { workflowStates(filter: { team: { key: { eq: $team } } }) { nodes { id name type position } } }`,
 			map[string]any{"team": is.Issue.Team.Key}, &ws); err != nil {
 			return err
 		}
-		sid := ""
+		sid, best := "", 0.0
 		for _, w := range ws.WorkflowStates.Nodes {
-			if w.Type == state {
-				sid = w.ID
-				break
+			if w.Type == state && (sid == "" || w.Position < best) {
+				sid, best = w.ID, w.Position
 			}
 		}
 		if sid == "" {
@@ -235,11 +275,12 @@ func (s *Source) Report(id, state, pr string) error {
 			return err
 		}
 	}
-	return nil
+	return s.do(`mutation($input: CommentCreateInput!) { commentCreate(input: $input) { success } }`,
+		map[string]any{"input": map[string]any{"issueId": uid, "body": auto.Comment(state, pr)}}, nil)
 }
 
 // do posts one GraphQL request and decodes data into out (nil: ignored). Errors never carry
-// the key.
+// the key, and API text in them is cleaned of escape sequences.
 func (s *Source) do(query string, vars map[string]any, out any) error {
 	body, _ := json.Marshal(map[string]any{"query": query, "variables": vars})
 	req, err := http.NewRequest("POST", Endpoint, bytes.NewReader(body))
@@ -250,11 +291,11 @@ func (s *Source) do(query string, vars map[string]any, out any) error {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("linear: request failed: %s", strings.ReplaceAll(err.Error(), s.key, "<key>"))
+		return fmt.Errorf("linear: request failed: %s", auto.Clean(strings.ReplaceAll(err.Error(), s.key, "<key>")))
 	}
 	defer resp.Body.Close()
 	if r, err := strconv.Atoi(resp.Header.Get("X-RateLimit-Requests-Remaining")); err == nil && r < lowRemaining {
-		s.warned.Do(func() {
+		warnOnce.Do(func() {
 			fmt.Fprintf(Warn, "linear: rate limit low: %d requests left in this window\n", r)
 		})
 	}
@@ -270,7 +311,7 @@ func (s *Source) do(query string, vars map[string]any, out any) error {
 	if len(res.Errors) > 0 {
 		var m []string
 		for _, e := range res.Errors {
-			m = append(m, strings.ReplaceAll(e.Message, s.key, "<key>"))
+			m = append(m, auto.Clean(strings.ReplaceAll(e.Message, s.key, "<key>")))
 		}
 		return fmt.Errorf("linear: %s", strings.Join(m, "; "))
 	}
