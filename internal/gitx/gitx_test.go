@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -303,5 +304,18 @@ func TestWithoutPRHint(t *testing.T) {
 	}
 	if got := withoutPRHint("error: failed to push\n"); got != "error: failed to push\n" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestChecksAllSkippedIsNotGreen(t *testing.T) {
+	fail, pend := regexp.MustCompile(`FAILURE|ERROR|CANCELLED|TIMED_OUT`), regexp.MustCompile(`PENDING|QUEUED|IN_PROGRESS`)
+	if g := Checks([]Rollup{{Conclusion: "SKIPPED"}, {Conclusion: "NEUTRAL"}}, fail, pend); g != "none" {
+		t.Fatalf("all skipped = %q", g)
+	}
+	if g := Checks([]Rollup{{Conclusion: "SKIPPED"}, {Conclusion: "SUCCESS"}}, fail, pend); g != "green" {
+		t.Fatalf("skipped + success = %q", g)
+	}
+	if g := Checks([]Rollup{{State: "SUCCESS"}}, fail, pend); g != "green" {
+		t.Fatalf("status success = %q", g)
 	}
 }
