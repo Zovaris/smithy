@@ -25,7 +25,7 @@ Autonomous intake (settings auto.*; state in ~/.smithy/auto/state.json).
           the workflow state and the PR attached); the issue is <source>:<id> (linear:TES-1 or
           linear:<uuid>) or a bare id taken by auto take
   status  queue, today's count and cap, hours, last poll per source, watcher alive or stale
-Exit 2 = bad usage or settings, 3 = no access to a source.`
+Exit 1 = a source failed to open, 2 = bad usage or settings, 3 = no access to a source.`
 
 // taskDir makes the task dir for take, always out of git (~/.smithy/plans/<repo>/<slug>), so
 // intake never leaves files in the target repo; tests replace it.
