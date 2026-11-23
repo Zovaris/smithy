@@ -82,7 +82,7 @@ Findings follow smelt's `references/RECEIVING.md`. The blocking ones become one 
 at the fix's commit, at the batch's speed even though the fix was built at `fast`. Before merging the fix PR, copy the batch check's `zz_` holdout file (kept in its worktree until
 then) into a fresh worktree of `origin/<fix-branch>` and run it there. You write the fix PR's dispositions (every finding, including declined
 ones and why) in its body. A high security finding also goes to the user (decide stage). Non-blocking ones
-go under **Followups**.
+go under **Followups**. Remove a check worktree with `smithy cleanup … --drop-holdout`.
 
 ## batch end (final message)
 
