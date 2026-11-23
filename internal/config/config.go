@@ -57,6 +57,7 @@ var Known = []Setting{
 	{"auto.max_per_day", "20", "smithy auto", "issues launched per local calendar day; the rest stay queued"},
 	{"auto.hours", "", "smithy auto", "launch window HH:MM-HH:MM in local time (22:00-07:00 wraps midnight); empty = always"},
 	{"auto.every", "60", "smithy auto", "seconds between polls of each source"},
+	{"auto.paused", "false", "smithy auto", "true holds smithy auto take: nothing launches until it is false again (p in smithy tui)"},
 	{"auto.merge", "manual", "tend auto", "merge mode for auto batches (production stays the user's, always)"},
 	{"linear.key_env", "LINEAR_API_KEY", "smithy auto", "name of the env var holding the Linear personal API key (never the key)"},
 	{"linear.team", "", "smithy auto", "Linear team key filter (e.g. ENG); comma list"},

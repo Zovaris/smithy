@@ -185,6 +185,7 @@ type Settings struct {
 	Mode, Label, ModelPrefix, SpeedPrefix string
 	Hours                                 string
 	MaxPerDay, Every                      int
+	Paused                                bool
 }
 
 // LoadSettings reads the auto.* settings.
@@ -195,6 +196,7 @@ func LoadSettings() (Settings, error) {
 		ModelPrefix: config.Get("auto.model_prefix", "model:"),
 		SpeedPrefix: config.Get("auto.speed_prefix", "speed:"),
 		Hours:       config.Get("auto.hours", ""),
+		Paused:      config.Get("auto.paused", "false") == "true",
 	}
 	for _, x := range strings.Split(config.Get("auto.sources", "github"), ",") {
 		if x = strings.TrimSpace(x); x != "" {
@@ -404,6 +406,9 @@ func Take(s Settings, max int, mkdir func(slug string) (string, error)) (TakeRes
 		switch {
 		case len(st.Queue) == 0:
 			r.Why = "empty queue"
+			return nil
+		case s.Paused:
+			r.Why = fmt.Sprintf("paused (auto.paused; %d queued)", len(st.Queue))
 			return nil
 		case !open:
 			r.Why = fmt.Sprintf("outside hours %s (%d queued)", s.Hours, len(st.Queue))

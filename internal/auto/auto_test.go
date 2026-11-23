@@ -166,6 +166,11 @@ func TestTakeCapHoursAndTaskFiles(t *testing.T) {
 		t.Fatalf("outside hours: %+v %v", r, err)
 	}
 	s.Hours = "22:00-07:00"
+	s.Paused = true
+	if r, err = Take(s, 0, mk); err != nil || r.Count != 0 || !strings.Contains(r.Why, "paused") {
+		t.Fatalf("paused: %+v %v", r, err)
+	}
+	s.Paused = false
 	r, err = Take(s, 0, mk)
 	if err != nil || r.Count != 2 || filepath.Base(r.Dir) != "auto-2026-01-01-1" {
 		t.Fatalf("take = %+v %v", r, err)
