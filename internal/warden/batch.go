@@ -28,7 +28,13 @@ const batchUsage = `usage: smithy batch <command>
       same task dir or on the same branches. Without a flag, max, cleanup, mode and merge come from
       settings (warden.max, warden.cleanup, warden.mode, warden.merge: repo, then user); merge stays
       empty when unset and smithy brief refuses until you set the user's auto/manual answer. --risky marks each listed item id risky
-      (an unknown id is an error).
+      (an unknown id is an error). An auto task dir (auto-*, from smithy auto take): merge comes
+      from auto.merge (default manual), each item's model from its Model: header (route: left to
+      smithy route), speed route takes the mode's, and production is the base when it is the
+      repo's default branch, else false.
+  set <batch> key=value...
+      sets batch.json fields: merge auto|manual, production <branch>|false, cleanup auto|ask,
+      mode "smelt fast|smelt normal|smelt full|plain", base_sha <base>:<sha> (one base per pair).
   add <batch> --id <id> --title <t> --intent <text> [--base b] [--speed fast|normal|full]
       appends one item (a fix item from the batch check); base defaults to the first item's, speed
       to the batch mode's; refuses a duplicate id, title or branch.
@@ -41,6 +47,7 @@ type batchItem struct {
 	Intent   string   `json:"intent"`
 	Source   string   `json:"source,omitempty"`
 	Speed    string   `json:"speed"`
+	Model    string   `json:"model,omitempty"`
 	Base     string   `json:"base"`
 	Prereqs  []string `json:"prereqs"`
 	Branch   string   `json:"branch"`
@@ -143,7 +150,11 @@ func batchInit(args []string) error {
 	if err != nil {
 		return err
 	}
+	isAuto := strings.HasPrefix(filepath.Base(td), "auto-")
 	merge := o["--merge"]
+	if merge == "" && isAuto {
+		merge = config.Get("auto.merge", "manual")
+	}
 	if merge == "" {
 		merge = config.Get("warden.merge", "")
 		if merge == "ask" {
@@ -211,6 +222,9 @@ func batchInit(args []string) error {
 		if speed == "" {
 			speed = "fast"
 		}
+		if speed == "route" {
+			speed = modeSpeed(mode)
+		}
 		intent := t.File
 		if rel, err := filepath.Rel(realPath(top), realPath(t.File)); err == nil && !strings.HasPrefix(rel, "..") {
 			rel = filepath.ToSlash(rel)
@@ -221,6 +235,9 @@ func batchInit(args []string) error {
 		it, err := newItem(repo, id, key, t.Title, intent, text, base, speed, pre)
 		if err != nil {
 			return err
+		}
+		if m := header(text, "Model"); m == "cheap" || m == "mid" || m == "strong" {
+			it.Model = m
 		}
 		items = append(items, it)
 	}
@@ -255,6 +272,12 @@ func batchInit(args []string) error {
 	dir := filepath.Join(cards.Home(), name)
 	bt := map[string]any{"batch": name, "repo": repo, "stack": false, "production": "", "mode": mode,
 		"merge": merge, "cleanup": cleanup, "tasks_dir": td, "items": items}
+	if isAuto {
+		bt["production"] = false
+		if base == defaultBase(repo) && gitOut(repo, "symbolic-ref", "--short", "refs/remotes/origin/HEAD") != "" {
+			bt["production"] = base
+		}
+	}
 	m := o["--max"]
 	if m == "" {
 		m = config.Get("warden.max", "5")
@@ -359,12 +382,7 @@ func batchAdd(args []string) error {
 	speed := o["--speed"]
 	if speed == "" {
 		mode, _ := bt["mode"].(string)
-		speed = "normal"
-		if f := strings.Fields(mode); len(f) == 2 && f[0] == "smelt" {
-			speed = f[1]
-		} else if strings.HasPrefix(mode, "plain") {
-			speed = "fast"
-		}
+		speed = modeSpeed(mode)
 	}
 	if speed != "fast" && speed != "normal" && speed != "full" {
 		return fmt.Errorf("--speed is %q, want fast, normal or full", speed)
@@ -386,12 +404,91 @@ func batchAdd(args []string) error {
 	return nil
 }
 
+// modeSpeed is the smelt speed a batch mode implies (plain: fast; unknown: normal).
+func modeSpeed(mode string) string {
+	if f := strings.Fields(mode); len(f) == 2 && f[0] == "smelt" {
+		return f[1]
+	}
+	if strings.HasPrefix(mode, "plain") {
+		return "fast"
+	}
+	return "normal"
+}
+
+// batchSet sets validated batch.json fields, so nobody hand-edits the file.
+func batchSet(args []string) error {
+	if len(args) < 2 {
+		return fmt.Errorf("set needs <batch> and key=value pairs")
+	}
+	if strings.ContainsAny(args[0], `/\`) || strings.HasPrefix(args[0], ".") {
+		return fmt.Errorf("bad batch name %q", args[0])
+	}
+	dir := filepath.Join(cards.Home(), args[0])
+	raw, err := os.ReadFile(filepath.Join(dir, "batch.json"))
+	if err != nil {
+		return fmt.Errorf("no batch.json in %s", dir)
+	}
+	var bt map[string]any
+	if err := json.Unmarshal(raw, &bt); err != nil {
+		return fmt.Errorf("batch.json unreadable: %v", err)
+	}
+	for _, p := range args[1:] {
+		k, v, ok := strings.Cut(p, "=")
+		if !ok {
+			return fmt.Errorf("not key=value: %s", p)
+		}
+		switch k {
+		case "merge":
+			if v != "auto" && v != "manual" {
+				return fmt.Errorf("merge is %q, want auto or manual", v)
+			}
+			bt[k] = v
+		case "cleanup":
+			if v != "auto" && v != "ask" {
+				return fmt.Errorf("cleanup is %q, want auto or ask", v)
+			}
+			bt[k] = v
+		case "mode":
+			if !validMode(v) {
+				return fmt.Errorf("mode is %q, want smelt fast, smelt normal, smelt full or plain", v)
+			}
+			bt[k] = v
+		case "production":
+			if v == "" || v == "false" {
+				bt[k] = false
+			} else {
+				bt[k] = v
+			}
+		case "base_sha":
+			b, sha, ok := strings.Cut(v, ":")
+			if !ok || b == "" || sha == "" {
+				return fmt.Errorf("base_sha is %q, want <base>:<sha>", v)
+			}
+			m, _ := bt[k].(map[string]any)
+			if m == nil {
+				m = map[string]any{}
+			}
+			m[b] = sha
+			bt[k] = m
+		default:
+			return fmt.Errorf("unknown field %q (merge, production, cleanup, mode, base_sha)", k)
+		}
+	}
+	if err := writeBatch(dir, bt); err != nil {
+		return err
+	}
+	fmt.Println("batch", args[0], "set")
+	return nil
+}
+
 // Batch runs `smithy batch`.
 func Batch(args []string) int {
 	var err error
 	switch {
 	case len(args) > 0 && args[0] == "init":
 		err = batchInit(args[1:])
+	case len(args) > 0 && args[0] == "set":
+		err = batchSet(args[1:])
 	case len(args) > 0 && args[0] == "add":
 		err = batchAdd(args[1:])
 	default:

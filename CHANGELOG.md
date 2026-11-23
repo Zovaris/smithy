@@ -26,6 +26,11 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - Fixed: auto task files use the issue's human id: file `NN-tes-1-<slug>.md`, `Key: TES-1`
   (so branches read `feat/TES-1-…`); the stable id moves to `Ref: <source>:<uuid>`.
   `smithy auto report` takes `linear:TES-1`, `linear:<uuid>` or a bare id it launched.
+- Fixed: `smithy batch init` on an `auto-*` task dir takes merge from `auto.merge`, each item's
+  `model` from its `Model:` header and `speed: route` from the mode, and records `production`
+  (the base when it is the default branch, else `false`).
+- Added: `smithy batch set <batch> key=value…` sets `merge`, `production`, `cleanup`, `mode` and
+  `base_sha` with validation; warden's docs use it instead of hand edits.
 
 - Added: tend `auto` mode (`references/AUTO.md`): waits on `smithy wait auto`, takes the queue
   into a task dir, runs warden on it with batch values pre-answered and reports each issue
