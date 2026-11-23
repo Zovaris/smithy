@@ -49,6 +49,22 @@ var Known = []Setting{
 	{"decide.key_env", "", "smithy decide", "name of the env var holding the key (never the key); empty for a local model"},
 	{"decide.enabled", "true", "smithy decide", "false after three failed calls in a row; set true to turn it back on"},
 	{"decide.timeout", "3000", "smithy decide", "milliseconds before a decide call is dropped"},
+	{"auto.sources", "github", "smithy auto", "comma list of issue sources to poll: github, linear"},
+	{"auto.mode", "labeled", "smithy auto", "labeled: only issues with the auto.label label; all: every issue that passes the source's filters"},
+	{"auto.label", "auto", "smithy auto", "label that opts an issue in (auto.mode labeled)"},
+	{"auto.model_prefix", "model:", "smithy auto", "label prefix for the worker tier (model:cheap, model:mid, model:strong)"},
+	{"auto.speed_prefix", "speed:", "smithy auto", "label prefix for the smelt speed (speed:fast, speed:normal, speed:full)"},
+	{"auto.max_per_day", "20", "smithy auto", "issues launched per local calendar day; the rest stay queued"},
+	{"auto.hours", "", "smithy auto", "launch window HH:MM-HH:MM in local time (22:00-07:00 wraps midnight); empty = always"},
+	{"auto.every", "60", "smithy auto", "seconds between polls of each source"},
+	{"auto.merge", "manual", "tend auto", "merge mode for auto batches (production stays the user's, always)"},
+	{"linear.key_env", "LINEAR_API_KEY", "smithy auto", "name of the env var holding the Linear personal API key (never the key)"},
+	{"linear.team", "", "smithy auto", "Linear team key filter (e.g. ENG); comma list"},
+	{"linear.project", "", "smithy auto", "Linear project name filter; comma list"},
+	{"linear.milestone", "", "smithy auto", "Linear project milestone name filter"},
+	{"linear.cycle", "", "smithy auto", "Linear cycle filter: current or a cycle number"},
+	{"linear.initiative", "", "smithy auto", "Linear initiative name filter (via the issue's project)"},
+	{"linear.states", "unstarted,backlog", "smithy auto", "Linear workflow state types that count as new work"},
 }
 
 // ErrUnset means the key has no value and no default: ask the user once, then save it.

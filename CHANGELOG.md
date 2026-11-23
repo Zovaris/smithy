@@ -5,6 +5,12 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: `smithy auto poll|take|report|status` and `smithy wait auto`: GitHub issues labeled
+  `auto` (or all, `auto.mode`) are queued once, `model:`/`speed:` labels set the task's `Model:`
+  and `Speed:` headers, and `take` writes the ones the daily cap and hours window allow into an
+  `auto-<date>-<n>` task dir (`Source:` header, issue text quoted as data). Settings `auto.*` and
+  `linear.*`; state in `~/.smithy/auto/state.json`.
+
 ## v0.14.1 — 2026-11-23
 
 - Fixed: hush failed to install (unquoted `: ` in its YAML `description`).
