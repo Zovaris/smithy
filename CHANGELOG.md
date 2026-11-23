@@ -5,6 +5,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.14.1 — 2026-11-23
+
 - Fixed: hush failed to install (unquoted `: ` in its YAML `description`).
 - Changed: the skills never download the smithy binary. Install it once with the new
   `install.sh` (checksum + build attestation, as before); the launcher only runs an installed
