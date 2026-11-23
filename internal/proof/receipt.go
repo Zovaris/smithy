@@ -36,7 +36,9 @@ const receiptUsage = `usage:
   smithy receipt check-red [--claim repro]
       exit 0 when a receipt with that claim exited non-zero on a commit before HEAD (the failing
       reproduction, committed before the fix) and one with that claim passes on HEAD; else exit 1
-      naming the cause. list also shows such red receipts ("red before fix"; --claim, default repro).
+      naming the cause. list also shows such red receipts ("red before fix"; --claim picks the
+      red claim, default repro) and the newest holdout from an earlier commit ("holdout commit",
+      or "holdout failed").
   smithy receipt clear
 Receipts live in <repo>/.smelt/receipts.jsonl; .smelt/ ignores itself (its own .gitignore).`
 
@@ -259,6 +261,8 @@ func (r Receipt) State(head string, dirtyNow bool) string {
 	switch {
 	case r.redFirst:
 		return "red before fix"
+	case r.holdout && r.Exit != 0:
+		return "holdout failed"
 	case r.holdout:
 		return "holdout commit"
 	case r.Commit != head && !r.sameCode:
@@ -413,16 +417,24 @@ func ReceiptMain(args []string) int {
 		}
 		sha, dirtyNow := head(root)
 		if !all {
+			// The newest clean holdout run on an earlier commit stays in the list (CHECK.md: its
+			// receipt stays on that commit), passing or failing, so the PR table shows it.
+			hold := -1
+			for i, r := range rs {
+				if r.Claim == "holdout" && !r.Dirty && r.Commit != sha && earlier(root, r.Commit, sha) {
+					hold = i
+				}
+			}
 			kept := rs[:0]
-			for _, r := range rs {
+			for i, r := range rs {
 				if r.Commit == sha || docsOnlySince(root, r.Commit, sha) {
 					r.sameCode = r.Commit != sha
 					kept = append(kept, r)
-				} else if r.Claim == redClaim && r.Exit != 0 && !r.Dirty && earlier(root, r.Commit, sha) {
-					r.redFirst = true
-					kept = append(kept, r)
-				} else if r.Claim == "holdout" && !r.Dirty && earlier(root, r.Commit, sha) {
+				} else if i == hold {
 					r.holdout = true
+					kept = append(kept, r)
+				} else if r.Claim == redClaim && r.Claim != "holdout" && r.Exit != 0 && !r.Dirty && earlier(root, r.Commit, sha) {
+					r.redFirst = true
 					kept = append(kept, r)
 				}
 			}

@@ -495,25 +495,42 @@ func TestCheckRedNeedsFailingReproBeforeTheFix(t *testing.T) {
 
 func mustLoad(dir string) []Receipt { rs, _ := Load(dir); return rs }
 
-func TestListKeepsHoldoutFromAnEarlierCommit(t *testing.T) {
+func listMD(t *testing.T) string {
+	t.Helper()
+	r, w, _ := os.Pipe()
+	old := os.Stdout
+	os.Stdout = w
+	ReceiptMain([]string{"list", "--md"})
+	os.Stdout = old
+	w.Close()
+	b, _ := io.ReadAll(r)
+	return string(b)
+}
+
+func commitFile(t *testing.T, dir, name string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte("package x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, dir, "add", name)
+	git(t, dir, "commit", "-q", "-m", name)
+}
+
+func TestListKeepsTheNewestHoldoutFromAnEarlierCommit(t *testing.T) {
 	dir := newRepo(t)
 	t.Chdir(dir)
 	ReceiptMain([]string{"run", "--claim", "holdout", "--", "true"})
+	commitFile(t, dir, "a.go")
+	ReceiptMain([]string{"run", "--claim", "holdout", "--", "false"})
 	ReceiptMain([]string{"run", "--claim", "other", "--", "true"})
-	if err := os.WriteFile(filepath.Join(dir, "code.go"), []byte("package x\n"), 0o644); err != nil {
-		t.Fatal(err)
+	commitFile(t, dir, "b.go")
+	out := listMD(t)
+	if strings.Count(out, "| holdout |") != 1 || !strings.Contains(out, "(holdout failed)") || strings.Contains(out, "| other |") {
+		t.Fatalf("want only the newest holdout, shown as failed:\n%s", out)
 	}
-	git(t, dir, "add", "code.go")
-	git(t, dir, "commit", "-q", "-m", "copies")
-	sha, _ := head(dir)
-	var hold Receipt
-	for _, r := range mustLoad(dir) {
-		if r.Claim == "holdout" {
-			hold = r
-		}
-	}
-	hold.holdout = true
-	if s := hold.State(sha, false); s != "holdout commit" {
-		t.Fatalf("state %q", s)
+	ReceiptMain([]string{"run", "--claim", "holdout", "--", "true"})
+	commitFile(t, dir, "c.go")
+	if out := listMD(t); strings.Count(out, "| holdout |") != 1 || !strings.Contains(out, "(holdout commit)") {
+		t.Fatalf("passing holdout:\n%s", out)
 	}
 }
