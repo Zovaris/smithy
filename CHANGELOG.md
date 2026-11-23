@@ -5,6 +5,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.14.0 — 2026-11-23
+
 ### Added
 - `smithy decisions add --by self` (now the default) labels a decision taken without consult.
 - `smithy tasks import <tasks.md>` splits one file of `## NN · Title` sections into task files.
