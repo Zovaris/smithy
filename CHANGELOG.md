@@ -5,6 +5,9 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: `smithy tui`, a live dashboard (Bubble Tea v2) of the auto watcher, its queue, warden
+  batches, task lists and pending decisions; refreshes every 2 s from local files only.
+  `internal/tui` is the one package allowed non-stdlib deps (Charm v2, latest).
 - Added: `smithy auto poll|take|report|status` and `smithy wait auto`: GitHub issues labeled
   `auto` (or all, `auto.mode`) are queued once, `model:`/`speed:` labels set the task's `Model:`
   and `Speed:` headers, and `take` writes the ones the daily cap and hours window allow into an

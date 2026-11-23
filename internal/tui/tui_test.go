@@ -1,0 +1,234 @@
+package tui
+
+import (
+	"flag"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
+)
+
+var update = flag.Bool("update", false, "rewrite the golden files")
+
+var fixedNow = time.Date(2026, 11, 23, 14, 30, 0, 0, time.UTC)
+
+func write(t *testing.T, path, s string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(s), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// fixture builds a smithy home with an auto state, one batch, one task list and two decisions.
+func fixture(t *testing.T) {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("SMITHY_HOME", home)
+	t.Setenv("WARDEN_HOME", "")
+	old := time.Local
+	time.Local = time.UTC
+	t.Cleanup(func() { time.Local = old })
+	write(t, filepath.Join(home, "auto", "state.json"), `{"version":1,
+"queue":[{"source":"github","key":"github","id":"42","title":"Add dark mode to the report","url":"https://github.com/o/r/issues/42","model":"mid","speed":"normal","queued_at":"2026-11-23T13:00:00Z"},
+{"source":"linear","key":"linear","id":"ENG-7","title":"Fix flaky login test","url":"https://linear.app/x/issue/ENG-7"}],
+"launched":{"2026-11-23":[{"source":"github","id":"40"},{"source":"github","id":"41"}]},
+"last_poll":{"github":"2026-11-23T14:29:30Z"}}`)
+	b := filepath.Join(home, "warden", "b1")
+	write(t, filepath.Join(b, "batch.json"), `{"items":[{"id":"01-api","title":"API","route":"strong"},{"id":"02-ui","title":"UI","route":"cheap"}]}`)
+	write(t, filepath.Join(b, "01-api.json"), `{"state":"pr_open","phase":"ship","pr":"https://github.com/o/r/pull/9","ci":"green"}`)
+	tdir := filepath.Join(home, "plans", "repo", "v1")
+	write(t, filepath.Join(tdir, "01-a.md"), "# 01 · A\nStatus: done\n")
+	write(t, filepath.Join(tdir, "02-b.md"), "# 02 · B\nStatus: doing\n")
+	write(t, filepath.Join(tdir, "03-c.md"), "# 03 · C\nStatus: todo\n")
+	oldDirs, oldDec := taskDirs, pendingDecisions
+	taskDirs = func() []string { return []string{tdir} }
+	pendingDecisions = func() ([]string, error) {
+		return []string{"2026-11-22 · timeout · Use Postgres? → yes · fits the stack · ref: https://github.com/o/r/pull/9"}, nil
+	}
+	t.Cleanup(func() { taskDirs, pendingDecisions = oldDirs, oldDec })
+}
+
+func model(w, h int) Model {
+	m := Model{width: w, height: h, dark: true, now: func() time.Time { return fixedNow }, load: Load,
+		opener: func(string) error { return nil }}
+	m.snap = Load(fixedNow)
+	return m
+}
+
+func TestLoad(t *testing.T) {
+	fixture(t)
+	s := Load(fixedNow)
+	w := s.Watcher
+	if !w.Alive || w.Today != 2 || w.Cap != 20 || len(w.Sources) != 1 {
+		t.Fatalf("watcher = %+v", w)
+	}
+	if len(s.Queue) != 2 || len(s.Batches) != 1 || len(s.Batches[0].Items) != 2 {
+		t.Fatalf("queue/batches = %d/%+v", len(s.Queue), s.Batches)
+	}
+	if it := s.Batches[0].Items[0]; it.Stage != "verify" || it.Model != "strong" || it.CI != "green" {
+		t.Fatalf("item = %+v", it)
+	}
+	if tl := s.Tasks[0]; tl.Total != 3 || tl.Counts["done"] != 1 || tl.Counts["doing"] != 1 {
+		t.Fatalf("tasks = %+v", tl)
+	}
+	if len(s.Decisions) != 1 || len(s.Errors) != 0 {
+		t.Fatalf("decisions/errors = %v %v", s.Decisions, s.Errors)
+	}
+	if Load(fixedNow.Add(time.Hour)).Watcher.Alive {
+		t.Fatal("watcher should be stale an hour later")
+	}
+}
+
+func TestLoadEmpty(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	t.Setenv("WARDEN_HOME", "")
+	oldDirs, oldDec := taskDirs, pendingDecisions
+	taskDirs = func() []string { return nil }
+	pendingDecisions = func() ([]string, error) { return nil, nil }
+	t.Cleanup(func() { taskDirs, pendingDecisions = oldDirs, oldDec })
+	m := model(80, 24)
+	out := ansi.Strip(m.render())
+	for _, want := range []string{"never polled", "0 queued", "0 batches"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("empty view lacks %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestGolden(t *testing.T) {
+	fixture(t)
+	for _, size := range [][2]int{{120, 40}, {80, 24}} {
+		m := model(size[0], size[1])
+		m.focus = pBatches
+		got := ansi.Strip(m.View().Content)
+		lines := strings.Split(got, "\n")
+		if len(lines) != size[1] {
+			t.Errorf("%dx%d: %d lines", size[0], size[1], len(lines))
+		}
+		for i, l := range lines {
+			if w := ansi.StringWidth(l); w > size[0] {
+				t.Errorf("%dx%d: line %d is %d wide", size[0], size[1], i, w)
+			}
+		}
+		file := filepath.Join("testdata", fmt.Sprintf("%dx%d.golden", size[0], size[1]))
+		if *update {
+			write(t, file, got)
+			continue
+		}
+		want, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != string(want) {
+			t.Errorf("%s differs (go test ./internal/tui -update):\n%s", file, got)
+		}
+	}
+}
+
+func press(m Model, k string) (Model, tea.Cmd) {
+	var msg tea.KeyPressMsg
+	switch k {
+	case "tab":
+		msg = tea.KeyPressMsg{Code: tea.KeyTab}
+	case "shift+tab":
+		msg = tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
+	case "down":
+		msg = tea.KeyPressMsg{Code: tea.KeyDown}
+	case "up":
+		msg = tea.KeyPressMsg{Code: tea.KeyUp}
+	case "right":
+		msg = tea.KeyPressMsg{Code: tea.KeyRight}
+	case "left":
+		msg = tea.KeyPressMsg{Code: tea.KeyLeft}
+	case "enter":
+		msg = tea.KeyPressMsg{Code: tea.KeyEnter}
+	case "esc":
+		msg = tea.KeyPressMsg{Code: tea.KeyEscape}
+	case "ctrl+c":
+		msg = tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
+	default:
+		msg = tea.KeyPressMsg{Code: rune(k[0]), Text: k}
+	}
+	nm, cmd := m.Update(msg)
+	return nm.(Model), cmd
+}
+
+func TestKeys(t *testing.T) {
+	fixture(t)
+	m := model(120, 40)
+	if m, _ = press(m, "tab"); m.focus != pQueue {
+		t.Fatalf("tab -> %v", m.focus)
+	}
+	if m, _ = press(m, "shift+tab"); m.focus != pWatcher {
+		t.Fatalf("shift+tab -> %v", m.focus)
+	}
+	if m, _ = press(m, "left"); m.focus != pDecisions {
+		t.Fatalf("left wraps -> %v", m.focus)
+	}
+	m, _ = press(m, "right")
+	m, _ = press(m, "right")
+	if m, _ = press(m, "down"); m.sel[pQueue] != 1 {
+		t.Fatalf("down -> %d", m.sel[pQueue])
+	}
+	if m, _ = press(m, "down"); m.sel[pQueue] != 1 {
+		t.Fatal("down past the end moved")
+	}
+	if m, _ = press(m, "up"); m.sel[pQueue] != 0 {
+		t.Fatal("up did not move")
+	}
+	if m, _ = press(m, "enter"); !m.modal || !strings.Contains(ansi.Strip(m.render()), "Add dark mode") {
+		t.Fatal("enter did not open the detail modal")
+	}
+	if m, _ = press(m, "tab"); m.focus != pQueue {
+		t.Fatal("tab moved focus under the modal")
+	}
+	if m, _ = press(m, "esc"); m.modal {
+		t.Fatal("esc did not close the modal")
+	}
+	var opened string
+	m.opener = func(u string) error { opened = u; return nil }
+	m, cmd := press(m, "o")
+	if cmd == nil {
+		t.Fatal("o returned no command")
+	}
+	cmd()
+	if opened != "https://github.com/o/r/issues/42" {
+		t.Fatalf("opened %q", opened)
+	}
+	m.focus = pTasks
+	if m, cmd = press(m, "o"); cmd != nil || m.status != "no URL for this row" {
+		t.Fatalf("o on a row without URL: %q", m.status)
+	}
+	if _, cmd = press(m, "r"); cmd == nil {
+		t.Fatal("r returned no command")
+	} else if _, ok := cmd().(snapMsg); !ok {
+		t.Fatal("r did not reload")
+	}
+	for _, k := range []string{"q", "ctrl+c"} {
+		_, cmd := press(m, k)
+		if cmd == nil {
+			t.Fatalf("%s returned no command", k)
+		}
+		if _, ok := cmd().(tea.QuitMsg); !ok {
+			t.Fatalf("%s did not quit", k)
+		}
+	}
+}
+
+func TestResize(t *testing.T) {
+	fixture(t)
+	m := model(120, 40)
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	out := ansi.Strip(nm.(Model).render())
+	if n := len(strings.Split(out, "\n")); n != 20 {
+		t.Fatalf("60x20 rendered %d lines", n)
+	}
+}

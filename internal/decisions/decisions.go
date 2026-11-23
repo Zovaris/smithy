@@ -298,3 +298,16 @@ func Main(args []string) int {
 	}
 	return bad("unknown subcommand " + pos[0])
 }
+
+// Pending is the unconfirmed entries of the current repo's log, without the checkbox prefix.
+func Pending() ([]string, error) {
+	lines, err := read()
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, i := range pending(lines) {
+		out = append(out, strings.TrimPrefix(lines[i], open))
+	}
+	return out, nil
+}
