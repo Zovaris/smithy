@@ -13,7 +13,7 @@ channel line needs one; `--subagent`: the fallback), checking the worktree is on
 Template: `{{x}}` is filled, `[if x]`…`[end]` kept only when x holds (`!x`: when not); `intent`
 is copied verbatim, never summarized or given added requirements, plans or criteria; rulings
 never go to reviewers; `rulings`: every line of the task dir's `rulings.md` when the source (or a path intent) is a
-task file, committed or not, else its lines naming the id, plus `<batch-dir>/decisions.md` lines naming the id; `taskfile`: that committed file (its `Spec:` line goes into Spec); `wait`: prereqs, or past `max`
+task file, committed or not, else its lines naming the id; `taskfile`: that committed file (its `Spec:` line goes into Spec); `wait`: prereqs, or past `max`
 among items without prereqs on a first launch; `relaunch`: `launches` > 0; `debug` / `risky`: the item's `route` / `risky`.
 
 ```

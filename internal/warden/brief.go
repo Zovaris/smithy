@@ -411,9 +411,9 @@ func Brief(args []string) int {
 	}
 	var rulings []string
 	if isTask {
-		rulings = append(allLines(ruleFiles...), rulingLines(id, filepath.Join(dir, "decisions.md"))...)
+		rulings = allLines(ruleFiles...)
 	} else {
-		rulings = rulingLines(id, append(ruleFiles, filepath.Join(dir, "decisions.md"))...)
+		rulings = rulingLines(id, ruleFiles...)
 	}
 	max := 5
 	if bt.Max != nil {

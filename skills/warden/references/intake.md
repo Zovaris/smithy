@@ -22,7 +22,7 @@ Work out what you were given, in this order, and say in the plan line which it w
    installed:
    - "Do you have a plan or task file? Give me the path or the board."
    - "Plan it with smelt" (when installed): the user runs smelt plan on the idea
-     (e.g. `/smelt plan <idea>`); when its task list exists, continue at 1.
+     (smelt's `plan` route on the idea); when its task list exists, continue at 1.
    - "I split it quickly": read the code, propose 2–6 tasks in the task-file format (vertical
      slices, real blockers only) in one message, write them once approved to the dir
      `smithy task-dir <slug>` gives (same settings and questions as smelt), continue at 1.
