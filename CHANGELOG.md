@@ -11,6 +11,11 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - `smithy batch init --risky <id,id>` marks risky items (security agent required).
 
 ### Fixed
+- `smithy wait pr:` names a PR whose head never got a check (`pr <n> no-ci: …`) when the wait ends,
+  so "pending" and "CI never ran" read differently; tend ends such a PR with `no-ci <url>`.
+- tend: green by fixing code, never by deleting, skipping or loosening a test or CI step; outside
+  PRs run with `--ignore-scripts` installs and no tokens, and changes to agent files, `.github/` or
+  install scripts go to the user; reruns up to twice before calling a step flaky.
 - Settings and help catch-up: `smithy batch init` reads `warden.max`, `warden.cleanup`, `warden.mode`
   and `warden.merge` when its flag isn't passed (new `--cleanup` and `--mode` flags; warden and
   brief fall back to `warden.max`); `smithy decisions list --ref <prefix>` filters entries and its

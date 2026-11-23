@@ -876,3 +876,12 @@ func TestRelaunchLineWhileCardsOpen(t *testing.T) {
 		t.Errorf("all final: %q", got)
 	}
 }
+
+func TestNoCILines(t *testing.T) {
+	none := &prWatcher{last: &prState{num: 1, state: "OPEN", url: "u1", checks: checks{state: "none"}}}
+	pend := &prWatcher{last: &prState{num: 2, state: "OPEN", url: "u2", checks: checks{state: "pending"}}}
+	got := noCILines([]watcher{none, pend, &prWatcher{}}, 9)
+	if len(got) != 1 || !strings.Contains(got[0], "pr 1 no-ci: no check ran in 9m") {
+		t.Fatalf("%q", got)
+	}
+}

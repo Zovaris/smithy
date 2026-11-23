@@ -7,8 +7,8 @@ One section per event line from `smithy wait watch`. Recipes report by default; 
 A run on the watched branch (default branch unless named) finished red.
 1. A PR from you for this workflow is open, or a newer run of it is green → note it, stop.
 2. Read the failing log (`gh run view <run-id> --log-failed` with `gh`, else the run page).
-3. Rerun once (`gh run rerun <run-id> --failed`): passes and no recent commit touches the
-   step → report `flaky <url>`; else a real failure.
+3. Rerun up to twice (`gh run rerun <run-id> --failed`): passes and no recent commit touches the
+   step → report `flaky <url>` with the rerun count; else a real failure.
 4. Real failure → report `actions red <url>: <step> <one-line cause>`. With `--fix` only, and
    only when small (the SKILL's critical rule; else report): a
    branch from the default branch (`smithy names branch`), the fix on the fix model (failing

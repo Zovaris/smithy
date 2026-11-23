@@ -16,7 +16,7 @@ inside the repo). Then repeat:
    - **merged / closed** (`cleanup`) → stop this PR. Remove the worktree you created, and the branch and
      worktree the launcher names as its own (`smithy cleanup <repo> <branch> [<worktree>]`,
      never forced); report `merged <url>, cleaned <what>` so the launcher can end its sessions.
-   - **checks red** (`fix-ci`) → `gh run view <run> --log-failed` when `gh` is installed (else open the failing check's page from the PR). Rerun once (`gh run rerun <run> --failed` when `gh` is installed): passes and no recent commit touches the step → report flaky; else a real failure: hand it to the fix model, failing test first when it is
+   - **checks red** (`fix-ci`) → `gh run view <run> --log-failed` when `gh` is installed (else open the failing check's page from the PR). Rerun up to twice (`gh run rerun <run> --failed` when `gh` is installed): passes and no recent commit touches the step → report flaky with the rerun count; else a real failure: hand it to the fix model, failing test first when it is
      a bug, and push the fix. Red again after a second real fix → "needs you".
    - **conflicting or behind base** (`sync-base`) → follow the repo: rebase if its history is linear (no merge
      commits on the base in `git log --merges -5`), else merge the base. A rebase needs a force
@@ -30,7 +30,8 @@ inside the repo). Then repeat:
      review_rounds=<n>`); without a card, in `~/.smithy/tend/<owner>-<repo>-<n>.rounds`.
    - **checks pending** (`wait`) → `smithy wait pr:<pr-url>` in the background (foreground where the
      harness can't wake on exit); it returns one line when checks finish, the PR merges or closes,
-     or a review lands. Exit 0: read the state again. Exit 4 (heartbeat): wait again. Exit 2 or 3
+     or a review lands. Exit 0: read the state again. Exit 4 (heartbeat): wait again, unless it printed `pr <n> no-ci`: then run the suite with
+     `smithy receipt run --claim suite -- <suite>` and end `no-ci <url>` (mergeable or not, say which). Exit 2 or 3
      (bad target, no gh and no token, or signed out): "needs you". Never sleep-then-check turns.
    - **changes requested or review still required with no open thread, or blocked** (`needs-you`)
      → "needs you <url>: <why>" (a card: `state=blocked`).
