@@ -5,10 +5,12 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
-- Added: `smithy tui`, a live dashboard (Bubble Tea v2) of the auto watcher, its queue, warden
-  batches (as a tree), task lists and pending decisions, with an animated dithered anvil header,
-  a spring cap meter and launch charts; refreshes every 2 s from local files only; `--no-anim`,
-  `SMITHY_REDUCE_MOTION` and `NO_COLOR` are honored.
+- Added: `smithy tui`, a live dashboard (Bubble Tea v2): a dithered animated anvil header with
+  the watcher, daily cap, agents and PRs; panels Incoming, Agents at work, Needs you, Activity,
+  Worktrees and Plans with numbered tabs, details, worker logs, copy, filter and mouse; reads
+  local files only (git worktree list cached 10 s); `--no-anim`, `SMITHY_REDUCE_MOTION` and
+  `NO_COLOR` are honored.
+- Added: `auto.paused` (`p` in `smithy tui`): `smithy auto take` launches nothing while true.
   `internal/tui` is the one package allowed non-stdlib deps (Charm v2, latest).
 - Added: `smithy auto poll|take|report|status` and `smithy wait auto`: GitHub issues labeled
   `auto` (or all, `auto.mode`) are queued once, `model:`/`speed:` labels set the task's `Model:`

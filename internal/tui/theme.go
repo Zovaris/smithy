@@ -13,7 +13,8 @@ import (
 type theme struct {
 	accent, ok, warn, err, muted, text, surface, border color.Color
 	forge                                               []color.Color // ember → orange → gold
-	shadow, warmWhite                                   color.Color   // wordmark shadow glyphs; shimmer target
+	warmWhite                                           color.Color   // shimmer target
+	steel, heat, spark                                  []color.Color // anvil shading, face glow, spark age
 	plain                                               bool          // no color: lean on bold and reverse
 	g                                                   glyphs
 }
@@ -64,10 +65,10 @@ func newTheme(dark bool, p colorprofile.Profile, unicode bool) theme {
 		t.g = uniGlyphs
 	}
 	t.forge = []color.Color{c("#B3260B"), c("#F25C05"), c("#FFB547")}
-	t.shadow, t.warmWhite = c("#5A2410"), c("#FFF1D6")
-	if !dark {
-		t.shadow = c("#C9A48E")
-	}
+	t.warmWhite = c("#FFF1D6")
+	t.steel = lipgloss.Blend1D(7, c("#151A22"), c("#2C3746"), c("#56657A"), c("#93A3B8"), c("#D5DEE8"))
+	t.heat = lipgloss.Blend1D(6, c("#56657A"), c("#B3260B"), c("#F25C05"), c("#FFB547"), c("#FFF1C1"))
+	t.spark = lipgloss.Blend1D(6, c("#FFFFFF"), c("#FFD36E"), c("#F25C05"), c("#8A1A06"))
 	if p <= colorprofile.Ascii {
 		t.plain = true
 		t.accent, t.ok, t.warn, t.err, t.muted, t.text, t.surface, t.border = nil, nil, nil, nil, nil, nil, nil, nil

@@ -2,26 +2,50 @@ package tui
 
 import (
 	"image/color"
+	"math"
+	"math/rand/v2"
 	"strings"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/colorprofile"
+	"github.com/charmbracelet/harmonica"
 )
 
-// fps is the frame rate while something moves (the shimmer or the cap meter); at rest no frames run.
-const fps = 14
+// fps is the frame rate while sparks, the glow, the shimmer or the cap meter move; at rest no frames run.
+const fps = 24
 
-// wordA is the ANSI Shadow wordmark (6 rows): █ are faces, the box glyphs its shadow.
-var wordA = []string{
-	"███████╗███╗   ███╗██╗████████╗██╗  ██╗██╗   ██╗",
-	"██╔════╝████╗ ████║██║╚══██╔══╝██║  ██║╚██╗ ██╔╝",
-	"███████╗██╔████╔██║██║   ██║   ███████║ ╚████╔╝ ",
-	"╚════██║██║╚██╔╝██║██║   ██║   ██╔══██║  ╚██╔╝  ",
-	"███████║██║ ╚═╝ ██║██║   ██║   ██║  ██║   ██║   ",
-	"╚══════╝╚═╝     ╚═╝╚═╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ",
+// anvilBig is the 30×14-pixel anvil (7 text rows of half blocks): three rows of headroom for
+// sparks, a face with the horn to the left and the heel to the right, a narrow waist and a
+// flared base. anvilSmall is the 16×8 one for narrow terminals.
+var anvilBig = []string{
+	"                              ",
+	"                              ",
+	"                              ",
+	"  ##########################  ",
+	"     #######################  ",
+	"         ###################  ",
+	"            ##############    ",
+	"              ##########      ",
+	"               ########       ",
+	"               ########       ",
+	"             ############     ",
+	"           ################   ",
+	"          ##################  ",
+	"          ##################  ",
 }
 
-// wordB is the Calvin S wordmark (3 rows) for terminals under 100 columns.
+var anvilSmall = []string{
+	"                ",
+	"  ############  ",
+	"     #########  ",
+	"       ######   ",
+	"        ####    ",
+	"        ####    ",
+	"      ########  ",
+	"      ########  ",
+}
+
+// wordB is the Calvin S name.
 var wordB = []string{
 	"╔═╗╔╦╗╦╔╦╗╦ ╦╦ ╦",
 	"╚═╗║║║║ ║ ╠═╣╚╦╝",
@@ -29,115 +53,234 @@ var wordB = []string{
 }
 
 const (
-	bandHalf   = 3    // shimmer band half-width in columns
-	bandMix    = 0.25 // strongest pull toward warm white
-	sweepSecs  = 3.0
-	restTicks  = 4 // refresh ticks (2 s each) between idle sweeps
-	fieldWidth = 14
+	bandHalf  = 3
+	bandMix   = 0.25
+	sweepSecs = 2.5
+	idleTicks = 5 // refresh ticks (2 s) between idle strikes
+	gravity   = 55.0
 )
 
-// fx is the header's motion: one shimmer band sweeping across the wordmark, then rest.
-type fx struct {
-	active bool
-	pos    float64 // band center column
-	width  int     // columns the band crosses
+var bayer4 = [4][4]float64{{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}}
+
+type sprite struct {
+	mask  []string
+	faceY int // first face row
+	hitX  float64
 }
 
-func newFX() *fx { return &fx{} }
+var (
+	bigAnvil   = sprite{anvilBig, 3, 18}
+	smallAnvil = sprite{anvilSmall, 1, 9}
+)
 
-// sweep starts a shimmer pass unless one is running.
-func (f *fx) sweep(width int) {
-	if !f.active {
-		f.active, f.width, f.pos = true, width, -bandHalf
+func (s sprite) w() int { return len(s.mask[0]) }
+func (s sprite) h() int { return len(s.mask) }
+func (s sprite) on(x, y int) bool {
+	return y >= 0 && y < s.h() && x >= 0 && x < s.w() && s.mask[y][x] == '#'
+}
+
+// shade is the steel lightness of an anvil pixel: lit from the top left, with a bright face, a
+// highlight on every top edge and darker flanks.
+func (s sprite) shade(x, y int) float64 {
+	v := 0.62 - 0.05*float64(y-s.faceY) - 0.22*float64(x)/float64(s.w())
+	switch {
+	case y == s.faceY:
+		v = 0.95 - 0.15*float64(x)/float64(s.w())
+	case !s.on(x, y-1):
+		v += 0.28
+	case !s.on(x-1, y):
+		v += 0.12
+	case !s.on(x+1, y) || !s.on(x, y+1):
+		v -= 0.15
+	}
+	return clamp01(v)
+}
+
+func clamp01(v float64) float64 { return math.Max(0, math.Min(1, v)) }
+
+type spark struct{ x, y, vx, vy, age, life float64 }
+
+// fx is the header's motion: sparks off the face, the face's heat glow and the name's shimmer.
+type fx struct {
+	rng     *rand.Rand
+	sparks  []spark
+	glow    float64
+	glowV   float64
+	spring  harmonica.Spring
+	shimmer bool
+	band    float64
+	bandW   int
+	hitX    float64
+	faceY   float64
+	maxW    float64
+	maxH    float64
+}
+
+func newFX(seed uint64) *fx {
+	return &fx{rng: rand.New(rand.NewPCG(seed, seed^0x5eed)), spring: harmonica.NewSpring(harmonica.FPS(fps), 3.0, 0.9)}
+}
+
+// strike heats the face, throws n sparks and starts a shimmer pass over the name.
+func (f *fx) strike(s sprite, n, nameW int) {
+	f.glow, f.glowV = 1, 0
+	f.hitX, f.faceY, f.maxW, f.maxH = s.hitX, float64(s.faceY), float64(s.w()), float64(s.h())
+	for i := 0; i < n; i++ {
+		f.sparks = append(f.sparks, spark{
+			x: s.hitX + f.rng.Float64()*4 - 2, y: float64(s.faceY) - 0.5,
+			vx: (f.rng.Float64()*2 - 1) * 22, vy: -9 - f.rng.Float64()*13,
+			life: 0.55 + f.rng.Float64()*0.6,
+		})
+	}
+	if !f.shimmer {
+		f.shimmer, f.band, f.bandW = true, -bandHalf, nameW
 	}
 }
 
 func (f *fx) step() {
-	if !f.active {
-		return
+	dt := 1.0 / fps
+	f.glow, f.glowV = f.spring.Update(f.glow, f.glowV, 0)
+	if f.glow < 0.01 && math.Abs(f.glowV) < 0.01 {
+		f.glow, f.glowV = 0, 0
 	}
-	f.pos += float64(f.width+2*bandHalf) / (sweepSecs * fps)
-	if f.pos > float64(f.width+bandHalf) {
-		f.active = false
+	live := f.sparks[:0]
+	for _, s := range f.sparks {
+		s.vy += gravity * dt
+		s.x += s.vx * dt
+		s.y += s.vy * dt
+		s.age += dt
+		if s.age < s.life && s.x >= 0 && s.x < f.maxW && s.y < f.maxH {
+			live = append(live, s)
+		}
+	}
+	f.sparks = live
+	if f.shimmer {
+		f.band += float64(f.bandW+2*bandHalf) / (sweepSecs * fps)
+		if f.band > float64(f.bandW+bandHalf) {
+			f.shimmer = false
+		}
 	}
 }
 
-func (f *fx) busy() bool { return f.active }
+func (f *fx) busy() bool { return f.glow > 0 || len(f.sparks) > 0 || f.shimmer }
 
-func isFace(r rune) bool { return r == '█' }
-
-// wordmark colors a wordmark: faces on a 2D ember→orange→gold blend, shadows in dim ember-brown,
-// plus the shimmer band when one is sweeping.
-func (m Model) wordmark(rows []string) []string {
+// anvil draws a sprite: Bayer-dithered steel in half blocks, the face glowing by the strike,
+// sparks white→gold→orange→red by age. Without 256 colors it falls back to shade glyphs.
+func (m Model) anvil(s sprite) []string {
 	t := m.th
-	w := 0
-	for _, r := range rows {
-		w = max(w, len([]rune(r)))
+	type px struct {
+		on bool
+		c  color.Color
+		v  float64
+		k  byte
 	}
-	rich := !t.plain && m.profile >= colorprofile.ANSI256
-	var grad []color.Color
-	if rich {
-		grad = lipgloss.Blend2D(w, len(rows), 100, t.forge...)
+	w, h := s.w(), s.h()
+	grid := make([][]px, h)
+	glow := 0.0
+	if m.motion {
+		glow = m.fx.glow
 	}
-	band, shimmer := 0.0, m.fx != nil && m.motion && m.fx.active
-	if shimmer {
-		band = m.fx.pos
+	rich := !t.plain && t.g.unicode && m.profile >= colorprofile.ANSI256
+	pick := func(r []color.Color, v float64, x, y int) color.Color {
+		lv := clamp01(v) * float64(len(r)-1)
+		i := int(lv)
+		if lv-float64(i) > (bayer4[y%4][x%4]+0.5)/16 && i < len(r)-1 {
+			i++
+		}
+		return r[i]
 	}
-	out := make([]string, len(rows))
-	for y, row := range rows {
-		var b strings.Builder
-		for x, r := range []rune(row) {
-			if r == ' ' {
-				b.WriteRune(' ')
+	for y := 0; y < h; y++ {
+		grid[y] = make([]px, w)
+		for x := 0; x < w; x++ {
+			if !s.on(x, y) {
 				continue
 			}
-			face := isFace(r) || len(rows) == 3
-			switch {
-			case t.plain:
-				b.WriteRune(r)
-			case !rich:
-				c := t.accent
-				if !face {
-					c = t.muted
+			v := s.shade(x, y)
+			p := px{on: true, v: v, k: 'a'}
+			if rich {
+				p.c = pick(t.steel, v, x, y)
+				heat := glow * math.Max(0, 1-math.Abs(float64(x)-s.hitX)/9) * math.Max(0, 1-float64(y-s.faceY)/2.5)
+				if heat > 0.04 {
+					p.c = pick(t.heat, heat, x, y)
 				}
-				b.WriteString(t.fg(c).Render(string(r)))
-			default:
-				c := grad[y*w+x]
-				if !face {
-					c = t.shadow
+			}
+			grid[y][x] = p
+		}
+	}
+	if m.motion {
+		for _, sp := range m.fx.sparks {
+			x, y := int(sp.x), int(sp.y)
+			if y >= 0 && y < h && x >= 0 && x < w {
+				p := px{on: true, v: 1, k: 's'}
+				if rich {
+					p.c = pick(t.spark, sp.age/sp.life, x, y)
 				}
-				if shimmer {
-					if d := abs(float64(x) - band); d < bandHalf {
-						mix := bandMix * (1 - d/bandHalf)
-						steps := lipgloss.Blend1D(11, c, t.warmWhite)
-						c = steps[int(mix*10+0.5)]
-					}
-				}
-				b.WriteString(lipgloss.NewStyle().Foreground(c).Render(string(r)))
+				grid[y][x] = p
 			}
 		}
-		out[y] = b.String()
+	}
+	out := make([]string, h/2)
+	for row := range out {
+		var b strings.Builder
+		for x := 0; x < w; x++ {
+			top, bot := grid[row*2][x], grid[row*2+1][x]
+			switch {
+			case !top.on && !bot.on:
+				b.WriteByte(' ')
+			case !rich:
+				c, v := top, (top.v+bot.v)/2
+				if !top.on || bot.k == 's' {
+					c = bot
+				}
+				if !top.on || !bot.on {
+					v *= 0.6
+				}
+				g := t.g.shades[min(int(v*float64(len(t.g.shades))), len(t.g.shades)-1)]
+				col := t.muted
+				if c.k == 's' {
+					col, g = t.warn, "*"
+				}
+				b.WriteString(t.fg(col).Render(g))
+			case top.on && bot.on:
+				b.WriteString(lipgloss.NewStyle().Foreground(top.c).Background(bot.c).Render("▀"))
+			case top.on:
+				b.WriteString(lipgloss.NewStyle().Foreground(top.c).Render("▀"))
+			default:
+				b.WriteString(lipgloss.NewStyle().Foreground(bot.c).Render("▄"))
+			}
+		}
+		out[row] = b.String()
 	}
 	return out
 }
 
-// field is the fading ╱ hatch beside the wordmark, one string per row (n wide, narrowing).
-func (m Model) field(rows int) []string {
+// wordmark colors the name per column ember→gold, with the shimmer band when one sweeps.
+func (m Model) wordmark() []string {
 	t := m.th
-	g := "╱"
-	if !t.g.unicode {
-		g = "/"
+	w := len([]rune(wordB[0]))
+	rich := !t.plain && m.profile >= colorprofile.ANSI256
+	var grad []color.Color
+	if rich {
+		grad = lipgloss.Blend1D(w, t.forge...)
 	}
-	fade := []color.Color{t.accent, t.accent, t.muted}
-	if !t.plain && m.profile >= colorprofile.ANSI256 {
-		fade = lipgloss.Blend1D(fieldWidth, t.forge[1], t.shadow, t.border)
-	}
-	out := make([]string, rows)
-	for y := 0; y < rows; y++ {
-		n := fieldWidth * (rows + 1 - y) / (rows + 1)
+	shimmer := m.motion && m.fx.shimmer
+	out := make([]string, len(wordB))
+	for y, row := range wordB {
 		var b strings.Builder
-		for x := 0; x < max(n, 0); x++ {
-			b.WriteString(t.fg(fade[min(x*len(fade)/fieldWidth, len(fade)-1)]).Render(g))
+		for x, r := range []rune(row) {
+			switch {
+			case r == ' ' || t.plain:
+				b.WriteRune(r)
+			case !rich:
+				b.WriteString(t.fg(t.accent).Render(string(r)))
+			default:
+				c := grad[x]
+				if shimmer {
+					if d := math.Abs(float64(x) - m.fx.band); d < bandHalf {
+						c = lipgloss.Blend1D(11, c, t.warmWhite)[int(bandMix*(1-d/bandHalf)*10+0.5)]
+					}
+				}
+				b.WriteString(lipgloss.NewStyle().Foreground(c).Bold(true).Render(string(r)))
+			}
 		}
 		out[y] = b.String()
 	}

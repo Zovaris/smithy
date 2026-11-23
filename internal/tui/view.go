@@ -2,11 +2,12 @@ package tui
 
 import (
 	"fmt"
-	"image/color"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
-	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/progress"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -16,33 +17,101 @@ import (
 
 func cardPath(batch, id string) string { return filepath.Join(cards.Home(), batch, id+".json") }
 
+func homeDir() string { h, _ := os.UserHomeDir(); return h }
+
+type rect struct{ x, y, w, h int }
+
+func (r rect) has(x, y int) bool { return x >= r.x && x < r.x+r.w && y >= r.y && y < r.y+r.h }
+
 // View renders the dashboard.
 func (m Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
-	v.WindowTitle = "smithy · " + aliveWord(m.snap.Watcher)
+	v.MouseMode = tea.MouseModeCellMotion
+	v.WindowTitle = "smithy · " + m.watchWord()
 	return v
 }
 
-func (m Model) render() string {
-	w, h := max(m.width, 40), max(m.height, 12)
-	head := m.header(w, h)
-	foot := m.footer(w)
-	bodyH := max(h-lipgloss.Height(head)-lipgloss.Height(foot), 3)
-	var body string
+func (m Model) size() (int, int) { return max(m.width, 40), max(m.height, 12) }
+
+// layout is where everything goes: header rows, the tab bar row, panel rects and the footer row.
+func (m Model) layout() (head []string, tabY int, rects map[panel]rect, footY int) {
+	w, h := m.size()
+	head = m.header(w)
+	tabY = len(head)
+	footY = h - 1
+	top := tabY + 1
+	bodyH := max(footY-top, 3)
+	rects = map[panel]rect{}
 	if w >= 110 && bodyH >= 14 {
-		body = m.wide(w, bodyH)
+		lw, rw := w*29/100, w*30/100
+		cw := w - lw - rw
+		lh, ch, rh := bodyH/2, bodyH*3/5, bodyH/2
+		rects[pIncoming] = rect{0, top, lw, lh}
+		rects[pPlans] = rect{0, top + lh, lw, bodyH - lh}
+		rects[pAgents] = rect{lw, top, cw, ch}
+		rects[pActivity] = rect{lw, top + ch, cw, bodyH - ch}
+		rects[pNeeds] = rect{lw + cw, top, rw, rh}
+		rects[pWorktrees] = rect{lw + cw, top + rh, rw, bodyH - rh}
 	} else {
-		body = m.stacked(w, bodyH)
+		rects[m.focus] = rect{0, top, w, bodyH}
 	}
-	screen := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
-	if !m.modal {
-		return screen
+	return
+}
+
+func (m Model) render() string {
+	w, h := m.size()
+	head, tabY, rects, footY := m.layout()
+	layers := []*lipgloss.Layer{
+		lipgloss.NewLayer(strings.TrimSuffix(strings.Repeat(strings.Repeat(" ", w)+"\n", h), "\n")),
+		lipgloss.NewLayer(strings.Join(head, "\n")),
+		lipgloss.NewLayer(m.tabbar(w)).Y(tabY),
+		lipgloss.NewLayer(m.footer(w)).Y(footY),
 	}
-	box := m.modalBox(w, bodyH)
-	x := max((w-lipgloss.Width(box))/2, 0)
-	y := lipgloss.Height(head) + max((bodyH-lipgloss.Height(box))/2, 0)
-	return lipgloss.NewCompositor(lipgloss.NewLayer(screen), lipgloss.NewLayer(box).X(x).Y(y).Z(1)).Render()
+	for p, r := range rects {
+		layers = append(layers, lipgloss.NewLayer(m.box(p, r)).X(r.x).Y(r.y))
+	}
+	if m.toast != "" {
+		t := m.th
+		box := m.panelStyle(t.accent).Render(t.fg(t.text).Render(m.toast))
+		layers = append(layers, lipgloss.NewLayer(box).X(max(w-lipgloss.Width(box)-2, 0)).Y(max(footY-lipgloss.Height(box), 0)).Z(2))
+	}
+	var over string
+	switch {
+	case m.logOpen:
+		over = m.logBox()
+	case m.helpOpen:
+		over = m.helpBox(w, h)
+	case m.modal:
+		over = m.modalBox(w, h-tabY-2)
+	}
+	if over != "" {
+		x := max((w-lipgloss.Width(over))/2, 0)
+		y := tabY + 1 + max((footY-tabY-1-lipgloss.Height(over))/2, 0)
+		layers = append(layers, lipgloss.NewLayer(over).X(x).Y(y).Z(3))
+	}
+	out := strings.Split(lipgloss.NewCompositor(layers...).Render(), "\n")
+	for len(out) < h {
+		out = append(out, "")
+	}
+	for i := range out[:h] {
+		out[i] = pad(out[i], w)
+	}
+	return strings.Join(out[:h], "\n")
+}
+
+func (m Model) panelStyle(border interface{}) lipgloss.Style {
+	t := m.th
+	st := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
+	if !t.g.unicode {
+		st = st.Border(lipgloss.NormalBorder())
+	}
+	if !t.plain {
+		if c, ok := border.(interface{ RGBA() (r, g, b, a uint32) }); ok {
+			st = st.BorderForeground(c)
+		}
+	}
+	return st
 }
 
 // pad fits a styled line to exactly w cells.
@@ -51,16 +120,153 @@ func pad(s string, w int) string {
 	return s + strings.Repeat(" ", max(w-lipgloss.Width(s), 0))
 }
 
-func (m Model) statusDot() string {
+func (m Model) panelAt(x, y int) (panel, bool) {
+	_, _, rects, _ := m.layout()
+	for p, r := range rects {
+		if r.has(x, y) {
+			return p, true
+		}
+	}
+	return 0, false
+}
+
+func (m Model) rowAt(p panel, y int) (int, bool) {
+	_, _, rects, _ := m.layout()
+	r := rects[p]
+	_, owner := m.panelBody(p, r.w-4, r.h-2)
+	i := y - r.y - 1
+	if i < 0 || i >= len(owner) || owner[i] < 0 {
+		return 0, false
+	}
+	return owner[i], true
+}
+
+func (m Model) tabAt(x, y int) (panel, bool) {
+	_, tabY, _, _ := m.layout()
+	if y != tabY {
+		return 0, false
+	}
+	pos := 1
+	for p := panel(0); p < nPanels; p++ {
+		wd := lipgloss.Width(m.tabLabel(p))
+		if x >= pos && x < pos+wd {
+			return p, true
+		}
+		pos += wd + 1
+	}
+	return 0, false
+}
+
+func (m Model) tabLabel(p panel) string {
+	n := len(m.entries(p))
+	badge := ""
+	if n > 0 {
+		badge = fmt.Sprintf(" (%d)", n)
+	}
+	if m.compactTabs() && p != m.focus {
+		return fmt.Sprintf(" %d%s ", p+1, badge)
+	}
+	return fmt.Sprintf(" %d %s%s ", p+1, tabs[p], badge)
+}
+
+// compactTabs is true when the full tab names don't fit: only the focused one keeps its name.
+func (m Model) compactTabs() bool {
+	w, _ := m.size()
+	n := 1
+	for p := panel(0); p < nPanels; p++ {
+		n += len([]rune(tabs[p])) + 10
+	}
+	return n > w
+}
+
+// tabbar is the thin rule under the header carrying the numbered panel tabs.
+func (m Model) tabbar(w int) string {
 	t := m.th
+	hz := "─"
+	if !t.g.unicode {
+		hz = "-"
+	}
+	var b strings.Builder
+	b.WriteString(t.fg(t.border).Render(hz))
+	for p := panel(0); p < nPanels; p++ {
+		l := m.tabLabel(p)
+		switch {
+		case p == m.focus:
+			st := lipgloss.NewStyle().Bold(true).Reverse(true)
+			if !t.plain {
+				st = lipgloss.NewStyle().Bold(true).Foreground(t.surface).Background(t.accent)
+			}
+			b.WriteString(st.Render(l))
+		case p == pNeeds && len(m.entries(pNeeds)) > 0:
+			b.WriteString(t.fg(t.warn).Bold(true).Render(l))
+		default:
+			b.WriteString(t.fg(t.muted).Render(l))
+		}
+		b.WriteString(t.fg(t.border).Render(hz))
+	}
+	return b.String() + t.fg(t.border).Render(strings.Repeat(hz, max(w-lipgloss.Width(b.String()), 0)))
+}
+
+func (m Model) counts() (working, waiting, stuck, ready, ciRunning int) {
+	for _, b := range m.snap.Batches {
+		for _, it := range b.Items {
+			switch it.Stage {
+			case "working", "starting":
+				working++
+			case "waiting":
+				waiting++
+			case "stuck", "decide":
+				stuck++
+			case "verify":
+				switch it.CI {
+				case "pending", "running", "queued", "in_progress":
+					ciRunning++
+				case "red", "fail", "failure":
+				default:
+					ready++
+				}
+			}
+		}
+	}
+	return
+}
+
+func (m Model) watchWord() string {
 	wt := m.snap.Watcher
 	switch {
+	case wt.Paused:
+		return "paused"
 	case wt.Alive:
-		return t.fg(t.ok).Render(t.g.on + " alive")
+		return "watching"
 	case wt.Polled:
-		return t.fg(t.err).Bold(true).Render(t.g.on + " stale")
+		return "stale"
 	}
-	return t.fg(t.muted).Render(t.g.off + " never polled")
+	return "not running"
+}
+
+// watcherLine is the watcher's state, with the fix when it is not running.
+func (m Model) watcherLine() string {
+	t := m.th
+	wt := m.snap.Watcher
+	mut, val := t.fg(t.muted), t.fg(t.text)
+	var src []string
+	for _, s := range wt.Sources {
+		if s == "linear" && wt.Team != "" {
+			s += " (" + wt.Team + ")"
+		}
+		src = append(src, s)
+	}
+	sources := or(strings.Join(src, ", "))
+	switch {
+	case wt.Paused:
+		return t.fg(t.warn).Bold(true).Render("‖ paused") + mut.Render(" "+t.g.dot+" intake held "+t.g.dot+" p resumes")
+	case wt.Alive:
+		next := wt.LastPoll.Add(time.Duration(wt.Every) * time.Second).Sub(m.snap.At)
+		return t.fg(t.ok).Render(t.g.on+" watching ") + val.Render(sources) + mut.Render(fmt.Sprintf(" %s next poll %ds", t.g.dot, max(int(next.Seconds()), 0)))
+	case wt.Polled:
+		return t.fg(t.err).Bold(true).Render(t.g.on+" stale") + mut.Render(" "+t.g.dot+" last poll "+ago(m.snap.At.Sub(wt.LastPoll))+" "+t.g.dot+" start: ") + val.Render("tend auto")
+	}
+	return t.fg(t.err).Render(t.g.off+" not running") + mut.Render(" "+t.g.dot+" "+sources+" "+t.g.dot+" start: ") + val.Render("tend auto")
 }
 
 func (m Model) capBar(w int) string {
@@ -74,435 +280,283 @@ func (m Model) capBar(w int) string {
 	return bar.ViewAs(m.capPos)
 }
 
-// wordWidth is the width of the wordmark the header draws at the current size.
-func (m Model) wordWidth() int {
-	if m.width < 100 {
-		return len([]rune(wordB[0]))
-	}
-	return len([]rune(wordA[0]))
-}
-
-// counts is how many batch items run and how many are blocked.
-func (m Model) counts() (running, blocked int) {
-	for _, it := range m.items() {
-		switch it.item.Stage {
-		case "working", "starting", "waiting", "verify":
-			running++
-		case "stuck", "decide":
-			blocked++
-		}
-	}
-	return
-}
-
-func peak(v []int) int {
-	hi := 0
-	for _, x := range v {
-		hi = max(hi, x)
-	}
-	return hi
-}
-
-// header is the wordmark with its hatch field and the watcher strip: Concept A (6 rows) from
-// 100 columns, Concept B (3 rows of word, 2 of status) below. The wordmark is never cut: it switches.
-func (m Model) header(w, h int) string {
+func (m Model) statusRows() (watcher, today, agents, prs string) {
 	t := m.th
 	wt := m.snap.Watcher
-	mut := t.fg(t.muted)
-	val := t.fg(t.text).Bold(!t.plain)
-	running, blocked := m.counts()
-	label := func(s string) string {
-		if s == "watcher" && m.focus == pWatcher {
-			return t.fg(t.accent).Bold(true).Render(fmt.Sprintf("%-8s", s))
-		}
-		return mut.Render(fmt.Sprintf("%-8s", s))
+	mut, val := t.fg(t.muted), t.fg(t.text)
+	working, waiting, stuck, ready, ciRunning := m.counts()
+	st := mut.Render(fmt.Sprintf("%d stuck", stuck))
+	if stuck > 0 {
+		st = t.fg(t.err).Bold(true).Render(fmt.Sprintf("%d stuck", stuck))
 	}
-	// gut is the cell before the watcher row: the focus marker when the Watcher has focus.
-	gut := " "
-	if m.focus == pWatcher {
-		gut = t.fg(t.accent).Bold(true).Render(t.g.sel)
+	rd := mut.Render(fmt.Sprintf("%d ready for you", ready))
+	if ready > 0 {
+		rd = t.fg(t.ok).Bold(true).Render(fmt.Sprintf("%d ready for you", ready))
 	}
-	poll := "never polled"
-	if wt.Polled {
-		poll = "polled " + ago(m.snap.At.Sub(wt.LastPoll))
-	}
-	watcher := m.statusDot() + mut.Render(" "+t.g.dot+" ") + val.Render(or(strings.Join(wt.Sources, ", "))) + mut.Render(" "+t.g.dot+" "+poll)
-	today := fmt.Sprintf("%d/%d", wt.Today, wt.Cap)
-	spark := t.fg(t.accent).Render(sparkline(wt.Hourly, 24, t.g.ticks)) + mut.Render(fmt.Sprintf("  peak %d/h", peak(wt.Hourly)))
-	blk := mut.Render(fmt.Sprintf("%d blocked", blocked))
-	if blocked > 0 {
-		blk = t.fg(t.err).Bold(true).Render(fmt.Sprintf("%d blocked", blocked))
-	}
-	queue := val.Render(fmt.Sprintf("%d queued", len(m.snap.Queue))) + mut.Render(" "+t.g.dot+" ") +
-		val.Render(fmt.Sprintf("%d running", running)) + mut.Render(" "+t.g.dot+" ") + blk
-	clock := mut.Render(m.snap.At.Local().Format("Mon 02 Jan 15:04:05"))
-	meta := mut.Render("forge " + t.g.dot + " " + Version)
-
-	if !t.g.unicode {
-		word := t.fg(t.accent).Bold(true).Render("SMITHY") + "  " + meta
-		return strings.Join([]string{
-			pad(" "+word+"   "+clock, w),
-			pad(gut+label("watcher")+watcher, w),
-			pad(" "+label("today")+m.capBar(10)+"  "+val.Render(today)+"   "+queue, w),
-		}, "\n")
-	}
-	if w < 100 {
-		word := m.wordmark(wordB)
-		field := m.field(3)
-		side := []string{field[0], field[1] + " " + mut.Render(Version+" "+t.g.dot+" ") + val.Render(fmt.Sprintf("%d running", running)), field[2]}
-		var lines []string
-		for i := range word {
-			l := " " + word[i] + "  " + side[i]
-			if i == 0 {
-				gap := max(w-lipgloss.Width(l)-lipgloss.Width(clock)-1, 1)
-				l += strings.Repeat(" ", gap) + clock
-			}
-			lines = append(lines, pad(l, w))
-		}
-		lines = append(lines,
-			pad(gut+label("watcher")+watcher, w),
-			pad(" "+label("today")+m.capBar(10)+"  "+val.Render(today)+mut.Render("   ")+queue, w))
-		return strings.Join(lines, "\n")
-	}
-	word := m.wordmark(wordA)
-	field := m.field(3)
-	left := []string{field[0], field[1], field[2], "", meta, ""}
-	status := []string{
-		"",
-		label("watcher") + watcher,
-		label("today") + m.capBar(14) + "  " + val.Render(today),
-		label("24h") + spark,
-		label("queue") + queue,
-		mut.Render(strings.Repeat(" ", 8)) + clock,
-	}
-	showField := w >= 1+len([]rune(wordA[0]))+2+fieldWidth+3+44
-	var lines []string
-	for i := range word {
-		l := " " + word[i]
-		if showField {
-			l += "  " + pad(left[i], fieldWidth)
-		}
-		if i == 0 && !showField {
-			status[0] = meta
-		}
-		if i == 1 {
-			l += "  " + gut + status[i]
-		} else {
-			l += "   " + status[i]
-		}
-		lines = append(lines, pad(l, w))
-	}
-	return strings.Join(lines, "\n")
+	dot := mut.Render(" " + t.g.dot + " ")
+	return m.watcherLine(),
+		m.capBar(13) + "  " + val.Render(fmt.Sprintf("%d / %d", wt.Today, wt.Cap)) + mut.Render(" launched"),
+		val.Render(fmt.Sprintf("%d working", working)) + dot + val.Render(fmt.Sprintf("%d waiting", waiting)) + dot + st,
+		rd + dot + val.Render(fmt.Sprintf("%d CI running", ciRunning))
 }
 
-func maxInt(v []int) int {
-	hi := 0
-	for _, x := range v {
-		hi = max(hi, x)
+// header is the anvil, the name and the status: 7 rows from 110 columns, 6 from 80, 4 below.
+func (m Model) header(w int) []string {
+	t := m.th
+	mut := t.fg(t.muted)
+	label := func(s string) string { return mut.Render(fmt.Sprintf("%-9s", s)) }
+	meta := mut.Render("autonomous forge " + t.g.dot + " " + Version + " " + t.g.dot + " " + or(m.snap.Repo))
+	clock := mut.Render(m.snap.At.Local().Format("15:04:05"))
+	watcher, today, agents, prs := m.statusRows()
+	word := m.wordmark()
+	if !t.g.unicode {
+		word = []string{t.fg(t.accent).Bold(true).Render("SMITHY"), "", ""}
 	}
-	return hi
+	if w < 80 {
+		return []string{pad(" "+word[0]+"  "+clock, w), pad(" "+word[1], w), pad(" "+word[2], w), pad(" "+watcher, w)}
+	}
+	if w < 110 {
+		anvil := m.anvil(smallAnvil)
+		name := []string{word[0], word[1], word[2], meta}
+		var out []string
+		for i := range anvil {
+			l := " " + anvil[i] + "  " + name[i]
+			if i == 0 {
+				l += strings.Repeat(" ", max(w-lipgloss.Width(l)-lipgloss.Width(clock)-1, 1)) + clock
+			}
+			out = append(out, pad(l, w))
+		}
+		return append(out, pad(" "+watcher+mut.Render("   ")+today, w), pad(" "+agents+mut.Render("   ")+prs, w))
+	}
+	anvil := m.anvil(bigAnvil)
+	name := []string{"", word[0], word[1], word[2], meta, "", ""}
+	status := []string{"", label("watcher") + watcher, label("today") + today, label("agents") + agents, label("PRs") + prs, "", label("") + clock}
+	sw := 0
+	for _, s := range status {
+		sw = max(sw, lipgloss.Width(s))
+	}
+	left := 1 + bigAnvil.w() + 3
+	nameW := max(w-left-sw-5, 16)
+	var out []string
+	for i := range anvil {
+		l := " " + anvil[i] + "   " + pad(name[i], nameW) + "    " + status[i]
+		out = append(out, pad(l, w))
+	}
+	return out
 }
 
 func (m Model) footer(w int) string {
 	t := m.th
-	hm := help.New()
-	hm.Styles = help.DefaultStyles(m.dark)
-	if t.plain {
-		hm.Styles = help.Styles{}
+	kst := t.fg(t.accent)
+	lbl := t.fg(t.muted)
+	if m.filtering {
+		return pad(" "+m.input.View()+lbl.Render("   enter keep "+t.g.dot+" esc clear"), w)
 	}
-	hm.SetWidth(w - 2)
-	var line string
-	if m.showHelp {
-		line = hm.FullHelpView(keys.FullHelp())
-	} else {
-		line = hm.ShortHelpView(keys.ShortHelp())
-	}
-	if m.status != "" && !m.showHelp {
-		line = t.fg(t.warn).Render(m.status)
-	}
-	var out []string
-	for _, l := range strings.Split(line, "\n") {
-		out = append(out, pad(" "+l, w))
-	}
-	return strings.Join(out, "\n")
-}
-
-// wide is three columns: Queue over Tasks, Batches, Decisions.
-func (m Model) wide(w, h int) string {
-	lw := w * 27 / 100
-	rw := w * 25 / 100
-	cw := w - lw - rw
-	qh := h / 2
-	left := lipgloss.JoinVertical(lipgloss.Left, m.box(pQueue, lw, qh), m.box(pTasks, lw, h-qh))
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, m.box(pBatches, cw, h), m.box(pDecisions, rw, h))
-}
-
-// stacked puts the panels one under another: the focused one gets the room, the rest a summary line.
-func (m Model) stacked(w, h int) string {
-	order := []panel{pQueue, pBatches, pTasks, pDecisions}
-	focus := m.focus
-	if focus == pWatcher {
-		focus = pBatches
-	}
-	var parts []string
-	big := h - 3*(len(order)-1)
-	for _, p := range order {
-		if p == focus && big >= 3 {
-			parts = append(parts, m.box(p, w, big))
-		} else {
-			parts = append(parts, m.box(p, w, 3))
+	render := func(bs []key.Binding) string {
+		var parts []string
+		for _, b := range bs {
+			h := b.Help()
+			parts = append(parts, kst.Render(h.Key)+" "+lbl.Render(h.Desc))
 		}
+		return strings.Join(parts, "  ")
 	}
-	return strings.Join(strings.Split(lipgloss.JoinVertical(lipgloss.Left, parts...), "\n")[:h], "\n")
+	var left string
+	switch {
+	case m.logOpen:
+		left = kst.Render("↑↓ pgup pgdn") + " " + lbl.Render("scroll") + "  " + render([]key.Binding{keys.Close})
+	case m.modal:
+		left = render([]key.Binding{keys.Close, keys.Open, keys.Copy, keys.Log})
+	default:
+		left = render(context(m.focus))
+	}
+	if f := m.filter[m.focus]; f != "" && !m.modal {
+		left = t.fg(t.warn).Render("filter: "+f) + "  " + left
+	}
+	if m.status != "" {
+		left = t.fg(t.warn).Render(m.status)
+	}
+	right := render([]key.Binding{keys.Jump, keys.Help, keys.Quit})
+	if lipgloss.Width(left)+lipgloss.Width(right)+4 > w {
+		right = render([]key.Binding{keys.Help})
+	}
+	gap := max(w-lipgloss.Width(left)-lipgloss.Width(right)-2, 1)
+	return pad(" "+left+strings.Repeat(" ", gap)+right, w)
 }
 
-// box draws a rounded panel with its title in the top border and its rows inside.
-func (m Model) box(p panel, w, h int) string {
+// box draws a panel: rounded border, a numbered title with a count badge in the top border,
+// one blank column inside each side, and its rows.
+func (m Model) box(p panel, r rect) string {
 	t := m.th
 	focused := p == m.focus
 	bc := t.border
 	if focused {
 		bc = t.accent
-	} else if p == pDecisions && len(m.snap.Decisions) > 0 {
-		bc = t.warn
 	}
 	bs := t.fg(bc)
 	tl, tr, bl, br, hz, vt := "╭", "╮", "╰", "╯", "─", "│"
 	if !t.g.unicode {
 		tl, tr, bl, br, hz, vt = "+", "+", "+", "+", "-", "|"
 	}
-	title := t.fg(t.muted).Render(titles[p])
+	title := t.fg(t.text).Render(fmt.Sprintf("%d %s", p+1, titles[p]))
 	if focused {
-		title = t.fg(t.accent).Bold(true).Render(titles[p])
+		st := lipgloss.NewStyle().Bold(true).Reverse(true)
+		if !t.plain {
+			st = lipgloss.NewStyle().Bold(true).Foreground(t.accent)
+		}
+		title = st.Render(fmt.Sprintf(" %d %s ", p+1, titles[p]))
 	}
-	if p == pDecisions && len(m.snap.Decisions) > 0 {
-		title = t.fg(t.warn).Bold(true).Render(titles[p])
+	n := len(m.visible(p))
+	badge := t.fg(t.muted).Render(fmt.Sprintf(" %s %d ", t.g.dot, n))
+	if p == pNeeds && n > 0 {
+		badge = t.fg(t.warn).Bold(true).Render(fmt.Sprintf(" %s %d ", t.g.dot, n))
 	}
-	head := bs.Render(tl+hz+" ") + title + t.fg(t.muted).Render(" "+t.g.dot+" "+m.count(p)) + " "
-	head = ansi.Truncate(head, w-1, "")
-	head += bs.Render(strings.Repeat(hz, max(w-1-lipgloss.Width(head), 0)) + tr)
-	inner := w - 4
-	content, at := m.lines(p, inner)
-	avail := h - 2
-	start := 0
-	if focused && at >= avail {
-		start = at - avail + 1
-	}
+	head := bs.Render(tl+hz+" ") + title + badge
+	head = ansi.Truncate(head, r.w-1, "")
+	head += bs.Render(strings.Repeat(hz, max(r.w-1-lipgloss.Width(head), 0)) + tr)
+	inner := r.w - 4
+	lines, _ := m.panelBody(p, inner, r.h-2)
 	out := []string{head}
-	for i := 0; i < avail; i++ {
+	for i := 0; i < r.h-2; i++ {
 		l := ""
-		if j := start + i; j < len(content) {
-			l = content[j]
+		if i < len(lines) {
+			l = lines[i]
 		}
 		out = append(out, bs.Render(vt)+" "+pad(l, inner)+" "+bs.Render(vt))
 	}
-	if avail >= 1 && h >= 3 {
-		out = append(out, bs.Render(bl+strings.Repeat(hz, max(w-2, 0))+br))
-	}
-	return strings.Join(out[:h], "\n")
+	out = append(out, bs.Render(bl+strings.Repeat(hz, max(r.w-2, 0))+br))
+	return strings.Join(out[:max(r.h, 1)], "\n")
 }
 
-func (m Model) count(p panel) string {
-	switch p {
-	case pWatcher:
-		return aliveWord(m.snap.Watcher)
-	case pQueue:
-		return fmt.Sprintf("%d queued", len(m.snap.Queue))
-	case pBatches:
-		return plural(len(m.snap.Batches), "batch", "batches") + " " + m.th.g.dot + " " + plural(len(m.items()), "item", "items")
-	case pTasks:
-		return plural(len(m.snap.Tasks), "list", "lists")
-	case pDecisions:
-		return fmt.Sprintf("%d pending", len(m.snap.Decisions))
-	}
-	return ""
-}
-
-// empty is one sentence and the command that changes it.
-func (m Model) empty(say, cmd string) ([]string, int) {
+// panelBody is the window of a panel's lines that fits h rows, with the entry each line belongs to.
+func (m Model) panelBody(p panel, w, h int) ([]string, []int) {
 	t := m.th
-	return []string{"", t.fg(t.muted).Italic(true).Render(say), t.fg(t.accent).Render("$ " + cmd)}, -1
-}
-
-func (m Model) stage(s string) (string, color.Color) {
-	t := m.th
-	switch s {
-	case "merged", "reported", "verify":
-		return t.g.on, t.ok
-	case "stuck", "decide":
-		return t.g.fail, t.err
-	case "working", "starting", "waiting":
-		return t.g.half, t.warn
-	}
-	return t.g.off, t.muted
-}
-
-func (m Model) ci(s string) string {
-	t := m.th
-	switch s {
-	case "green", "pass", "success":
-		return t.fg(t.ok).Render(t.g.pass + " " + s)
-	case "red", "fail", "failure":
-		return t.fg(t.err).Render(t.g.fail + " " + s)
-	}
-	return t.fg(t.muted).Render(t.g.dot + " " + s)
-}
-
-// selRow renders the selected row: marker plus reverse video, so selection never relies on color.
-func (m Model) selRow(plain string, w int) string {
-	t := m.th
-	s := t.g.sel + " " + plain
-	s = ansi.Truncate(s, w, "…")
-	s += strings.Repeat(" ", max(w-lipgloss.Width(s), 0))
-	st := lipgloss.NewStyle().Reverse(true).Bold(true)
-	if !t.plain {
-		st = st.Foreground(t.accent)
-	}
-	return st.Render(s)
-}
-
-// lines renders a panel's rows cut to width and returns the selected row's line index (-1 if none).
-func (m Model) lines(p panel, w int) ([]string, int) {
-	t := m.th
+	es := m.visible(p)
 	mut := t.fg(t.muted)
-	txt := t.fg(t.text)
-	focused := p == m.focus
-	sel := m.sel[p]
-	var rows []string
-	at := -1
-	add := func(i int, styled string) {
-		if focused && i == sel {
-			at = len(rows)
-			rows = append(rows, m.selRow(ansi.Strip(styled), w))
-			return
+	if len(es) == 0 {
+		if m.filter[p] != "" {
+			return []string{"", mut.Italic(true).Render("Nothing matches “" + m.filter[p] + "”."), t.fg(t.accent).Render("esc") + mut.Render(" clears the filter")}, []int{-1, -1, -1}
 		}
-		rows = append(rows, "  "+ansi.Truncate(styled, w-2, "…"))
+		lines := []string{"", mut.Italic(true).Render(meaning[p])}
+		switch p {
+		case pIncoming:
+			lines = append(lines, t.fg(t.accent).Render("$ smithy auto poll"))
+		case pAgents:
+			lines = append(lines, t.fg(t.accent).Render("$ smithy warden status"))
+		case pNeeds:
+			lines = []string{"", t.fg(t.ok).Render(t.g.pass + " Nothing needs you."), mut.Italic(true).Render(meaning[p])}
+		case pPlans:
+			lines = append(lines, t.fg(t.accent).Render(`$ smithy tasks add <dir> "<title>"`))
+		}
+		own := make([]int, len(lines))
+		for i := range own {
+			own[i] = -1
+		}
+		return lines, own
 	}
-	switch p {
-	case pQueue:
-		if len(m.snap.Queue) == 0 {
-			return m.empty("Nothing queued.", "smithy auto poll")
-		}
-		for i, q := range m.snap.Queue {
-			add(i, txt.Render(q.Title))
-			rows = append(rows, "    "+mut.Render(ansi.Truncate(q.Source+" "+q.ID+" "+t.g.dot+" "+or(q.Model)+" "+t.g.dot+" "+or(q.Speed), w-4, "…")))
-		}
-	case pBatches:
-		if len(m.snap.Batches) == 0 {
-			return m.empty("No warden batches running.", "smithy warden status")
-		}
-		i := 0
-		for _, b := range m.snap.Batches {
-			done := 0
-			var dots strings.Builder
-			for _, it := range b.Items {
-				g, c := m.stage(it.Stage)
-				dots.WriteString(t.fg(c).Render(g))
-				if it.Stage == "merged" || it.Stage == "reported" {
-					done++
-				}
+	var lines []string
+	var own []int
+	selLine := 0
+	for i, e := range es {
+		if e.head != "" {
+			if len(lines) > 0 {
+				lines, own = append(lines, ""), append(own, -1)
 			}
-			rows = append(rows, t.fg(t.text).Bold(true).Render(b.Name)+mut.Render(fmt.Sprintf("  %d/%d done  ", done, len(b.Items)))+dots.String())
-			for j, it := range b.Items {
-				branch := t.g.tee
-				if j == len(b.Items)-1 {
-					branch = t.g.elbow
-				}
-				g, c := m.stage(it.Stage)
-				pr := mut.Render(shortPR(it.PR))
-				idW := max(min(w-46, 22), 8)
-				line := mut.Render(branch+" ") + t.fg(c).Render(g+" ") + txt.Render(fmt.Sprintf("%-*s", idW, ansi.Truncate(it.ID, idW, "…"))) +
-					t.fg(c).Render(fmt.Sprintf(" %-8s", it.Stage)) + mut.Render(fmt.Sprintf(" %-9s %-6s ", ansi.Truncate(it.State, 9, "…"), it.Model)) +
-					pad(m.ci(it.CI), 8) + " " + pr
-				if focused && i == sel {
-					at = len(rows)
-					rows = append(rows, m.selRow(ansi.Strip(line), w))
-				} else {
-					rows = append(rows, "  "+ansi.Truncate(line, w-2, "…"))
-				}
-				i++
-			}
+			lines, own = append(lines, t.fg(t.text).Bold(!t.plain).Render(ansi.Truncate(e.head, w, "…"))), append(own, -1)
 		}
-	case pTasks:
-		if len(m.snap.Tasks) == 0 {
-			return m.empty("No task lists for this repo.", `smithy tasks add <dir> "<title>"`)
-		}
-		for i, tl := range m.snap.Tasks {
-			var parts []string
-			for _, s := range statuses(tl.Counts) {
-				c := t.muted
-				switch s {
-				case "done":
-					c = t.ok
-				case "doing":
-					c = t.warn
-				case "blocked":
-					c = t.err
-				}
-				parts = append(parts, t.fg(c).Render(fmt.Sprintf("%d %s", tl.Counts[s], s)))
+		sel := p == m.focus && i == m.sel[p]
+		if sel {
+			selLine = len(lines)
+			s := ansi.Truncate(t.g.sel+" "+e.tree+e.icon+" "+e.text, w, "…")
+			s += strings.Repeat(" ", max(w-lipgloss.Width(s), 0))
+			st := lipgloss.NewStyle().Reverse(true).Bold(true)
+			if !t.plain {
+				st = lipgloss.NewStyle().Bold(true).Foreground(t.surface).Background(t.accent)
 			}
-			doneN := tl.Counts["done"]
-			meter := ""
-			if tl.Total > 0 {
-				n := doneN * 8 / tl.Total
-				meter = t.fg(t.ok).Render(strings.Repeat(t.g.shades[3], n)) + mut.Render(strings.Repeat(t.g.shades[0], 8-n)) + " "
-			}
-			add(i, meter+txt.Render(filepath.Base(tl.Dir)))
-			rows = append(rows, "    "+ansi.Truncate(strings.Join(parts, mut.Render(" "+t.g.dot+" ")), w-4, "…"))
+			lines = append(lines, st.Render(s))
+		} else {
+			lines = append(lines, "  "+mut.Render(e.tree)+t.fg(e.color).Render(e.icon)+" "+t.fg(t.text).Render(ansi.Truncate(e.text, w-4-lipgloss.Width(e.tree), "…")))
 		}
-	case pDecisions:
-		if len(m.snap.Decisions) == 0 {
-			return []string{"", t.fg(t.ok).Render(t.g.pass + " Nothing waiting on you."), mut.Render("Decisions agents take alone land here.")}, -1
-		}
-		for i, d := range m.snap.Decisions {
-			f := strings.Split(d, " · ")
-			q, meta := d, ""
-			if len(f) >= 3 {
-				q, meta = f[2], f[0]+" "+t.g.dot+" "+f[1]
-			}
-			add(i, t.fg(t.warn).Render("? ")+txt.Render(q))
-			if meta != "" {
-				rows = append(rows, "    "+mut.Render(ansi.Truncate(meta, w-4, "…")))
+		own = append(own, i)
+		if e.meta != "" {
+			lines, own = append(lines, "    "+mut.Render(ansi.Truncate(e.meta, w-4, "…"))), append(own, i)
+			if e.tree != "" {
+				lines[len(lines)-1] = "  " + mut.Render(ansi.Truncate(e.meta, w-2, "…"))
 			}
 		}
 	}
-	return rows, at
-}
-
-func shortPR(pr string) string {
-	if i := strings.LastIndex(pr, "/pull/"); i >= 0 {
-		return "#" + pr[i+len("/pull/"):]
+	start := 0
+	if selLine+2 > h {
+		start = min(selLine+2-h, max(len(lines)-h, 0))
 	}
-	return pr
+	end := min(start+h, len(lines))
+	return lines[start:end], own[start:end]
 }
 
 func (m Model) modalBox(w, h int) string {
 	t := m.th
-	d := m.detail()
-	bw := min(w-6, 84)
+	e, ok := m.selected()
+	if !ok {
+		return ""
+	}
+	bw := min(w-6, 100)
 	inner := bw - 4
-	lines := []string{t.fg(t.accent).Bold(true).Render(titles[m.focus]+" "+t.g.dot+" details") + "  " + t.fg(t.muted).Render("esc close · o open"), ""}
+	lines := []string{t.fg(t.accent).Bold(true).Render(e.title), ""}
 	kw := 0
-	for _, kv := range d {
+	for _, kv := range e.detail {
 		kw = max(kw, len(kv[0]))
 	}
-	for _, kv := range d {
+	for _, kv := range e.detail {
 		k := t.fg(t.muted).Render(fmt.Sprintf("%-*s  ", kw, kv[0]))
 		v := t.fg(t.text).Render(kv[1])
 		if kv[0] == "url" || kv[0] == "pr" || kv[0] == "ref" {
-			v = t.fg(t.accent).Underline(true).Render(kv[1])
+			v = t.fg(t.accent).Underline(!t.plain).Render(kv[1])
 		}
 		lines = append(lines, ansi.Truncate(k+v, inner, "…"))
 	}
 	if len(lines) > h-2 {
-		lines = lines[:max(h-2, 1)]
+		lines = append(lines[:max(h-3, 1)], t.fg(t.muted).Render("…"))
 	}
-	st := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1).Width(bw)
+	st := m.panelStyle(t.accent).Width(bw)
 	if !t.plain {
-		st = st.BorderForeground(t.accent).Background(t.surface)
+		st = st.Background(t.surface)
 	}
-	if !t.g.unicode {
-		st = st.Border(lipgloss.NormalBorder())
+	return st.Render(strings.Join(lines, "\n"))
+}
+
+func (m Model) logBox() string {
+	t := m.th
+	title := t.fg(t.accent).Bold(true).Render("log ") + t.fg(t.muted).Render(home(m.logTitle))
+	pct := t.fg(t.muted).Render(fmt.Sprintf("%3.0f%%", m.logView.ScrollPercent()*100))
+	body := title + "\n\n" + m.logView.View() + "\n" + pct
+	st := m.panelStyle(t.accent)
+	if !t.plain {
+		st = st.Background(t.surface)
+	}
+	return st.Render(body)
+}
+
+func (m Model) helpBox(w, h int) string {
+	t := m.th
+	k, l := t.fg(t.accent), t.fg(t.muted)
+	lines := []string{t.fg(t.accent).Bold(true).Render("smithy tui " + t.g.dot + " help"), ""}
+	for _, b := range []key.Binding{keys.Jump, keys.Next, keys.Prev, keys.Up, keys.Down, keys.Enter, keys.Close,
+		keys.Open, keys.Log, keys.Copy, keys.Pause, keys.Filter, keys.Refresh, keys.Help, keys.Quit} {
+		lines = append(lines, k.Render(fmt.Sprintf("%-8s", b.Help().Key))+l.Render(b.Help().Desc))
+	}
+	lines = append(lines, k.Render(fmt.Sprintf("%-8s", "mouse"))+l.Render("click selects, double-click opens, wheel scrolls"), "")
+	for p := panel(0); p < nPanels; p++ {
+		lines = append(lines, t.fg(t.text).Bold(true).Render(fmt.Sprintf("%d %-15s", p+1, titles[p]))+l.Render(meaning[p]))
+	}
+	if len(lines) > h-4 {
+		lines = lines[:max(h-4, 1)]
+	}
+	bw := min(w-6, 96)
+	for i := range lines {
+		lines[i] = ansi.Truncate(lines[i], bw-4, "…")
+	}
+	st := m.panelStyle(t.accent).Width(bw)
+	if !t.plain {
+		st = st.Background(t.surface)
 	}
 	return st.Render(strings.Join(lines, "\n"))
 }

@@ -1,0 +1,24 @@
+ ╔═╗╔╦╗╦╔╦╗╦ ╦╦ ╦  14:30:00                                           
+ ╚═╗║║║║ ║ ╠═╣╚╦╝                                                     
+ ╚═╝╩ ╩╩ ╩ ╩ ╩ ╩                                                      
+ ● watching github · next poll 30s                                    
+─ 1 (2) ─ 2 Agents (3) ─ 3 (3) ─ 4 (7) ─ 5 (2) ─ 6 (1) ───────────────
+╭─  2 Agents at work  · 3 ───────────────────────────────────────────╮
+│ b1  0/3 done                                                       │
+│ ▸ ├─ ● github#40   API          verify   ✓ green   #9              │
+│   │   feat/api · pr_open · beat 2m ago · strong                    │
+│   ├─ ✗ github#41   UI           stuck    -         -               │
+│   │   feat/ui · blocked · beat 30m ago · cheap                     │
+│   └─ ○ 03-db       DB           queued   -         -               │
+│       - · - · beat - · mid                                         │
+│                                                                    │
+│                                                                    │
+│                                                                    │
+│                                                                    │
+│                                                                    │
+│                                                                    │
+│                                                                    │
+│                                                                    │
+│                                                                    │
+╰────────────────────────────────────────────────────────────────────╯
+ enter details  l log  o open url  c copy  / filter            ? help 
