@@ -732,7 +732,7 @@ Targets (any mix):
                       when ask.timeout is 0 skip the timer (wait for the answer)
   watch[:<scopes>]    tend's watch mode; scopes is a comma list of prs, issues, actions, base,
                       alerts, or all (default tend.watch; issue label from tend.label)
-Finished checks are reported at once. Exit 0 = events, 4 = heartbeat, 2 = bad target, 3 = no GitHub access (gh missing or signed out and no GH_TOKEN).
+Finished checks are reported at once. Exit 0 = events, 4 = heartbeat (plus "pr <n> no-ci" for a PR whose head never got a check), 2 = bad target, 3 = no GitHub access (gh missing or signed out and no GH_TOKEN).
 Defaults: settings watch.events, watch.every (30 s), watch.max (50 min).`
 
 // expandWatch turns `watch[:<scopes>]` into targets, the scopes and issue label coming from

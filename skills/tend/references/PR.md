@@ -30,7 +30,8 @@ inside the repo). Then repeat:
      review_rounds=<n>`); without a card, in `~/.smithy/tend/<owner>-<repo>-<n>.rounds`.
    - **checks pending** (`wait`) → `smithy wait pr:<pr-url>` in the background (foreground where the
      harness can't wake on exit); it returns one line when checks finish, the PR merges or closes,
-     or a review lands. Exit 0: read the state again. Exit 4 (heartbeat): wait again. Exit 2 or 3
+     or a review lands. Exit 0: read the state again. Exit 4 (heartbeat): wait again, unless it printed `pr <n> no-ci`: then run the suite with
+     `smithy receipt run --claim suite -- <suite>` and end `no-ci <url>` (mergeable or not, say which). Exit 2 or 3
      (bad target, no gh and no token, or signed out): "needs you". Never sleep-then-check turns.
    - **changes requested or review still required with no open thread, or blocked** (`needs-you`)
      → "needs you <url>: <why>" (a card: `state=blocked`).
