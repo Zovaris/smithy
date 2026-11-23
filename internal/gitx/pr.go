@@ -3,6 +3,7 @@ package gitx
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -151,8 +152,11 @@ func PRMain(args []string) int {
 			return die(p, "body drops template headings from %s: %s", rel, strings.Join(miss, "|"))
 		}
 	}
-	if c := attached("git", "push", "-q", "-u", "origin", branch); c != 0 {
-		return c
+	// The push's output (GitHub's "Create a pull request" hint) only shows on failure: the PR URL
+	// printed below is the one to use.
+	if out, err := exec.Command("git", "push", "-q", "-u", "origin", branch).CombinedOutput(); err != nil {
+		os.Stderr.Write(out)
+		return code(err)
 	}
 	if ghx.Mode() == "none" {
 		repo, err := ghx.RepoName()
