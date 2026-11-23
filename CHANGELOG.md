@@ -5,6 +5,114 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.15.0 — 2026-11-23
+
+- Added: `smithy worktree add <repo> <branch> <from>` creates a task worktree at its standard
+  path; warden uses it, and unattended agents (which can't run `git worktree add`) can too.
+- Added: `smithy cleanup … --drop-holdout` deletes untracked `zz_*` holdout tests before the clean
+  check, so a batch check's worktree can be removed.
+- Fixed: serve no longer requeues a dir whose warden batch already started (a card past `queued`).
+- Fixed: when a serve orchestrator ends with every task file of its dir still `todo`, serve puts
+  those issues back in the queue (`requeued N issue(s): orchestrator started nothing (log …)`), at
+  most twice per issue (`requeued` in state.json); after that it logs `giving up on <id>`.
+- Added: the TUI Agents view and Overview "Agents now" show the running serve orchestrator as its
+  own row (kind orchestrator: agent, pid, elapsed, task dir, session log; `l` opens its log), read
+  from `serve.json` or `orchestrator.json`.
+- Added: `smithy auto serve [--agent <cli>] [--once] [--max-hours <n>]`, the unattended loop
+  outside the LLM: polls every `auto.every`, and when `auto take` yields a task dir starts one
+  headless orchestrator (`smithy agent --bg --profile auto`) that runs `tend auto once <dir>`; one
+  at a time (`~/.smithy/auto/orchestrator.json`), logs in `~/.smithy/auto/sessions/`, heartbeat in
+  `~/.smithy/auto/serve.json`. In a terminal a compact live view (Esc, q or Ctrl+C asks before
+  stopping); otherwise one line per event. Stopping never stops the orchestrator or its workers.
+  `smithy auto status`, the TUI header and System view (`l` opens the session log) show serve.
+- Added: `smithy agent --profile auto`: Claude Code with permission mode `dontAsk` and an
+  allowed-tools list (Read, Edit, Write, Glob, Grep; Bash for git, gh, go/npm test, smithy);
+  Codex with `approval_policy=never` in its workspace-write sandbox. Never a full bypass.
+- Security: the auto profile reaches every worker (`SMITHY_AGENT_PROFILE`); its allow-list names
+  git and gh subcommands (push only to origin) and smithy by absolute path only, and a deny list
+  blocks `git -c`/`config`, fetch/push exec and URL options, shell redirects and tee, `gh api|auth|gist|alias|extension`, `smithy auth|config`, curl, wget,
+  secret files and hook/rc/settings edits. `auto.agent` takes an absolute path; doctor runs its
+  `--version` and states Codex's network limit. Serve's locks are O_EXCL with atomic rewrites,
+  pids carry their start time (a reused pid reads as dead), a failed launch puts the issues back
+  in the queue, SIGTERM no longer waits for a poll, and `--once` keeps the view for 3 s.
+- Added: settings `auto.agent` and `auto.session_hours` (default 3); `smithy doctor` warns when
+  `auto.agent` is missing or can't run headless. tend `auto once <dir>`; warden ends an `auto-*`
+  dir `blocked` when only the subagent fallback can launch workers.
+- Changed: `smithy cards board --changed-since` exits 4 (not 3) when nothing changed;
+  `smithy auto` exits 1 (not 2) when a source fails to open for a reason other than access.
+- Added: `smithy <cmd> <sub> --help` prints only that subcommand's usage.
+- Fixed: every error `smithy auto` and the Linear source print goes through one cleaner
+  (`internal/text`, also used by the event log and decisions); `events.jsonl` stays 0600 after
+  open and rotation.
+- Fixed (`smithy tui`): copied commands shell-quote every value; markdown links show their
+  target (no OSC 8 hyperlinks); `--demo` never opens a URL, it says what it would open.
+- Changed (skills): the merge and production rule lives once in use-smithy **Merges** (tend never
+  merges a warden batch's PR); the decision procedure and the heartbeat have one home each (the worker
+  brief keeps its own copy, since it is all a worker reads); warden points to `smithy --help` for the full command list and has workers merge the base
+  instead of `gh pr update-branch`.
+- Docs: `docs/settings.md` lists every `auto.*` and `linear.*` key and the real model key names;
+  README says Linear needs `linear.team` and a key; tend AUTO.md notes `auth.json` is readable by
+  same-user processes.
+- Added: `smithy tui`, a live dashboard (Bubble Tea v2): a dithered animated anvil header with
+  the watcher, daily cap, agents and PRs; full-size views behind a tab bar (Overview charts of
+  work per hour, agents by stage, the cap, CI health and how long work takes; Agents with a
+  timeline and log preview; Incoming with ignored issues and source status; Needs you, where `a`
+  accepts and `x` rejects a decision; Done; Activity; Worktrees; Plans, whose specs and tasks
+  open in a markdown reader; System, a read-only health report), details, logs, copy, filter,
+  sort and mouse; reads local files only;
+  `smithy tui --demo` shows a rich fake world; `--no-anim`, `SMITHY_REDUCE_MOTION` and
+  `NO_COLOR` are honored.
+- Added: `~/.smithy/events.jsonl`, a bounded event log (rotates at 5 MB, keeps one old file)
+  written by `smithy auto` (poll, queued, skipped with the reason, launched, report) and
+  `smithy cards set` (stage, CI, merged); never issue bodies or keys. The Linear source records
+  its rate-limit headroom in the auto state.
+- Added: `smithy decisions reject <n> "<why>"`: the entry stays pending with `rejected: <why>`,
+  so the agent sees it and decides again.
+- Added: `auto.paused` (`p` in `smithy tui`): `smithy auto take` launches nothing while true.
+  `internal/tui` is the one package allowed non-stdlib deps (Charm v2, latest).
+- Added: `smithy auto poll|take|report|status` and `smithy wait auto`: GitHub issues labeled
+  `auto` (or all, `auto.mode`) are queued once, `model:`/`speed:` labels set the task's `Model:`
+  and `Speed:` headers, and `take` writes the ones the daily cap and hours window allow into an
+  `auto-<date>-<n>` task dir (`Source:` header, issue text quoted as data). Settings `auto.*` and
+  `linear.*`; state in `~/.smithy/auto/state.json`.
+- Added: Linear source for `smithy auto` (`auto.sources=linear`): GraphQL over net/http with the
+  key from `linear.key_env`, never printed; `linear.team` is a required allow-list (filtered in
+  the query and re-checked per issue); `report` comments, moves the workflow state and attaches
+  the PR. Missing team or key exits 3. The last poll time is now the fetch start.
+- Added: `smithy auth set <service>` (key on stdin only), `list` (masked) and `remove`; keys live
+  in `~/.smithy/auth.json` (0600, refused if others can read it); the `<service>.key_env` env var
+  wins. Child agents never inherit the Linear key env var.
+- Fixed: auto task headers and quoted issue bodies are cleaned of control characters and line
+  separators; one misconfigured source no longer stops the others; Linear polls cap pages, read
+  only the last 7 days on the first poll, overlap the last poll by 2 minutes, uppercase team keys
+  and reject unknown state types.
+- Fixed: `smithy auto take` writes its task dir to `~/.smithy/plans/<repo>/` whatever
+  `tasks.commit` says, so intake never leaves files in the target repo.
+- Fixed: auto task files use the issue's human id: file `NN-tes-1-<slug>.md`, `Key: TES-1`
+  (so branches read `feat/TES-1-…`); the stable id moves to `Ref: <source>:<uuid>`.
+  `smithy auto report` takes `linear:TES-1`, `linear:<uuid>` or a bare id it launched.
+- Fixed: `smithy batch init` on an `auto-*` task dir takes merge from `auto.merge`, each item's
+  `model` from its `Model:` header and `speed: route` from the mode, and records `production`
+  (the base when it is the default branch or the default can't be found from origin/HEAD, gh or
+  ls-remote, else `false`). `""` production blocks a merge like a production base.
+  The gh and ls-remote lookups time out after 10 s (then production=base).
+  `batch.json` writes are atomic; `batch set` and `batch add` lock it and checks `production` is `false` or an
+  existing branch and `base_sha`'s base is in the batch. Card writes and beats take the card lock.
+  A bare id in `smithy auto report` that two sources launched exits 2 naming both refs.
+- Added: `smithy batch set <batch> key=value…` sets `merge`, `production`, `cleanup`, `mode` and
+  `base_sha` with validation; warden's docs use it instead of hand edits.
+- Added: worker heartbeat: `smithy cards beat <batch> <id>` (and every `cards set`) stamps
+  `last_beat`; the board shows a `beat` column and `wait batch`'s `stale:` line its age. A working
+  item is stuck after `warden.stuck_minutes` (default 15, was 45 min of no update) without a beat.
+- Changed: tend `AUTO.md` says unattended runs need workers that outlive the session (CLI
+  `claude --bg`, Codex, `smithy agent` CLIs or desktop sessions, not the subagent fallback), and
+  reports issues by their `Ref:` or `linear:TES-1`.
+
+- Added: tend `auto` mode (`references/AUTO.md`): waits on `smithy wait auto`, takes the queue
+  into a task dir, runs warden on it with batch values pre-answered and reports each issue
+  started, completed or blocked. use-smithy routes "build issues unattended" to it; README
+  "Autonomous mode".
+
 ## v0.14.1 — 2026-11-23
 
 - Fixed: hush failed to install (unquoted `: ` in its YAML `description`).

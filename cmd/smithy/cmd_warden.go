@@ -9,6 +9,6 @@ func init() {
 		"--max=", warden.WaitTurn)
 	register("brief", "render a warden worker's brief from batch.json", warden.BriefUsage,
 		"--to= --subagent", warden.Brief)
-	register("batch", "write or extend a warden batch.json (init, add)", warden.BatchUsage,
+	register("batch", "write, set or extend a warden batch.json (init, set, add)", warden.BatchUsage,
 		"--repo= --base= --merge= --max= --risky= --cleanup= --mode= --id= --title= --intent= --speed=", warden.Batch)
 }

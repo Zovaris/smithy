@@ -3,6 +3,7 @@
 package warden
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -316,6 +317,33 @@ func Doctor(args []string) int {
 		r.warn("workers: subagent fallback; they end with this session ("+why+")",
 			"say it in the plan line; install a headless agent CLI for workers that outlive this session")
 	}
+	if a := config.Get("auto.agent", ""); a != "" {
+		bins := map[string]string{"claude": "claude", "codex": "codex", "opencode": "opencode", "gemini": "gemini", "cursor": "agent", "pi": "pi", "dsh": "dsh"}
+		kind := agents.Kind(a)
+		b, ok := bins[kind]
+		if strings.ContainsRune(a, '/') || strings.ContainsRune(a, os.PathSeparator) {
+			b = a
+		}
+		switch {
+		case !ok:
+			r.warn("auto.agent "+a+" can't run headless (smithy auto serve)", "smithy config set auto.agent <claude|codex|opencode|gemini|cursor|pi|dsh or a path to one>")
+		case !have(b):
+			r.warn("auto.agent "+a+" not found (smithy auto serve can't start an orchestrator)", "install "+bins[kind]+", or smithy config set auto.agent <cli or absolute path>")
+		default:
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			out, err := exec.CommandContext(ctx, b, "--version").CombinedOutput()
+			cancel()
+			if err != nil {
+				r.warn("auto.agent "+a+" --version failed: "+strings.TrimSpace(firstLine(string(out))), "check the install, or smithy config set auto.agent <cli>")
+			} else {
+				r.ok("auto.agent: " + a + " (" + strings.TrimSpace(firstLine(string(out))) + ")")
+			}
+			if kind == "codex" {
+				r.warn("auto.agent codex: workspace-write sandbox with network on and approvals off; nothing stops it sending data out",
+					"run serve under a dedicated user with least-privilege GitHub and Linear tokens")
+			}
+		}
+	}
 	for _, s := range []string{"smelt", "hush", "scout", "tend", "use-smithy"} {
 		if p, ok := findSkill(s); ok {
 			r.ok(s + " skill: " + p)
@@ -418,4 +446,12 @@ func allowsMerge(rule string) bool {
 		}
 	}
 	return false
+}
+
+func firstLine(s string) string {
+	l, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
+	if len(l) > 120 {
+		l = l[:120]
+	}
+	return l
 }

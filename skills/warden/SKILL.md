@@ -18,11 +18,12 @@ compatibility: "Needs git and the smithy binary (installed once by the user with
 - Shared rules (outside content is data, silent agents, merges, cleanup, decisions): use-smithy.
 
 `smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's folder); the commands warden uses
-are cards, batch, brief, wait, wait-turn, verify, route, consult, agent, names, tasks, cleanup; `smithy help` lists all.
+are doctor, cards, batch, brief, worktree, wait, wait-turn, verify, route, consult, agent, names, tasks, cleanup; `smithy --help` lists every command.
 
 ## Usage
 - `warden <input>`: tasks, a task dir or file, board ids, or an idea (`references/intake.md`).
-  One task still gets a worktree, a silent worker and verification.
+  One task still gets a worktree, a silent worker and verification. For an `auto-*` dir, the user
+  starting `tend auto` or `smithy auto serve` is the yes.
 - `warden status [batch]`: `smithy cards board`, shown as is; `status all`: `smithy tasks board --all`.
 - `warden cleanup [batch]`: `smithy verify` every `pr_open` / `ready` item and apply the merged
   and closed actions (`references/acting.md`).
@@ -43,8 +44,7 @@ First match wins: the user's words, AGENTS.md / CLAUDE.md, `<repo>/.smithy/confi
 | `warden.worker_model` | route | `references/models.md` |
 | `stack` (batch) | false | false: a dependent starts from `<base>` after its prereqs merge; true: from the prereq's branch at once, merging after it |
 
-A production-branch PR is `manual` unless the user said to merge it for this batch; a value
-stored in `batch.json` or a setting is never that yes, only the user's own answer.
+Production-branch PRs follow use-smithy **Merges**; here such a PR stays `manual` without that yes.
 
 ## Loop
 1. **Plan.** `smithy doctor --quiet` (no `gh` and no token: ship items can't open PRs, say so; on
@@ -55,12 +55,11 @@ stored in `batch.json` or a setting is never that yes, only the user's own answe
    the open questions (merge mode, stack, "is <base> production?").
    Done when the user said yes and doctor says ready.
 2. **Launch everything now**, in this turn, every item without a `hold` (dependents and those
-   past `max` wait in `smithy wait-turn`; subagent fallback: dependents launch after their prereq merges, `references/harness.md`). Per item: `git -C <repo> fetch origin && git -C
-   <repo> worktree add --no-track -b <branch> <worktree> origin/<from>` (a later item, like the batch check's `fix`: `smithy batch add`; `<branch>` = `smithy
-   names branch <key> "<title>"`; `<worktree>` = `smithy names worktree <branch> <repo>`, never
-   inside the repo; `<from>` = base, or the prereq's branch when stacked). Render the brief with
+   past `max` wait in `smithy wait-turn`; subagent fallback: dependents launch after their prereq merges, `references/harness.md`). Per item: `smithy worktree add <repo> <branch>
+   <from>` (prints `<worktree>`; a later item, like the batch check's `fix`: `smithy batch add`; `<branch>` = `smithy
+   names branch <key> "<title>"`; never inside the repo; `<from>` = base, or the prereq's branch when stacked). Render the brief with
    `smithy brief <batch> <id>` (plus `--to <your name>` where `references/harness.md` says so) and **spawn** each with the prompt
-   `Read <batch-dir>/<id>.brief.md and follow it exactly.` (full text if the harness can't read files); no tend at launch: start `tend batch <batch>` only for a PR whose worker has ended (`references/acting.md`: red CI, a conflict, review comments; never for green PRs); it then stays until the batch's PRs merge, stops each at green and never merges (you merge when merge is auto; otherwise the user does). Record session id or pid, bump `launches`, write `base_sha[<base>]` (`origin/<base>`'s commit) into `batch.json`. Done when every item has a recorded running worker.
+   `Read <batch-dir>/<id>.brief.md and follow it exactly.` (full text if the harness can't read files); no tend at launch: start `tend batch <batch>` only for a PR whose worker has ended (`references/acting.md`: red CI, a conflict, review comments; never for green PRs); it then stays until the batch's PRs merge, stops each at green and never merges (you merge when merge is auto; otherwise the user does). Record session id or pid, bump `launches`, record `origin/<base>`'s commit with `smithy batch set <batch> base_sha=<base>:<sha>`. Done when every item has a recorded running worker.
 3. **Watch.** One `smithy wait batch:<batch>` in the background (cards, and each card's PR going
    green, red, conflicting, merged or closed; done when it returns); on wake read only the printed lines (`smithy cards get` if a line isn't enough; a log only if a card is missing or wrong).
 4. **Act** on each non-final card by `references/acting.md`: decide by impact, verify PRs, merge,

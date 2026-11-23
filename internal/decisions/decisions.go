@@ -12,6 +12,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/text"
 )
 
 // Usage is the text for `smithy decisions --help`.
@@ -19,11 +20,13 @@ const Usage = `usage: smithy decisions add "<question>" "<choice>" --why "<reaso
        smithy decisions pending | list [--ref <prefix>]
        smithy decisions confirm <n>|--all
        smithy decisions change <n> "<new choice>"
+       smithy decisions reject <n> "<why>"
 The log of the user's decisions taken without them, one line each, in
 ~/.smithy/decisions/<owner>-<repo>.md (from origin's URL; the main checkout's folder name when there
 is no origin; shared by its worktrees).
 add appends one entry; pending lists the unconfirmed ones; confirm marks them kept; change
-replaces the choice and marks it confirmed. Numbers are positions in the pending list only (as pending prints
+replaces the choice and marks it confirmed; reject keeps the entry pending with a
+"rejected: <why>" field, so the agent sees it in pending and takes the decision again. Numbers are positions in the pending list only (as pending prints
 them); list shows every entry, unnumbered (--ref <prefix> keeps those whose ref starts with it). Fields can't contain " · " or " → ".
 Exit 0 = ok, 1 = cannot read or write the log, 2 = bad usage.`
 
@@ -57,7 +60,7 @@ func slug(url, dir string) string {
 // File is the decisions log of the current repo.
 func File() string { return filepath.Join(ghx.Home(), "decisions", repoSlug()+".md") }
 
-func flat(s string) string { return strings.Join(strings.Fields(s), " ") }
+func flat(s string) string { return text.Clean(s) }
 
 // clean flattens a field and rejects the separators the line format parses by position.
 func clean(name, s string) (string, error) {
@@ -68,8 +71,10 @@ func clean(name, s string) (string, error) {
 	return s, nil
 }
 
-func read() ([]string, error) {
-	b, err := os.ReadFile(File())
+func read() ([]string, error) { return readFile(File()) }
+
+func readFile(file string) ([]string, error) {
+	b, err := os.ReadFile(file)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -250,6 +255,22 @@ func Main(args []string) int {
 			fmt.Printf("%d. %s\n", n+1, strings.TrimPrefix(lines[i], open))
 		}
 		return 0
+	case "reject":
+		if len(pos) != 3 || all {
+			return bad(`reject takes <n> "<why>"`)
+		}
+		n, err := strconv.Atoi(pos[1])
+		if err != nil {
+			return bad("bad number " + pos[1])
+		}
+		if err := Reject(n, pos[2]); err != nil {
+			if strings.Contains(err.Error(), "can't contain") || strings.Contains(err.Error(), "is empty") {
+				return bad(err.Error())
+			}
+			return fail(err)
+		}
+		fmt.Println("rejected 1; the agent sees it in smithy decisions pending")
+		return 0
 	case "confirm", "change":
 		if pos[0] == "confirm" && !(all && len(pos) == 1) && !(!all && len(pos) == 2) {
 			return bad("confirm takes <n> or --all")
@@ -297,4 +318,67 @@ func Main(args []string) int {
 		return 0
 	}
 	return bad("unknown subcommand " + pos[0])
+}
+
+// Pending is the unconfirmed entries of the current repo's log, without the checkbox prefix.
+func Pending() ([]string, error) { return PendingIn(File()) }
+
+// PendingIn is Pending for a given log file, so a caller can resolve File() once.
+func PendingIn(file string) ([]string, error) {
+	lines, err := readFile(file)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, i := range pending(lines) {
+		out = append(out, strings.TrimPrefix(lines[i], open))
+	}
+	return out, nil
+}
+
+// pick finds pending decision n (1-based, as pending numbers them).
+func pick(lines []string, n int) (int, error) {
+	p := pending(lines)
+	if n < 1 || n > len(p) {
+		return 0, fmt.Errorf("no pending decision %d (smithy decisions pending numbers them)", n)
+	}
+	return p[n-1], nil
+}
+
+// Confirm marks pending decision n as kept.
+func Confirm(n int) error {
+	return update(func(lines []string) ([]string, error) {
+		i, err := pick(lines, n)
+		if err != nil {
+			return nil, err
+		}
+		lines[i] = done + strings.TrimPrefix(lines[i], open)
+		return lines, nil
+	})
+}
+
+// Reject keeps pending decision n open with a "rejected: <why>" field (replacing an earlier one),
+// so the agent that took it sees the rejection in pending and decides again.
+func Reject(n int, why string) error {
+	w, err := clean("why", why)
+	if err != nil {
+		return err
+	}
+	if w == "" {
+		return fmt.Errorf("why is empty")
+	}
+	return update(func(lines []string) ([]string, error) {
+		i, err := pick(lines, n)
+		if err != nil {
+			return nil, err
+		}
+		var keep []string
+		for _, f := range strings.Split(lines[i], sep) {
+			if !strings.HasPrefix(f, "rejected: ") {
+				keep = append(keep, f)
+			}
+		}
+		lines[i] = strings.Join(append(keep, "rejected: "+w), sep)
+		return lines, nil
+	})
 }

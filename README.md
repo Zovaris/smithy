@@ -136,15 +136,39 @@ To use `smithy` in your own terminal, accept the PATH offer in use-smithy setup 
 Two JSON files, the repo's first: `<repo>/.smithy/config.json` and `~/.smithy/config.json`. You
 never edit them by hand: use-smithy setup asks everything up front, or each skill asks the first
 time it needs a value. `smithy config list` shows every setting and where it came from; all of
-them, with defaults, are in [docs/settings.md](docs/settings.md).
+them, with defaults, are in [docs/settings.md](docs/settings.md). API keys (e.g. Linear) live apart
+in `~/.smithy/auth.json` (mode 0600): `smithy auth set linear < keyfile`, never in a config file. Any process running as you (agents
+included) can read it, so use a test or least-privilege key.
+
+## Autonomous mode
+
+tend `auto` watches GitHub issues (and Linear, once `linear.team` is set and a key is stored with
+`smithy auth set linear` or in `LINEAR_API_KEY`) and builds each
+qualified one unattended through warden, reporting progress back on the issue. Issues opt in with
+the `auto` label; a daily cap and an optional hours window bound the spend. `smithy tui` shows
+the queue and running batches.
+
+```
+smithy config set auto.sources github,linear
+smithy config set linear.team ENG
+smithy config set auto.max_per_day 20
+smithy auto serve          # the loop outside the LLM; Esc/q stops it, agents keep running
+```
+
+Security: run unattended mode under a dedicated OS user or machine, with a least-privilege GitHub
+token and a test or least-privilege Linear key. Issue text can carry injected instructions; the
+`smithy agent --profile auto` allow-list (explicit git/gh subcommands, denied config, credential and
+network commands, denied secret files) reduces that risk but cannot remove it. Codex runs in its
+workspace-write sandbox with network on (push needs it) and approvals off, so nothing stops it
+sending data out: least-privilege tokens matter most there.
 
 ## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh             # binary, latest
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.14.1    # binary, pinned
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.15.0    # binary, pinned
 npx skills add Zovaris/smithy -g -y --skill '*' -a claude-code -a codex   # no prompts
-npx skills add Zovaris/smithy@v0.14.1 -g                                   # pin a release
+npx skills add Zovaris/smithy@v0.15.0 -g                                   # pin a release
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # skills + binary
 ```
 
@@ -154,8 +178,8 @@ Drop `-g` to install into the current project only. Requires the
 
 ## Roadmap
 
-smithy is GitHub-only today. Other forges (GitLab, Bitbucket) come later; there is no `glab`
-support now.
+GitHub is the only forge today (Linear is an issue source for autonomous mode, not a forge).
+Other forges (GitLab, Bitbucket) come later; there is no `glab` support now.
 
 ## Contributing
 

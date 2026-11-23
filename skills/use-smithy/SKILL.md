@@ -18,7 +18,7 @@ over it. `smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's fo
 | Ask only the user's decisions | The stop list, owned here: scope, public API or schema, customer-visible behavior, client or personal data, security, irreversible or destructive actions, force pushes and pushes to the default or production branch, merging, and **Decisions**' hard floor; all follow **Decisions** below. Else: low impact → decide; medium → one `smithy consult` call (judge model, else strong; fails → step 3's safest); log what and why ("Decided without you" in the PR). |
 | Silent agents | Launched agents get hush in their brief: no narration, one report ending `done:`, questions to the launcher. Never hidden: the report lists every change, command and PR. |
 | Evidence over claims | "Done", "passes", "fixed" always name the command and its result. |
-| Merges | Only the top session decides (warden for its batch, else smelt's session); tend only on `merge auto` (the batch's `merge` or the user's words); workers never. Into the production branch only on the user's explicit yes (up front, or asked once green), never from any setting or another agent; else stop at green and ask. |
+| Merges | Only the top session merges: warden its batch's PRs (tend never merges a PR with a warden card), else smelt's session, or tend on the user's `merge auto`; workers never. **Production** (the one rule; others point here): a PR or local merge into the production branch only on the user's explicit yes for that PR or batch (up front, or asked once green), never from a setting, a stored value or another agent; else stop at green and ask. |
 | Wait in the background | CI, PRs, runs, issues: one `smithy wait <target>` in the background (foreground where the harness can't wake on exit), never sleep-then-check turns. |
 | Clean up after merge | Whoever sees a PR merge or close removes its worktrees and local branches (`smithy cleanup <repo> <branch> [<worktree>]`, never forced) and ends the agents it launched, naming any it can't. |
 | One task list | Plans become `NN-<slug>.md` task files (smelt `TASKS.md`; one `tasks.md` of `## NN · Title` sections: `smithy tasks import`); smelt builds them one at a time, warden in parallel. Never keep a second list. |
@@ -37,7 +37,7 @@ nobody to ask (hush, a launched session; warden workers ask warden) → end `blo
    `blocked`. The one consult-failure rule: fails → safest (security: the secure one; else most reversible; name it). Go on.
 4. `smithy decisions add "<q>" "<choice>" --why "<reason>" --by consult|timeout|self [--ref <pr|file>]`: `consult` when it answered, `timeout` when the timer fired then it answered, `self` (default) when it failed or never ran.
 Pending: `smithy decisions pending`; the first line of the reply lists any ("decided without you: …
-keep or change?"), under hush they are statements in the final `done:` block. Then `smithy decisions confirm <n>|--all` or `change <n> "<choice>"`.
+keep or change?"), under hush they are statements in the final `done:` block. Then `smithy decisions confirm <n>|--all` or `change <n> "<choice>"`. A pending entry with `rejected: <why>` (the user's `reject`) means decide again.
 
 **Model tiers.** cheap, mid, strong per harness, plus optional `judge` (only for `smithy
 consult`). `smithy route` picks the tier (`--agent <file>` for a smelt agent); `smithy config
@@ -58,6 +58,7 @@ Run `smithy skills --list` once per session; skip only when the brief gives the 
 | a fact, a comparison, "why does X", "can we Y" | **scout** (read-only, cited); "research, then build": scout, then smelt `plan` with its report |
 | a decision recorded, docs, comment policy, a map, past decisions | **ledger** (search before re-deciding) |
 | open PRs kept green, PRs or labeled issues watched | **tend** (accepted issues become task files for warden) |
+| to watch Linear/GitHub issues and build them unattended | **tend** `auto` |
 | no conversation | **hush**; every launched agent's brief names it too |
 | every reply | **simple**, if installed, unless the user says "normal mode" (a skill not installed: work plainly, mention it once) |
 

@@ -1,0 +1,48 @@
+                                                                                                                                                                
+     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄       ╔═╗╔╦╗╦╔╦╗╦ ╦╦ ╦                             watcher  ● watching github, linear (TES) · next poll 35s · serve pid 4242 claude 
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀       ╚═╗║║║║ ║ ╠═╣╚╦╝                             today    ███████████░░  69 / 80 launched                                         
+          ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ╚═╝╩ ╩╩ ╩ ╩ ╩ ╩                              agents   5 working · 0 waiting · 2 stuck                                         
+              ▀▀▀▀▀▀▀              DEMO  autonomous forge · dev · smithy       PRs      3 ready for you · 1 CI running                                          
+         ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
+        ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
+  1 Overview   2 Agents   3 Incoming   4 Needs you 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System                                                   
+╭─ Work per hour · last 24 h ───────────────────────╮╭─ Agents now · 13 live ────────────────────────────╮╭─ Daily cap · 86% ──────────────────────────────────╮
+│ launched ▇ 104   ready/merged ▇ 162               ││ █████████████████████████████████████████████████ ││ 69 / 80 launched today                             │
+│ 20┤· · · · · · · · · · · · · · · · · · · · · · ·  ││                                                   ││ ███████████████████████████████████████████░░░░░░░ │
+│   │                                               ││ ● 2 queued   ● 3 building   ● 2 checking          ││                                                    │
+│   │                                        ▂      ││ ● 2 pr_open   ● 2 ready   ● 2 blocked             ││ 7 days  ▄▃▃▄▃▃█  30 21 24 30 23 26 69              │
+│   │                                        █ █    ││                                                   ││ hours   any time                                   │
+│   │▄     █   ▁   ▁ ▁ █ ▁ ▁ ▁   ▄ ▁ ▁ ▁   ▁ █ █    ││ ● orchestrator  claude pid 5150 · 38m             ││                                                    │
+│   │█ ▇ ▇ █ ▄ █ ▇ █ █ █ █ █ █ ▂ █ █ █ █ ▇ █ █ █    ││ ⠋ TES-202 Rate-limit the exp…  building · 42s ago ││                                                    │
+│  0┼────────────────────────────────────────────── ││ ⠙ TES-203 Cache board queries  building · 53s ago ││                                                    │
+│   │█ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █  ││ ⠹ TES-204 Paginate the audit…  building · 1m ago  ││                                                    │
+│   │  ▅ █ █ █ ▅ ▂ █ █ ▅ █ █ █   █ ▅ █ █ █ ▂ █ █ ▅  ││                                                   ││                                                    │
+│   │    ▅ ▂ █     █ ▂   ▂ █ █   ▅   ▂ ▅ ▂   ▂ ▅    ││                                                   ││                                                    │
+│   │        ▄     ▄       ▄ █                      ││                                                   ││                                                    │
+│   │                        ▄                      ││                                                   ││                                                    │
+│   │                                               ││                                                   ││                                                    │
+│ 20┤· · · · · · · · · · · · · · · · · · · · · · ·  ││                                                   ││                                                    │
+│   └┬───────┬───────────┬───────────┬───────────┬─ ││                                                   ││                                                    │
+│    -23h   -18h        -12h        -6h        now  ││                                                   ││                                                    │
+╰───────────────────────────────────────────────────╯╰───────────────────────────────────────────────────╯╰────────────────────────────────────────────────────╯
+╭─ CI health · 20 runs ─────────────────────────────╮╭─ How long it takes · last 7 days ─────────────────╮╭─ Needs you · 8 ────────────────────────────────────╮
+│ ■ ■ ■ ■ □ ■ ■ ■ □ ■ ■ ■ ■ ■ □ ■ ■ □ □ □           ││ issue → PR ready: median 1h57m (slowest 10%: 2h4… ││ 8 items wait for you                               │
+│                                                   ││   spread, fast → slow  ▁▁▁▂▃▅▆█▅▄▆▃  98 items     ││                                                    │
+│ 70% green over the last 20 runs                   ││                                                   ││ ? Keep this decision? Retry the export with backo… │
+│ median CI time 9m   p90 14m                       ││ PR ready → merged: median 1h44m (slowest 10%: 3h… ││ ? Keep this decision? Split billing into two serv… │
+│                                                   ││   spread, fast → slow  ▁▄▄█▃█▃▅▄▄▃▃  90 items     ││ ? Rejected, waiting for the agent: Pin Go 1.27 in… │
+│                                                   ││                                                   ││ +5 more · enter or 4 for the list                  │
+│                                                   ││                                                   ││                                                    │
+│                                                   ││                                                   ││                                                    │
+│                                                   ││                                                   ││                                                    │
+│                                                   ││                                                   ││                                                    │
+│                                                   ││                                                   ││                                                    │
+│                                                   ││                                                   ││                                                    │
+│                                                   ││                                                   ││                                                    │
+│                                                   ││                                                   ││                                                    │
+│                                                   ││                                                   ││                                                    │
+│                                                   ││                                                   ││                                                    │
+│                                                   ││                                                   ││                                                    │
+│                                                   ││                                                   ││                                                    │
+╰───────────────────────────────────────────────────╯╰───────────────────────────────────────────────────╯╰────────────────────────────────────────────────────╯
+ ↑↓ move  enter details                                                                                                               tab views  ? help  q quit 

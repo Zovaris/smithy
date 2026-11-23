@@ -7,7 +7,7 @@ import (
 
 func init() {
 	register("agent", "run one headless agent CLI on a prompt file", agents.AgentUsage,
-		"--bg --readonly --cwd= --log= --model= --effort= --timeout=", agents.AgentMain)
+		"--bg --readonly --cwd= --log= --model= --effort= --timeout= --profile=", agents.AgentMain)
 	register("consult", "ask the strongest model to settle one decision", agents.ConsultUsage,
 		"--context=", agents.ConsultMain)
 	register("decisions", "the log of the user's decisions taken without them", decisions.Usage,

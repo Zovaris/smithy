@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/auto"
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
@@ -637,6 +638,17 @@ func stuck(rows []cards.Row) string {
 	return strings.Join(ids, ",")
 }
 
+// stuckBeats lists the stuck items with their last heartbeat age.
+func stuckBeats(rows []cards.Row) string {
+	var ids []string
+	for _, r := range rows {
+		if r.Stage == "stuck" {
+			ids = append(ids, r.ID+" (last beat "+r.Beat+")")
+		}
+	}
+	return strings.Join(ids, ", ")
+}
+
 func newBatch(name string, all bool) (*batchWatcher, error) {
 	if name == "" {
 		b := cards.Batches()
@@ -679,7 +691,7 @@ func (w *batchWatcher) poll() ([]string, error) {
 	out = append(out, w.prLines(rows, false)...)
 	if len(out) == 0 {
 		if s := stuck(rows); s != "" && s != w.stuckBefore {
-			out = []string{fmt.Sprintf("batch %s stale: %s", w.name, s)}
+			out = []string{fmt.Sprintf("batch %s stale: %s", w.name, stuckBeats(rows))}
 		}
 	}
 	return out, nil
@@ -727,6 +739,8 @@ Targets (any mix):
   base[:<branch>]     the branch (default: origin's default) moved on origin
   alerts              a new open Dependabot alert (skipped, with a note, without read access)
                       actions and alerts already there on the first run are recorded, not reported
+  auto                new qualified issues from auto.sources were queued (the "auto … queued"
+                      lines of smithy auto poll); polls every auto.every s and records each poll
   timer:<minutes>     fires after the minutes (exit 0, "timer: <m>m elapsed"); alone, no GitHub;
                       the ask timeout: smithy wait timer:$(smithy config get ask.timeout), minimum 0.05;
                       when ask.timeout is 0 skip the timer (wait for the answer)
@@ -846,7 +860,7 @@ func Main(args []string) int {
 			if arg != "" {
 				continue
 			}
-		case "prs", "issues", "actions", "base", "alerts":
+		case "prs", "issues", "actions", "base", "alerts", "auto":
 			continue
 		}
 		fmt.Fprintf(os.Stderr, "smithy wait: unknown target %s\n", t)
@@ -871,12 +885,15 @@ func Main(args []string) int {
 		if onlyBatches(targets) {
 			every = 10
 		}
+		if len(targets) == 1 && targets[0] == "auto" {
+			every, _ = strconv.ParseFloat(config.Get("auto.every", "60"), 64)
+		}
 	}
 	if max < 0 {
 		max, _ = strconv.ParseFloat(config.Get("watch.max", "50"), 64)
 	}
 	for _, t := range targets {
-		if !strings.HasPrefix(t, "batch:") {
+		if !strings.HasPrefix(t, "batch:") && t != "auto" {
 			if err := ghx.Ready(); err != nil {
 				fmt.Fprintln(os.Stderr, "smithy wait:", err)
 				return 3
@@ -908,6 +925,8 @@ func Main(args []string) int {
 			w = newBase(arg)
 		case "alerts":
 			w = &alertsWatcher{seen: newSeen("alerts")}
+		case "auto":
+			w, err = newAuto()
 		default:
 			err = fmt.Errorf("unknown target %s", t)
 		}
@@ -981,4 +1000,29 @@ func pushedAhead(s *prState) bool {
 	}
 	_, err = ghx.Run("git", "merge-base", "--is-ancestor", s.head, sha)
 	return err == nil
+}
+
+// autoWatcher polls the auto sources and wakes for newly queued issues.
+type autoWatcher struct{ s auto.Settings }
+
+func newAuto() (*autoWatcher, error) {
+	s, err := auto.LoadSettings()
+	if err != nil {
+		return nil, err
+	}
+	if srcs, err := s.Open(""); len(srcs) == 0 {
+		if err == nil {
+			err = fmt.Errorf("auto.sources is empty")
+		}
+		return nil, err
+	}
+	return &autoWatcher{s}, nil
+}
+
+func (w *autoWatcher) poll() ([]string, error) {
+	lines, code := auto.PollLines(w.s, "")
+	if code != 0 && len(lines) == 0 {
+		return nil, fmt.Errorf("auto poll failed (exit %d)", code)
+	}
+	return lines, nil
 }

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/events"
 )
 
 func setup(t *testing.T) string {
@@ -16,7 +18,33 @@ func setup(t *testing.T) string {
 	h := t.TempDir()
 	t.Setenv("WARDEN_HOME", h)
 	t.Setenv("WARDEN_STALE_MIN", "")
+	t.Setenv("SMITHY_HOME", t.TempDir())
 	return h
+}
+
+func TestSetLogsEvents(t *testing.T) {
+	setup(t)
+	if _, err := Set("b1", "01", []string{"state=working"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Set("b1", "01", []string{"state=pr_open", "pr=https://x/pull/1", "ci=pending"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Set("b1", "01", []string{"note=hi"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Set("b1", "01", []string{"state=merged"}); err != nil {
+		t.Fatal(err)
+	}
+	es, err := events.Read(time.Time{}, 0)
+	var got []string
+	for _, e := range es {
+		got = append(got, e.Kind+":"+e.Detail)
+	}
+	want := []string{"stage:working", "stage:pr_open", "ci:pending", "merged:merged"}
+	if err != nil || !reflect.DeepEqual(got, want) || es[1].Batch != "b1" || es[1].PR != "https://x/pull/1" {
+		t.Fatalf("events = %v %v", got, err)
+	}
 }
 
 func capture(t *testing.T, f func() int) (string, string, int) {
@@ -235,6 +263,35 @@ func TestSetDirError(t *testing.T) {
 	}
 }
 
+func TestBeat(t *testing.T) {
+	h := setup(t)
+	t.Setenv("SMITHY_CONFIG", filepath.Join(h, "config.json"))
+	c, err := Set("b", "a", []string{"state=working"})
+	if err != nil || c["last_beat"] == nil {
+		t.Fatalf("set must beat: %v %v", c, err)
+	}
+	upd := c["updated"]
+	time.Sleep(2 * time.Millisecond)
+	if _, _, code := capture(t, func() int { return Main([]string{"beat", "b", "a"}) }); code != 0 {
+		t.Fatalf("beat exit %d", code)
+	}
+	got := read(filepath.Join(h, "b", "a.json"))
+	if got["updated"] != upd || s(got, "last_beat") <= s(c, "last_beat") || got["state"] != "working" {
+		t.Errorf("beat must move last_beat only: %v", got)
+	}
+	if _, _, code := capture(t, func() int { return Main([]string{"beat", "b", "nope"}) }); code != 1 {
+		t.Errorf("beat on a missing card: %d", code)
+	}
+	out, _ := Board("b", false)
+	if !strings.Contains(out, "beat") {
+		t.Errorf("board lacks beat column:\n%s", out)
+	}
+	os.WriteFile(filepath.Join(h, "config.json"), []byte(`{"warden":{"stuck_minutes":"1"}}`), 0o644)
+	if st := Stage(map[string]any{"state": "working", "last_beat": stamp(5 * time.Minute)}, nil); st != "stuck" {
+		t.Errorf("warden.stuck_minutes ignored: %s", st)
+	}
+}
+
 func TestStage(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -259,7 +316,10 @@ func TestStage(t *testing.T) {
 		{"dropped", map[string]any{"state": "dropped"}, nil, "", "dropped"},
 		{"working fresh", map[string]any{"state": "working", "updated": stamp(time.Minute)}, nil, "", "working"},
 		{"working stale default", map[string]any{"state": "working", "updated": stamp(2 * time.Hour)}, nil, "", "stuck"},
-		{"working under default threshold", map[string]any{"state": "working", "updated": stamp(30 * time.Minute)}, nil, "", "working"},
+		{"working under default threshold", map[string]any{"state": "working", "updated": stamp(10 * time.Minute)}, nil, "", "working"},
+		{"no beat past default 15m", map[string]any{"state": "working", "updated": stamp(20 * time.Minute)}, nil, "", "stuck"},
+		{"recent beat keeps old card working", map[string]any{"state": "working", "updated": stamp(2 * time.Hour), "last_beat": stamp(time.Minute)}, nil, "", "working"},
+		{"old beat is stuck", map[string]any{"state": "working", "updated": stamp(time.Minute), "last_beat": stamp(time.Hour)}, nil, "", "stuck"},
 		{"stale env lowers threshold", map[string]any{"state": "working", "updated": stamp(10 * time.Minute)}, nil, "5", "stuck"},
 		{"stale env raises threshold", map[string]any{"state": "working", "updated": stamp(2 * time.Hour)}, nil, "600", "working"},
 		{"stale env invalid falls back", map[string]any{"state": "working", "updated": stamp(2 * time.Hour)}, nil, "abc", "stuck"},
@@ -271,6 +331,7 @@ func TestStage(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv("WARDEN_STALE_MIN", tc.stale)
+			t.Setenv("SMITHY_CONFIG", filepath.Join(t.TempDir(), "none.json"))
 			if got := Stage(tc.card, tc.item); got != tc.want {
 				t.Fatalf("got %q want %q", got, tc.want)
 			}
@@ -526,7 +587,7 @@ func TestMainBoardChangedSince(t *testing.T) {
 	mustSet(t, "b1", "a", "state=working")
 
 	_, _, code := capture(t, func() int { return Main([]string{"board", "b1", "--changed-since", "2999-01-01T00:00:00.000Z"}) })
-	if code != 3 {
+	if code != 4 {
 		t.Fatalf("nothing changed: %d", code)
 	}
 	so, _, code := capture(t, func() int { return Main([]string{"board", "b1", "--changed-since", "2000-01-01T00:00:00.000Z"}) })

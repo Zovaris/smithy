@@ -45,7 +45,38 @@ func TestBuild(t *testing.T) {
 			t.Errorf("Build(%s, %+v) = %+v, %v; want %q stdin=%v %s", c.cli, c.o, s, err, c.want, c.stdin, c.h)
 		}
 	}
-	s, _ := Build("claude", Options{}, "", nil, "", env(map[string]string{"AGENT_PERMISSION_MODE": "acceptEdits"}))
+	auto := Options{Profile: "auto", SmithyBins: []string{"/opt/smithy/bin/smithy", "rel/smithy"}}
+	s, _ := Build("/Apps/Claude Code/2.1/claude", auto, "", nil, "", env(map[string]string{"AGENT_PERMISSION_MODE": "bypassPermissions"}))
+	argv := strings.Join(s.Argv, "\n")
+	if s.Argv[0] != "/Apps/Claude Code/2.1/claude" || s.Harness != "claude-cli" || !strings.HasPrefix(argv, "/Apps/Claude Code/2.1/claude\n-p\n--permission-mode\ndontAsk\n--allowedTools\n") {
+		t.Errorf("claude auto profile = %q", s.Argv)
+	}
+	for _, want := range []string{"\nBash(git commit *)\n", "\nBash(git push origin *)\n", "\nBash(gh pr create *)\n", "\nBash(/opt/smithy/bin/smithy *)\n",
+		"\n--disallowedTools\n", "\nBash(gh api *)\n", "\nBash(git -c *)\n", "\nRead(~/.ssh/**)\n", "\nEdit(**/.git/hooks/**)\n", "\nBash(/opt/smithy/bin/smithy auth *)\n",
+		"\nBash(git fetch origin)\n", "\nBash(git worktree list)\n", "\nBash(git * --upload-pack*)\n", "\nBash(git * --receive-pack*)\n",
+		"\nBash(git * --exec*)\n", "\nBash(git * --repo*)\n", "\nBash(git * --output*)\n", "\nBash(git push * http*)\n", "\nBash(git push * git@*)\n",
+		"\nBash(git push * ssh*)\n", "\nBash(git push * file*)\n", "\nBash(git checkout * -- /*)\n", "\nBash(*>*)\n", "\nBash(* | tee *)\n"} {
+		if !strings.Contains(argv+"\n", want) {
+			t.Errorf("auto profile lacks %q", strings.TrimSpace(want))
+		}
+	}
+	for _, bad := range []string{"Bash(*)", "bypass", "Bash(git *)", "Bash(gh *)", "Bash(*/", "rel/smithy", "Bash(git push *)", "Bash(git fetch *)", "Bash(git worktree *)", "Bash(git worktree)"} {
+		if strings.Contains(argv, bad) {
+			t.Errorf("auto profile allows %q: %q", bad, s.Argv)
+		}
+	}
+	e := strings.Join(Env([]string{ProfileEnv + "=x", "A=1"}, s, auto), " ")
+	if !strings.Contains(e, ProfileEnv+"=auto") || strings.Contains(e, ProfileEnv+"=x") {
+		t.Errorf("workers don't inherit the profile: %s", e)
+	}
+	if e := strings.Join(Env([]string{ProfileEnv + "=auto"}, s, Options{}), " "); strings.Contains(e, ProfileEnv) {
+		t.Errorf("profile leaked into a plain run: %s", e)
+	}
+	s, _ = Build("codex", auto, "", nil, "/r/.git", none)
+	if want := []string{"codex", "exec", "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true", "--add-dir", "/r/.git", "-c", "approval_policy=never", "-"}; !reflect.DeepEqual(s.Argv, want) {
+		t.Errorf("codex auto profile = %q", s.Argv)
+	}
+	s, _ = Build("claude", Options{}, "", nil, "", env(map[string]string{"AGENT_PERMISSION_MODE": "acceptEdits"}))
 	if s.Argv[3] != "acceptEdits" {
 		t.Errorf("AGENT_PERMISSION_MODE ignored: %q", s.Argv)
 	}
@@ -112,6 +143,21 @@ func TestEnv(t *testing.T) {
 	want := []string{"PATH=/bin", "AGENT_PROMPT_FILE=/p", "AGENT_MODEL=", "AGENT_EFFORT=low", "AGENT_READONLY=1", "WARDEN_HARNESS=pi"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("Env = %q", got)
+	}
+}
+
+func TestEnvDropsLinearKey(t *testing.T) {
+	h := t.TempDir()
+	t.Setenv("SMITHY_HOME", h)
+	t.Setenv("SMITHY_CONFIG", filepath.Join(h, "config.json"))
+	t.Chdir(t.TempDir())
+	os.WriteFile(filepath.Join(h, "config.json"), []byte(`{"linear":{"key_env":"MY_LIN"}}`), 0o644)
+	got := Scrub([]string{"MY_LIN=s1", "LINEAR_API_KEY=s2", "PATH=/bin"})
+	if !reflect.DeepEqual(got, []string{"PATH=/bin"}) {
+		t.Errorf("Scrub = %q", got)
+	}
+	if e := Env([]string{"MY_LIN=s1", "PATH=/bin"}, Spec{}, Options{}); strings.Contains(strings.Join(e, " "), "s1") {
+		t.Errorf("Env kept the key: %q", e)
 	}
 }
 
@@ -524,5 +570,44 @@ func TestConsultPromptEscalatesOnlyTheHardFloor(t *testing.T) {
 	}
 	if strings.Contains(p, "product owner") {
 		t.Fatalf("prompt:\n%s", p)
+	}
+}
+
+func TestSmithyPathsIncludesEverySkillLauncher(t *testing.T) {
+	root := t.TempDir()
+	for _, s := range []string{"tend", "warden", "use-smithy"} {
+		d := filepath.Join(root, s, "scripts")
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(d, "smithy"), []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("SMITHY_SKILL_DIR", filepath.Join(root, "tend", "scripts"))
+	got := strings.Join(SmithyPaths(), "\n")
+	for _, s := range []string{"tend", "warden", "use-smithy"} {
+		if !strings.Contains(got, filepath.Join(root, s, "scripts", "smithy")) {
+			t.Fatalf("missing %s launcher in %q", s, got)
+		}
+	}
+	for _, d := range AutoDenied(nil) {
+		if strings.HasPrefix(d, "Write(") {
+			t.Fatalf("Write deny rules are ignored by claude; use Edit: %s", d)
+		}
+	}
+}
+
+func TestAutoDirsIncludesSmithyHomeAndSkillsRoot(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SMITHY_HOME", home)
+	root := t.TempDir()
+	l := filepath.Join(root, "tend", "scripts", "smithy")
+	if err := os.MkdirAll(filepath.Dir(l), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Join(AutoDirs([]string{l}), "\n")
+	if !strings.Contains(got, home) || !strings.Contains(got, root) {
+		t.Fatalf("AutoDirs = %q", got)
 	}
 }

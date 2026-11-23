@@ -324,6 +324,25 @@ func TestTaskDir(t *testing.T) {
 	}
 }
 
+func TestLocalTaskDirIgnoresTasksCommit(t *testing.T) {
+	dir := newRepo(t)
+	home := t.TempDir()
+	t.Setenv("SMITHY_CONFIG", filepath.Join(home, "config.json"))
+	t.Setenv("SMITHY_HOME", home)
+	t.Setenv("SMELT_PLANS", "")
+	t.Chdir(dir)
+	if err := config.Set(config.RepoFile(), "tasks.commit", "true"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LocalTaskDir("auto-1")
+	if want := filepath.Join(home, "plans", filepath.Base(dir), "auto-1"); err != nil || got != want {
+		t.Fatalf("LocalTaskDir = %q %v, want %q", got, err, want)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "docs")); !os.IsNotExist(err) {
+		t.Error("LocalTaskDir wrote into the repo")
+	}
+}
+
 func TestTaskDirOutsideRepo(t *testing.T) {
 	t.Chdir(t.TempDir())
 	if _, _, err := TaskDir("s1"); !errors.Is(err, ErrNotRepo) {
