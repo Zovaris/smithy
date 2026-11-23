@@ -135,7 +135,7 @@ func WaitTurn(args []string) int {
 			fmt.Fprintln(os.Stderr, planErr(batch, err))
 			return 2
 		}
-		max := 5
+		max := defaultMax()
 		if p.Max != nil {
 			max = *p.Max
 		}
