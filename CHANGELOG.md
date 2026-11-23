@@ -14,8 +14,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - `smithy brief`: a `Spec:` line takes only its first token; `batch init` stores an absolute
   intent when the task file isn't committed on the base.
 - warden doctor accepts an allow rule for `smithy pr merge`.
-- tend: the full suite passes before pushing a merge or rebase of the base; Decisions: consult's
-  ESCALATE with nobody to ask takes the safest option.
+- Skill text: tend runs the full suite (a receipt) before pushing a merge or rebase of the base;
+  use-smithy says where consult's ESCALATE goes when nobody can answer.
 - `smithy decisions`: the log is named after origin's owner and repo, so two checkouts in
   folders with the same name no longer share one (logs under the old folder name stay as they are).
 - `smithy consult`: a fallback CLI uses the models saved for its own harness, never the current

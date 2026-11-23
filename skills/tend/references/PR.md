@@ -43,7 +43,7 @@ inside the repo). Then repeat:
      says the user approved it (use-smithy: merges); otherwise stop at green (or keep waiting when
      told to stay until merged).
 3. Commit fixes with `smithy commit` (style once, one concern per commit). After a merge or
-   rebase of the base, the full suite passes before any push (a receipt). Push without force
+   rebase of the base, `smithy receipt run --claim suite -- <suite>` passes before any push. Push without force
    unless the rebase rule above allows it.
 
 Done when the PR's `action` is `done` (green), `cleanup` (merged or closed) or it was handed
