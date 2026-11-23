@@ -304,7 +304,7 @@ func Doctor(args []string) int {
 		for _, f := range claudeFiles() {
 			if s, ok := readSettings(f); ok {
 				for _, a := range s.Permissions.Allow {
-					if strings.HasPrefix(a, "Bash(gh pr merge") {
+					if strings.HasPrefix(a, "Bash(gh pr merge") || strings.Contains(a, "smithy pr merge") || strings.Contains(a, "smithy:*") || strings.Contains(a, "*smithy*") {
 						allowed = f
 					}
 				}
@@ -316,7 +316,7 @@ func Doctor(args []string) int {
 		if allowed != "" {
 			r.ok("gh pr merge allowed (" + allowed + ")")
 		} else {
-			r.warn("gh pr merge not in the allow list (auto merges may stop at ready)", `add "Bash(gh pr merge:*)" to permissions.allow in ~/.claude/settings.json, or use merge manual`)
+			r.warn("gh pr merge not in the allow list (auto merges may stop at ready)", `add "Bash(smithy pr merge:*)" (or "Bash(gh pr merge:*)") to permissions.allow in ~/.claude/settings.json, or use merge manual`)
 		}
 	}
 	d := cards.Home()

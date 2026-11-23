@@ -282,3 +282,20 @@ func TestBriefBoardDebugRisky(t *testing.T) {
 		t.Errorf("board fallback or plain item wrong:\n%s", got)
 	}
 }
+
+func TestSpecLineFirstToken(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "01-a.md")
+	for in, want := range map[string]string{
+		"./spec.md":                     "./spec.md",
+		"./spec.md (see section 3)":     "./spec.md",
+		"  ./spec.md\textra words here": "./spec.md",
+		"-":                             "",
+		"- ignored":                     "",
+		"":                              "",
+	} {
+		writeFile(t, f, "# 01\nSpec: "+in+"\n")
+		if got := specLine(f); got != want {
+			t.Errorf("Spec: %q -> %q, want %q", in, got, want)
+		}
+	}
+}

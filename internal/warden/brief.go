@@ -198,13 +198,13 @@ func pathLike(s string) bool {
 	return s != "" && !strings.ContainsAny(s, " \t\n") && (strings.Contains(s, "/") || strings.HasSuffix(s, ".md"))
 }
 
-// specLine is the value of a task file's `Spec:` line ("" when absent or "-").
+// specLine is the value of a task file's `Spec:` line (its first token; "" when absent or "-").
 func specLine(file string) string {
 	b, _ := os.ReadFile(file)
 	for _, l := range strings.Split(string(b), "\n") {
 		if v, ok := strings.CutPrefix(strings.TrimSpace(l), "Spec:"); ok {
-			if v = strings.TrimSpace(v); v != "-" {
-				return v
+			if f := strings.Fields(v); len(f) > 0 && f[0] != "-" {
+				return f[0]
 			}
 		}
 	}

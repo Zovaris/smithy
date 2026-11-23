@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,13 +18,16 @@ import (
 
 const batchUsage = `usage: smithy batch <command>
   init <tasks_dir> --repo <dir> [--base b] [--merge auto|manual] [--max n]
+      [--risky <id,id>]
       writes <batch-dir>/batch.json (batch = <repo>-<task dir name>, -2, -3 when taken) from the task
-      files that aren't done or dropped: id <slug>-NN, title, intent = the file's path, speed,
+      files that aren't done or dropped: id <slug>-NN, title, intent = the file's path (relative to the repo when the file is
+      committed on origin/<base>, else absolute), speed,
       prereqs from Blocked by, branch and worktree from smithy names, risky and route: debug from
       the task text (smelt's Risky list; a fix-type title). Prints the batch dir. Blockers that are
       done or dropped aren't prereqs. Refused while another batch has unfinished items from the
       same task dir or on the same branches. Without --merge, merge stays empty and smithy brief
-      refuses until you set the user's auto/manual answer.
+      refuses until you set the user's auto/manual answer. --risky marks each listed item id risky
+      (an unknown id is an error).
   add <batch> --id <id> --title <t> --intent <text> [--base b] [--speed fast|normal|full]
       appends one item (a fix item from the batch check); base defaults to the first item's, speed
       to the batch mode's; refuses a duplicate id, title or branch.
@@ -106,7 +110,7 @@ func defaultBase(repo string) string {
 }
 
 func batchInit(args []string) error {
-	o, pos, err := batchOpts(args, "--repo", "--base", "--merge", "--max")
+	o, pos, err := batchOpts(args, "--repo", "--base", "--merge", "--max", "--risky")
 	if err != nil {
 		return err
 	}
@@ -163,7 +167,10 @@ func batchInit(args []string) error {
 		}
 		intent := t.File
 		if rel, err := filepath.Rel(realPath(repo), realPath(t.File)); err == nil && !strings.HasPrefix(rel, "..") {
-			intent = filepath.ToSlash(rel)
+			rel = filepath.ToSlash(rel)
+			if exec.Command("git", "-C", repo, "cat-file", "-e", "origin/"+base+":"+rel).Run() == nil {
+				intent = rel
+			}
 		}
 		it, err := newItem(repo, id, key, t.Title, intent, text, base, speed, pre)
 		if err != nil {
@@ -173,6 +180,20 @@ func batchInit(args []string) error {
 	}
 	if len(items) == 0 {
 		return fmt.Errorf("every task in %s is done or dropped", td)
+	}
+	if r := o["--risky"]; r != "" {
+		for _, id := range strings.Split(r, ",") {
+			id = strings.TrimSpace(id)
+			found := false
+			for i := range items {
+				if items[i].ID == id {
+					items[i].Risky, found = true, true
+				}
+			}
+			if !found {
+				return fmt.Errorf("--risky: no item %q in %s", id, td)
+			}
+		}
 	}
 	if err := clash(td, items); err != nil {
 		return err
