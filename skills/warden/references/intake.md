@@ -14,7 +14,8 @@ Work out what you were given, in this order, and say in the plan line which it w
    just planned"): `smithy tasks ready <dir>` gives what can start; blocked ones wait for their
    blockers. Id = `<slug>-NN`. Source = the file. An `auto-<date>-<n>` dir from tend `auto` comes
    with its batch values pre-answered (merge, cleanup, each item's `Model:`/`Speed:`): no plan-line
-   question, launch it. One file of `## NN · Title` sections:
+   question, launch it. It launches only workers that outlive the session (`smithy agent` or app
+   sessions); with only the subagent fallback, end `blocked` and tell the user. One file of `## NN · Title` sections:
    `smithy tasks import <file>` first.
 2. **Board ids** (GitHub issues, Linear, Jira keys): read each with `gh` (when installed), the GitHub API when a token is set, or the harness's tracker
    tools. Id = the key. Source = the key (`owner/repo#n` for GitHub).

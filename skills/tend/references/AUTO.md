@@ -2,7 +2,15 @@
 
 Builds qualified issues from `auto.sources` unattended, until the user says stop. Settings and
 what qualifies: `smithy config list` (`auto.*`, `linear.*`); `smithy auto status` shows the queue,
-today's count against `auto.max_per_day`, hours and whether the watcher is alive.
+today's count against `auto.max_per_day`, hours, whether the watcher is alive and serve's state.
+
+For unattended use, recommend `smithy auto serve` (the loop outside the LLM, no tokens while idle;
+`smithy auto serve --help`): it starts one headless session per task dir that runs `tend auto
+once <dir>`. In-chat `tend auto` stays for supervised short runs.
+
+## Once (`tend auto once <dir>`, started by serve)
+Steps 3 and 4 below for that one dir, then **End**: no wait, no take. End when every item is
+ready, merged or blocked, or when `auto.session_hours` passes; workers keep running after you.
 
 ## Loop
 1. `smithy wait auto` in the background (use-smithy's background waits). It wakes with

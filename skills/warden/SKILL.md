@@ -22,7 +22,8 @@ are cards, batch, brief, wait, wait-turn, verify, route, consult, agent, names, 
 
 ## Usage
 - `warden <input>`: tasks, a task dir or file, board ids, or an idea (`references/intake.md`).
-  One task still gets a worktree, a silent worker and verification.
+  One task still gets a worktree, a silent worker and verification. For an `auto-*` dir, the user
+  starting `tend auto` or `smithy auto serve` is the yes.
 - `warden status [batch]`: `smithy cards board`, shown as is; `status all`: `smithy tasks board --all`.
 - `warden cleanup [batch]`: `smithy verify` every `pr_open` / `ready` item and apply the merged
   and closed actions (`references/acting.md`).
