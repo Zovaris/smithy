@@ -107,14 +107,13 @@ type options struct {
 	dark    bool
 	unicode bool
 	motion  bool
-	seed    uint64
 	now     func() time.Time
 	load    func(time.Time) Snapshot
 }
 
 func newModel(o options) Model {
 	m := Model{width: 120, height: 40, dark: o.dark, profile: o.profile, unicode: o.unicode, motion: o.motion,
-		now: o.now, load: o.load, opener: openURL, fx: newFX(o.seed),
+		now: o.now, load: o.load, opener: openURL, fx: newFX(),
 		spring: harmonica.NewSpring(harmonica.FPS(fps), 4.0, 0.95)}
 	m.th = newTheme(m.dark, m.profile, m.unicode)
 	m.snap = m.load(m.now())
@@ -131,7 +130,7 @@ func New(noAnim bool) Model {
 	}
 	motion := !noAnim && os.Getenv("SMITHY_REDUCE_MOTION") == ""
 	return newModel(options{profile: p, dark: true, unicode: utf8Locale(), motion: motion,
-		seed: uint64(time.Now().UnixNano()), now: time.Now, load: Load})
+		now: time.Now, load: Load})
 }
 
 func capPercent(w Watcher) float64 {
@@ -141,7 +140,7 @@ func capPercent(w Watcher) float64 {
 	return min(float64(w.Today)/float64(w.Cap), 1)
 }
 
-// Init starts the refresh loop, asks for the background color and strikes the anvil once.
+// Init starts the refresh loop, asks for the background color and sweeps the shimmer once.
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{tick(), tea.RequestBackgroundColor}
 	if m.motion {
@@ -203,8 +202,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.loading = true
 			cmds = append(cmds, m.reload())
 		}
-		if m.motion && m.ticks%12 == 0 {
-			m.fx.strike(6)
+		if m.motion && m.ticks%restTicks == 0 {
+			m.fx.sweep(m.wordWidth())
 			cmds = append(cmds, m.animate())
 		}
 		if len(cmds) == 0 {
@@ -212,7 +211,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(append(cmds, tick())...)
 	case strikeMsg:
-		m.fx.strike(22)
+		m.fx.sweep(m.wordWidth())
 		return m, m.animate()
 	case frameMsg:
 		m.framing = false
@@ -239,7 +238,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if events(prev, m.snap) {
-			m.fx.strike(26)
+			m.fx.sweep(m.wordWidth())
 		}
 		return m, m.animate()
 	case openedMsg:
@@ -253,7 +252,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// events reports a real change worth a strike: a launch, or an item merged.
+// events reports a real change worth a shimmer: a launch, or an item merged.
 func events(prev, cur Snapshot) bool {
 	merged := func(s Snapshot) int {
 		n := 0

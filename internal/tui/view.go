@@ -69,60 +69,130 @@ func (m Model) capBar(w int) string {
 		n := int(m.capPos*float64(w) + 0.5)
 		return "[" + strings.Repeat("#", n) + strings.Repeat(".", max(w-n, 0)) + "]"
 	}
-	bar := progress.New(progress.WithColors(t.ember[2], t.ember[4], t.ember[6]), progress.WithoutPercentage(),
-		progress.WithFillCharacters('━', '─'), progress.WithWidth(w))
+	bar := progress.New(progress.WithColors(t.forge...), progress.WithoutPercentage(),
+		progress.WithFillCharacters('█', '░'), progress.WithWidth(w))
 	return bar.ViewAs(m.capPos)
 }
 
-// header is the animated art with the watcher's vitals, or one line when space is short.
+// wordWidth is the width of the wordmark the header draws at the current size.
+func (m Model) wordWidth() int {
+	if m.width < 100 {
+		return len([]rune(wordB[0]))
+	}
+	return len([]rune(wordA[0]))
+}
+
+// counts is how many batch items run and how many are blocked.
+func (m Model) counts() (running, blocked int) {
+	for _, it := range m.items() {
+		switch it.item.Stage {
+		case "working", "starting", "waiting", "verify":
+			running++
+		case "stuck", "decide":
+			blocked++
+		}
+	}
+	return
+}
+
+func peak(v []int) int {
+	hi := 0
+	for _, x := range v {
+		hi = max(hi, x)
+	}
+	return hi
+}
+
+// header is the wordmark with its hatch field and the watcher strip: Concept A (6 rows) from
+// 100 columns, Concept B (3 rows of word, 2 of status) below. The wordmark is never cut: it switches.
 func (m Model) header(w, h int) string {
 	t := m.th
 	wt := m.snap.Watcher
 	mut := t.fg(t.muted)
-	txt := t.fg(t.text)
-	clock := mut.Render(m.snap.At.Local().Format("Mon 02 Jan  15:04:05"))
-	ruleC := t.border
-	if m.focus == pWatcher {
-		ruleC = t.accent
-	}
-	rule := func() string {
-		label := " Watcher "
-		if m.focus == pWatcher {
-			label = " " + t.g.sel + " Watcher "
+	val := t.fg(t.text).Bold(!t.plain)
+	running, blocked := m.counts()
+	label := func(s string) string {
+		if s == "watcher" && m.focus == pWatcher {
+			return t.fg(t.accent).Bold(true).Render(fmt.Sprintf("%-8s", s))
 		}
-		return t.fg(ruleC).Render(strings.Repeat(t.g.bar, 2)+label+strings.Repeat(t.g.bar, max(w-len([]rune(label))-2, 0))) + ""
+		return mut.Render(fmt.Sprintf("%-8s", s))
 	}
-	today := fmt.Sprintf("%d/%d today", wt.Today, wt.Cap)
-	if w < 100 || h < 28 {
-		logo := t.fg(t.accent).Bold(true).Render("smithy") + " " + mut.Render(Version)
-		left := logo + "  " + m.statusDot() + mut.Render("  "+t.g.dot+" ") + txt.Render(today)
-		gap := max(w-lipgloss.Width(left)-lipgloss.Width(clock)-2, 1)
-		return pad(" "+left+strings.Repeat(" ", gap)+clock, w) + "\n" + pad(rule(), w)
+	// gut is the cell before the watcher row: the focus marker when the Watcher has focus.
+	gut := " "
+	if m.focus == pWatcher {
+		gut = t.fg(t.accent).Bold(true).Render(t.g.sel)
 	}
-	art := strings.Split(m.art(), "\n")
-	sw := w - artWidth() - 4
-	barW := max(min(sw-18, 40), 8)
-	sources := or(strings.Join(wt.Sources, ", "))
 	poll := "never polled"
 	if wt.Polled {
 		poll = "polled " + ago(m.snap.At.Sub(wt.LastPoll))
 	}
-	chart := braille(wt.Daily, max(wt.Cap, maxInt(wt.Daily)), wt.Cap, min(7, max(sw-34, 2)), 1)[0]
+	watcher := m.statusDot() + mut.Render(" "+t.g.dot+" ") + val.Render(or(strings.Join(wt.Sources, ", "))) + mut.Render(" "+t.g.dot+" "+poll)
+	today := fmt.Sprintf("%d/%d", wt.Today, wt.Cap)
+	spark := t.fg(t.accent).Render(sparkline(wt.Hourly, 24, t.g.ticks)) + mut.Render(fmt.Sprintf("  peak %d/h", peak(wt.Hourly)))
+	blk := mut.Render(fmt.Sprintf("%d blocked", blocked))
+	if blocked > 0 {
+		blk = t.fg(t.err).Bold(true).Render(fmt.Sprintf("%d blocked", blocked))
+	}
+	queue := val.Render(fmt.Sprintf("%d queued", len(m.snap.Queue))) + mut.Render(" "+t.g.dot+" ") +
+		val.Render(fmt.Sprintf("%d running", running)) + mut.Render(" "+t.g.dot+" ") + blk
+	clock := mut.Render(m.snap.At.Local().Format("Mon 02 Jan 15:04:05"))
+	meta := mut.Render("forge " + t.g.dot + " " + Version)
+
 	if !t.g.unicode {
-		chart = sparkline(wt.Daily, 14, t.g.ticks)
+		word := t.fg(t.accent).Bold(true).Render("SMITHY") + "  " + meta
+		return strings.Join([]string{
+			pad(" "+word+"   "+clock, w),
+			pad(gut+label("watcher")+watcher, w),
+			pad(" "+label("today")+m.capBar(10)+"  "+val.Render(today)+"   "+queue, w),
+		}, "\n")
 	}
-	stats := []string{
-		m.statusDot() + mut.Render("  "+sources+"  "+t.g.dot+"  "+poll),
-		txt.Render(fmt.Sprintf("%-10s", today)) + " " + m.capBar(barW),
-		mut.Render("hours ") + txt.Render(hoursWord(wt)) + mut.Render("  "+t.g.dot+"  every ") + txt.Render(fmt.Sprintf("%ds", wt.Every)),
-		mut.Render("24h ") + t.fg(t.accent).Render(sparkline(wt.Hourly, 24, t.g.ticks)) + mut.Render("  14d ") + t.fg(t.warn).Render(chart),
-		t.fg(t.accent).Bold(true).Render("smithy") + " " + mut.Render(Version) + "   " + clock,
+	if w < 100 {
+		word := m.wordmark(wordB)
+		field := m.field(3)
+		side := []string{field[0], field[1] + " " + mut.Render(Version+" "+t.g.dot+" ") + val.Render(fmt.Sprintf("%d running", running)), field[2]}
+		var lines []string
+		for i := range word {
+			l := " " + word[i] + "  " + side[i]
+			if i == 0 {
+				gap := max(w-lipgloss.Width(l)-lipgloss.Width(clock)-1, 1)
+				l += strings.Repeat(" ", gap) + clock
+			}
+			lines = append(lines, pad(l, w))
+		}
+		lines = append(lines,
+			pad(gut+label("watcher")+watcher, w),
+			pad(" "+label("today")+m.capBar(10)+"  "+val.Render(today)+mut.Render("   ")+queue, w))
+		return strings.Join(lines, "\n")
 	}
+	word := m.wordmark(wordA)
+	field := m.field(3)
+	left := []string{field[0], field[1], field[2], "", meta, ""}
+	status := []string{
+		"",
+		label("watcher") + watcher,
+		label("today") + m.capBar(14) + "  " + val.Render(today),
+		label("24h") + spark,
+		label("queue") + queue,
+		mut.Render(strings.Repeat(" ", 8)) + clock,
+	}
+	showField := w >= 1+len([]rune(wordA[0]))+2+fieldWidth+3+44
 	var lines []string
-	for i := range art {
-		lines = append(lines, pad(" "+art[i]+"   "+stats[i], w))
+	for i := range word {
+		l := " " + word[i]
+		if showField {
+			l += "  " + pad(left[i], fieldWidth)
+		}
+		if i == 0 && !showField {
+			status[0] = meta
+		}
+		if i == 1 {
+			l += "  " + gut + status[i]
+		} else {
+			l += "   " + status[i]
+		}
+		lines = append(lines, pad(l, w))
 	}
-	return strings.Join(append(lines, pad(rule(), w)), "\n")
+	return strings.Join(lines, "\n")
 }
 
 func maxInt(v []int) int {

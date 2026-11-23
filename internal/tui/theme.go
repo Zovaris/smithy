@@ -12,9 +12,8 @@ import (
 // theme is the semantic palette and glyph set for one background, color profile and charset.
 type theme struct {
 	accent, ok, warn, err, muted, text, surface, border color.Color
-	ember                                               []color.Color // header and progress gradient, dark → bright
-	spark                                               []color.Color // spark life ramp, hot → cold
-	steel                                               []color.Color // anvil shading, dark → light
+	forge                                               []color.Color // ember → orange → gold
+	shadow, warmWhite                                   color.Color   // wordmark shadow glyphs; shimmer target
 	plain                                               bool          // no color: lean on bold and reverse
 	g                                                   glyphs
 }
@@ -64,11 +63,10 @@ func newTheme(dark bool, p colorprofile.Profile, unicode bool) theme {
 	if unicode {
 		t.g = uniGlyphs
 	}
-	t.ember = lipgloss.Blend1D(8, c("#4A0D05"), c("#B3260B"), c("#F25C05"), c("#FFB547"), c("#FFF1C1"))
-	t.spark = lipgloss.Blend1D(8, c("#FFFFFF"), c("#FFD36E"), c("#F25C05"), c("#7A1204"))
-	t.steel = lipgloss.Blend1D(6, c("#1A1A1F"), c("#3B3D46"), c("#6B6F7D"), c("#B9BDC9"))
+	t.forge = []color.Color{c("#B3260B"), c("#F25C05"), c("#FFB547")}
+	t.shadow, t.warmWhite = c("#5A2410"), c("#FFF1D6")
 	if !dark {
-		t.steel = lipgloss.Blend1D(6, c("#2B2D33"), c("#4A4D57"), c("#7C8090"), c("#A9AEBD"))
+		t.shadow = c("#C9A48E")
 	}
 	if p <= colorprofile.Ascii {
 		t.plain = true

@@ -41,7 +41,7 @@ func fixture(t *testing.T) {
 	write(t, filepath.Join(home, "auto", "state.json"), `{"version":1,
 "queue":[{"source":"github","key":"github","id":"42","title":"Add dark mode to the report","url":"https://github.com/o/r/issues/42","model":"mid","speed":"normal","queued_at":"2026-11-23T13:00:00Z"},
 {"source":"linear","key":"linear","id":"ENG-7","title":"Fix flaky login test","url":"https://linear.app/x/issue/ENG-7"}],
-"launched":{"2026-11-23":[{"source":"github","id":"40"},{"source":"github","id":"41"}]},
+"launched":{"2026-11-23":[{"source":"github","id":"40","at":"2026-11-23T09:10:00Z"},{"source":"github","id":"41","at":"2026-11-23T13:20:00Z"},{"source":"github","id":"39","at":"2026-11-23T13:40:00Z"}]},
 "last_poll":{"github":"2026-11-23T14:29:30Z"}}`)
 	b := filepath.Join(home, "warden", "b1")
 	write(t, filepath.Join(b, "batch.json"), `{"items":[{"id":"01-api","title":"API","route":"strong"},{"id":"02-ui","title":"UI","route":"cheap"}]}`)
@@ -59,7 +59,7 @@ func fixture(t *testing.T) {
 }
 
 func model(w, h int) Model {
-	m := newModel(options{profile: colorprofile.TrueColor, dark: true, unicode: true, seed: 7,
+	m := newModel(options{profile: colorprofile.TrueColor, dark: true, unicode: true,
 		now: func() time.Time { return fixedNow }, load: Load})
 	m.width, m.height = w, h
 	m.opener = func(string) error { return nil }
@@ -70,7 +70,7 @@ func TestLoad(t *testing.T) {
 	fixture(t)
 	s := Load(fixedNow)
 	w := s.Watcher
-	if !w.Alive || w.Today != 2 || w.Cap != 20 || len(w.Sources) != 1 {
+	if !w.Alive || w.Today != 3 || w.Cap != 20 || len(w.Sources) != 1 {
 		t.Fatalf("watcher = %+v", w)
 	}
 	if len(s.Queue) != 2 || len(s.Batches) != 1 || len(s.Batches[0].Items) != 2 {
@@ -323,7 +323,7 @@ func TestModalFloats(t *testing.T) {
 	m.focus = pQueue
 	m, _ = press(m, "enter")
 	out := ansi.Strip(m.render())
-	if !strings.Contains(out, "Queue · details") || !strings.Contains(out, "Decisions") || !strings.Contains(out, "Watcher") {
+	if !strings.Contains(out, "Queue · details") || !strings.Contains(out, "Decisions") || !strings.Contains(out, "watcher") {
 		t.Fatalf("modal does not float over the dashboard:\n%s", out)
 	}
 	if n := len(strings.Split(out, "\n")); n != 40 {
@@ -343,26 +343,39 @@ func TestResize(t *testing.T) {
 
 func TestHeaderFrameDeterministic(t *testing.T) {
 	fixture(t)
-	frameAt := func(seed uint64, steps int) string {
+	frameAt := func(steps int) string {
 		m := model(120, 40)
 		m.motion = true
-		m.fx = newFX(seed)
-		m.fx.strike(22)
+		m.fx.sweep(m.wordWidth())
 		for i := 0; i < steps; i++ {
 			m.fx.step()
 		}
-		return m.art()
+		return strings.Join(m.wordmark(wordA), "\n")
 	}
-	a, b := frameAt(42, 9), frameAt(42, 9)
-	if a != b {
-		t.Fatal("same seed, different frames")
+	if frameAt(9) != frameAt(9) {
+		t.Fatal("same step, different frames")
 	}
-	if a == frameAt(43, 9) {
-		t.Fatal("different seeds drew the same sparks")
+	rest := model(120, 40)
+	still := strings.Join(rest.wordmark(wordA), "\n")
+	if frameAt(9) == still || frameAt(9) == frameAt(20) {
+		t.Fatal("the shimmer band does not move")
 	}
-	still := model(120, 40).art()
-	if a == still || ansi.StringWidth(strings.Split(still, "\n")[0]) != artWidth() {
-		t.Fatal("animated frame equals the still one, or the art width is off")
+	if ansi.Strip(frameAt(9)) != strings.Join(wordA, "\n") {
+		t.Fatal("shimmer changed the wordmark's glyphs")
+	}
+	for _, w := range []int{120, 100, 99, 80} {
+		m := model(w, 30)
+		head := ansi.Strip(m.header(w, 30))
+		want := wordA[0]
+		if w < 100 {
+			want = wordB[0]
+		}
+		if !strings.Contains(head, strings.TrimRight(want, " ")) {
+			t.Fatalf("width %d: wordmark cut or wrong variant:\n%s", w, head)
+		}
+		if n := len(strings.Split(head, "\n")); n > 6 {
+			t.Fatalf("width %d: header is %d rows", w, n)
+		}
 	}
 }
 
@@ -370,17 +383,17 @@ func TestMotionStopsWhenIdle(t *testing.T) {
 	fixture(t)
 	m := model(120, 40)
 	m.motion = true
-	nm, cmd := m.Update(strikeMsg{})
+	nm, cmd := m.Update(strikeMsg{}) // sweeps the shimmer
 	m = nm.(Model)
 	if cmd == nil || !m.framing {
-		t.Fatal("strike did not start frames")
+		t.Fatal("sweep did not start frames")
 	}
 	for i := 0; i < 200 && m.framing; i++ {
 		nm, _ = m.Update(frameMsg{})
 		m = nm.(Model)
 	}
 	if m.framing || m.fx.busy() {
-		t.Fatal("frames keep running after the sparks died")
+		t.Fatal("frames keep running after the sweep ended")
 	}
 	still := model(120, 40)
 	if nm, cmd := still.Update(strikeMsg{}); cmd != nil || nm.(Model).framing {
@@ -390,7 +403,7 @@ func TestMotionStopsWhenIdle(t *testing.T) {
 
 func TestNoColor(t *testing.T) {
 	fixture(t)
-	m := newModel(options{profile: colorprofile.Ascii, dark: true, unicode: false, seed: 1,
+	m := newModel(options{profile: colorprofile.Ascii, dark: true, unicode: false,
 		now: func() time.Time { return fixedNow }, load: Load})
 	out := m.render()
 	if strings.Contains(out, "\x1b[38") || strings.Contains(out, "\x1b[48") {
