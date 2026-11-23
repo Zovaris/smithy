@@ -1,6 +1,7 @@
 package warden
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/cards"
@@ -134,18 +136,31 @@ func defaultBase(repo string) string {
 	return "main"
 }
 
+// lookupTimeout bounds each network lookup of the default branch; tests shorten it.
+var lookupTimeout = 10 * time.Second
+
 // knownDefault is the repo's default branch from origin/HEAD, then gh, then ls-remote; "" when
 // none answers (callers then treat the base as production: fail safe).
 func knownDefault(repo string) string {
 	if b := gitOut(repo, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"); b != "" {
 		return strings.TrimPrefix(b, "origin/")
 	}
-	cmd := exec.Command("gh", "repo", "view", "--json", "defaultBranchRef", "-q", ".defaultBranchRef.name")
-	cmd.Dir = repo
-	if out, err := cmd.Output(); err == nil && strings.TrimSpace(string(out)) != "" {
+	run := func(name string, args ...string) string {
+		ctx, cancel := context.WithTimeout(context.Background(), lookupTimeout)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, name, args...)
+		cmd.Dir = repo
+		cmd.WaitDelay = time.Second
+		out, err := cmd.Output()
+		if err != nil {
+			return ""
+		}
 		return strings.TrimSpace(string(out))
 	}
-	for _, l := range strings.Split(gitOut(repo, "ls-remote", "--symref", "origin", "HEAD"), "\n") {
+	if b := run("gh", "repo", "view", "--json", "defaultBranchRef", "-q", ".defaultBranchRef.name"); b != "" {
+		return b
+	}
+	for _, l := range strings.Split(run("git", "ls-remote", "--symref", "origin", "HEAD"), "\n") {
 		if ref, ok := strings.CutPrefix(l, "ref: refs/heads/"); ok {
 			if b, _, ok := strings.Cut(ref, "\t"); ok {
 				return b
@@ -407,20 +422,26 @@ func batchAdd(args []string) error {
 		return fmt.Errorf("add needs <batch>, --id, --title and --intent")
 	}
 	dir := filepath.Join(cards.Home(), pos[0])
-	raw, err := os.ReadFile(filepath.Join(dir, "batch.json"))
-	if err != nil {
-		return fmt.Errorf("no batch.json in %s", dir)
+	var it batchItem
+	if err := editBatch(dir, func(bt map[string]any) error {
+		var err error
+		it, err = addItem(bt, o)
+		return err
+	}); err != nil {
+		return err
 	}
-	var bt map[string]any
-	if err := json.Unmarshal(raw, &bt); err != nil {
-		return fmt.Errorf("batch.json unreadable: %v", err)
-	}
+	fmt.Println(it.Branch, it.Worktree)
+	return nil
+}
+
+// addItem appends the item `batch add` describes to bt.
+func addItem(bt map[string]any, o map[string]string) (batchItem, error) {
 	list, _ := bt["items"].([]any)
 	base := o["--base"]
 	for _, x := range list {
 		m, _ := x.(map[string]any)
 		if m["id"] == o["--id"] || m["title"] == o["--title"] {
-			return fmt.Errorf("item %s already exists (same id or title)", m["id"])
+			return batchItem{}, fmt.Errorf("item %s already exists (same id or title)", m["id"])
 		}
 		if b, _ := m["base"].(string); base == "" {
 			base = b
@@ -436,23 +457,19 @@ func batchAdd(args []string) error {
 		speed = modeSpeed(mode)
 	}
 	if speed != "fast" && speed != "normal" && speed != "full" {
-		return fmt.Errorf("--speed is %q, want fast, normal or full", speed)
+		return batchItem{}, fmt.Errorf("--speed is %q, want fast, normal or full", speed)
 	}
 	it, err := newItem(repo, o["--id"], "-", o["--title"], o["--intent"], o["--title"]+"\n"+o["--intent"], base, speed, nil)
 	if err != nil {
-		return err
+		return batchItem{}, err
 	}
 	for _, x := range list {
 		if m, _ := x.(map[string]any); m["branch"] == it.Branch {
-			return fmt.Errorf("item %s already uses branch %s", m["id"], it.Branch)
+			return batchItem{}, fmt.Errorf("item %s already uses branch %s", m["id"], it.Branch)
 		}
 	}
 	bt["items"] = append(list, it)
-	if err := writeBatch(dir, bt); err != nil {
-		return err
-	}
-	fmt.Println(it.Branch, it.Worktree)
-	return nil
+	return it, nil
 }
 
 // modeSpeed is the smelt speed a batch mode implies (plain: fast; unknown: normal).

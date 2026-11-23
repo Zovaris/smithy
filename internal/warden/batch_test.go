@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBatchInitAdd(t *testing.T) {
@@ -286,6 +287,23 @@ func TestBatchInitAutoUnknownDefaultIsProduction(t *testing.T) {
 	raw, _ := os.ReadFile(filepath.Join(strings.TrimSpace(o), "batch.json"))
 	if !strings.Contains(string(raw), `"production": "main"`) {
 		t.Errorf("unknown default branch must fail safe to production=base: %s", raw)
+	}
+}
+
+func TestKnownDefaultTimesOut(t *testing.T) {
+	_, repo, _ := autoRepo(t)
+	bin := t.TempDir()
+	writeFile(t, filepath.Join(bin, "gh"), "#!/bin/sh\nexec sleep 5\n")
+	os.Chmod(filepath.Join(bin, "gh"), 0o755)
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	defer func(d time.Duration) { lookupTimeout = d }(lookupTimeout)
+	lookupTimeout = 200 * time.Millisecond
+	start := time.Now()
+	if d := knownDefault(repo); d != "" {
+		t.Errorf("knownDefault = %q, want \"\" (fail safe)", d)
+	}
+	if el := time.Since(start); el > 3*time.Second {
+		t.Errorf("lookup took %v; the timeout did not stop gh", el)
 	}
 }
 
