@@ -122,6 +122,21 @@ func TestEveryCommandHelpAndUnknownOption(t *testing.T) {
 	}
 }
 
+func TestSubcommandHelpPrintsOnlyThatSubcommand(t *testing.T) {
+	repo, env := sandbox(t)
+	for _, tc := range []struct{ cmd, sub, other string }{
+		{"decisions", "reject", "decisions add"},
+		{"cards", "beat", "set <batch>"},
+		{"batch", "set", "init <tasks_dir>"},
+		{"auto", "take", "poll    "},
+	} {
+		out, errOut, code := run(t, repo, env, tc.cmd, tc.sub, "--help")
+		if code != 0 || !strings.Contains(out, tc.sub) || strings.Contains(out, tc.other) {
+			t.Errorf("%s %s --help: exit %d, stdout %q, stderr %q", tc.cmd, tc.sub, code, out, errOut)
+		}
+	}
+}
+
 func TestUsageMistakesAndSilentFailures(t *testing.T) {
 	repo, env := sandbox(t)
 	outside := t.TempDir()
