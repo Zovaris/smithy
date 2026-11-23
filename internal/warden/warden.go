@@ -316,6 +316,17 @@ func Doctor(args []string) int {
 		r.warn("workers: subagent fallback; they end with this session ("+why+")",
 			"say it in the plan line; install a headless agent CLI for workers that outlive this session")
 	}
+	if a := config.Get("auto.agent", ""); a != "" {
+		bins := map[string]string{"claude": "claude", "codex": "codex", "opencode": "opencode", "gemini": "gemini", "cursor": "agent", "pi": "pi", "dsh": "dsh"}
+		switch b, ok := bins[a]; {
+		case !ok:
+			r.warn("auto.agent "+a+" can't run headless (smithy auto serve)", "smithy config set auto.agent <claude|codex|opencode|gemini|cursor|pi|dsh>")
+		case !have(b):
+			r.warn("auto.agent "+a+" not on PATH (smithy auto serve can't start an orchestrator)", "install "+b+", or smithy config set auto.agent <cli>")
+		default:
+			r.ok("auto.agent: " + a)
+		}
+	}
 	for _, s := range []string{"smelt", "hush", "scout", "tend", "use-smithy"} {
 		if p, ok := findSkill(s); ok {
 			r.ok(s + " skill: " + p)

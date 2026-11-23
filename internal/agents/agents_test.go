@@ -45,7 +45,19 @@ func TestBuild(t *testing.T) {
 			t.Errorf("Build(%s, %+v) = %+v, %v; want %q stdin=%v %s", c.cli, c.o, s, err, c.want, c.stdin, c.h)
 		}
 	}
-	s, _ := Build("claude", Options{}, "", nil, "", env(map[string]string{"AGENT_PERMISSION_MODE": "acceptEdits"}))
+	auto := Options{Profile: "auto"}
+	s, _ := Build("claude", auto, "", nil, "", env(map[string]string{"AGENT_PERMISSION_MODE": "bypassPermissions"}))
+	if want := []string{"claude", "-p", "--permission-mode", "dontAsk", "--allowedTools", strings.Join(AutoTools, ",")}; !reflect.DeepEqual(s.Argv, want) {
+		t.Errorf("claude auto profile = %q", s.Argv)
+	}
+	if strings.Contains(strings.Join(s.Argv, " "), "Bash(*)") || strings.Contains(strings.Join(s.Argv, " "), "bypass") {
+		t.Errorf("auto profile is a bypass: %q", s.Argv)
+	}
+	s, _ = Build("codex", auto, "", nil, "/r/.git", none)
+	if want := []string{"codex", "exec", "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true", "--add-dir", "/r/.git", "-c", "approval_policy=never", "-"}; !reflect.DeepEqual(s.Argv, want) {
+		t.Errorf("codex auto profile = %q", s.Argv)
+	}
+	s, _ = Build("claude", Options{}, "", nil, "", env(map[string]string{"AGENT_PERMISSION_MODE": "acceptEdits"}))
 	if s.Argv[3] != "acceptEdits" {
 		t.Errorf("AGENT_PERMISSION_MODE ignored: %q", s.Argv)
 	}

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/config"
 )
 
 func init() {
@@ -437,6 +439,18 @@ func TestDoctorSkillNotInHarness(t *testing.T) {
 	o, c := doctor(t, "--quiet")
 	if c != 0 || !strings.Contains(o, "  warn  codex can't load tend, hush (installed elsewhere, not in its skills folder)\n        fix: link each into /h/skills") {
 		t.Errorf("%d\n%s", c, o)
+	}
+}
+
+func TestDoctorAutoAgent(t *testing.T) {
+	newDoctor(t, "git", "gh")
+	config.Set(config.UserFile(), "auto.agent", "codex")
+	if o, _ := doctor(t, "--quiet"); !strings.Contains(o, "auto.agent codex not on PATH") {
+		t.Errorf("missing CLI not flagged:\n%s", o)
+	}
+	config.Set(config.UserFile(), "auto.agent", "vim")
+	if o, _ := doctor(t, "--quiet"); !strings.Contains(o, "auto.agent vim can't run headless") {
+		t.Errorf("unknown CLI not flagged:\n%s", o)
 	}
 }
 

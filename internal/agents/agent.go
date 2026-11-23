@@ -22,7 +22,7 @@ import (
 
 const agentUsage = `Harness-agnostic agent runner: runs one headless coding agent on a prompt file.
   smithy agent [--bg] [--cwd <dir>] [--log <file>] [--model <m>] [--effort low|medium] [--timeout <min>]
-               [--readonly] <prompt-file>
+               [--readonly] [--profile auto] <prompt-file>
 Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list below.
   AGENT_CMD   any shell command; gets the prompt on stdin and in $AGENT_PROMPT_FILE, the model
               in $AGENT_MODEL, and $AGENT_READONLY=1 for read-only runs
@@ -34,6 +34,10 @@ Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list be
   cursor      agent -p --force (Cursor CLI)
   pi          pi -p (--tools read when read-only)
   dsh         dsh headless --approval-policy never (DeepSeek Harness; model from its profile)
+--profile auto (smithy auto serve's orchestrator; never a full bypass): claude runs with
+  permission mode dontAsk and an allowed-tools list limited to Read, Edit, Write, Glob, Grep and Bash for
+  git, gh, go/npm test and smithy; codex keeps --sandbox workspace-write with approval_policy never;
+  the other CLIs keep their own headless mode above.
 Effort: --effort, else $AGENT_EFFORT, else the agent.effort setting (default medium). Anything
 above medium is capped at medium. Passed as --effort (claude) or -c model_reasoning_effort
 (codex), and as $AGENT_EFFORT to every CLI; the others keep their own default and say so.
@@ -65,7 +69,14 @@ type Options struct {
 	ReadOnly   bool
 	PromptFile string
 	Timeout    time.Duration
+	Profile    string
 }
+
+// AutoTools are the only tools a claude session under --profile auto may use; everything else
+// is denied (permission mode dontAsk), so an unattended run never asks and never bypasses.
+var AutoTools = []string{"Read", "Edit", "Write", "Glob", "Grep",
+	"Bash(git *)", "Bash(gh *)", "Bash(go test *)", "Bash(go vet *)", "Bash(npm test *)", "Bash(npm run test *)",
+	"Bash(smithy *)", "Bash(*/scripts/smithy *)"}
 
 // DefaultTimeout is the agent.timeout setting when unset, in minutes.
 const DefaultTimeout = "90"
@@ -97,6 +108,9 @@ func supervisor(o Options, log string) (*exec.Cmd, error) {
 	}
 	if o.ReadOnly {
 		a = append(a, "--readonly")
+	}
+	if o.Profile != "" {
+		a = append(a, "--profile", o.Profile)
 	}
 	cmd := exec.Command(exe, append(a, o.PromptFile)...)
 	cmd.Dir, cmd.Env = o.Cwd, Scrub(os.Environ())
@@ -210,10 +224,16 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if perm == "" {
 			perm = "auto"
 		}
+		if o.Profile == "auto" {
+			perm = "dontAsk"
+		}
 		if o.ReadOnly {
 			perm = "plan"
 		}
 		a = []string{"claude", "-p", "--permission-mode", perm}
+		if o.Profile == "auto" && !o.ReadOnly {
+			a = append(a, "--allowedTools", strings.Join(AutoTools, ","))
+		}
 		opt("--model")
 		if o.Effort != "" {
 			a = append(a, "--effort", o.Effort)
@@ -228,6 +248,9 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 			a = append(a, "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true")
 			if gitDir != "" {
 				a = append(a, "--add-dir", gitDir)
+			}
+			if o.Profile == "auto" {
+				a = append(a, "-c", "approval_policy=never")
 			}
 		}
 		opt("-m")
@@ -547,6 +570,12 @@ loop:
 			o.Effort = args[1]
 		case "--timeout":
 			o.Timeout = ParseTimeout(args[1])
+		case "--profile":
+			if args[1] != "auto" {
+				fmt.Fprintf(os.Stderr, "smithy agent: unknown profile %q (known: auto)\n", args[1])
+				return 2
+			}
+			o.Profile = args[1]
 		default:
 			break loop
 		}
