@@ -28,8 +28,14 @@ type serveView struct {
 	loaded  time.Time
 	recent  []string
 	confirm bool
+	ended   bool // --once finished: the view stays until a key or holdOnce
 	width   int
 }
+
+// holdOnce is how long the view stays after a --once cycle ends.
+var holdOnce = 3 * time.Second
+
+type serveQuit struct{}
 
 type serveTick struct{}
 type serveLog string
@@ -90,6 +96,13 @@ func (m serveView) waitDone() tea.Cmd {
 func (m serveView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case serveDone:
+		if m.sv == nil || !m.sv.Opt.Once || m.ended {
+			return m, tea.Quit
+		}
+		m.ended = true
+		m.refresh()
+		return m, tea.Tick(holdOnce, func(time.Time) tea.Msg { return serveQuit{} })
+	case serveQuit:
 		return m, tea.Quit
 	case serveTick:
 		m.refresh()
@@ -104,9 +117,12 @@ func (m serveView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 	case tea.KeyPressMsg:
 		k := msg.String()
+		if m.ended {
+			return m, tea.Quit
+		}
 		if m.confirm {
 			switch k {
-			case "y", "Y", "enter":
+			case "y", "Y", "enter", "ctrl+c":
 				return m, tea.Quit
 			default:
 				m.confirm = false
@@ -182,7 +198,9 @@ func (m serveView) lines() []string {
 		out = append(out, "  "+val.Render(short(l, w-3)))
 	}
 	out = append(out, "")
-	if m.confirm {
+	if m.ended {
+		out = append(out, mut.Render(" --once done "+t.g.dot+" any key closes"))
+	} else if m.confirm {
 		out = append(out, " "+t.fg(t.warn).Bold(!t.plain).Render("stop serve? running agents keep going (y/n)"))
 	} else {
 		out = append(out, mut.Render(" esc/q stop "+t.g.dot+" smithy tui for the full dashboard"))

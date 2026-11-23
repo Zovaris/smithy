@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/auto"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -49,6 +50,19 @@ func TestServeViewStopConfirm(t *testing.T) {
 	tm, _ = tm.Update(keyPress("q"))
 	if _, cmd := tm.Update(keyPress("y")); cmd == nil {
 		t.Error("y did not quit")
+	}
+	if _, cmd := tm.Update(keyPress("ctrl+c")); cmd == nil {
+		t.Error("ctrl+c at the prompt did not confirm")
+	}
+	once := m
+	once.sv = &auto.Server{Opt: auto.ServeOptions{Once: true}}
+	var om tea.Model = once
+	om, cmd := om.Update(serveDone{})
+	if !om.(serveView).ended || cmd == nil || !strings.Contains(strings.Join(om.(serveView).lines(), "\n"), "any key closes") {
+		t.Error("--once did not hold the view")
+	}
+	if _, cmd := om.Update(keyPress("x")); cmd == nil {
+		t.Error("a key did not close the held view")
 	}
 	if _, cmd := tm.Update(serveDone{}); cmd == nil {
 		t.Error("serve end did not quit")

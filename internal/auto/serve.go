@@ -44,6 +44,8 @@ type Heartbeat struct {
 	State      string    `json:"state"` // idle, polling or orchestrating
 	SessionLog string    `json:"session_log,omitempty"`
 	SessionPID int       `json:"session_pid,omitempty"`
+	PIDStart   string    `json:"pid_start,omitempty"`     // the process's start time, so a reused pid reads as dead
+	SessionPS  string    `json:"session_start,omitempty"` // same, for the orchestrator
 	SessionAt  time.Time `json:"session_at,omitzero"`
 	SessionDir string    `json:"session_dir,omitempty"`
 }
@@ -81,7 +83,7 @@ func (hb *Heartbeat) Health(now time.Time) string {
 		last = hb.Started
 	}
 	every := max(hb.Every, 1)
-	if !Alive(hb.PID) || now.Sub(last) > time.Duration(3*every)*time.Second {
+	if !AliveAs(hb.PID, hb.PIDStart) || now.Sub(last) > time.Duration(3*every)*time.Second {
 		return "stale"
 	}
 	return "running"
@@ -89,7 +91,32 @@ func (hb *Heartbeat) Health(now time.Time) string {
 
 // SessionRunning reports whether the heartbeat's orchestrator process is still alive.
 func (hb *Heartbeat) SessionRunning() bool {
-	return hb != nil && hb.SessionPID > 0 && Alive(hb.SessionPID)
+	return hb != nil && hb.SessionPID > 0 && AliveAs(hb.SessionPID, hb.SessionPS)
+}
+
+// procStart is the start time ps reports for pid ("" when unknown, as on Windows).
+var procStart = func(pid int) string {
+	if runtime.GOOS == "windows" || pid <= 0 {
+		return ""
+	}
+	out, err := exec.Command("ps", "-o", "lstart=", "-p", strconv.Itoa(pid)).Output()
+	if err != nil {
+		return ""
+	}
+	return strings.Join(strings.Fields(string(out)), " ")
+}
+
+// AliveAs reports whether pid is alive and, when start is known, is still the process that
+// started then (a reused pid reads as dead).
+func AliveAs(pid int, start string) bool {
+	if !Alive(pid) {
+		return false
+	}
+	if start == "" {
+		return true
+	}
+	now := procStart(pid)
+	return now == "" || now == start
 }
 
 // Alive reports whether a process with this pid exists.
@@ -165,12 +192,24 @@ func NewServer(o ServeOptions, log func(string)) (*Server, error) {
 	if o.Cwd == "" {
 		o.Cwd, _ = os.Getwd()
 	}
-	if prev, err := ReadServe(); err == nil && prev != nil && prev.PID != os.Getpid() && Alive(prev.PID) {
-		return nil, fmt.Errorf("serve already running (pid %d); stop it first", prev.PID)
+	err := acquire(ServeFile(), func(b []byte) bool {
+		var prev Heartbeat
+		return json.Unmarshal(b, &prev) == nil && prev.PID != os.Getpid() && AliveAs(prev.PID, prev.PIDStart)
+	})
+	if errors.Is(err, errHeld) {
+		prev, _ := ReadServe()
+		pid := 0
+		if prev != nil {
+			pid = prev.PID
+		}
+		return nil, fmt.Errorf("serve already running (pid %d); stop it first", pid)
+	}
+	if err != nil {
+		return nil, err
 	}
 	s, _ := LoadSettings()
 	sv := &Server{Opt: o, Log: log, mkdr: taskDir,
-		hb: Heartbeat{PID: os.Getpid(), Started: now(), Agent: o.Agent, Every: s.Every, State: "idle"}}
+		hb: Heartbeat{PID: os.Getpid(), PIDStart: procStart(os.Getpid()), Started: now(), Agent: o.Agent, Every: s.Every, State: "idle"}}
 	sv.adopt()
 	return sv, sv.beat()
 }
@@ -178,10 +217,45 @@ func NewServer(o ServeOptions, log func(string)) (*Server, error) {
 // Session is ~/.smithy/auto/orchestrator.json, the lock that keeps one orchestrator at a time; it
 // outlives serve, so a restarted serve never starts a second one.
 type Session struct {
-	PID int       `json:"pid"`
-	Log string    `json:"log"`
-	Dir string    `json:"dir"`
-	At  time.Time `json:"at"`
+	PID   int       `json:"pid"`
+	Log   string    `json:"log"`
+	Dir   string    `json:"dir"`
+	At    time.Time `json:"at"`
+	Start string    `json:"start,omitempty"`
+}
+
+var errHeld = errors.New("held")
+
+// acquire creates path exclusively (O_EXCL). When it exists, held decides from its content
+// whether its owner is alive: errHeld if so, else the stale file is replaced once.
+func acquire(path string, held func([]byte) bool) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	for try := 0; ; try++ {
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+		if err == nil {
+			f.WriteString("{}\n")
+			return f.Close()
+		}
+		if !errors.Is(err, os.ErrExist) {
+			return err
+		}
+		b, _ := os.ReadFile(path)
+		if len(strings.TrimSpace(string(b))) > 2 && held(b) || try > 0 {
+			return errHeld
+		}
+		os.Remove(path)
+	}
+}
+
+// writeAtomic replaces path through a temp file and a rename.
+func writeAtomic(path string, b []byte) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // LockFile is the orchestrator lock's path.
@@ -203,7 +277,7 @@ func ReadLock() *Session {
 // adopt copies a recorded orchestrator into the heartbeat.
 func (sv *Server) adopt() {
 	if l := ReadLock(); l != nil {
-		sv.hb.SessionPID, sv.hb.SessionLog, sv.hb.SessionDir, sv.hb.SessionAt = l.PID, l.Log, l.Dir, l.At
+		sv.hb.SessionPID, sv.hb.SessionLog, sv.hb.SessionDir, sv.hb.SessionAt, sv.hb.SessionPS = l.PID, l.Log, l.Dir, l.At, l.Start
 	}
 }
 
@@ -216,11 +290,7 @@ func (sv *Server) beat() error {
 	if err := os.MkdirAll(filepath.Dir(f), 0o700); err != nil {
 		return err
 	}
-	tmp := f + ".tmp"
-	if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, f)
+	return writeAtomic(f, append(b, '\n'))
 }
 
 func (sv *Server) logf(format string, a ...any) {
@@ -241,7 +311,19 @@ func (sv *Server) Run(ctx context.Context) error {
 	}
 	sv.logf("serve started: pid %d, agent %s", sv.hb.PID, sv.hb.Agent)
 	for {
-		every := sv.Cycle()
+		res := make(chan time.Duration, 1)
+		go func() { res <- sv.Cycle() }()
+		var every time.Duration
+		select {
+		case every = <-res:
+		case <-ctx.Done():
+			sv.stopped()
+			return nil
+		case <-deadline:
+			sv.logf("serve: --max-hours reached")
+			sv.stopped()
+			return nil
+		}
 		if sv.Opt.Once {
 			sv.logf("serve: --once done")
 			return nil
@@ -305,19 +387,33 @@ func (sv *Server) Cycle() time.Duration {
 		if sv.hb.SessionPID > 0 {
 			sv.logf("orchestrator pid %d ended (log %s)", sv.hb.SessionPID, sv.hb.SessionLog)
 			sv.hb.SessionPID = 0
-			os.Remove(LockFile())
 		}
+		if err := acquire(LockFile(), func(b []byte) bool {
+			var l Session
+			return json.Unmarshal(b, &l) == nil && AliveAs(l.PID, l.Start)
+		}); err != nil {
+			sv.logf("serve: orchestrator lock: %v", err)
+			break
+		}
+		before, _ := os.ReadFile(StateFile())
 		r, err := Take(s, 0, sv.mkdr)
 		switch {
 		case err != nil:
+			os.Remove(LockFile())
 			sv.logf("serve: take: %v", err)
 		case r.Count == 0:
+			os.Remove(LockFile())
 			if r.Why != "empty queue" {
 				sv.logf("auto none: %s", r.Why)
 			}
 		default:
 			if err := sv.launch(r.Dir); err != nil {
-				sv.logf("serve: orchestrator did not start: %v", err)
+				os.Remove(LockFile())
+				if before != nil {
+					_ = writeAtomic(StateFile(), before)
+				}
+				os.RemoveAll(r.Dir)
+				sv.logf("serve: orchestrator did not start, %d issue(s) back in the queue: %v", r.Count, err)
 			} else {
 				sv.hb.State = "orchestrating"
 				sv.logf("orchestrator started: pid %d, %d issue(s), %s, log %s", sv.hb.SessionPID, r.Count, r.Dir, sv.hb.SessionLog)
@@ -373,7 +469,7 @@ func (sv *Server) launch(dir string) error {
 		}
 		return err
 	}
-	f := strings.Fields(string(out))
+	f := strings.SplitN(strings.TrimSpace(string(out)), " ", 2)
 	if len(f) < 2 {
 		return fmt.Errorf("smithy agent printed %q, not <pid> <log>", strings.TrimSpace(string(out)))
 	}
@@ -381,9 +477,9 @@ func (sv *Server) launch(dir string) error {
 	if err != nil {
 		return fmt.Errorf("smithy agent printed %q, not <pid> <log>", strings.TrimSpace(string(out)))
 	}
-	sv.hb.SessionPID, sv.hb.SessionLog, sv.hb.SessionAt, sv.hb.SessionDir = pid, f[1], now(), dir
-	b, _ := json.Marshal(Session{PID: pid, Log: f[1], Dir: dir, At: sv.hb.SessionAt})
-	return os.WriteFile(LockFile(), append(b, '\n'), 0o600)
+	sv.hb.SessionPID, sv.hb.SessionLog, sv.hb.SessionAt, sv.hb.SessionDir, sv.hb.SessionPS = pid, f[1], now(), dir, procStart(pid)
+	b, _ := json.Marshal(Session{PID: pid, Log: f[1], Dir: dir, At: sv.hb.SessionAt, Start: sv.hb.SessionPS})
+	return writeAtomic(LockFile(), append(b, '\n'))
 }
 
 // View draws the live serve view until done closes or the user stops serve; logs carries each
@@ -443,6 +539,8 @@ func ServeMain(args []string, view View) int {
 		default:
 		}
 	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 	sv, err := NewServer(o, log)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "smithy auto serve:", Clean(err.Error()))
@@ -451,8 +549,6 @@ func ServeMain(args []string, view View) int {
 		}
 		return 1
 	}
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
 	done := make(chan struct{})
 	go func() {
 		_ = sv.Run(ctx)

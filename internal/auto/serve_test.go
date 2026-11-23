@@ -143,9 +143,7 @@ func TestServeStopsOnCancelAndRefusesSecond(t *testing.T) {
 	if _, err := NewServer(ServeOptions{Agent: "claude"}, nil); err != nil {
 		t.Errorf("same pid refused: %v", err)
 	}
-	b, _ := os.ReadFile(ServeFile())
-	other := strings.Replace(string(b), `"pid": `+strconv.Itoa(os.Getpid()), `"pid": 1`, 1)
-	os.WriteFile(ServeFile(), []byte(other), 0o600)
+	os.WriteFile(ServeFile(), []byte(`{"pid": 1, "pid_start": "`+procStart(1)+`"}`), 0o600)
 	if _, err := NewServer(ServeOptions{Agent: "claude"}, nil); err == nil || !strings.Contains(err.Error(), "already running") {
 		t.Errorf("second serve: %v", err)
 	}
@@ -184,5 +182,32 @@ func TestHealth(t *testing.T) {
 	hb.LastCycle, hb.PID = n, 999999
 	if hb.Health(n) != "stale" {
 		t.Error("dead pid")
+	}
+	if runtime.GOOS != "windows" {
+		hb.PID, hb.PIDStart = os.Getpid(), "Mon Jan  1 00:00:00 2001"
+		if hb.Health(n) != "stale" {
+			t.Error("reused pid read as alive")
+		}
+		hb.PIDStart = procStart(os.Getpid())
+		if hb.Health(n) != "running" {
+			t.Error("same process read as dead")
+		}
+	}
+}
+
+func TestServeFailedLaunchRequeues(t *testing.T) {
+	serveSetup(t)
+	selfExe = func() (string, error) { return "/nonexistent/smithy", nil }
+	var logs []string
+	sv := newTestServer(t, &logs)
+	sv.Cycle()
+	if st, _ := Load(); len(st.Queue) != 1 || st.Queue[0].ID != "7" || len(st.Launched) != 0 && len(st.Launched[day(now())]) != 0 {
+		t.Errorf("issue not requeued: %+v\nlogs %q", st, logs)
+	}
+	if ReadLock() != nil {
+		t.Error("lock left after a failed launch")
+	}
+	if !strings.Contains(strings.Join(logs, "\n"), "back in the queue") {
+		t.Errorf("logs = %q", logs)
 	}
 }
