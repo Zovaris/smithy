@@ -199,3 +199,28 @@ func TestListRefPrefix(t *testing.T) {
 		t.Errorf("unfiltered list: %q", out)
 	}
 }
+
+func TestRejectAndConfirm(t *testing.T) {
+	setup(t)
+	capture(t, func() int { return Main([]string{"add", "Q1?", "a", "--why", "w"}) })
+	capture(t, func() int { return Main([]string{"add", "Q2?", "b", "--why", "w"}) })
+	if _, c := capture(t, func() int { return Main([]string{"reject", "1", "too risky"}) }); c != 0 {
+		t.Fatalf("reject exit %d", c)
+	}
+	if _, c := capture(t, func() int { return Main([]string{"reject", "1", "bad · sep"}) }); c != 2 {
+		t.Fatalf("reject with a separator exit %d", c)
+	}
+	if err := Reject(1, "really too risky"); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := Pending()
+	if len(p) != 2 || !strings.HasSuffix(p[0], "rejected: really too risky") || strings.Count(p[0], "rejected:") != 1 {
+		t.Fatalf("pending = %q", p)
+	}
+	if err := Confirm(2); err != nil {
+		t.Fatal(err)
+	}
+	if p, _ := Pending(); len(p) != 1 || Confirm(5) == nil {
+		t.Fatalf("after confirm = %q", p)
+	}
+}

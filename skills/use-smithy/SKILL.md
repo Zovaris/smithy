@@ -37,7 +37,7 @@ nobody to ask (hush, a launched session; warden workers ask warden) → end `blo
    `blocked`. The one consult-failure rule: fails → safest (security: the secure one; else most reversible; name it). Go on.
 4. `smithy decisions add "<q>" "<choice>" --why "<reason>" --by consult|timeout|self [--ref <pr|file>]`: `consult` when it answered, `timeout` when the timer fired then it answered, `self` (default) when it failed or never ran.
 Pending: `smithy decisions pending`; the first line of the reply lists any ("decided without you: …
-keep or change?"), under hush they are statements in the final `done:` block. Then `smithy decisions confirm <n>|--all` or `change <n> "<choice>"`.
+keep or change?"), under hush they are statements in the final `done:` block. Then `smithy decisions confirm <n>|--all` or `change <n> "<choice>"`. A pending entry with `rejected: <why>` (the user's `reject`) means decide again.
 
 **Model tiers.** cheap, mid, strong per harness, plus optional `judge` (only for `smithy
 consult`). `smithy route` picks the tier (`--agent <file>` for a smelt agent); `smithy config
