@@ -183,6 +183,79 @@ func TestFailureLoggedOnceAndUnconfiguredIsQuiet(t *testing.T) {
 	}
 }
 
+func TestOutageRetriesNextCycle(t *testing.T) {
+	f, _ := setup(t)
+	var logs []string
+	n := New(func(s string) { logs = append(logs, s) })
+	t0 := time.Now()
+	n.Flush(t0)
+	f.fail = 1
+	appendEv(t, events.Event{Kind: "stage", Item: "T-1", Detail: "blocked"})
+	appendEv(t, events.Event{Kind: "stage", Item: "T-2", Detail: "ready"})
+	n.Flush(t0.Add(time.Second))
+	if len(f.msgs) != 0 {
+		t.Fatalf("sent during outage: %v", f.msgs)
+	}
+	n.Flush(t0.Add(time.Minute))
+	if len(f.msgs) != 2 {
+		t.Fatalf("want both alerts after the outage, got %d", len(f.msgs))
+	}
+	n.Flush(t0.Add(2 * time.Minute))
+	if len(f.msgs) != 2 {
+		t.Fatalf("resent: %d", len(f.msgs))
+	}
+}
+
+func TestRetryDroppedAfterADay(t *testing.T) {
+	f, _ := setup(t)
+	var logs []string
+	n := New(func(s string) { logs = append(logs, s) })
+	t0 := time.Now()
+	n.Flush(t0)
+	f.fail = 100
+	appendEv(t, events.Event{Kind: "stage", Item: "T-1", Detail: "blocked"})
+	n.Flush(t0.Add(time.Second))
+	n.Flush(t0.Add(25 * time.Hour))
+	f.fail = 0
+	n.Flush(t0.Add(26 * time.Hour))
+	if len(f.msgs) != 0 {
+		t.Fatalf("expired alert sent: %v", f.msgs)
+	}
+	dropped := 0
+	for _, l := range logs {
+		if strings.Contains(l, "dropped") {
+			dropped++
+		}
+	}
+	if dropped != 1 {
+		t.Fatalf("logs %v", logs)
+	}
+}
+
+func TestFailedSendDoesNotUseRateWindow(t *testing.T) {
+	f, _ := setup(t)
+	n := New(nil)
+	t0 := time.Now()
+	n.Flush(t0)
+	f.fail = 1
+	appendEv(t, events.Event{Kind: "stage", Item: "T-1", Detail: "blocked"})
+	n.Flush(t0.Add(time.Second))
+	st, _ := load()
+	if len(st.Window) != 0 {
+		t.Fatalf("window %v", st.Window)
+	}
+}
+
+func TestStatusWarnsUnknownKinds(t *testing.T) {
+	setup(t)
+	home := os.Getenv("SMITHY_HOME")
+	os.WriteFile(filepath.Join(home, "config.json"), []byte(`{"notify":{"telegram":{"chat":"42"},"kinds":"blocked,nope"}}`), 0o600)
+	s := strings.Join(Status(), "\n")
+	if !strings.Contains(s, "unknown notify.kinds: nope") {
+		t.Fatalf("status %q", s)
+	}
+}
+
 func TestStatusMasksToken(t *testing.T) {
 	setup(t)
 	s := strings.Join(Status(), "\n")

@@ -66,7 +66,17 @@ type state struct {
 	LastSent time.Time            `json:"last_sent,omitempty"`
 	LastErr  string               `json:"last_error,omitempty"`
 	ErrAt    time.Time            `json:"error_at,omitempty"`
+	Retry    []retry              `json:"retry,omitempty"`
 }
+
+// retry is an alert whose send failed; it is tried again each flush for RetryFor.
+type retry struct {
+	Kind, Key, Title, PR, Reason, Dedupe string
+	First                                time.Time
+}
+
+// RetryFor is how long a failed alert is retried before it is dropped (logged once).
+const RetryFor = 24 * time.Hour
 
 func load() (state, bool) {
 	var s state
@@ -170,7 +180,10 @@ func enabled() map[string]bool {
 	return on
 }
 
-type item struct{ kind, key, title, pr, reason, dedupe string }
+type item struct {
+	kind, key, title, pr, reason, dedupe string
+	first                                time.Time
+}
 
 func message(it item) string {
 	lines := []string{"smithy · " + label[it.kind]}
@@ -251,11 +264,23 @@ type Notifier struct {
 // New returns a Notifier that reports a failure once through log (nil: silent).
 func New(log func(string)) *Notifier { return &Notifier{log: log} }
 
-// Final waits for a running flush, then flushes once more (serve calls it when it stops).
+// FinalWait bounds Final.
+var FinalWait = 15 * time.Second
+
+// Final waits for a running flush, then flushes once more (serve calls it when it stops); it
+// returns after FinalWait at most, leaving an unfinished flush behind.
 func (n *Notifier) Final(now time.Time) {
-	n.mu.Lock()
-	n.mu.Unlock()
-	n.Flush(now)
+	done := make(chan struct{})
+	go func() {
+		n.mu.Lock()
+		n.mu.Unlock()
+		n.Flush(now)
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(FinalWait):
+	}
 }
 
 // Flush sends what happened since the last flush. It never panics or returns an error: a failed
@@ -277,6 +302,17 @@ func (n *Notifier) Flush(now time.Time) {
 	evs, _ := events.Read(st.Cursor.Add(-48*time.Hour), 0)
 	titles := map[string]string{}
 	var pending []item
+	for _, r := range st.Retry {
+		if now.Sub(r.First) > RetryFor {
+			if n.log != nil {
+				n.log(fmt.Sprintf("notify: dropped %s %s after %s of failed sends", r.Kind, text.Clean(r.Key), RetryFor))
+			}
+			st.Sent[r.Dedupe] = now
+			continue
+		}
+		pending = append(pending, item{kind: r.Kind, key: r.Key, title: r.Title, pr: r.PR, reason: r.Reason, dedupe: r.Dedupe, first: r.First})
+	}
+	st.Retry = nil
 	cursor := st.Cursor
 	for _, e := range evs {
 		if e.Kind == "launched" && e.Detail != "" {
@@ -312,28 +348,43 @@ func (n *Notifier) Flush(now time.Time) {
 		}
 	}
 	budget := PerMinute - len(win)
+	keep := func(its []item) {
+		for _, it := range its {
+			if it.first.IsZero() {
+				it.first = now
+			}
+			st.Retry = append(st.Retry, retry{Kind: it.kind, Key: it.key, Title: it.title, PR: it.pr, Reason: it.reason, Dedupe: it.dedupe, First: it.first})
+		}
+	}
 	if len(todo) > 0 && (budget < 1 || (len(todo) > budget && budget < 2)) {
-		st.Window = win
+		keep(todo)
+		st.Cursor, st.Window = cursor, win
 		_ = st.save()
 		return
 	}
-	one := func(msg string) {
-		win = append(win, now)
+	one := func(msg string) bool {
 		if err := send(tok, chat, msg); err != nil {
 			if err.Error() != st.LastErr && n.log != nil {
 				n.log("notify: " + err.Error())
 			}
 			st.LastErr, st.ErrAt = err.Error(), now
-			return
+			return false
 		}
+		win = append(win, now)
 		st.LastErr, st.LastSent = "", now
+		return true
 	}
 	individual := todo
 	if len(todo) > budget {
 		individual = todo[:budget-1]
 	}
-	for _, it := range individual {
-		one(message(it))
+	for i, it := range individual {
+		if !one(message(it)) {
+			keep(todo[i:])
+			todo = todo[:i]
+			individual = todo
+			break
+		}
 	}
 	if rest := todo[len(individual):]; len(rest) > 0 {
 		count := map[string]int{}
@@ -345,7 +396,10 @@ func (n *Notifier) Flush(now time.Time) {
 			parts = append(parts, fmt.Sprintf("%d %s", c, k))
 		}
 		sort.Strings(parts)
-		one(fmt.Sprintf("smithy · %d more\n%s\nsmithy tui shows them", len(rest), strings.Join(parts, ", ")))
+		if !one(fmt.Sprintf("smithy · %d more\n%s\nsmithy tui shows them", len(rest), strings.Join(parts, ", "))) {
+			keep(rest)
+			todo = individual
+		}
 	}
 	for _, it := range todo {
 		st.Sent[it.dedupe] = now
@@ -377,6 +431,16 @@ func Status() []string {
 		out = append(out, "chat   not set (smithy config set notify.telegram.chat <id>)")
 	}
 	out = append(out, "kinds  "+text.Clean(config.Get("notify.kinds", strings.Join(Kinds, ","))))
+	var unknown []string
+	for k := range enabled() {
+		if _, ok := label[k]; !ok && k != "" {
+			unknown = append(unknown, text.Clean(k))
+		}
+	}
+	if len(unknown) > 0 {
+		sort.Strings(unknown)
+		out = append(out, "warn   unknown notify.kinds: "+strings.Join(unknown, ",")+" (ignored)")
+	}
 	if _, _, err := creds(); err == nil {
 		out = append(out, "state  on (smithy auto serve sends)")
 	} else {
