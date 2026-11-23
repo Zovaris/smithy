@@ -5,6 +5,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.15.0 — 2026-11-23
+
 - Added: `smithy worktree add <repo> <branch> <from>` creates a task worktree at its standard
   path; warden uses it, and unattended agents (which can't run `git worktree add`) can too.
 - Added: `smithy cleanup … --drop-holdout` deletes untracked `zz_*` holdout tests before the clean
