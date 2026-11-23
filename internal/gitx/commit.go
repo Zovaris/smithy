@@ -178,21 +178,36 @@ func CommitMain(args []string) int {
 		die(p, "name the paths for this commit (atomic: one concern per commit)")
 		return 2
 	}
+	staged := lines(git("diff", "--cached", "--name-only", "--no-renames", "--relative"))
+	var add []string
 	for _, f := range paths {
-		// A deleted file git still tracks is a valid path: committing its removal.
+		// A deleted file git still tracks is a valid path: committing its removal; so is the old
+		// side of a staged rename (git mv), which is already staged and needs no add.
 		if _, err := os.Lstat(f); err != nil && quiet("git", "ls-files", "--error-unmatch", "--", f) != nil {
-			die(p, "no such path: %s", f)
-			return 2
+			if !covered(filepath.ToSlash(filepath.Clean(f)), staged) {
+				die(p, "no such path: %s", f)
+				return 2
+			}
+			continue
 		}
+		add = append(add, f)
 	}
 	if err := Check(msg, detect()); err != nil {
 		return die(p, "%s", err)
 	}
-	if staged := lines(git("diff", "--cached", "--name-only")); len(staged) > 0 {
-		return die(p, "already staged: %s; unstage or include them deliberately", strings.Join(staged, " "))
+	var outside []string
+	for _, f := range staged {
+		if !coveredBy(f, paths) {
+			outside = append(outside, f)
+		}
 	}
-	if c := attached("git", append([]string{"add", "--"}, paths...)...); c != 0 {
-		return c
+	if len(outside) > 0 {
+		return die(p, "already staged: %s; unstage or include them deliberately", strings.Join(outside, " "))
+	}
+	if len(add) > 0 {
+		if c := attached("git", append([]string{"add", "--"}, add...)...); c != 0 {
+			return c
+		}
 	}
 	if git("diff", "--cached", "--name-only") == "" {
 		return die(p, "nothing to commit in: %s", strings.Join(paths, " "))
@@ -202,4 +217,25 @@ func CommitMain(args []string) int {
 		return c
 	}
 	return attached("git", "log", "-1", "--format=%h %s")
+}
+
+// coveredBy reports whether staged file f (repo-relative, slash form) is one of paths or inside one.
+func coveredBy(f string, paths []string) bool {
+	for _, p := range paths {
+		p = strings.TrimSuffix(filepath.ToSlash(filepath.Clean(p)), "/")
+		if p == "." || f == p || strings.HasPrefix(f, p+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+// covered reports whether path p is a staged file or a folder holding one.
+func covered(p string, staged []string) bool {
+	for _, f := range staged {
+		if f == p || strings.HasPrefix(f, p+"/") {
+			return true
+		}
+	}
+	return false
 }

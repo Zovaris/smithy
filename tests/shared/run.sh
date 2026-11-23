@@ -76,6 +76,8 @@ t "accepts good message" '$S/smithy commit check "feat(api): add pagination"'
 echo a > a.txt; echo b > b.txt
 t "requires paths" '! $S/smithy commit "feat(api): add a"'
 t "commits only given paths" '$S/smithy commit "feat(api): add a" a.txt && [ "$(git status --short)" = "?? b.txt" ]'
+t "commits a git mv rename" 'git mv a.txt c.txt && $S/smithy commit "refactor: rename a to c" a.txt c.txt && [ "$(git status --short)" = "?? b.txt" ] && git ls-files --error-unmatch c.txt >/dev/null'
+t "refuses staged files outside the paths" 'git add b.txt; ! $S/smithy commit "feat: add c" c.txt 2>&1 | grep -q x; $S/smithy commit "feat: add c" c.txt 2>&1 | grep -q "already staged: b.txt"; git reset -q b.txt'
 
 # smithy pr
 t "no template → none" '$S/smithy pr template | grep -q "^none:"'
