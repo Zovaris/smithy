@@ -15,7 +15,7 @@ import (
 )
 
 // Usage is the text for `smithy decisions --help`.
-const Usage = `usage: smithy decisions add "<question>" "<choice>" --why "<reason>" [--by consult|timeout|self] [--ref <pr|file>]
+const Usage = `usage: smithy decisions add "<question>" "<choice>" --why "<reason>" [--by self|consult|timeout] [--ref <pr|file>]
        smithy decisions pending | list
        smithy decisions confirm <n>|--all
        smithy decisions change <n> "<new choice>"
@@ -140,7 +140,7 @@ func change(line, choice string) (string, error) {
 // Main runs `smithy decisions`.
 func Main(args []string) int {
 	var pos []string
-	why, by, ref, all := "", "consult", "", false
+	why, by, ref, all := "", "self", "", false
 	for i := 0; i < len(args); i++ {
 		next := func() string {
 			if i+1 < len(args) {
