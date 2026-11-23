@@ -7,12 +7,15 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/auto"
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/decisions"
 	"github.com/Zovaris/smithy/internal/tasks"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Snapshot is everything the dashboard shows, read at one moment.
@@ -62,7 +65,8 @@ type TaskList struct {
 
 var (
 	taskDirs         = tasks.Dirs
-	pendingDecisions = decisions.Pending
+	decisionsFile    = sync.OnceValue(decisions.File)
+	pendingDecisions = func() ([]string, error) { return decisions.PendingIn(decisionsFile()) }
 )
 
 // Load reads the snapshot from local files; a part that fails to read is left empty and named in Errors.
@@ -117,7 +121,78 @@ func Load(now time.Time) Snapshot {
 	} else {
 		snap.Decisions = d
 	}
-	return snap
+	return sanitize(snap)
+}
+
+var c1ToESC = strings.NewReplacer("\u009b", "\x1b[", "\u009d", "\x1b]", "\u0090", "\x1bP", "\u009e", "\x1b^", "\u009f", "\x1b_", "\u0098", "\x1bX")
+
+// clean drops escape sequences and C0/C1 control characters, so issue and card text can't drive the terminal.
+func clean(s string) string {
+	s = strings.Map(func(r rune) rune { // C1 controls as runes (U+009B is CSI) become ESC forms Strip knows
+		if r >= 0x80 && r <= 0x9f {
+			return -1
+		}
+		return r
+	}, c1ToESC.Replace(s))
+	s = ansi.Strip(s)
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r == '\n' || r == '\t' || r == '\r':
+			return ' '
+		case r < 0x20 || (r >= 0x7f && r <= 0x9f):
+			return -1
+		}
+		return r
+	}, s)
+}
+
+func cleanAll(l []string) []string {
+	for i := range l {
+		l[i] = clean(l[i])
+	}
+	return l
+}
+
+// sanitize cleans every string in the snapshot.
+func sanitize(s Snapshot) Snapshot {
+	s.Watcher.Sources = cleanAll(s.Watcher.Sources)
+	s.Watcher.Hours = clean(s.Watcher.Hours)
+	for i := range s.Queue {
+		q := &s.Queue[i]
+		q.Source, q.Key, q.ID, q.Title, q.URL, q.Body, q.Model, q.Speed =
+			clean(q.Source), clean(q.Key), clean(q.ID), clean(q.Title), clean(q.URL), clean(q.Body), clean(q.Model), clean(q.Speed)
+	}
+	for i := range s.Batches {
+		b := &s.Batches[i]
+		b.Name = clean(b.Name)
+		for j := range b.Items {
+			it := &b.Items[j]
+			it.ID, it.Stage, it.State, it.Phase, it.Progress, it.PR, it.CI, it.Age, it.Text, it.Title, it.Model =
+				clean(it.ID), clean(it.Stage), clean(it.State), clean(it.Phase), clean(it.Progress), clean(it.PR),
+				clean(it.CI), clean(it.Age), clean(it.Text), clean(it.Title), clean(it.Model)
+			if it.Updated != nil {
+				u := clean(*it.Updated)
+				it.Updated = &u
+			}
+		}
+	}
+	for i := range s.Tasks {
+		tl := &s.Tasks[i]
+		tl.Dir = clean(tl.Dir)
+		counts := map[string]int{}
+		for k, v := range tl.Counts {
+			counts[clean(k)] += v
+		}
+		tl.Counts = counts
+		for j := range tl.Tasks {
+			t := &tl.Tasks[j]
+			t.File, t.NN, t.Title, t.Status, t.PR = clean(t.File), clean(t.NN), clean(t.Title), clean(t.Status), clean(t.PR)
+			t.Blockers = cleanAll(t.Blockers)
+		}
+	}
+	s.Decisions = cleanAll(s.Decisions)
+	s.Errors = cleanAll(s.Errors)
+	return s
 }
 
 type meta struct {

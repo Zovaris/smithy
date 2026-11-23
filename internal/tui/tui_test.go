@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -220,6 +221,111 @@ func TestKeys(t *testing.T) {
 		if _, ok := cmd().(tea.QuitMsg); !ok {
 			t.Fatalf("%s did not quit", k)
 		}
+	}
+}
+
+func TestSanitize(t *testing.T) {
+	fixture(t)
+	home := os.Getenv("SMITHY_HOME")
+	write(t, filepath.Join(home, "auto", "state.json"), `{"version":1,"queue":[
+{"source":"github","id":"1","title":"evil\u001b]52;c;aGk=\u0007 clip","url":"https://x.io/1\u001b[2J"},
+{"source":"github","id":"2","title":"\u001b[2Jwipe\u009b31m\u0001","url":"javascript:alert(1)"}]}`)
+	write(t, filepath.Join(home, "warden", "b1", "02-ui.json"), `{"state":"working","note":"n\u001b[31mred\u001b]8;;http://e\u0007"}`)
+	pendingDecisions = func() ([]string, error) { return []string{"d \u001b[2J· x"}, errors.New("bad\u001b[2J") }
+	s := Load(fixedNow)
+	var all []string
+	for _, q := range s.Queue {
+		all = append(all, q.Title, q.URL, q.ID, q.Source)
+	}
+	for _, b := range s.Batches {
+		for _, it := range b.Items {
+			all = append(all, it.Text, it.State, it.Title)
+		}
+	}
+	all = append(all, s.Decisions...)
+	all = append(all, s.Errors...)
+	for _, x := range all {
+		for _, r := range x {
+			if r < 0x20 || (r >= 0x7f && r <= 0x9f) {
+				t.Fatalf("control char %q survived in %q", r, x)
+			}
+		}
+	}
+	if s.Queue[0].Title != "evil clip" || s.Queue[1].Title != "wipe" {
+		t.Fatalf("titles = %q %q", s.Queue[0].Title, s.Queue[1].Title)
+	}
+}
+
+func TestOpenRequiresWebURL(t *testing.T) {
+	fixture(t)
+	home := os.Getenv("SMITHY_HOME")
+	write(t, filepath.Join(home, "auto", "state.json"), `{"version":1,"queue":[
+{"source":"github","id":"1","title":"a","url":"javascript:alert(1)"},
+{"source":"github","id":"2","title":"b","url":"https:///nohost"},
+{"source":"github","id":"3","title":"c","url":"file:///etc/passwd"},
+{"source":"github","id":"4","title":"d","url":"http://ok.example/4"}]}`)
+	m := model(120, 40)
+	m.focus = pQueue
+	var opened []string
+	m.opener = func(u string) error { opened = append(opened, u); return nil }
+	for i := 0; i < 3; i++ {
+		m.sel[pQueue] = i
+		nm, cmd := press(m, "o")
+		if cmd != nil || nm.status != "not a web URL" {
+			t.Fatalf("row %d: cmd=%v status=%q", i, cmd != nil, nm.status)
+		}
+	}
+	m.sel[pQueue] = 3
+	_, cmd := press(m, "o")
+	cmd()
+	if len(opened) != 1 || opened[0] != "http://ok.example/4" {
+		t.Fatalf("opened %q", opened)
+	}
+}
+
+func TestOverlappingLoads(t *testing.T) {
+	fixture(t)
+	m := model(120, 40)
+	nm, cmd := m.Update(tickMsg(fixedNow))
+	m = nm.(Model)
+	if !m.loading || cmd == nil {
+		t.Fatal("tick did not start a load")
+	}
+	nm, _ = m.Update(tickMsg(fixedNow))
+	if m2 := nm.(Model); !m2.loading {
+		t.Fatal("second tick lost the loading flag")
+	}
+	calls := 0
+	m.load = func(t time.Time) Snapshot { calls++; return Snapshot{At: t} }
+	_, cmd = m.Update(tickMsg(fixedNow))
+	if _, ok := cmd().(tickMsg); !ok {
+		t.Fatal("tick in flight should only schedule the next tick")
+	}
+	if calls != 0 {
+		t.Fatalf("load called %d times while in flight", calls)
+	}
+	old := Snapshot{At: fixedNow.Add(-time.Minute)}
+	nm, _ = m.Update(snapMsg(old))
+	if m = nm.(Model); !m.snap.At.Equal(fixedNow) || m.loading {
+		t.Fatalf("older snapshot applied (at %v) or loading kept", m.snap.At)
+	}
+	nm, _ = m.Update(snapMsg(Snapshot{At: fixedNow.Add(time.Second)}))
+	if !nm.(Model).snap.At.Equal(fixedNow.Add(time.Second)) {
+		t.Fatal("newer snapshot dropped")
+	}
+}
+
+func TestModalFloats(t *testing.T) {
+	fixture(t)
+	m := model(120, 40)
+	m.focus = pQueue
+	m, _ = press(m, "enter")
+	out := ansi.Strip(m.render())
+	if !strings.Contains(out, "Queue · details") || !strings.Contains(out, "Decisions") || !strings.Contains(out, "Watcher") {
+		t.Fatalf("modal does not float over the dashboard:\n%s", out)
+	}
+	if n := len(strings.Split(out, "\n")); n != 40 {
+		t.Fatalf("modal view has %d lines", n)
 	}
 }
 

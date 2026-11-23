@@ -68,8 +68,10 @@ func clean(name, s string) (string, error) {
 	return s, nil
 }
 
-func read() ([]string, error) {
-	b, err := os.ReadFile(File())
+func read() ([]string, error) { return readFile(File()) }
+
+func readFile(file string) ([]string, error) {
+	b, err := os.ReadFile(file)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -300,8 +302,11 @@ func Main(args []string) int {
 }
 
 // Pending is the unconfirmed entries of the current repo's log, without the checkbox prefix.
-func Pending() ([]string, error) {
-	lines, err := read()
+func Pending() ([]string, error) { return PendingIn(File()) }
+
+// PendingIn is Pending for a given log file, so a caller can resolve File() once.
+func PendingIn(file string) ([]string, error) {
+	lines, err := readFile(file)
 	if err != nil {
 		return nil, err
 	}

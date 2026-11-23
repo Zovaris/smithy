@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"image/color"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -65,17 +66,19 @@ type openedMsg struct{ err error }
 
 // Model is the dashboard's Bubble Tea model.
 type Model struct {
-	snap   Snapshot
-	focus  panel
-	sel    [nPanels]int
-	modal  bool
-	width  int
-	height int
-	dark   bool
-	status string
-	now    func() time.Time
-	load   func(time.Time) Snapshot
-	opener func(string) error
+	snap  Snapshot
+	focus panel
+	sel   [nPanels]int
+	modal bool
+	// loading is true while a load runs; ticks skip their load until it lands.
+	loading bool
+	width   int
+	height  int
+	dark    bool
+	status  string
+	now     func() time.Time
+	load    func(time.Time) Snapshot
+	opener  func(string) error
 }
 
 // New builds the model with the real clock, loader and URL opener.
@@ -105,8 +108,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.BackgroundColorMsg:
 		m.dark = msg.IsDark()
 	case tickMsg:
+		if m.loading {
+			return m, tick()
+		}
+		m.loading = true
 		return m, tea.Batch(m.reload(), tick())
 	case snapMsg:
+		m.loading = false
+		if msg.At.Before(m.snap.At) {
+			return m, nil
+		}
 		m.snap = Snapshot(msg)
 		m.clamp()
 	case openedMsg:
@@ -146,7 +157,10 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Open):
 		return m.open()
 	case key.Matches(msg, keys.Refresh):
-		m.status = "refreshed"
+		if m.loading {
+			return m, nil
+		}
+		m.status, m.loading = "refreshed", true
 		return m, m.reload()
 	}
 	return m, nil
@@ -156,6 +170,10 @@ func (m Model) open() (tea.Model, tea.Cmd) {
 	u := m.url()
 	if u == "" {
 		m.status = "no URL for this row"
+		return m, nil
+	}
+	if !webURL(u) {
+		m.status = "not a web URL"
 		return m, nil
 	}
 	m.status = "opening " + u
@@ -169,6 +187,12 @@ func (m *Model) clamp() {
 			m.sel[p] = max(n-1, 0)
 		}
 	}
+}
+
+// webURL accepts only http(s) URLs with a host, so `o` never hands the opener a file or script URL.
+func webURL(u string) bool {
+	p, err := url.Parse(u)
+	return err == nil && (p.Scheme == "http" || p.Scheme == "https") && p.Host != ""
 }
 
 func openURL(u string) error {
@@ -227,12 +251,12 @@ func (m Model) url() string {
 			return m.snap.Queue[i].URL
 		}
 	case pBatches:
-		if it := m.items(); i < len(it) && strings.HasPrefix(it[i].item.PR, "http") {
+		if it := m.items(); i < len(it) && it[i].item.PR != "-" {
 			return it[i].item.PR
 		}
 	case pDecisions:
 		if i < len(m.snap.Decisions) {
-			if _, ref, ok := strings.Cut(m.snap.Decisions[i], "ref: "); ok && strings.HasPrefix(ref, "http") {
+			if _, ref, ok := strings.Cut(m.snap.Decisions[i], "ref: "); ok {
 				return strings.TrimSpace(ref)
 			}
 		}
@@ -365,14 +389,19 @@ func (m Model) render() string {
 	foot := m.footer(w)
 	bodyH := h - lipgloss.Height(head) - lipgloss.Height(foot)
 	var body string
-	if m.modal {
-		body = lipgloss.Place(w, bodyH, lipgloss.Center, lipgloss.Center, m.modalBox(w, bodyH))
-	} else if w >= 100 && bodyH >= 24 {
+	if w >= 100 && bodyH >= 24 {
 		body = m.wide(w, bodyH)
 	} else {
 		body = m.stacked(w, bodyH)
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
+	screen := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
+	if !m.modal {
+		return screen
+	}
+	box := m.modalBox(w, bodyH)
+	x := max((w-lipgloss.Width(box))/2, 0)
+	y := lipgloss.Height(head) + max((bodyH-lipgloss.Height(box))/2, 0)
+	return lipgloss.NewCompositor(lipgloss.NewLayer(screen), lipgloss.NewLayer(box).X(x).Y(y).Z(1)).Render()
 }
 
 func (m Model) header(w int) string {
