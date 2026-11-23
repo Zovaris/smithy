@@ -146,7 +146,7 @@ func Load(now time.Time) Snapshot {
 	}
 	w.Alive = w.Polled && now.Sub(w.LastPoll) <= time.Duration(3*s.Every)*time.Second
 	w.Serve = auto.ServeOf(now)
-	w.Serve.Agent, w.Serve.SessionLog, w.Serve.Loop = clean(w.Serve.Agent), clean(w.Serve.SessionLog), clean(w.Serve.Loop)
+	w.Serve.Agent, w.Serve.SessionLog, w.Serve.Loop, w.Serve.SessionDir = clean(w.Serve.Agent), clean(w.Serve.SessionLog), clean(w.Serve.Loop), clean(w.Serve.SessionDir)
 	snap.Watcher = w
 	snap.Queue = st.Queue
 

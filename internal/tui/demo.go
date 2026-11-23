@@ -246,7 +246,8 @@ func Demo(now time.Time) Snapshot {
 	w := Watcher{Alive: true, Polled: true, Sources: []string{"github", "linear"}, Team: "TES", LastPoll: now.Add(-25 * time.Second),
 		Today: today, Cap: max(80, today+10), Hours: "", OpenNow: true, Every: 60, Daily: daily, Hourly: hourly,
 		Serve: auto.ServeStatus{State: "running", PID: 4242, Agent: "claude", LastCycle: now.Add(-25 * time.Second), Loop: "orchestrating",
-			SessionLog: "/home/dev/.smithy/auto/sessions/20261123-091500.log", SessionPID: 5150}}
+			SessionLog: "/home/dev/.smithy/auto/sessions/20261123-091500.log", SessionPID: 5150, SessionOn: true,
+			SessionAt: now.Add(-38 * time.Minute), SessionDir: "/home/dev/.smithy/plans/smithy/auto-2026-11-23-1"}}
 	snap := Snapshot{At: now, Watcher: w, Queue: queue, Batches: batches, Tasks: lists, Worktrees: wts, Events: evs,
 		Rates: map[string]int{"linear": 1342}, Repo: "smithy", Demo: true,
 		Decisions: []string{

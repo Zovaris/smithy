@@ -386,7 +386,17 @@ func (sv *Server) Cycle() time.Duration {
 		sv.hb.State = "idle"
 		if sv.hb.SessionPID > 0 {
 			sv.logf("orchestrator pid %d ended (log %s)", sv.hb.SessionPID, sv.hb.SessionLog)
-			sv.hb.SessionPID = 0
+			n, gaveUp, err := Requeue(sv.hb.SessionDir)
+			switch {
+			case err != nil:
+				sv.logf("serve: requeue: %v", err)
+			case n > 0:
+				sv.logf("requeued %d issue(s): orchestrator started nothing (log %s)", n, sv.hb.SessionLog)
+			}
+			for _, id := range gaveUp {
+				sv.logf("giving up on %s: orchestrators started nothing %d times; it stays launched", id, MaxRequeues+1)
+			}
+			sv.hb.SessionPID, sv.hb.SessionDir = 0, ""
 		}
 		if err := acquire(LockFile(), func(b []byte) bool {
 			var l Session

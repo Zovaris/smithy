@@ -211,3 +211,52 @@ func TestServeFailedLaunchRequeues(t *testing.T) {
 		t.Errorf("logs = %q", logs)
 	}
 }
+
+// An orchestrator whose agent exits without starting any task puts its issues back, at most
+// twice per issue; the third time serve gives up and leaves them launched.
+func TestServeRequeuesWhenOrchestratorStartedNothing(t *testing.T) {
+	_, fake := serveSetup(t)
+	t.Setenv("FAKE_PID", "999998")
+	var logs []string
+	sv := newTestServer(t, &logs)
+	for i := 0; i < 4; i++ {
+		sv.Cycle()
+	}
+	argv, _ := os.ReadFile(filepath.Join(fake, "argv"))
+	if n := strings.Count(string(argv), "\n"); n != 3 {
+		t.Errorf("launched %d times, want 3\nlogs %q", n, logs)
+	}
+	all := strings.Join(logs, "\n")
+	if strings.Count(all, "requeued 1 issue(s): orchestrator started nothing (log ") != 2 || !strings.Contains(all, "giving up on 7") {
+		t.Errorf("logs = %q", logs)
+	}
+	st, _ := Load()
+	if len(st.Queue) != 0 || len(st.Launched[day(now())]) != 1 || st.Requeued["fake:7"] != 2 {
+		t.Errorf("state = %+v", st)
+	}
+	if q := st.Launched[day(now())]; len(q) == 1 {
+		if _, err := os.Stat(q[0].Dir); err != nil {
+			t.Errorf("given-up task dir removed: %v", err)
+		}
+	}
+}
+
+func TestServeKeepsStartedWork(t *testing.T) {
+	serveSetup(t)
+	t.Setenv("FAKE_PID", "999998")
+	var logs []string
+	sv := newTestServer(t, &logs)
+	sv.Cycle()
+	files, _ := filepath.Glob(filepath.Join(sv.Heartbeat().SessionDir, "01-*.md"))
+	if len(files) != 1 {
+		t.Fatalf("no task file: %q", logs)
+	}
+	b, _ := os.ReadFile(files[0])
+	if err := os.WriteFile(files[0], []byte(strings.Replace(string(b), "Status: todo", "Status: doing", 1)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sv.Cycle()
+	if strings.Contains(strings.Join(logs, "\n"), "requeued") {
+		t.Errorf("started work requeued: %q", logs)
+	}
+}
