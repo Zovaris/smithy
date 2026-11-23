@@ -151,8 +151,12 @@ func (m Model) openEdit(unset bool) (tea.Model, tea.Cmd) {
 	}
 	e.kind, e.opts = config.KindOf(s.Key)
 	if e.opts != nil {
+		cur := s.Value
+		if cur == "" {
+			cur = s.Default
+		}
 		for i, o := range e.opts {
-			if o == s.Value {
+			if o == cur {
 				e.opt = i
 			}
 		}
@@ -321,7 +325,11 @@ func (m Model) editBox(w int) string {
 		}
 		lines = append(lines, acc.Bold(true).Render(title), "",
 			kv("change", val.Render(old)+mut.Render(" "+arrow(t)+" ")+t.fg(t.ok).Bold(true).Render(nv)),
-			kv("scope", scope), kv("runs", mut.Render(shellCmd(e))), "",
+			kv("scope", scope), kv("runs", mut.Render(shellCmd(e))))
+		if !e.repo && e.set.Src == "repo" {
+			lines = append(lines, "", t.fg(t.warn).Render(short("this repo sets "+e.set.Key+": the repo value wins here", inner)))
+		}
+		lines = append(lines, "",
 			t.fg(t.border).Render(strings.Repeat("─", inner)))
 		hint := acc.Render("enter") + " " + mut.Render("save") + "   " + acc.Render("tab") + " " + mut.Render("user/repo") + "   " + acc.Render("esc") + " " + mut.Render("back")
 		if e.unset {

@@ -11,8 +11,9 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   the default. Writes go through `config.Apply`/`config.Remove`, the same path as
   `smithy config set|unset`; secret-valued keys are locked (auth stays in `smithy auth`); demo mode
   only says the command it would run.
-- Changed: `smithy config set` validates typed keys: booleans (`auto.paused`, `decide.enabled`),
-  whole numbers (`warden.max`, `auto.every`, …) and choices (`auto.mode`, `warden.merge`,
+- Changed: `smithy config set` validates typed keys the way the code reads them: booleans
+  (`auto.paused`, `decide.enabled`), whole numbers (`warden.max`, `auto.every` at least 1), non-negative
+  numbers (`watch.every`, `auto.session_hours`, `auto.max_cost_per_day`, …) and choices (`auto.mode`, `warden.merge`,
   `warden.mode`, `tasks.location`, …); comma lists are trimmed.
 
 - Added: token use and cost per run. `smithy agent` runs Claude Code with `--output-format json`,

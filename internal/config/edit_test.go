@@ -20,14 +20,17 @@ func TestKindOf(t *testing.T) {
 
 func TestNormalizeTyped(t *testing.T) {
 	for _, c := range []struct{ key, in, out string }{
-		{"auto.paused", "TRUE", "true"}, {"warden.max", " 7 ", "7"}, {"auto.mode", "all", "all"}, {"auto.sources", "github, linear", "github,linear"},
+		{"auto.paused", "TRUE", "true"}, {"warden.max", " 7 ", "7"}, {"auto.mode", "all", "all"}, {"auto.sources", "github, linear", "github,linear"}, {"auto.max_cost_per_day", "12.5", "12.5"}, {"watch.every", "0.5", "0.5"}, {"watch.max", "2.5", "2.5"},
+		{"auto.session_hours", "1.5", "1.5"}, {"warden.stuck_minutes", "7.5", "7.5"}, {"agent.timeout", "0", "0"},
+		{"warden.merge", "ask", "ask"}, {"warden.cleanup", "ask", "ask"},
 	} {
 		got, _, err := Normalize(c.key, c.in)
 		if err != nil || got != c.out {
 			t.Errorf("Normalize(%s,%q) = %q %v", c.key, c.in, got, err)
 		}
 	}
-	for _, c := range [][2]string{{"auto.paused", "maybe"}, {"warden.max", "-1"}, {"warden.max", "x"}, {"auto.mode", "some"}} {
+	for _, c := range [][2]string{{"auto.paused", "maybe"}, {"warden.max", "-1"}, {"warden.max", "x"}, {"auto.mode", "some"}, {"auto.max_cost_per_day", "-1"}, {"auto.max_cost_per_day", "lots"},
+		{"warden.max", "0"}, {"warden.max", "1.5"}, {"auto.every", "0"}, {"decide.timeout", "2.5"}, {"watch.every", "-1"}, {"warden.cleanup", "manual"}} {
 		if _, _, err := Normalize(c[0], c[1]); err == nil {
 			t.Errorf("Normalize(%s,%q) accepted", c[0], c[1])
 		}

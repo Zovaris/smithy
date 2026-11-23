@@ -100,6 +100,35 @@ func TestSettingsEnumAndUnset(t *testing.T) {
 	}
 }
 
+func TestSettingsPreselectDefault(t *testing.T) {
+	m := settingsAt(t, "warden.merge")
+	m.sys.Settings[m.sel[vSystem]] = Setting{Key: "warden.merge", Src: "unset", Default: "ask"}
+	m, _ = press(m, "enter")
+	m, _ = press(m, "enter")
+	if m.edit == nil || m.edit.val != "ask" {
+		t.Fatalf("default ask not kept: %+v", m.edit)
+	}
+	m = settingsAt(t, "auto.mode")
+	m, _ = press(m, "enter")
+	if m.edit.opts[m.edit.opt] != "labeled" {
+		t.Fatal("current value not preselected")
+	}
+}
+
+func TestSettingsShadowWarning(t *testing.T) {
+	m := settingsAt(t, "warden.max")
+	m.sys.Settings[m.sel[vSystem]].Src = "repo"
+	m, _ = press(m, "enter")
+	m, _ = press(m, "enter")
+	if !m.edit.repo {
+		t.Fatal("repo value should default to repo scope")
+	}
+	m, _ = press(m, "tab")
+	if !strings.Contains(ansi.Strip(m.render()), "repo value wins here") {
+		t.Fatal("no shadow warning")
+	}
+}
+
 func TestSettingsDemoOnlySays(t *testing.T) {
 	m := settingsAt(t, "auto.paused")
 	m.setter = nil

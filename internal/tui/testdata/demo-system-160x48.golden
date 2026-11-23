@@ -6,7 +6,7 @@
          ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
   1 Overview   2 Agents   3 Incoming   4 Needs you 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System                                                   
-╭─ Health · read-only ─────────────────────────────────────────────────────────╮╭─ Settings · 51 · enter edits ────────────────────────────────────────────────╮
+╭─ Health · read-only ─────────────────────────────────────────────────────────╮╭─ Settings · 52 · enter edits ────────────────────────────────────────────────╮
 │ Versions                                                                     ││ auto.*                                                                       │
 │ binary  0.15.0                                                               ││ ▸ auto.sources           github,linear  user    comma list of issue sources… │
 │ skills  0.15.0  ✓ match                                                      ││   auto.mode              labeled        default labeled: only issues with t… │
@@ -14,34 +14,34 @@
 │ Serve  smithy auto serve                                                     ││   auto.model_prefix      model:         default label prefix for the worker… │
 │ running  pid 4242 · agent claude · orchestrating · last cycle 25s ago        ││   auto.speed_prefix      speed:         default label prefix for the smelt … │
 │ session /home/dev/.smithy/auto/sessions/20261123-091500.log  l opens it      ││   auto.max_per_day       80             user    issues launched per local c… │
-│                                                                              ││   auto.hours             -              unset   launch window HH:MM-HH:MM i… │
-│ Paths                                                                        ││   auto.every             60             default seconds between polls of ea… │
-│ home    /home/dev/.smithy                                                    ││   auto.paused            false          default true holds smithy auto take… │
-│ events  /home/dev/.smithy/events.jsonl  (412.7 KB)                           ││   auto.agent             -              unset   agent CLI for serve's orche… │
-│                                                                              ││   auto.session_hours     3              default hours one orchestrator sess… │
-│ Auth  keys are masked                                                        ││   auto.merge             manual         default merge mode for auto batches… │
-│ github ****9f2c                                                              ││                                                                              │
-│ linear ****a41b                                                              ││ linear.*                                                                     │
-│                                                                              ││   linear.key_env         LINEAR_API_KEY default name of the env var holding… │
-│ Notify  Telegram, smithy notify test                                         ││   linear.team            TES            user    required: Linear team keys … │
-│ token  ****x7Qa (/home/dev/.smithy/auth.json)                                ││   linear.project         -              unset   Linear project name filter;… │
-│ chat 123456789                                                               ││   linear.milestone       -              unset   Linear project milestone na… │
-│ kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_r… ││   linear.cycle           -              unset   Linear cycle filter: curren… │
-│ state  on (smithy auto serve sends)                                          ││   linear.initiative      -              unset   Linear initiative name filt… │
-│ last sent 2026-11-23 09:12                                                   ││   linear.states          unstarted,bac… default Linear workflow state types… │
+│                                                                              ││   auto.max_cost_per_day  -              unset   USD of reported agent cost … │
+│ Paths                                                                        ││   auto.hours             -              unset   launch window HH:MM-HH:MM i… │
+│ home    /home/dev/.smithy                                                    ││   auto.every             60             default seconds between polls of ea… │
+│ events  /home/dev/.smithy/events.jsonl  (412.7 KB)                           ││   auto.paused            false          default true holds smithy auto take… │
+│                                                                              ││   auto.agent             -              unset   agent CLI for serve's orche… │
+│ Auth  keys are masked                                                        ││   auto.session_hours     3              default hours one orchestrator sess… │
+│ github ****9f2c                                                              ││   auto.merge             manual         default merge mode for auto batches… │
+│ linear ****a41b                                                              ││                                                                              │
+│                                                                              ││ linear.*                                                                     │
+│ Notify  Telegram, smithy notify test                                         ││   linear.key_env         LINEAR_API_KEY default name of the env var holding… │
+│ token  ****x7Qa (/home/dev/.smithy/auth.json)                                ││   linear.team            TES            user    required: Linear team keys … │
+│ chat 123456789                                                               ││   linear.project         -              unset   Linear project name filter;… │
+│ kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_r… ││   linear.milestone       -              unset   Linear project milestone na… │
+│ state  on (smithy auto serve sends)                                          ││   linear.cycle           -              unset   Linear cycle filter: curren… │
+│ last sent 2026-11-23 09:12                                                   ││   linear.initiative      -              unset   Linear initiative name filt… │
+│                                                                              ││   linear.states          unstarted,bac… default Linear workflow state types… │
+│ Doctor                                                                       ││                                                                              │
+│ warden doctor                                                                ││ warden.*                                                                     │
+│ ok   binary v0.15.0                                                          ││   warden.merge           manual         user    auto: warden merges green P… │
+│ ok   git found                                                               ││   warden.cleanup         auto           default auto: end finished workers … │
+│ ok   gh found and authenticated                                              ││   warden.max             5              default parallel workers (a token-c… │
+│ ok   claude found                                                            ││   warden.mode            smelt normal   default batch check speed: smelt fa… │
+│ ok   worktree root /home/dev/worktrees writable                              ││   warden.stuck_minutes   15             default minutes without a worker he… │
+│ warn 2 orphaned worktrees (smithy warden cleanup)                            ││   warden.worker_model    route          default route: pick cheap/mid/stron… │
 │                                                                              ││                                                                              │
-│ Doctor                                                                       ││ warden.*                                                                     │
-│ warden doctor                                                                ││   warden.merge           manual         user    auto: warden merges green P… │
-│ ok   binary v0.15.0                                                          ││   warden.cleanup         auto           default auto: end finished workers … │
-│ ok   git found                                                               ││   warden.max             5              default parallel workers (a token-c… │
-│ ok   gh found and authenticated                                              ││   warden.mode            smelt normal   default batch check speed: smelt fa… │
-│ ok   claude found                                                            ││   warden.stuck_minutes   15             default minutes without a worker he… │
-│ ok   worktree root /home/dev/worktrees writable                              ││   warden.worker_model    route          default route: pick cheap/mid/stron… │
-│ warn 2 orphaned worktrees (smithy warden cleanup)                            ││                                                                              │
 │                                                                              ││ notify.*                                                                     │
 │                                                                              ││   notify.telegram.chat   123456789      user    Telegram chat id serve noti… │
 │                                                                              ││   notify.kinds           pr_ready,bloc… default comma list of notification … │
-│                                                                              ││                                                                              │
 │                                                                              ││                                                                              │
 │                                                                              ││ enter edits · u unsets · auth stays in smithy auth                           │
 ╰──────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────╯

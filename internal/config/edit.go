@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -11,7 +12,8 @@ var enums = map[string][]string{
 	"tasks.location": {"repo", "local", "board"},
 	"tasks.commit":   {"true", "false"},
 	"tasks.ignore":   {"gitignore", "exclude"},
-	"warden.merge":   {"auto", "manual"},
+	"warden.merge":   {"ask", "auto", "manual"},
+	"warden.cleanup": {"auto", "ask"},
 	"warden.mode":    {"smelt fast", "smelt normal", "smelt full", "plain"},
 	"agent.effort":   {"low", "medium"},
 	"auto.mode":      {"labeled", "all"},
@@ -20,7 +22,15 @@ var enums = map[string][]string{
 var bools = map[string]bool{"auto.paused": true, "decide.enabled": true}
 
 var numbers = map[string]bool{"warden.max": true, "warden.stuck_minutes": true, "ask.timeout": true, "agent.timeout": true,
-	"watch.every": true, "watch.max": true, "decide.timeout": true, "auto.max_per_day": true, "auto.every": true, "auto.session_hours": true}
+	"watch.every": true, "watch.max": true, "decide.timeout": true, "auto.max_per_day": true, "auto.every": true, "auto.session_hours": true,
+	"auto.max_cost_per_day": true}
+
+// decimals are read with ParseFloat; the other numbers with Atoi.
+var decimals = map[string]bool{"auto.max_cost_per_day": true, "watch.every": true, "watch.max": true, "auto.session_hours": true,
+	"warden.stuck_minutes": true, "agent.timeout": true, "ask.timeout": true}
+
+// atLeastOne are whole numbers the code rejects below 1.
+var atLeastOne = map[string]bool{"warden.max": true, "auto.every": true}
 
 var lists = map[string]bool{"route.domain": true, "watch.events": true, "tend.watch": true, "auto.sources": true, "notify.kinds": true,
 	"linear.team": true, "linear.project": true, "linear.states": true}
@@ -70,7 +80,16 @@ func typed(key, value string) (string, error) {
 		}
 		return "", fmt.Errorf("%s must be one of %s, got %q", key, strings.Join(opts, ", "), value)
 	case "number":
-		if n, err := strconv.Atoi(v); err != nil || n < 0 {
+		if decimals[key] {
+			if f, err := strconv.ParseFloat(v, 64); err != nil || f < 0 || math.IsNaN(f) || math.IsInf(f, 0) {
+				return "", fmt.Errorf("%s must be a non-negative number, got %q", key, value)
+			}
+			return v, nil
+		}
+		if n, err := strconv.Atoi(v); err != nil || n < 0 || (atLeastOne[key] && n < 1) {
+			if atLeastOne[key] {
+				return "", fmt.Errorf("%s must be a whole number of at least 1, got %q", key, value)
+			}
 			return "", fmt.Errorf("%s must be a non-negative whole number, got %q", key, value)
 		}
 		return v, nil
