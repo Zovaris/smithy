@@ -11,6 +11,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -58,9 +59,10 @@ func fixture(t *testing.T) {
 }
 
 func model(w, h int) Model {
-	m := Model{width: w, height: h, dark: true, now: func() time.Time { return fixedNow }, load: Load,
-		opener: func(string) error { return nil }}
-	m.snap = Load(fixedNow)
+	m := newModel(options{profile: colorprofile.TrueColor, dark: true, unicode: true, seed: 7,
+		now: func() time.Time { return fixedNow }, load: Load})
+	m.width, m.height = w, h
+	m.opener = func(string) error { return nil }
 	return m
 }
 
@@ -97,7 +99,7 @@ func TestLoadEmpty(t *testing.T) {
 	t.Cleanup(func() { taskDirs, pendingDecisions = oldDirs, oldDec })
 	m := model(80, 24)
 	out := ansi.Strip(m.render())
-	for _, want := range []string{"never polled", "0 queued", "0 batches"} {
+	for _, want := range []string{"never polled", "0 queued", "smithy warden status"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("empty view lacks %q:\n%s", want, out)
 		}
@@ -336,5 +338,68 @@ func TestResize(t *testing.T) {
 	out := ansi.Strip(nm.(Model).render())
 	if n := len(strings.Split(out, "\n")); n != 20 {
 		t.Fatalf("60x20 rendered %d lines", n)
+	}
+}
+
+func TestHeaderFrameDeterministic(t *testing.T) {
+	fixture(t)
+	frameAt := func(seed uint64, steps int) string {
+		m := model(120, 40)
+		m.motion = true
+		m.fx = newFX(seed)
+		m.fx.strike(22)
+		for i := 0; i < steps; i++ {
+			m.fx.step()
+		}
+		return m.art()
+	}
+	a, b := frameAt(42, 9), frameAt(42, 9)
+	if a != b {
+		t.Fatal("same seed, different frames")
+	}
+	if a == frameAt(43, 9) {
+		t.Fatal("different seeds drew the same sparks")
+	}
+	still := model(120, 40).art()
+	if a == still || ansi.StringWidth(strings.Split(still, "\n")[0]) != artWidth() {
+		t.Fatal("animated frame equals the still one, or the art width is off")
+	}
+}
+
+func TestMotionStopsWhenIdle(t *testing.T) {
+	fixture(t)
+	m := model(120, 40)
+	m.motion = true
+	nm, cmd := m.Update(strikeMsg{})
+	m = nm.(Model)
+	if cmd == nil || !m.framing {
+		t.Fatal("strike did not start frames")
+	}
+	for i := 0; i < 200 && m.framing; i++ {
+		nm, _ = m.Update(frameMsg{})
+		m = nm.(Model)
+	}
+	if m.framing || m.fx.busy() {
+		t.Fatal("frames keep running after the sparks died")
+	}
+	still := model(120, 40)
+	if nm, cmd := still.Update(strikeMsg{}); cmd != nil || nm.(Model).framing {
+		t.Fatal("reduced motion scheduled frames")
+	}
+}
+
+func TestNoColor(t *testing.T) {
+	fixture(t)
+	m := newModel(options{profile: colorprofile.Ascii, dark: true, unicode: false, seed: 1,
+		now: func() time.Time { return fixedNow }, load: Load})
+	out := m.render()
+	if strings.Contains(out, "\x1b[38") || strings.Contains(out, "\x1b[48") {
+		i := strings.Index(out, "\x1b[38")
+		t.Fatalf("NO_COLOR output carries colors: %q", out[max(i-40, 0):min(i+40, len(out))])
+	}
+	for _, r := range ansi.Strip(out) {
+		if (r >= 0x2500 && r <= 0x28ff) || strings.ContainsRune("●◐○✓✗▸", r) {
+			t.Fatalf("ASCII mode drew %q", r)
+		}
 	}
 }

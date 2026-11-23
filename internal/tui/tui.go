@@ -2,28 +2,26 @@ package tui
 
 import (
 	"fmt"
-	"image/color"
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/charmbracelet/harmonica"
 )
 
 // Usage is the text for `smithy tui --help`.
-const Usage = `usage: smithy tui
+const Usage = `usage: smithy tui [--no-anim]
 A live, read-only dashboard: the auto watcher, its queue, warden batches, task lists and
 pending decisions. It refreshes every 2 s from local files only (no network, no tokens).
 Keys: tab/shift+tab or left/right switch panel, up/down select, enter details, esc close,
-o open the URL, r refresh, q quit.
+o open the URL, r refresh, ? all keys, q quit.
+--no-anim (or SMITHY_REDUCE_MOTION=1) draws still frames; NO_COLOR=1 drops color.
 Exit 0 = quit, 1 = the terminal could not run it, 2 = bad usage.`
 
 // Version is the binary's version, shown in the header.
@@ -45,54 +43,119 @@ const (
 var titles = [nPanels]string{"Watcher", "Queue", "Batches", "Tasks", "Decisions"}
 
 type keyMap struct {
-	Next, Prev, Up, Down, Enter, Close, Open, Refresh, Quit key.Binding
+	Next, Prev, Up, Down, Enter, Close, Open, Refresh, Help, Quit key.Binding
 }
 
 var keys = keyMap{
-	Next:    key.NewBinding(key.WithKeys("tab", "right"), key.WithHelp("tab/→", "next panel")),
-	Prev:    key.NewBinding(key.WithKeys("shift+tab", "left"), key.WithHelp("⇧tab/←", "prev")),
-	Up:      key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/↓", "select")),
-	Down:    key.NewBinding(key.WithKeys("down", "j")),
+	Next:    key.NewBinding(key.WithKeys("tab", "right"), key.WithHelp("tab", "next")),
+	Prev:    key.NewBinding(key.WithKeys("shift+tab", "left"), key.WithHelp("⇧tab", "prev")),
+	Up:      key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑↓", "select")),
+	Down:    key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
 	Enter:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "details")),
 	Close:   key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
-	Open:    key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open url")),
+	Open:    key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open")),
 	Refresh: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
+	Help:    key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "keys")),
 	Quit:    key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 }
 
+func (k keyMap) ShortHelp() []key.Binding {
+	return []key.Binding{k.Next, k.Up, k.Enter, k.Open, k.Help, k.Quit}
+}
+
+func (k keyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{{k.Next, k.Prev, k.Up, k.Down}, {k.Enter, k.Close, k.Open}, {k.Refresh, k.Help, k.Quit}}
+}
+
 type tickMsg time.Time
+type frameMsg struct{}
+type strikeMsg struct{}
 type snapMsg Snapshot
 type openedMsg struct{ err error }
 
 // Model is the dashboard's Bubble Tea model.
 type Model struct {
-	snap  Snapshot
-	focus panel
-	sel   [nPanels]int
-	modal bool
-	// loading is true while a load runs; ticks skip their load until it lands.
-	loading bool
-	width   int
-	height  int
-	dark    bool
-	status  string
-	now     func() time.Time
-	load    func(time.Time) Snapshot
-	opener  func(string) error
+	snap     Snapshot
+	focus    panel
+	sel      [nPanels]int
+	modal    bool
+	loading  bool // a load is running; ticks skip theirs until it lands
+	showHelp bool
+	width    int
+	height   int
+	dark     bool
+	profile  colorprofile.Profile
+	unicode  bool
+	motion   bool
+	framing  bool // a frame loop is scheduled
+	ticks    int
+	status   string
+	th       theme
+	fx       *fx
+	capPos   float64
+	capVel   float64
+	spring   harmonica.Spring
+	queueLog []int
+	now      func() time.Time
+	load     func(time.Time) Snapshot
+	opener   func(string) error
 }
 
-// New builds the model with the real clock, loader and URL opener.
-func New() Model {
-	m := Model{width: 120, height: 40, dark: true, now: time.Now, load: Load, opener: openURL}
+// options sets up a model; tests pass fixed ones, New reads the environment.
+type options struct {
+	profile colorprofile.Profile
+	dark    bool
+	unicode bool
+	motion  bool
+	seed    uint64
+	now     func() time.Time
+	load    func(time.Time) Snapshot
+}
+
+func newModel(o options) Model {
+	m := Model{width: 120, height: 40, dark: o.dark, profile: o.profile, unicode: o.unicode, motion: o.motion,
+		now: o.now, load: o.load, opener: openURL, fx: newFX(o.seed),
+		spring: harmonica.NewSpring(harmonica.FPS(fps), 4.0, 0.95)}
+	m.th = newTheme(m.dark, m.profile, m.unicode)
 	m.snap = m.load(m.now())
+	m.queueLog = []int{len(m.snap.Queue)}
+	m.capPos = capPercent(m.snap.Watcher)
 	return m
 }
 
-// Init starts the refresh loop and asks the terminal for its background color.
-func (m Model) Init() tea.Cmd { return tea.Batch(tick(), tea.RequestBackgroundColor) }
+// New builds the model from the environment: NO_COLOR, SMITHY_REDUCE_MOTION, the locale.
+func New(noAnim bool) Model {
+	p := colorprofile.TrueColor
+	if os.Getenv("NO_COLOR") != "" {
+		p = colorprofile.Ascii
+	}
+	motion := !noAnim && os.Getenv("SMITHY_REDUCE_MOTION") == ""
+	return newModel(options{profile: p, dark: true, unicode: utf8Locale(), motion: motion,
+		seed: uint64(time.Now().UnixNano()), now: time.Now, load: Load})
+}
+
+func capPercent(w Watcher) float64 {
+	if w.Cap <= 0 {
+		return 0
+	}
+	return min(float64(w.Today)/float64(w.Cap), 1)
+}
+
+// Init starts the refresh loop, asks for the background color and strikes the anvil once.
+func (m Model) Init() tea.Cmd {
+	cmds := []tea.Cmd{tick(), tea.RequestBackgroundColor}
+	if m.motion {
+		cmds = append(cmds, func() tea.Msg { return strikeMsg{} })
+	}
+	return tea.Batch(cmds...)
+}
 
 func tick() tea.Cmd {
 	return tea.Tick(refreshEvery, func(t time.Time) tea.Msg { return tickMsg(t) })
+}
+
+func frame() tea.Cmd {
+	return tea.Tick(time.Second/fps, func(time.Time) tea.Msg { return frameMsg{} })
 }
 
 func (m Model) reload() tea.Cmd {
@@ -100,26 +163,85 @@ func (m Model) reload() tea.Cmd {
 	return func() tea.Msg { return snapMsg(load(now())) }
 }
 
-// Update handles keys, resizes, ticks and fresh snapshots.
+// animate starts the frame loop if motion is on and none is running.
+func (m *Model) animate() tea.Cmd {
+	if !m.motion || m.framing {
+		return nil
+	}
+	m.framing = true
+	return frame()
+}
+
+func (m Model) busy() bool {
+	return m.fx.busy() || abs(m.capPos-capPercent(m.snap.Watcher)) > 0.002 || abs(m.capVel) > 0.002
+}
+
+func abs(f float64) float64 {
+	if f < 0 {
+		return -f
+	}
+	return f
+}
+
+// Update handles keys, resizes, ticks, frames and fresh snapshots.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tea.BackgroundColorMsg:
 		m.dark = msg.IsDark()
+		m.th = newTheme(m.dark, m.profile, m.unicode)
+	case tea.ColorProfileMsg:
+		if os.Getenv("NO_COLOR") == "" {
+			m.profile = msg.Profile
+			m.th = newTheme(m.dark, m.profile, m.unicode)
+		}
 	case tickMsg:
-		if m.loading {
+		m.ticks++
+		var cmds []tea.Cmd
+		if !m.loading {
+			m.loading = true
+			cmds = append(cmds, m.reload())
+		}
+		if m.motion && m.ticks%12 == 0 {
+			m.fx.strike(6)
+			cmds = append(cmds, m.animate())
+		}
+		if len(cmds) == 0 {
 			return m, tick()
 		}
-		m.loading = true
-		return m, tea.Batch(m.reload(), tick())
+		return m, tea.Batch(append(cmds, tick())...)
+	case strikeMsg:
+		m.fx.strike(22)
+		return m, m.animate()
+	case frameMsg:
+		m.framing = false
+		m.fx.step()
+		m.capPos, m.capVel = m.spring.Update(m.capPos, m.capVel, capPercent(m.snap.Watcher))
+		if m.busy() {
+			return m, m.animate()
+		}
+		m.capPos, m.capVel = capPercent(m.snap.Watcher), 0
 	case snapMsg:
 		m.loading = false
 		if msg.At.Before(m.snap.At) {
 			return m, nil
 		}
+		prev := m.snap
 		m.snap = Snapshot(msg)
 		m.clamp()
+		m.queueLog = append(m.queueLog, len(m.snap.Queue))
+		if len(m.queueLog) > 60 {
+			m.queueLog = m.queueLog[len(m.queueLog)-60:]
+		}
+		if !m.motion {
+			m.capPos = capPercent(m.snap.Watcher)
+			return m, nil
+		}
+		if events(prev, m.snap) {
+			m.fx.strike(26)
+		}
+		return m, m.animate()
 	case openedMsg:
 		m.status = ""
 		if msg.err != nil {
@@ -131,15 +253,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// events reports a real change worth a strike: a launch, or an item merged.
+func events(prev, cur Snapshot) bool {
+	merged := func(s Snapshot) int {
+		n := 0
+		for _, b := range s.Batches {
+			for _, it := range b.Items {
+				if it.Stage == "merged" || it.Stage == "reported" {
+					n++
+				}
+			}
+		}
+		return n
+	}
+	return cur.Watcher.Today > prev.Watcher.Today || merged(cur) > merged(prev)
+}
+
 func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
+	case key.Matches(msg, keys.Help):
+		m.showHelp = !m.showHelp
 	case m.modal && key.Matches(msg, keys.Close, keys.Enter):
 		m.modal = false
 	case m.modal && key.Matches(msg, keys.Open):
 		return m.open()
 	case m.modal:
+	case key.Matches(msg, keys.Close):
+		m.showHelp = false
 	case key.Matches(msg, keys.Next):
 		m.focus = (m.focus + 1) % nPanels
 	case key.Matches(msg, keys.Prev):
@@ -288,7 +430,8 @@ func (m Model) detail() [][2]string {
 			r := it[i].item
 			return [][2]string{{"batch", it[i].batch}, {"item", r.ID}, {"title", or(r.Title)}, {"stage", r.Stage},
 				{"state", r.State}, {"phase", r.Phase}, {"progress", r.Progress}, {"model", r.Model},
-				{"ci", r.CI}, {"pr", r.PR}, {"age", r.Age}, {"note", or(r.Text)}}
+				{"ci", r.CI}, {"pr", r.PR}, {"age", r.Age}, {"note", or(r.Text)},
+				{"card", cardPath(it[i].batch, r.ID)}}
 		}
 	case pTasks:
 		if i < len(m.snap.Tasks) {
@@ -356,318 +499,31 @@ func ago(d time.Duration) string {
 	return fmt.Sprintf("%dd ago", int(d.Hours()/24))
 }
 
-// palette holds the colors for the terminal's background.
-type palette struct {
-	accent, muted, text, ok, warn, bad, border color.Color
-}
-
-func (m Model) colors() palette {
-	ld := lipgloss.LightDark(m.dark)
-	c := lipgloss.Color
-	return palette{
-		accent: ld(c("#5A4FCF"), c("#A89BFF")),
-		muted:  ld(c("#8A8A8A"), c("#6C6C6C")),
-		text:   ld(c("#1F1F1F"), c("#E4E4E4")),
-		ok:     ld(c("#1E8A4C"), c("#5FD38D")),
-		warn:   ld(c("#A86A00"), c("#F2C14E")),
-		bad:    ld(c("#C0392B"), c("#FF6B6B")),
-		border: ld(c("#C8C8C8"), c("#3A3A3A")),
-	}
-}
-
-// View renders the dashboard.
-func (m Model) View() tea.View {
-	v := tea.NewView(m.render())
-	v.AltScreen = true
-	v.WindowTitle = "smithy tui"
-	return v
-}
-
-func (m Model) render() string {
-	w, h := max(m.width, 40), max(m.height, 12)
-	head := m.header(w)
-	foot := m.footer(w)
-	bodyH := h - lipgloss.Height(head) - lipgloss.Height(foot)
-	var body string
-	if w >= 100 && bodyH >= 24 {
-		body = m.wide(w, bodyH)
-	} else {
-		body = m.stacked(w, bodyH)
-	}
-	screen := lipgloss.JoinVertical(lipgloss.Left, head, body, foot)
-	if !m.modal {
-		return screen
-	}
-	box := m.modalBox(w, bodyH)
-	x := max((w-lipgloss.Width(box))/2, 0)
-	y := lipgloss.Height(head) + max((bodyH-lipgloss.Height(box))/2, 0)
-	return lipgloss.NewCompositor(lipgloss.NewLayer(screen), lipgloss.NewLayer(box).X(x).Y(y).Z(1)).Render()
-}
-
-func (m Model) header(w int) string {
-	c := m.colors()
-	left := lipgloss.NewStyle().Bold(true).Foreground(c.accent).Render("smithy") + " " +
-		lipgloss.NewStyle().Foreground(c.muted).Render(Version+" · tui")
-	right := lipgloss.NewStyle().Foreground(c.muted).Render(m.snap.At.Local().Format("Mon 02 Jan 15:04:05"))
-	gap := max(w-lipgloss.Width(left)-lipgloss.Width(right)-2, 1)
-	return " " + left + strings.Repeat(" ", gap) + right + " "
-}
-
-func (m Model) footer(w int) string {
-	c := m.colors()
-	hm := help.New()
-	hm.Styles = help.DefaultStyles(m.dark)
-	hm.SetWidth(w - 2)
-	bs := []key.Binding{keys.Next, keys.Prev, keys.Up, keys.Enter, keys.Open, keys.Refresh, keys.Quit}
-	if m.modal {
-		bs = []key.Binding{keys.Close, keys.Open, keys.Quit}
-	}
-	line := " " + hm.ShortHelpView(bs)
-	if m.status != "" {
-		st := lipgloss.NewStyle().Foreground(c.warn).Render(m.status)
-		line = " " + ansi.Truncate(st, w-2, "…")
-	}
-	return line
-}
-
-func (m Model) wide(w, h int) string {
-	leftW := w / 3
-	topH := 9
-	botH := 10
-	midH := h - topH - botH
-	top := lipgloss.JoinHorizontal(lipgloss.Top, m.box(pWatcher, leftW, topH), m.box(pQueue, w-leftW, topH))
-	bot := lipgloss.JoinHorizontal(lipgloss.Top, m.box(pTasks, w/2, botH), m.box(pDecisions, w-w/2, botH))
-	return lipgloss.JoinVertical(lipgloss.Left, top, m.box(pBatches, w, midH), bot)
-}
-
-// stacked puts the panels one under another: the focused one gets the room, the others show a summary line.
-func (m Model) stacked(w, h int) string {
-	var parts []string
-	focusH := h - 3*(int(nPanels)-1)
-	for p := panel(0); p < nPanels; p++ {
-		if p == m.focus {
-			parts = append(parts, m.box(p, w, max(focusH, 3)))
-		} else {
-			parts = append(parts, m.box(p, w, 3))
-		}
-	}
-	return lipgloss.JoinVertical(lipgloss.Left, parts...)
-}
-
-// box draws a panel with its title, a count and as many lines as fit around the selection.
-func (m Model) box(p panel, w, h int) string {
-	c := m.colors()
-	focused := p == m.focus
-	bc := c.border
-	tc := c.muted
-	if focused {
-		bc, tc = c.accent, c.accent
-	}
-	inner := w - 4
-	title := lipgloss.NewStyle().Bold(true).Foreground(tc).Render(titles[p]) +
-		lipgloss.NewStyle().Foreground(c.muted).Render("  "+m.count(p))
-	lines := []string{ansi.Truncate(title, inner, "…")}
-	content := m.lines(p, inner)
-	avail := h - 3
-	if avail > 0 {
-		start := 0
-		if sel := m.sel[p]; focused && p != pWatcher && sel >= avail {
-			start = sel - avail + 1
-		}
-		for i := start; i < len(content) && i < start+avail; i++ {
-			lines = append(lines, content[i])
-		}
-	}
-	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(bc).
-		Padding(0, 1).Width(w).Height(h).MaxHeight(h).Render(strings.Join(lines, "\n"))
-}
-
-func (m Model) count(p panel) string {
-	switch p {
-	case pWatcher:
-		return aliveWord(m.snap.Watcher)
-	case pQueue:
-		return fmt.Sprintf("%d queued", len(m.snap.Queue))
-	case pBatches:
-		return plural(len(m.snap.Batches), "batch", "batches") + " · " + plural(len(m.items()), "item", "items")
-	case pTasks:
-		return plural(len(m.snap.Tasks), "list", "lists")
-	case pDecisions:
-		return fmt.Sprintf("%d pending", len(m.snap.Decisions))
-	}
-	return ""
-}
-
-func (m Model) empty(s string) []string {
-	return []string{lipgloss.NewStyle().Foreground(m.colors().muted).Italic(true).Render(s)}
-}
-
-// lines renders a panel's rows, already cut to width; the selected row is highlighted when focused.
-func (m Model) lines(p panel, w int) []string {
-	c := m.colors()
-	mut := lipgloss.NewStyle().Foreground(c.muted)
-	txt := lipgloss.NewStyle().Foreground(c.text)
-	var rows []string
-	switch p {
-	case pWatcher:
-		wt := m.snap.Watcher
-		st := lipgloss.NewStyle().Foreground(c.bad)
-		if wt.Alive {
-			st = lipgloss.NewStyle().Foreground(c.ok)
-		} else if !wt.Polled {
-			st = mut
-		}
-		kv := func(k, v string) string { return mut.Render(fmt.Sprintf("%-10s", k)) + v }
-		rows = []string{
-			kv("state", st.Render("● "+aliveWord(wt))),
-			kv("sources", txt.Render(or(strings.Join(wt.Sources, ", ")))),
-			kv("last poll", txt.Render(pollWord(wt, m.snap.At))),
-			kv("today", txt.Render(fmt.Sprintf("%d / %d", wt.Today, wt.Cap))),
-			kv("hours", txt.Render(hoursWord(wt))),
-		}
-		for _, e := range m.snap.Errors {
-			rows = append(rows, lipgloss.NewStyle().Foreground(c.bad).Render("! "+e))
-		}
-		return cut(rows, w)
-	case pQueue:
-		if len(m.snap.Queue) == 0 {
-			return m.empty("nothing queued")
-		}
-		for _, q := range m.snap.Queue {
-			rows = append(rows, "  "+txt.Render(fmt.Sprintf("%-14s ", q.Source+" "+q.ID))+
-				mut.Render(fmt.Sprintf("%-7s %-7s ", or(q.Model), or(q.Speed)))+txt.Render(q.Title))
-		}
-	case pBatches:
-		if len(m.snap.Batches) == 0 {
-			return m.empty("no warden batches")
-		}
-		rows = append(rows, mut.Render(fmt.Sprintf("  %-22s %-9s %-14s %-7s %-8s %s", "item", "stage", "state", "model", "ci", "pr")))
-		for _, it := range m.items() {
-			r := it.item
-			rows = append(rows, "  "+txt.Render(fmt.Sprintf("%-22s ", ansi.Truncate(it.batch+"/"+r.ID, 22, "…")))+
-				m.stageStyle(r.Stage).Render(fmt.Sprintf("%-9s ", r.Stage))+
-				mut.Render(fmt.Sprintf("%-14s %-7s ", r.State, r.Model))+
-				m.ciStyle(r.CI).Render(fmt.Sprintf("%-8s ", r.CI))+mut.Render(shortPR(r.PR)))
-		}
-		return m.highlight(p, cut(rows, w), 1)
-	case pTasks:
-		if len(m.snap.Tasks) == 0 {
-			return m.empty("no task lists")
-		}
-		for _, tl := range m.snap.Tasks {
-			var parts []string
-			for _, s := range statuses(tl.Counts) {
-				parts = append(parts, fmt.Sprintf("%d %s", tl.Counts[s], s))
-			}
-			rows = append(rows, "  "+txt.Render(fmt.Sprintf("%-22s ", ansi.Truncate(filepath.Base(tl.Dir), 22, "…")))+
-				mut.Render(strings.Join(parts, " · ")))
-		}
-	case pDecisions:
-		if len(m.snap.Decisions) == 0 {
-			return m.empty("no pending decisions")
-		}
-		for _, d := range m.snap.Decisions {
-			f := strings.Split(d, " · ")
-			q := d
-			if len(f) >= 3 {
-				q = f[2]
-			}
-			rows = append(rows, "  "+txt.Render(q))
-		}
-	}
-	return m.highlight(p, cut(rows, w), 0)
-}
-
-// highlight marks the selected row (rows start with two spaces; offset skips a header row).
-func (m Model) highlight(p panel, rows []string, offset int) []string {
-	i := m.sel[p] + offset
-	if p != m.focus || i >= len(rows) {
-		return rows
-	}
-	plain := strings.TrimPrefix(ansi.Strip(rows[i]), "  ")
-	rows[i] = lipgloss.NewStyle().Foreground(m.colors().accent).Bold(true).Render("› " + plain)
-	return rows
-}
-
-func cut(rows []string, w int) []string {
-	for i, r := range rows {
-		rows[i] = ansi.Truncate(r, w, "…")
-	}
-	return rows
-}
-
-func shortPR(pr string) string {
-	if i := strings.LastIndex(pr, "/pull/"); i >= 0 {
-		return "#" + pr[i+len("/pull/"):]
-	}
-	return pr
-}
-
-func (m Model) stageStyle(s string) lipgloss.Style {
-	c := m.colors()
-	switch s {
-	case "merged", "reported", "verify":
-		return lipgloss.NewStyle().Foreground(c.ok)
-	case "stuck", "decide":
-		return lipgloss.NewStyle().Foreground(c.bad)
-	case "working", "starting", "waiting":
-		return lipgloss.NewStyle().Foreground(c.warn)
-	}
-	return lipgloss.NewStyle().Foreground(c.muted)
-}
-
-func (m Model) ciStyle(s string) lipgloss.Style {
-	c := m.colors()
-	switch s {
-	case "green", "pass", "success":
-		return lipgloss.NewStyle().Foreground(c.ok)
-	case "red", "fail", "failure":
-		return lipgloss.NewStyle().Foreground(c.bad)
-	}
-	return lipgloss.NewStyle().Foreground(c.muted)
-}
-
-func (m Model) modalBox(w, h int) string {
-	c := m.colors()
-	d := m.detail()
-	bw := min(w-4, 90)
-	inner := bw - 4
-	lines := []string{lipgloss.NewStyle().Bold(true).Foreground(c.accent).Render(titles[m.focus] + " · details"), ""}
-	kw := 0
-	for _, kv := range d {
-		kw = max(kw, len(kv[0]))
-	}
-	for _, kv := range d {
-		k := lipgloss.NewStyle().Foreground(c.muted).Render(fmt.Sprintf("%-*s  ", kw, kv[0]))
-		lines = append(lines, ansi.Truncate(k+lipgloss.NewStyle().Foreground(c.text).Render(kv[1]), inner, "…"))
-	}
-	if len(lines) > h-2 {
-		lines = lines[:max(h-2, 1)]
-	}
-	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(c.accent).
-		Padding(0, 1).Width(bw).Render(strings.Join(lines, "\n"))
-}
-
-// Main runs `smithy tui`.
-func Main(args []string) int {
-	for _, a := range args {
-		if a == "-h" || a == "--help" {
-			fmt.Println(Usage)
-			return 0
-		}
-		fmt.Fprintf(os.Stderr, "smithy tui: unexpected argument %s\n%s\n", a, Usage)
-		return 2
-	}
-	if _, err := tea.NewProgram(New()).Run(); err != nil {
-		fmt.Fprintln(os.Stderr, "smithy tui:", err)
-		return 1
-	}
-	return 0
-}
-
 func plural(n int, one, many string) string {
 	if n == 1 {
 		return "1 " + one
 	}
 	return fmt.Sprintf("%d %s", n, many)
+}
+
+// Main runs `smithy tui`.
+func Main(args []string) int {
+	noAnim := false
+	for _, a := range args {
+		switch a {
+		case "-h", "--help":
+			fmt.Println(Usage)
+			return 0
+		case "--no-anim":
+			noAnim = true
+		default:
+			fmt.Fprintf(os.Stderr, "smithy tui: unexpected argument %s\n%s\n", a, Usage)
+			return 2
+		}
+	}
+	if _, err := tea.NewProgram(New(noAnim)).Run(); err != nil {
+		fmt.Fprintln(os.Stderr, "smithy tui:", err)
+		return 1
+	}
+	return 0
 }

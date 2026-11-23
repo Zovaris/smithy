@@ -40,6 +40,8 @@ type Watcher struct {
 	Hours    string
 	OpenNow  bool
 	Every    int
+	Daily    []int // launches per local day, the last 14 days, oldest first
+	Hourly   []int // launches per hour today, 0..23
 }
 
 // Batch is one warden batch and its items.
@@ -84,6 +86,15 @@ func Load(now time.Time) Snapshot {
 	w := Watcher{Sources: s.Sources, Cap: s.MaxPerDay, Hours: s.Hours, Every: s.Every,
 		Today: len(st.Launched[now.Format("2006-01-02")])}
 	w.OpenNow, _ = auto.InHours(s.Hours, now)
+	for d := 13; d >= 0; d-- {
+		w.Daily = append(w.Daily, len(st.Launched[now.AddDate(0, 0, -d).Format("2006-01-02")]))
+	}
+	w.Hourly = make([]int, 24)
+	for _, l := range st.Launched[now.Format("2006-01-02")] {
+		if !l.At.IsZero() {
+			w.Hourly[l.At.In(now.Location()).Hour()]++
+		}
+	}
 	for _, p := range st.LastPoll {
 		if p.After(w.LastPoll) {
 			w.LastPoll, w.Polled = p, true
