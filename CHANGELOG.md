@@ -6,6 +6,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 ## Unreleased
 
 ### Fixed
+- `smithy decisions`: the log is named after origin's owner and repo, so two checkouts in
+  folders with the same name no longer share one (logs under the old folder name stay as they are).
 - `smithy consult`: a fallback CLI uses the models saved for its own harness, never the current
   harness's names (desktop without `claude` on PATH sent `opus` to opencode).
 - smelt SHIP: full `smithy verify` form, red CI from the base goes to tend, commits in dependency

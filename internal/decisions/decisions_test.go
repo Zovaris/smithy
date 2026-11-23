@@ -139,3 +139,15 @@ func TestConcurrentAddAndConfirm(t *testing.T) {
 		t.Fatalf("want 21 entries, got %d:\n%s", n+1, b)
 	}
 }
+
+func TestSlug(t *testing.T) {
+	for _, c := range [][3]string{
+		{"git@github.com:Zovaris/smithy.git", "x", "Zovaris-smithy"},
+		{"https://github.com/Zovaris/smithy/", "x", "Zovaris-smithy"},
+		{"", "b", "b"},
+	} {
+		if got := slug(c[0], c[1]); got != c[2] {
+			t.Errorf("slug(%q) = %q", c[0], got)
+		}
+	}
+}
