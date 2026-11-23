@@ -494,3 +494,26 @@ func TestCheckRedNeedsFailingReproBeforeTheFix(t *testing.T) {
 }
 
 func mustLoad(dir string) []Receipt { rs, _ := Load(dir); return rs }
+
+func TestListKeepsHoldoutFromAnEarlierCommit(t *testing.T) {
+	dir := newRepo(t)
+	t.Chdir(dir)
+	ReceiptMain([]string{"run", "--claim", "holdout", "--", "true"})
+	ReceiptMain([]string{"run", "--claim", "other", "--", "true"})
+	if err := os.WriteFile(filepath.Join(dir, "code.go"), []byte("package x\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, dir, "add", "code.go")
+	git(t, dir, "commit", "-q", "-m", "copies")
+	sha, _ := head(dir)
+	var hold Receipt
+	for _, r := range mustLoad(dir) {
+		if r.Claim == "holdout" {
+			hold = r
+		}
+	}
+	hold.holdout = true
+	if s := hold.State(sha, false); s != "holdout commit" {
+		t.Fatalf("state %q", s)
+	}
+}

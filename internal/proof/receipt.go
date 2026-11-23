@@ -55,6 +55,7 @@ type Receipt struct {
 	sameCode bool
 	// redFirst: a failing repro on an earlier commit, the red half of red-then-green.
 	redFirst bool
+	holdout  bool
 }
 
 // earlier reports whether commit a is a strict ancestor of b.
@@ -258,6 +259,8 @@ func (r Receipt) State(head string, dirtyNow bool) string {
 	switch {
 	case r.redFirst:
 		return "red before fix"
+	case r.holdout:
+		return "holdout commit"
 	case r.Commit != head && !r.sameCode:
 		return "stale"
 	case r.Dirty || dirtyNow:
@@ -417,6 +420,9 @@ func ReceiptMain(args []string) int {
 					kept = append(kept, r)
 				} else if r.Claim == redClaim && r.Exit != 0 && !r.Dirty && earlier(root, r.Commit, sha) {
 					r.redFirst = true
+					kept = append(kept, r)
+				} else if r.Claim == "holdout" && !r.Dirty && earlier(root, r.Commit, sha) {
+					r.holdout = true
 					kept = append(kept, r)
 				}
 			}
