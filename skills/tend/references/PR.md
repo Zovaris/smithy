@@ -16,7 +16,7 @@ inside the repo). Then repeat:
    - **merged / closed** (`cleanup`) → stop this PR. Remove the worktree you created, and the branch and
      worktree the launcher names as its own (`smithy cleanup <repo> <branch> [<worktree>]`,
      never forced); report `merged <url>, cleaned <what>` so the launcher can end its sessions.
-   - **checks red** (`fix-ci`) → `gh run view <run> --log-failed` when `gh` is installed (else open the failing check's page from the PR). Rerun once (`gh run rerun <run> --failed` when `gh` is installed): passes and no recent commit touches the step → report flaky; else a real failure: hand it to the fix model, failing test first when it is
+   - **checks red** (`fix-ci`) → `gh run view <run> --log-failed` when `gh` is installed (else open the failing check's page from the PR). Rerun up to twice (`gh run rerun <run> --failed` when `gh` is installed): passes and no recent commit touches the step → report flaky with the rerun count; else a real failure: hand it to the fix model, failing test first when it is
      a bug, and push the fix. Red again after a second real fix → "needs you".
    - **conflicting or behind base** (`sync-base`) → follow the repo: rebase if its history is linear (no merge
      commits on the base in `git log --merges -5`), else merge the base. A rebase needs a force
