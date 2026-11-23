@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -111,6 +112,9 @@ func TestVerdict(t *testing.T) {
 		{"OPEN", "green", "CONFLICTING", false, "", no, "conflict"},
 		{"OPEN", "red", "CONFLICTING", false, "", no, "conflict"},
 		{"OPEN", "none", "MERGEABLE", false, "head", no, "green"},
+		{"OPEN", "green", "UNKNOWN", false, "", no, "pending"},
+		{"OPEN", "green", "UNKNOWN", true, "", no, "pending"},
+		{"OPEN", "red", "UNKNOWN", false, "", no, "red"},
 	}
 	for _, c := range cases {
 		if got := Verdict(c.state, c.checks, c.mergeable, c.draft, c.local, "head", c.anc); got != c.want {
@@ -290,5 +294,28 @@ func TestVerifyConflictExit4(t *testing.T) {
 		if c := VerifyMain([]string{dir, "b", "5"}); c != 4 {
 			t.Errorf("%s + CONFLICTING: exit %d, want 4", checks, c)
 		}
+	}
+}
+
+func TestWithoutPRHint(t *testing.T) {
+	in := "remote: \nremote: Create a pull request for 'feat/x' on GitHub by visiting:\nremote:      https://github.com/o/r/pull/new/feat/x\nremote: \nhook: lint ok\n"
+	if got := withoutPRHint(in); got != "hook: lint ok\n" {
+		t.Fatalf("got %q", got)
+	}
+	if got := withoutPRHint("error: failed to push\n"); got != "error: failed to push\n" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestChecksAllSkippedIsNotGreen(t *testing.T) {
+	fail, pend := regexp.MustCompile(`FAILURE|ERROR|CANCELLED|TIMED_OUT`), regexp.MustCompile(`PENDING|QUEUED|IN_PROGRESS`)
+	if g := Checks([]Rollup{{Conclusion: "SKIPPED"}, {Conclusion: "NEUTRAL"}}, fail, pend); g != "none" {
+		t.Fatalf("all skipped = %q", g)
+	}
+	if g := Checks([]Rollup{{Conclusion: "SKIPPED"}, {Conclusion: "SUCCESS"}}, fail, pend); g != "green" {
+		t.Fatalf("skipped + success = %q", g)
+	}
+	if g := Checks([]Rollup{{State: "SUCCESS"}}, fail, pend); g != "green" {
+		t.Fatalf("status success = %q", g)
 	}
 }

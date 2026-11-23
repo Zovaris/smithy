@@ -12,5 +12,5 @@ Started by you (by name, the way your harness starts skills) or by an agent. It 
 
 - Low-impact choices it makes itself and lists where the work lands (PR body or final line).
 - It commits or opens a PR only when the task asks for it.
-- Your decisions: the hard floor (merging or deploying to the production branch, deleting or irreversibly rewriting user data, credentials, secrets or logins, money) stops with `blocked: <why>`; the rest of the stop list goes to one `smithy consult` and
-  is logged with `smithy decisions add` for you to keep or change.
+- Your decisions: use-smithy's **Decisions** (hard floor → `blocked: <why>`; the rest is
+  decided and logged for you to keep or change).

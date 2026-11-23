@@ -3,6 +3,7 @@ package gitx
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -15,7 +16,9 @@ const prUsage = `Pull requests that follow the repo's PR template.
   smithy pr template                        print the template path(s), or a line starting 'none:' when the repo has none
   smithy pr create --base <b> --title "<t>" --body-file <f> [--draft]
                                             open the PR for the current branch, or print the open one;
-                                            without gh or GH_TOKEN, push and print the compare URL
+                                            without gh or GH_TOKEN, push and print the compare URL;
+                                            exit 3 when origin is not a GitHub remote (no PR opened,
+                                            branch not pushed)
   smithy pr merge <pr> [--rebase|--merge|--squash]
                                             merge a PR (default --merge) with gh or the GitHub API
 With a template, the body must keep every heading of the template (fill them, write "N/A" when
@@ -151,8 +154,14 @@ func PRMain(args []string) int {
 			return die(p, "body drops template headings from %s: %s", rel, strings.Join(miss, "|"))
 		}
 	}
-	if c := attached("git", "push", "-q", "-u", "origin", branch); c != 0 {
-		return c
+	// GitHub's "Create a pull request for ..." hint is dropped (the PR URL printed below is the one
+	// to use); every other line of the push's output is kept.
+	push := exec.Command("git", "push", "-q", "-u", "origin", branch)
+	push.Stdin = os.Stdin
+	out, err := push.CombinedOutput()
+	os.Stderr.WriteString(withoutPRHint(string(out)))
+	if err != nil {
+		return code(err)
 	}
 	if ghx.Mode() == "none" {
 		repo, err := ghx.RepoName()
@@ -196,4 +205,29 @@ func prMerge(args []string) int {
 	}
 	fmt.Println("merged " + ref)
 	return 0
+}
+
+// withoutPRHint drops the remote's "Create a pull request" hint block from git push output.
+func withoutPRHint(out string) string {
+	var keep []string
+	skip := false
+	for _, l := range strings.SplitAfter(out, "\n") {
+		t := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(l), "remote:"))
+		switch {
+		case strings.HasPrefix(t, "Create a pull request for"):
+			skip = true
+			continue
+		case skip && strings.HasPrefix(t, "https://"):
+			skip = false
+			continue
+		case skip && t == "":
+			continue
+		}
+		skip = false
+		if t == "" && strings.HasPrefix(strings.TrimSpace(l), "remote:") {
+			continue
+		}
+		keep = append(keep, l)
+	}
+	return strings.Join(keep, "")
 }

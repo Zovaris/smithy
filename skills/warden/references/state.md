@@ -2,19 +2,19 @@
 
 Batch dir `~/.smithy/warden/<batch>/` (`$WARDEN_HOME`; `<batch>` = `YYYYMMDD-HHMM` or the
 feature slug). No secrets or client data in it. A dir that already exists (empty or not) is
-never reused: add `-2`, `-3` to the name. `smithy batch init <tasks_dir> --repo <dir> [--base b] [--merge auto|manual] [--max n]`
+never reused: add `-2`, `-3` to the name. `smithy batch init <tasks_dir> --repo <dir> [--base b] [--merge auto|manual] [--max n] [--risky id,id]`
 writes it from a task dir as `<repo>-<task dir name>` (merge stays empty without `--merge`: set the user's plan-line answer); `smithy batch add <batch> --id --title --intent [--base] [--speed]` appends an item.
 
 ## batch.json (yours)
 
 `{"batch","repo","max","stack","production","mode","base_sha","merge","cleanup","tasks_dir","items":[{"id","title","kind",
-"intent","source","speed","model","base","prereqs","merge","branch","worktree","session","hold",
+"intent","source","speed","model","base","prereqs","merge","branch","worktree","session","pid","log","hold",
 "launches","route","risky"}]}`
 
 - `intent`: the user's own words for the task, verbatim, never rewritten or enriched (for a task
   file or board item: its path or key, which the worker reads). Later asks are appended verbatim.
-- `base_sha`: `{"<base>": "<sha>"}`, each base's `origin/<base>` commit at launch; the batch
-  check reviews everything after it.
+- `base_sha`: `{"<base>": "<sha>"}`, written by warden at launch: each base's `origin/<base>`
+  commit; the batch check reviews everything after `base_sha[<base>]`.
 - `speed`: the item's smelt speed as asked (`(full)`); workers still build at `fast`, and the
   batch check runs at the highest speed among the items.
 - `stack`: boolean, default false (wait for the prereq to merge); see SKILL.md Defaults.

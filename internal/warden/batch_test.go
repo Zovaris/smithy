@@ -20,6 +20,9 @@ func TestBatchInitAdd(t *testing.T) {
 	writeFile(t, filepath.Join(td, "02-reset.md"), "# 02 · Password reset\nStatus: todo\nBlocked by: 01\nSpeed: fast\nPR: -\n")
 	writeFile(t, filepath.Join(td, "03-old.md"), "# 03 · Old\nStatus: done\nBlocked by: none\nPR: -\n")
 	writeFile(t, filepath.Join(td, "04-list.md"), "# 04 · List view\nStatus: todo\nBlocked by: 03\nPR: -\n")
+	git(t, repo, "add", "-A")
+	git(t, repo, "commit", "-q", "-m", "tasks")
+	git(t, repo, "update-ref", "refs/remotes/origin/main", "HEAD")
 	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo, "--merge", "auto"}) })
 	dir := strings.TrimSpace(o)
 	if c != 0 || filepath.Base(dir) != "repo-notes" {
@@ -66,5 +69,148 @@ func TestBatchInitAdd(t *testing.T) {
 	}
 	if _, _, c := capture(t, func() int { return Batch([]string{"init", td}) }); c != 2 {
 		t.Errorf("init without --repo: %d", c)
+	}
+}
+
+func TestBatchInitIntentCommitted(t *testing.T) {
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("WARDEN_HOME", filepath.Join(root, "warden"))
+	t.Setenv("HOME", root)
+	repo := filepath.Join(root, "repo")
+	td := filepath.Join(repo, "notes")
+	os.MkdirAll(td, 0o755)
+	git(t, repo, "init", "-q", "-b", "main")
+	writeFile(t, filepath.Join(repo, "README.md"), "x")
+	git(t, repo, "add", "-A")
+	git(t, repo, "commit", "-q", "-m", "init")
+	git(t, repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · A thing\nStatus: todo\nBlocked by: none\nPR: -\n")
+	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo}) })
+	if c != 0 {
+		t.Fatalf("%d %s", c, er)
+	}
+	var bt briefBatch
+	raw, _ := os.ReadFile(filepath.Join(strings.TrimSpace(o), "batch.json"))
+	json.Unmarshal(raw, &bt)
+	if want := filepath.Join(td, "01-a.md"); bt.Items[0].Intent != want {
+		t.Errorf("uncommitted task file keeps its absolute path: %q want %q", bt.Items[0].Intent, want)
+	}
+}
+
+func TestBatchInitRisky(t *testing.T) {
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("WARDEN_HOME", filepath.Join(root, "warden"))
+	t.Setenv("HOME", root)
+	repo := filepath.Join(root, "repo")
+	td := filepath.Join(repo, "notes")
+	os.MkdirAll(td, 0o755)
+	git(t, repo, "init", "-q", "-b", "main")
+	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · Alpha\nStatus: todo\nBlocked by: none\nPR: -\n")
+	writeFile(t, filepath.Join(td, "02-b.md"), "# 02 · Beta\nStatus: todo\nBlocked by: none\nPR: -\n")
+	writeFile(t, filepath.Join(td, "03-c.md"), "# 03 · Gamma\nStatus: todo\nBlocked by: none\nPR: -\n")
+	if _, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo, "--risky", "notes-02,nope"}) }); c == 0 || !strings.Contains(er, "nope") {
+		t.Fatalf("unknown id must fail: %d %s", c, er)
+	}
+	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo, "--risky", "notes-02,notes-03"}) })
+	if c != 0 {
+		t.Fatalf("%d %s", c, er)
+	}
+	var bt briefBatch
+	raw, _ := os.ReadFile(filepath.Join(strings.TrimSpace(o), "batch.json"))
+	json.Unmarshal(raw, &bt)
+	if bt.Items[0].Risky || !bt.Items[1].Risky || !bt.Items[2].Risky {
+		t.Errorf("risky flags: %+v", bt.Items)
+	}
+}
+
+func TestBatchInitIntentRepoSubdir(t *testing.T) {
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("WARDEN_HOME", filepath.Join(root, "warden"))
+	t.Setenv("HOME", root)
+	top := filepath.Join(root, "repo")
+	sub := filepath.Join(top, "pkg")
+	td := filepath.Join(sub, "notes")
+	os.MkdirAll(td, 0o755)
+	git(t, top, "init", "-q", "-b", "main")
+	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · A thing\nStatus: todo\nBlocked by: none\nPR: -\n")
+	git(t, top, "add", "-A")
+	git(t, top, "commit", "-q", "-m", "init")
+	git(t, top, "update-ref", "refs/remotes/origin/main", "HEAD")
+	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", sub}) })
+	if c != 0 {
+		t.Fatalf("%d %s", c, er)
+	}
+	var bt briefBatch
+	raw, _ := os.ReadFile(filepath.Join(strings.TrimSpace(o), "batch.json"))
+	json.Unmarshal(raw, &bt)
+	if want := "pkg/notes/01-a.md"; bt.Items[0].Intent != want {
+		t.Errorf("intent %q want %q", bt.Items[0].Intent, want)
+	}
+}
+
+func TestBatchInitRiskyEmpty(t *testing.T) {
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("WARDEN_HOME", filepath.Join(root, "warden"))
+	t.Setenv("HOME", root)
+	repo := filepath.Join(root, "repo")
+	td := filepath.Join(repo, "notes")
+	os.MkdirAll(td, 0o755)
+	git(t, repo, "init", "-q", "-b", "main")
+	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · Alpha\nStatus: todo\nBlocked by: none\nPR: -\n")
+	for _, a := range [][]string{{"--risky="}, {"--risky", ""}} {
+		args := append([]string{"init", td, "--repo", repo}, a...)
+		if _, er, c := capture(t, func() int { return Batch(args) }); c == 0 || !strings.Contains(er, "--risky") {
+			t.Errorf("%v: empty --risky must fail: %d %s", a, c, er)
+		}
+	}
+}
+
+func TestBatchInitSettingsDefaults(t *testing.T) {
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("WARDEN_HOME", filepath.Join(root, "warden"))
+	t.Setenv("HOME", root)
+	repo := filepath.Join(root, "repo")
+	td := filepath.Join(repo, "notes")
+	os.MkdirAll(td, 0o755)
+	git(t, repo, "init", "-q", "-b", "main")
+	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · Add a\nStatus: todo\nBlocked by: none\nPR: -\n")
+	read := func(dir string) map[string]any {
+		var m map[string]any
+		raw, _ := os.ReadFile(filepath.Join(strings.TrimSpace(dir), "batch.json"))
+		if err := json.Unmarshal(raw, &m); err != nil {
+			t.Fatalf("%v %s", err, raw)
+		}
+		return m
+	}
+	init := func(extra ...string) (map[string]any, string, int) {
+		o, er, c := capture(t, func() int { return Batch(append([]string{"init", td, "--repo", repo}, extra...)) })
+		if c != 0 {
+			return nil, er, c
+		}
+		return read(o), er, c
+	}
+	t.Setenv("SMITHY_CONFIG", filepath.Join(root, "none.json"))
+	m, er, c := init()
+	if c != 0 || m["mode"] != "smelt normal" || m["cleanup"] != "auto" || m["merge"] != "" || m["max"] != float64(5) {
+		t.Fatalf("defaults: %d %s %v", c, er, m)
+	}
+	cfg := filepath.Join(root, "user-config.json")
+	t.Setenv("SMITHY_CONFIG", cfg)
+	os.RemoveAll(filepath.Join(root, "warden"))
+	writeFile(t, cfg, `{"warden":{"max":3,"cleanup":"ask","mode":"smelt full","merge":"manual"}}`)
+	os.RemoveAll(filepath.Join(root, "warden"))
+	m, er, c = init()
+	if c != 0 || m["mode"] != "smelt full" || m["cleanup"] != "ask" || m["merge"] != "manual" || m["max"] != float64(3) {
+		t.Fatalf("from config: %d %s %v", c, er, m)
+	}
+	os.RemoveAll(filepath.Join(root, "warden"))
+	m, er, c = init("--max", "2", "--merge", "auto", "--cleanup", "auto", "--mode", "plain")
+	if c != 0 || m["mode"] != "plain" || m["cleanup"] != "auto" || m["merge"] != "auto" || m["max"] != float64(2) {
+		t.Fatalf("flags win: %d %s %v", c, er, m)
+	}
+	for _, bad := range [][]string{{"--cleanup", "never"}, {"--mode", "turbo"}} {
+		if _, _, c := init(bad...); c != 2 {
+			t.Errorf("%v must be refused: %d", bad, c)
+		}
 	}
 }

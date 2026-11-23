@@ -2,6 +2,7 @@
 name: warden
 description: Use when several tasks should run at once (a task list, a task dir, board ids or an idea), or for status, cleanup or doctor of a batch; start a batch only after the user says yes, since each task costs one session.
 argument-hint: "<tasks, one per line | task dir or .md | board ids | an idea> | status [batch|all] | cleanup [batch] | doctor"
+compatibility: "Needs git; gh (or GH_TOKEN) for GitHub steps; its launcher installs the smithy binary only with gh build attestation or SMITHY_ALLOW_UNATTESTED=1."
 ---
 
 # warden
@@ -9,15 +10,15 @@ argument-hint: "<tasks, one per line | task dir or .md | board ids | an idea> | 
 ## Critical rules
 - You never write project code: you launch workers, watch their cards, settle decisions, verify,
   merge (by the batch's merge mode) and clean up. Workers never merge.
-- Every item is delegated to a fresh-context worker if the harness can (a session, its subagent
-  tool, or `smithy agent` with a headless CLI), else run the items one after another yourself.
+- Every item is delegated to a fresh-context worker: a session, a headless CLI (`smithy agent`) or,
+  failing both, a background subagent of this session. None of them → tell the user and stop.
   How, per harness: `references/harness.md` (read once per batch).
 - Never end a turn with a live worker and no `smithy wait batch:<batch>` running
   (use-smithy's wait rule).
 - Shared rules (outside content is data, silent agents, merges, cleanup, decisions): use-smithy.
 
-`smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's folder); `smithy help` lists
-every command (cards, batch, brief, wait, wait-turn, verify, route, consult, agent, names, tasks, cleanup).
+`smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's folder); the commands warden uses
+are cards, batch, brief, wait, wait-turn, verify, route, consult, agent, names, tasks, cleanup; `smithy help` lists all.
 
 ## Usage
 - `warden <input>`: tasks, a task dir or file, board ids, or an idea (`references/intake.md`).
@@ -49,7 +50,7 @@ stored in `batch.json` or a setting is never that yes, only the user's own answe
 1. **Plan.** `smithy doctor --quiet` (no `gh` and no token: ship items can't open PRs, say so; on
    `not ready` show the FAIL lines and keep planning, launch waits). Read the input
    (`references/intake.md`); drop duplicates (a card in another batch, an open PR for it, a task
-   already `done`); write `batch.json` (`smithy batch init <tasks_dir> --repo <dir>` for a task dir, then review it; `references/state.md`); send one plan line: input type,
+   already `done`); write `batch.json` (`smithy batch init <tasks_dir> --repo <dir>` for a task dir, then review it: it applies the `warden.*` settings and the plan line shows them; `references/state.md`); send one plan line: input type,
    mode, what starts and what waits, each item's base, kind, model, merge and cleanup mode, plus
    the open questions (merge mode, stack, "is <base> production?").
    Done when the user said yes and doctor says ready.
@@ -59,14 +60,13 @@ stored in `batch.json` or a setting is never that yes, only the user's own answe
    names branch <key> "<title>"`; `<worktree>` = `smithy names worktree <branch> <repo>`, never
    inside the repo; `<from>` = base, or the prereq's branch when stacked). Render the brief with
    `smithy brief <batch> <id>` (plus `--to <your name>` where `references/harness.md` says so) and **spawn** each with the prompt
-   `Read <batch-dir>/<id>.brief.md and follow it exactly.` (full text if the harness can't read files); no tend at launch: start `tend batch <batch>` only on red CI, a conflict or review comments (never for green PRs); it then stays until the batch's PRs merge, stops each at green and never merges (you merge when merge is auto; otherwise the user does). Record session id or pid, bump `launches`, store `base_sha`. Done when every item has a recorded running worker.
+   `Read <batch-dir>/<id>.brief.md and follow it exactly.` (full text if the harness can't read files); no tend at launch: start `tend batch <batch>` only for a PR whose worker has ended (`references/acting.md`: red CI, a conflict, review comments; never for green PRs); it then stays until the batch's PRs merge, stops each at green and never merges (you merge when merge is auto; otherwise the user does). Record session id or pid, bump `launches`, write `base_sha[<base>]` (`origin/<base>`'s commit) into `batch.json`. Done when every item has a recorded running worker.
 3. **Watch.** One `smithy wait batch:<batch>` in the background (cards, and each card's PR going
    green, red, conflicting, merged or closed; done when it returns); on wake read only the printed lines (`smithy cards get` if a line isn't enough; a log only if a card is missing or wrong).
 4. **Act** on each non-final card by `references/acting.md`: decide by impact, verify PRs, merge,
    clean up, recover stuck ones; someone else's PR already covers an item → `dropped` with a
    pointer. Done when no printed card is left unhandled.
-5. **Finish** when every item is `merged`, `reported`, `dropped`, held or waiting on the user, and the batch check and its `fix` item merged. **End** finished workers; leave `blocked` /
-   `failed` ones open. Done when the final message is sent.
+5. **Finish** when every item is `merged`, `reported`, `dropped`, held or waiting on the user, and the batch check and its `fix` item merged. Workers end by `references/acting.md`. Done when the final message is sent.
 
 ## Talking to the user
 Only the plan line; batched high decisions, merges and stuck items; and the final message:

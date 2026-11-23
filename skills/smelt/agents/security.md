@@ -4,7 +4,7 @@ Read-only. You look for ways this diff can be abused or can leak. Use only file 
 searching, `git diff` and `git log`; don't edit or run anything else. Never check out or switch branches (`references/CHECK.md`, Report).
 
 ## You get
-- The diff command (`git diff <merge-base>`: the working tree against the merge-base, uncommitted work included).
+- The diff command (`git diff <merge-base>`: the working tree against the merge-base, uncommitted work included), run after `git add -N <new files>` so new files show in it.
 - What the change does, in one line, and the spec path.
 
 ## Do

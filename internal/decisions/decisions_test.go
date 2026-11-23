@@ -139,3 +139,46 @@ func TestConcurrentAddAndConfirm(t *testing.T) {
 		t.Fatalf("want 21 entries, got %d:\n%s", n+1, b)
 	}
 }
+
+func TestSlug(t *testing.T) {
+	for _, c := range [][3]string{
+		{"git@github.com:Zovaris/smithy.git", "x", "Zovaris-smithy"},
+		{"https://github.com/Zovaris/smithy/", "x", "Zovaris-smithy"},
+		{"", "b", "b"},
+	} {
+		if got := slug(c[0], c[1]); got != c[2] {
+			t.Errorf("slug(%q) = %q", c[0], got)
+		}
+	}
+}
+
+func TestAddBySelf(t *testing.T) {
+	setup(t)
+	if _, c := capture(t, func() int {
+		return Main([]string{"add", "Default retries?", "3", "--why", "issue says so", "--by", "self"})
+	}); c != 0 {
+		t.Fatalf("add --by self exit %d", c)
+	}
+	if out, _ := capture(t, func() int { return Main([]string{"pending"}) }); !strings.Contains(out, "by self · Default retries?") {
+		t.Fatalf("pending:\n%s", out)
+	}
+}
+
+func TestListRefPrefix(t *testing.T) {
+	setup(t)
+	for _, a := range [][]string{{"A?", "x", "--ref", "PR 12"}, {"B?", "y", "--ref", "PR 13"}, {"C?", "z"}} {
+		capture(t, func() int { return Main(append([]string{"add", a[0], a[1], "--why", "w"}, a[2:]...)) })
+	}
+	out, c := capture(t, func() int { return Main([]string{"list", "--ref", "PR 1"}) })
+	if c != 0 || !strings.Contains(out, "A?") || !strings.Contains(out, "B?") || strings.Contains(out, "C?") {
+		t.Errorf("prefix PR 1: %d %q", c, out)
+	}
+	out, _ = capture(t, func() int { return Main([]string{"list", "--ref", "PR 12"}) })
+	if !strings.Contains(out, "A?") || strings.Contains(out, "B?") {
+		t.Errorf("prefix PR 12: %q", out)
+	}
+	out, _ = capture(t, func() int { return Main([]string{"list"}) })
+	if !strings.Contains(out, "C?") {
+		t.Errorf("unfiltered list: %q", out)
+	}
+}

@@ -397,6 +397,11 @@ func tier(t string) bool { return t == "cheap" || t == "mid" || t == "strong" ||
 // Model returns the user's model for a tier in the current harness.
 func Model(t string) (string, error) {
 	h, _ := harness.Detect()
+	return ModelFor(h, t)
+}
+
+// ModelFor returns the user's model for a tier in harness h.
+func ModelFor(h, t string) (string, error) {
 	v, ok, err := readKeyErr(UserFile(), "models."+h+"."+t)
 	if err != nil {
 		return "", err

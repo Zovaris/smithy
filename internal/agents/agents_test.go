@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -485,5 +486,43 @@ func TestRouteRiskWordsAreSpecific(t *testing.T) {
 		if got, r := Route(text, "ship", "normal"); got != want {
 			t.Errorf("Route(%q) = %s %q, want %s", text, got, r, want)
 		}
+	}
+}
+
+func TestConsultModelUsesTheCLIsOwnHarness(t *testing.T) {
+	saved := map[string]string{"claude-desktop/strong": "opus", "opencode/judge": "anthropic/claude-opus",
+		"opencode/strong": "other", "claude-cli/strong": "sonnet"}
+	mf := func(h, tier string) (string, error) {
+		if m, ok := saved[h+"/"+tier]; ok {
+			return m, nil
+		}
+		return "", errors.New("unset")
+	}
+	cases := []struct{ h, cli, env, want string }{
+		{"claude-desktop", "claude", "", "opus"},
+		{"claude-desktop", "opencode", "", "anthropic/claude-opus"},
+		{"claude-desktop", "codex", "", ""},
+		{"claude-desktop", "codex", "x", "x"},
+		{"codex", "claude", "", "sonnet"},
+		{"opencode", "opencode", "", "anthropic/claude-opus"},
+		{"codex", "", "", ""},
+	}
+	for _, c := range cases {
+		if got := ConsultModel(c.h, c.cli, c.env, mf); got != c.want {
+			t.Errorf("%v: got %q", c, got)
+		}
+	}
+}
+
+func TestConsultPromptEscalatesOnlyTheHardFloor(t *testing.T) {
+	p := ConsultPrompt("Cap amount digits?", "18, 28", "")
+	for _, want := range []string{"ESCALATE: <why> only when", "production branch", "irreversibly rewrites user data",
+		"credentials, secrets or logins", "moves or charges real money"} {
+		if !strings.Contains(p, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if strings.Contains(p, "product owner") {
+		t.Fatalf("prompt:\n%s", p)
 	}
 }

@@ -466,3 +466,167 @@ func TestMainCommands(t *testing.T) {
 		t.Errorf("list missing: %d %q", c, e)
 	}
 }
+
+func TestImport(t *testing.T) {
+	repo := sandbox(t)
+	src := filepath.Join(repo, "list.md")
+	write(t, src, "# Plan\n\n## 01 · First thing\nbody one\n\n## 02 - Second thing\nbody two\n\n## 3. Third\nbody three\n")
+	dir := filepath.Join(repo, "out")
+	out, e, code := run(t, "import", src, dir)
+	if code != 0 {
+		t.Fatalf("import: exit %d, err %q", code, e)
+	}
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("want 3 paths, got %q", out)
+	}
+	ts := Load(dir)
+	if len(ts) != 3 || ts[0].NN != "01" || ts[0].Title != "First thing" || ts[0].Status != "todo" || ts[1].Title != "Second thing" || ts[2].NN != "03" {
+		t.Fatalf("parsed %+v", ts)
+	}
+	b, _ := os.ReadFile(lines[0])
+	if !strings.Contains(string(b), "body one") || strings.Contains(string(b), "body two") || !strings.Contains(string(b), "Blocked by: none") {
+		t.Errorf("task file:\n%s", b)
+	}
+	if _, e, code := run(t, "import", src, dir); code == 0 || !strings.Contains(e, "exists") {
+		t.Errorf("overwrite not refused: %d %q", code, e)
+	}
+	if got := Load(dir); len(got) != 3 {
+		t.Errorf("refusal wrote files: %d", len(got))
+	}
+	// default dir is the file's folder
+	if _, e, code := run(t, "import", src); code != 0 {
+		t.Fatalf("default dir: %d %q", code, e)
+	}
+	if len(Load(repo)) != 3 {
+		t.Errorf("default dir import missing: %+v", Load(repo))
+	}
+	empty := filepath.Join(repo, "empty.md")
+	write(t, empty, "# nothing\n")
+	if _, _, code := run(t, "import", empty); code == 0 {
+		t.Error("no sections should fail")
+	}
+}
+
+func importErr(t *testing.T, name, body, want string) {
+	t.Helper()
+	repo := sandbox(t)
+	src := filepath.Join(repo, "list.md")
+	write(t, src, body)
+	dir := filepath.Join(repo, "out")
+	_, e, code := run(t, "import", src, dir)
+	if code == 0 || !strings.Contains(e, want) {
+		t.Errorf("%s: want error containing %q, got %d %q", name, want, code, e)
+	}
+	if got := Load(dir); len(got) != 0 {
+		t.Errorf("%s: wrote files on error: %+v", name, got)
+	}
+}
+
+func TestImportStrict(t *testing.T) {
+	importErr(t, "unnumbered heading", "## 01 · A\nx\n\n## Notes\ny\n", "Notes")
+	importErr(t, "empty title", "## 01 ·\nx\n", "empty title")
+	importErr(t, "empty title bare number", "## 01\nx\n", "empty title")
+
+	repo := sandbox(t)
+	src := filepath.Join(repo, "list.md")
+	write(t, src, "\ufeff# Plan\r\n\r\n## 01 · First\r\nbody one\r\n```\r\n## Not a heading\r\n```\r\n\r\n## 02 Second\r\nbody two\r\n")
+	dir := filepath.Join(repo, "out")
+	if _, e, code := run(t, "import", src, dir); code != 0 {
+		t.Fatalf("bom/crlf/space sep: %d %q", code, e)
+	}
+	ts := Load(dir)
+	if len(ts) != 2 || ts[0].Title != "First" || ts[1].Title != "Second" || ts[1].NN != "02" {
+		t.Fatalf("parsed %+v", ts)
+	}
+	b, _ := os.ReadFile(ts[0].File)
+	if strings.Contains(string(b), "\r") || !strings.Contains(string(b), "## Not a heading") {
+		t.Errorf("crlf or fence:\n%q", b)
+	}
+}
+
+func TestImportHeaderLines(t *testing.T) {
+	repo := sandbox(t)
+	src := filepath.Join(repo, "list.md")
+	write(t, src, "## 01 · A\nbody\n\n## 02 · B\nBlocked by: 01\nSpeed: full\nmore\nBlocked by: none\n")
+	dir := filepath.Join(repo, "out")
+	if _, e, code := run(t, "import", src, dir); code != 0 {
+		t.Fatalf("%d %q", code, e)
+	}
+	ts := Load(dir)
+	if len(ts) != 2 || !reflect.DeepEqual(ts[1].Blockers, []string{"01"}) || len(ts[0].Blockers) != 0 {
+		t.Fatalf("blockers %+v", ts)
+	}
+	b, _ := os.ReadFile(ts[1].File)
+	s := string(b)
+	if !strings.Contains(s, "Speed: full\n") || strings.Contains(s, "Speed: fast") || strings.Count(s, "Blocked by: 01") != 1 || strings.Count(s, "Speed:") != 1 {
+		t.Errorf("header not carried:\n%s", s)
+	}
+}
+
+func TestParseFirstHeaderWins(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "01-a.md")
+	write(t, f, "# 01 · A\nStatus: todo\nBlocked by: 02\nPR: -\n\nStatus: done\nBlocked by: none\nPR: https://x/1\n")
+	tk, err := Parse(f)
+	if err != nil || tk.Status != "todo" || tk.PR != "-" || !reflect.DeepEqual(tk.Blockers, []string{"02"}) {
+		t.Errorf("%+v %v", tk, err)
+	}
+}
+
+func TestImportAllOrNothing(t *testing.T) {
+	repo := sandbox(t)
+	src := filepath.Join(repo, "list.md")
+	write(t, src, "## 01 · A\nx\n\n## 02 · B\ny\n")
+	dir := filepath.Join(repo, "out")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// a directory squats on the second target name, so its rename fails
+	if err := os.MkdirAll(filepath.Join(dir, "02-b.md", "x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Import(src, dir); err == nil {
+		t.Fatal("expected a write error")
+	}
+	es, _ := os.ReadDir(dir)
+	for _, e := range es {
+		if e.Name() != "02-b.md" {
+			t.Errorf("left behind %s", e.Name())
+		}
+	}
+}
+
+func TestNextOnAListFileHintsImport(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "tasks.md"), []byte("## 01 · A\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, w, _ := os.Pipe()
+	old := os.Stderr
+	os.Stderr = w
+	c := Main([]string{"next", dir})
+	os.Stderr = old
+	w.Close()
+	b, _ := io.ReadAll(r)
+	if c != 3 || !strings.Contains(string(b), "smithy tasks import") {
+		t.Fatalf("exit %d: %s", c, b)
+	}
+}
+
+func TestImportCarriesSharedContext(t *testing.T) {
+	dir := t.TempDir()
+	list := filepath.Join(dir, "tasks.md")
+	if err := os.WriteFile(list, []byte("# Plan\nGo 1.22, stdlib only.\n\n## 01 · A\nfirst\n## 02 · B\nsecond\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ts, err := Import(list, dir)
+	if err != nil || len(ts) != 2 {
+		t.Fatalf("%v %v", ts, err)
+	}
+	for _, tk := range ts {
+		b, _ := os.ReadFile(tk)
+		if !strings.Contains(string(b), "Shared context (from tasks.md):\nGo 1.22, stdlib only.") {
+			t.Fatalf("%s:\n%s", tk, b)
+		}
+	}
+}

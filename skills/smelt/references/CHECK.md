@@ -11,11 +11,11 @@
 Each agent the speed lists (SKILL.md) runs as a fresh agent, in parallel, in one wave. Prompt =
 its `agents/<name>.md` text (or absolute path), a `## You get` block with exactly what that file
 lists, and the report contract below. Never your conversation, plan or opinion of the code
-(it would share your blind spots). Give every agent `<smithy>`, the
-absolute path of this skill's `scripts/smithy`. Without a subagent tool: write each prompt to a
+(it would share your blind spots). An agent whose file lists `<smithy>` (reviewer, regression)
+gets the absolute path of this skill's `scripts/smithy`. Without a subagent tool: write each prompt to a
 file and run `smithy agent --bg --log <log> <prompt-file>` (read-only ones with `--readonly`),
 then read the logs. Each agent's tier: `smithy route --agent agents/<name>.md --speed <speed>`, then the model from
-`smithy config model <tier>`; at full every check agent routes to strong (seven strong contexts). Test
+`smithy config model <tier>` (route returns strong for every agent at full). Test
 agents run only their own `zz_` file (others may be red). Mutation is a second step: run the
 tool after the wave's fixes, then launch its agent.
 
@@ -47,17 +47,20 @@ Test agents write `zz_<agent>` files with the runner's default suffix (`zz_<agen
 commit, no extra worktree (exception: warden's batch check gives them a fresh worktree of
 `origin/<base>`). Copy the cases worth keeping into the repo's own test files and
 naming, then delete every `zz_` file; never commit one as is. Rule tests (a pattern, a
-prefix list, a token format) cover every variant the spec names, one case each.
+prefix list, a token format) cover every variant the spec names, one case each. When the code
+serves HTTP, the adversary, e2e and hostile prompts also carry: raw HTTP paths (`..`, `%2e%2e`,
+`%2f`) go out through a raw client (`node:http` with `path`, `curl --path-as-is`, Python
+`http.client`); fetch and most URL parsers rewrite them first.
 
 **Holdout.** You run the adversary's file but never read it to write code (nor show it to the
 implementer): fix from the finding (input, expected, actual), re-deriving its expected literals yourself
-before writing the red test (the adversary can be wrong). After the fixes, run it once on the
-final tree: `smithy receipt run --claim holdout -- <single-file command from smithy stack>
-<zz file>`. Failing it is blocking, unless its finding was declined as spec-ambiguous (quote the spec line and both readings it allows; a unit, case or rule the spec names is not ambiguous): then
-one line in the PR's dispositions, naming the declined test ids, closes it, and its declined tests may be dropped. The holdout receipt stays on that commit (behind the copies and any later fixes); it still goes in the PR table. Copies of
+before writing the red test (the adversary can be wrong). Commit the fixes (`smithy commit`, never a
+`zz_` file), then run the file once on that commit, in place: `smithy receipt run --claim holdout -- <single-file command from smithy stack>
+<zz file>`. Receipts ignore untracked `zz_` files, so it is clean; any other uncommitted change makes it dirty and it doesn't count. Once later commits sit on top, `smithy receipt list` still shows it, as `holdout commit` (passed) or `holdout failed`, and it goes in the PR table. A failing holdout is blocking, unless its finding was declined as spec-ambiguous (quote the spec line and both readings it allows; a unit, case or rule the spec names is not ambiguous): then
+one line in the PR's dispositions, naming the declined test ids, closes it, and its declined tests may be dropped. Copies of
 its cases are written only after that run (copy the rest as is, with type and lint fix-ups).
 During check, typecheck and lint receipts run with the `zz_` files moved to the system temp
-dir, never anywhere inside the repo (runners scan dot dirs too); before commit they are deleted.
+dir, never anywhere inside the repo (runners scan dot dirs too); put them back for the holdout run, and delete them before ship's commits.
 **Reviewing another ref** (not your tree): `git worktree add <tmp> <ref> --detach`, install
 deps there, and give the agents that path.
 

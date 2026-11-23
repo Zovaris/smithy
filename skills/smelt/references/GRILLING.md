@@ -1,6 +1,6 @@
 # Grilling
 
-Nobody to ask: decide per SKILL.md Always; also list behaviours the request leaves open in the spec's Decisions so agents treat them as settled.
+Nobody to ask: as in `BRAINSTORM.md`.
 
 After the brainstorm settled the why and the approach, close the remaining decisions.
 Treat the plan as a design tree. Each round:

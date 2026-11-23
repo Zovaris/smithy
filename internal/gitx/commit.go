@@ -178,21 +178,43 @@ func CommitMain(args []string) int {
 		die(p, "name the paths for this commit (atomic: one concern per commit)")
 		return 2
 	}
+	prefix := strings.TrimSpace(git("rev-parse", "--show-prefix"))
+	staged := lines(git("diff", "--cached", "--name-only", "--no-renames"))
+	var add, roots []string
 	for _, f := range paths {
-		// A deleted file git still tracks is a valid path: committing its removal.
-		if _, err := os.Lstat(f); err != nil && quiet("git", "ls-files", "--error-unmatch", "--", f) != nil {
-			die(p, "no such path: %s", f)
+		r := filepath.ToSlash(filepath.Clean(filepath.Join(prefix, f)))
+		if filepath.IsAbs(f) || r == ".." || strings.HasPrefix(r, "../") {
+			die(p, "path outside the repo: %s", f)
 			return 2
 		}
+		roots = append(roots, r)
+		// A deleted file git still tracks is a valid path: committing its removal; so is the old
+		// side of a staged rename (git mv), which is already staged and needs no add.
+		if _, err := os.Lstat(f); err != nil && quiet("git", "ls-files", "--error-unmatch", "--", f) != nil {
+			if !under(r, staged) {
+				die(p, "no such path: %s", f)
+				return 2
+			}
+			continue
+		}
+		add = append(add, f)
 	}
 	if err := Check(msg, detect()); err != nil {
 		return die(p, "%s", err)
 	}
-	if staged := lines(git("diff", "--cached", "--name-only")); len(staged) > 0 {
-		return die(p, "already staged: %s; unstage or include them deliberately", strings.Join(staged, " "))
+	var outside []string
+	for _, f := range staged {
+		if !under(f, roots) {
+			outside = append(outside, f)
+		}
 	}
-	if c := attached("git", append([]string{"add", "--"}, paths...)...); c != 0 {
-		return c
+	if len(outside) > 0 {
+		return die(p, "already staged: %s; unstage or include them deliberately", strings.Join(outside, " "))
+	}
+	if len(add) > 0 {
+		if c := attached("git", append([]string{"add", "--"}, add...)...); c != 0 {
+			return c
+		}
 	}
 	if git("diff", "--cached", "--name-only") == "" {
 		return die(p, "nothing to commit in: %s", strings.Join(paths, " "))
@@ -202,4 +224,19 @@ func CommitMain(args []string) int {
 		return c
 	}
 	return attached("git", "log", "-1", "--format=%h %s")
+}
+
+// under reports whether repo-root path f equals or sits inside one of roots, or a root equals or
+// holds f. The repo root itself (".") never covers a file that was already staged, so
+// `smithy commit "<msg>" .` still refuses earlier staging.
+func under(f string, roots []string) bool {
+	for _, r := range roots {
+		if r == "." {
+			continue
+		}
+		if f == r || strings.HasPrefix(f, r+"/") || strings.HasPrefix(r, f+"/") {
+			return true
+		}
+	}
+	return false
 }

@@ -9,7 +9,7 @@ runs the Spec-check part itself, as a checklist.
 ## You get
 - The diff command (`git diff $(git merge-base origin/<base> HEAD)`: the working tree against
   where the branch left the remote base, uncommitted work included; never a local base branch,
-  it can be stale).
+  it can be stale), run after `git add -N <new files>` so new files show in it.
 - The spec or task path (or the PR description when there is none: say so in the report).
 - Paths to the repo's rules: AGENTS.md / CLAUDE.md, CONTRIBUTING.md, `docs/agents/STANDARDS.md`,
   lint/format config, ADRs. With none of those: use-smithy's shared rules and the language's
@@ -37,7 +37,7 @@ Skip style, naming and structure here: Standards owns them.
    temporal coupling, swallowed errors, mutable shared state, dead code, leaking abstractions
    across a seam, comments that restate code.
 3. Comments: only doc comments on exported API, license headers, shebangs, usage blocks, tool directives
-   with a reason and `smithy:allow` markers (ledger's `references/COMMENTS.md` when installed). Explanatory comments, commented-out
+   with a reason and user-approved `smithy:allow` markers (ledger's `references/COMMENTS.md` when installed). Explanatory comments, commented-out
    code and TODOs are findings. Run `<smithy> comments --diff $(git merge-base origin/<base> HEAD)`
    and report what it prints.
 4. Tests: tests that mirror the implementation, assertions on mocks, missing failure paths,
@@ -71,6 +71,6 @@ see is `should` unless a test reproduces it; everything else `should` or `nit`.
 Only claims you can point to a line for. Nothing found is a valid result in either report.
 Re-review: read the code at the commit sha in your prompt (`git show <sha>:<file>`), never an
 older one. Check every spec-check row that was missing, partial or wrong and every blocking
-Standards finding; answer only whether each is resolved (file:line). A departure recorded in
+Standards finding; answer per finding: `resolved` (file:line), `not resolved`, or `new problem: <what>`. A departure recorded in
 `rulings.md` as an open risk for the user closes as "deferred to user"; don't re-flag it.
-A new problem the fixes added is reported as `new problem: <what>`. Don't re-list advisory, `should` or `nit` items.
+Don't re-list advisory, `should` or `nit` items.

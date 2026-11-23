@@ -11,7 +11,7 @@ Started by you (by name, the way your harness starts skills) or by an agent thro
 |---|---|
 | `/smelt <task>` | Picks the entry: no plan → `plan`, a plan or task → `build`, a bug → `debug` |
 | `/smelt plan <idea>` | Brainstorm, grill the open decisions, write the spec and the task list |
-| `/smelt build next` · `build all` | Build the next ready task, or every task in order (one implementer each when there are more than three) |
+| `/smelt build next` · `build all` | Build the next ready task, or every task in order (three or fewer, or about an hour: built in this session; more: one implementer each) |
 | `/smelt <phase> <task>` | One phase: `brainstorm`, `spec`, `build`, `check`, `ship`, `retro` |
 | `/smelt from check <task>` | From that phase to the end, e.g. on code you already wrote |
 | `/smelt debug <bug>` | Root cause, failing test, fix, regression test, PR |

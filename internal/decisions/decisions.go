@@ -15,15 +15,16 @@ import (
 )
 
 // Usage is the text for `smithy decisions --help`.
-const Usage = `usage: smithy decisions add "<question>" "<choice>" --why "<reason>" [--by consult|timeout] [--ref <pr|file>]
-       smithy decisions pending | list
+const Usage = `usage: smithy decisions add "<question>" "<choice>" --why "<reason>" [--by self|consult|timeout, default self] [--ref <pr|file>]
+       smithy decisions pending | list [--ref <prefix>]
        smithy decisions confirm <n>|--all
        smithy decisions change <n> "<new choice>"
 The log of the user's decisions taken without them, one line each, in
-~/.smithy/decisions/<repo>.md (the main checkout's folder name; shared by its worktrees).
+~/.smithy/decisions/<owner>-<repo>.md (from origin's URL; the main checkout's folder name when there
+is no origin; shared by its worktrees).
 add appends one entry; pending lists the unconfirmed ones; confirm marks them kept; change
 replaces the choice and marks it confirmed. Numbers are positions in the pending list only (as pending prints
-them); list shows every entry, unnumbered. Fields can't contain " · " or " → ".
+them); list shows every entry, unnumbered (--ref <prefix> keeps those whose ref starts with it). Fields can't contain " · " or " → ".
 Exit 0 = ok, 1 = cannot read or write the log, 2 = bad usage.`
 
 const (
@@ -33,13 +34,24 @@ const (
 	arw  = " → "
 )
 
-// repoSlug names the log: the folder of the main checkout, so worktrees share one log.
+// repoSlug names the log: origin's owner-repo, else the folder of the main checkout, so worktrees
+// share one log and two checkouts named alike don't.
 var repoSlug = func() string {
 	out, err := ghx.Run("git", "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if err != nil || strings.TrimSpace(out) == "" {
 		return "no-repo"
 	}
-	return filepath.Base(filepath.Dir(strings.TrimSpace(out)))
+	url, _ := ghx.Run("git", "remote", "get-url", "origin")
+	return slug(strings.TrimSpace(url), filepath.Base(filepath.Dir(strings.TrimSpace(out))))
+}
+
+func slug(url, dir string) string {
+	u := strings.TrimSuffix(strings.TrimSuffix(url, "/"), ".git")
+	parts := strings.FieldsFunc(u, func(r rune) bool { return r == '/' || r == ':' })
+	if len(parts) >= 2 {
+		return parts[len(parts)-2] + "-" + parts[len(parts)-1]
+	}
+	return dir
 }
 
 // File is the decisions log of the current repo.
@@ -126,10 +138,21 @@ func change(line, choice string) (string, error) {
 	return done + strings.Join(f, sep), nil
 }
 
+// refMatches reports whether an entry's ref field starts with prefix (every entry when prefix is empty).
+func refMatches(line, prefix string) bool {
+	if prefix == "" {
+		return true
+	}
+	f := strings.Split(line, sep)
+	last := f[len(f)-1]
+	r, ok := strings.CutPrefix(last, "ref: ")
+	return ok && strings.HasPrefix(r, prefix)
+}
+
 // Main runs `smithy decisions`.
 func Main(args []string) int {
 	var pos []string
-	why, by, ref, all := "", "consult", "", false
+	why, by, ref, all := "", "self", "", false
 	for i := 0; i < len(args); i++ {
 		next := func() string {
 			if i+1 < len(args) {
@@ -175,8 +198,8 @@ func Main(args []string) int {
 		if len(pos) != 3 {
 			return bad(`add needs "<question>" "<choice>" --why "<reason>"`)
 		}
-		if by != "consult" && by != "timeout" {
-			return bad(fmt.Sprintf("--by must be consult or timeout, got %q", by))
+		if by != "consult" && by != "timeout" && by != "self" {
+			return bad(fmt.Sprintf("--by must be consult, timeout or self, got %q", by))
 		}
 		fields := []string{time.Now().Format("2006-01-02"), "by " + by}
 		var vals [4]string
@@ -204,13 +227,16 @@ func Main(args []string) int {
 		if len(pos) != 1 {
 			return bad("unexpected argument " + pos[1])
 		}
+		if ref != "" && pos[0] != "list" {
+			return bad("--ref filters list only")
+		}
 		lines, err := read()
 		if err != nil {
 			return fail(err)
 		}
 		if pos[0] == "list" {
 			for _, l := range lines {
-				if strings.HasPrefix(l, open) || strings.HasPrefix(l, done) {
+				if (strings.HasPrefix(l, open) || strings.HasPrefix(l, done)) && refMatches(l, ref) {
 					fmt.Println(l)
 				}
 			}

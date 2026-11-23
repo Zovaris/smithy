@@ -22,7 +22,7 @@ code in docs exempt; a bare ======= only next to a <<<<<<< or |||||||), and bina
 files, printed as warnings for a human look.
 Prints file:line, the rule and a masked match; exit 1 on any finding (warnings don't count),
 0 when clean.
-A line that is a known false positive can carry "smithy:allow" to be skipped.`
+A line that is a known false positive can carry "smithy:allow" to be skipped (only with the user's yes).`
 
 type rule struct {
 	name string
@@ -271,7 +271,7 @@ func ScanMain(args []string) int {
 		fmt.Fprintln(os.Stderr, AllowNote(allowed))
 	}
 	if len(fs) > 0 {
-		fmt.Fprintf(os.Stderr, "scan: %d finding(s); fix them, or mark a false positive with smithy:allow\n", len(fs))
+		fmt.Fprintf(os.Stderr, "scan: %d finding(s); fix them; smithy:allow only on a false positive the user approved\n", len(fs))
 		return 1
 	}
 	fmt.Fprintf(os.Stderr, "scan: clean against %s\n", label)

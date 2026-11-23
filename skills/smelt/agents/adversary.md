@@ -8,6 +8,7 @@ point. Assume it is wrong somewhere.
 - The spec / acceptance criteria.
 - The public interface: signatures, types, routes, CLI flags.
 - The test commands (single file and full suite) and the test folder conventions.
+- The raw-HTTP rule (`references/CHECK.md`), when the code serves HTTP.
 
 Do not open the implementation bodies of the code under test until you have written your first
 round of tests from the spec alone. After that, you may read them to aim a second round.

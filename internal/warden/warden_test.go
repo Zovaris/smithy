@@ -372,48 +372,43 @@ func TestDoctorAgentsLookup(t *testing.T) {
 }
 
 func TestDoctorClaudeSettings(t *testing.T) {
-	const hookJSON = `{"hooks":{"PermissionRequest":[{"matcher":"mcp__ccd_session__.*","hooks":[{"command":"echo '{\"behavior\": \"allow\"}'"}]}]},"permissions":{"allow":["Bash(gh pr merge:*)"]}}`
-	t.Run("desktop with hook and merge allow", func(t *testing.T) {
+	t.Run("desktop with merge allow", func(t *testing.T) {
 		d := newDoctor(t, "git", "gh")
 		t.Setenv("WARDEN_HARNESS", "claude-desktop")
 		settings := filepath.Join(d.home, ".claude", "settings.json")
-		writeFile(t, settings, hookJSON)
+		writeFile(t, settings, `{"permissions":{"allow":["Bash(gh pr merge:*)"]}}`)
 		o, c := doctor(t)
-		if c != 0 || !strings.Contains(o, "  ok    harness: claude-desktop (adapter: desktop") ||
-			!strings.Contains(o, "  ok    start_session auto-approve hook ("+settings+")") ||
-			!strings.Contains(o, "  ok    gh pr merge allowed ("+settings+")") {
+		if c != 0 || !strings.Contains(o, "  ok    gh pr merge allowed ("+settings+")") || strings.Contains(o, "auto-approve") {
 			t.Errorf("%d\n%s", c, o)
 		}
 	})
-	t.Run("desktop without settings", func(t *testing.T) {
+	t.Run("smithy pr merge allow rule", func(t *testing.T) {
+		for _, rule := range []string{"Bash(gh pr merge*)", "Bash(smithy pr merge:*)", "Bash(smithy:*)", "Bash(/opt/x/scripts/smithy pr merge:*)", "Bash(~/.claude/skills/use-smithy/scripts/smithy:*)"} {
+			d := newDoctor(t, "git", "gh")
+			t.Setenv("WARDEN_HARNESS", "claude-desktop")
+			writeFile(t, filepath.Join(d.home, ".claude", "settings.json"), `{"permissions":{"allow":["`+rule+`"]}}`)
+			o, _ := doctor(t)
+			if strings.Contains(o, "not in the allow list") || !strings.Contains(o, "  ok    gh pr merge allowed (") {
+				t.Errorf("%s:\n%s", rule, o)
+			}
+		}
+	})
+	t.Run("non-Bash or unrelated rules do not count", func(t *testing.T) {
+		for _, rule := range []string{"Read(~/smithy-notes/**)", "Bash(ls smithy:*)", "Edit(smithy:*)", "Bash(*smithy*)"} {
+			d := newDoctor(t, "git", "gh")
+			t.Setenv("WARDEN_HARNESS", "claude-desktop")
+			writeFile(t, filepath.Join(d.home, ".claude", "settings.json"), `{"permissions":{"allow":["`+rule+`"]}}`)
+			o, _ := doctor(t)
+			if !strings.Contains(o, "not in the allow list") {
+				t.Errorf("%s counted as a merge allow:\n%s", rule, o)
+			}
+		}
+	})
+	t.Run("warning names smithy pr merge", func(t *testing.T) {
 		newDoctor(t, "git", "gh")
-		t.Setenv("WARDEN_HARNESS", "claude-desktop")
-		o, c := doctor(t)
-		if c != 0 || !strings.Contains(o, "  warn  no start_session auto-approve hook (one 'Allow' click per worker)") || !strings.Contains(o, "  warn  gh pr merge not in the allow list") {
-			t.Errorf("%d\n%s", c, o)
-		}
-	})
-	t.Run("hook script in home with tilde", func(t *testing.T) {
-		d := newDoctor(t, "git", "gh")
-		t.Setenv("WARDEN_HARNESS", "claude-desktop")
-		writeFile(t, filepath.Join(d.home, "hook.sh"), `echo '{"behavior":"allow"}'`)
-		writeFile(t, filepath.Join(d.home, ".claude", "settings.json"), `{"hooks":{"PermissionRequest":[{"matcher":"mcp__ccd_session__start_session","hooks":[{"command":"~/hook.sh"}]}]}}`)
-		o, _ := doctor(t)
-		if !strings.Contains(o, "  ok    start_session auto-approve hook") {
-			t.Errorf("tilde hook:\n%s", o)
-		}
-	})
-	t.Run("hook that does not allow or does not match", func(t *testing.T) {
-		d := newDoctor(t, "git", "gh")
-		t.Setenv("WARDEN_HARNESS", "claude-desktop")
-		writeFile(t, filepath.Join(d.home, ".claude", "settings.json"), `{"hooks":{"PermissionRequest":[
-			{"matcher":"mcp__ccd_session__start_session","hooks":[{"command":"echo nothing"}]},
-			{"matcher":"Bash","hooks":[{"command":"echo '{\"behavior\":\"allow\"}'"}]},
-			{"matcher":"(","hooks":[{"command":"echo '{\"behavior\":\"allow\"}'"}]},
-			{"hooks":[{"command":"echo '{\"behavior\":\"allow\"}'"}]}]}}`)
-		o, _ := doctor(t)
-		if !strings.Contains(o, "  warn  no start_session auto-approve hook") {
-			t.Errorf("should warn:\n%s", o)
+		t.Setenv("WARDEN_HARNESS", "claude-cli")
+		if o, _ := doctor(t); !strings.Contains(o, "smithy pr merge") {
+			t.Errorf("fix text:\n%s", o)
 		}
 	})
 	t.Run("project local settings", func(t *testing.T) {

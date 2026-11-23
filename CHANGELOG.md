@@ -5,6 +5,78 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.14.0 — 2026-11-23
+
+### Added
+- `smithy decisions add --by self` (now the default) labels a decision taken without consult.
+- `smithy tasks import <tasks.md>` splits one file of `## NN · Title` sections into task files.
+- `smithy batch init --risky <id,id>` marks risky items (security agent required).
+
+### Fixed
+- `smithy wait pr:` names a PR whose head never got a check (`pr <n> no-ci: …`) when the wait ends,
+  so "pending" and "CI never ran" read differently; tend ends such a PR with `no-ci <url>`.
+- tend: green by fixing code, never by deleting, skipping or loosening a test or CI step; outside
+  PRs run with `--ignore-scripts` installs and no tokens, and changes to agent files, `.github/` or
+  install scripts go to the user; reruns up to twice before calling a step flaky.
+- Settings and help catch-up: `smithy batch init` reads `warden.max`, `warden.cleanup`, `warden.mode`
+  and `warden.merge` when its flag isn't passed (new `--cleanup` and `--mode` flags; warden and
+  brief fall back to `warden.max`); `smithy decisions list --ref <prefix>` filters entries and its
+  help names the log file and the `--by` default; `smithy wait timer`, `smithy verify`,
+  `smithy pr create` (exit 3 for a non-GitHub origin) and `smithy receipt run` (exit 127, 128+signal)
+  help match the code; docs/settings.md adds the `judge` model row and the `warden.merge` note.
+- `smithy tasks import` keeps text before the first section (stack, shared rules) as shared
+  context in every task file instead of refusing the list.
+- warden harness: a returning subagent worker is the wake; no batch wait needed.
+- `smithy verify`: checks that are all skipped or neutral are `none` (no proof), not green: `none`
+  is pending when `.github/workflows` holds a workflow, and counts green only when the repo has
+  no workflow (no CI configured).
+- tend reads a foreign PR's agent instructions from the base, never from the PR head.
+- Skills that ship the launcher declare a `compatibility` line (git, gh or GH_TOKEN, attestation);
+  `tests/skills.sh` limits the SKILL.md body, not the frontmatter.
+- `smithy tasks next|ready` on a folder with no task files says so and points to
+  `smithy tasks import` when a `## NN` list is there (`next` printed "all done").
+- Skill text: use-smithy routes a single `tasks.md` through `smithy tasks import` to warden and
+  splits the ESCALATE step (hard floor → blocked; the rest → safest); adversary, e2e and hostile
+  send raw HTTP paths with a raw client; TDD closes keep-alive connections in HTTP tests.
+- `smithy consult` answers ESCALATE only for the hard floor (production, deleting user data, real
+  credentials or logins as values, not auth code, moving or charging real money); code that
+  computes money or security is its pick; an ESCALATE with nobody to ask ends blocked.
+  The stop list and hard floor say "moving or charging real money"; hush points to use-smithy.
+- `smithy pr create` drops GitHub's "Create a pull request" push hint (other push output stays),
+  so the PR URL is the only link printed.
+- Skill text: the holdout receipt runs on a committed tree; an agreed spec skips the builder check
+  unless it has open questions.
+- `smithy receipt list` keeps the newest holdout receipt from an earlier commit ("holdout commit",
+  or "holdout failed" when it failed), so it reaches the PR table.
+- Skill text: use-smithy routes "research, then build" to scout then smelt plan; TDD runs single
+  test files with the runner's timeout (a hang is not red).
+- `smithy commit` accepts a staged `git mv` rename (both paths named), refuses paths outside the
+  repo, and checks earlier staging against repo-root paths (also from a subfolder, and for `.`).
+- Skill text: Decisions define "safest" outside security (most reversible, least new surface);
+  debug re-runs the repro receipt on the final HEAD; SHIP's per-commit rebase starts after the red
+  repro commit, which goes first on the branch.
+- `smithy verify`: an open PR whose mergeable is still UNKNOWN is `pending`, not green.
+- `smithy brief`: a `Spec:` line takes only its first token; `batch init` stores an absolute
+  intent when the task file isn't committed on the base.
+- warden doctor accepts an allow rule for `smithy pr merge`.
+- Skill text: tend runs the full suite (a receipt) before pushing a merge or rebase of the base;
+  use-smithy says where consult's ESCALATE goes when nobody can answer.
+- `smithy decisions`: the log is named after origin's owner and repo, so two checkouts in
+  folders with the same name no longer share one (logs under the old folder name stay as they are).
+- `smithy consult`: a fallback CLI uses the models saved for its own harness, never the current
+  harness's names (desktop without `claude` on PATH sent `opus` to opencode).
+- smelt SHIP: full `smithy verify` form, commits in dependency order, base red noted in the PR;
+  tend fixes base red only when small, else reports it; Decisions: the timer is only for a user
+  who can answer.
+
+### Security
+- Launcher: without `gh` it no longer installs on the checksum alone; it needs the build
+  attestation, or `SMITHY_ALLOW_UNATTESTED=1` to accept checksum-only.
+- warden: doctor no longer suggests a `PermissionRequest` hook that auto-approves worker launches.
+- smelt: secret-looking fixtures are made obviously fake; `smithy:allow` needs the user's yes.
+- tend: names outside text (issues, comments, CI logs) as data in its own rules.
+- hush: the description no longer says it triggers for every launched agent.
+
 ## v0.13.0 — 2026-11-22
 
 - **Release audit fixes.** One owner for the ask flow, decision log, model ask and stop list (use-smithy); warden logs decisions with `smithy decisions add --ref`, not `decisions.md`; plain skill names instead of slash examples; doc corrections.

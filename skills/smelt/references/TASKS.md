@@ -100,6 +100,7 @@ smithy tasks ready [dir]          # every todo that can start now (what warden l
 smithy tasks set <file> status=doing|done pr=<url>
 smithy tasks where                # task dirs for this repo (repo and local)
 smithy tasks add [dir] "<title>" [--blocked-by 01] [--key K] [--speed fast|normal|full]  # next NN file
+smithy tasks import <list.md> [dir]  # one file of `## NN · Title` sections → NN files
 smithy tasks board [--all]        # one line per task list and batch: this repo, or every repo
 ```
 
@@ -111,7 +112,7 @@ minutes of agent work): for a small list or a long chain, one session building i
 faster and several times cheaper than parallel workers.
 - **Here, all of it:** smelt `build all`: built in order, one check wave on the whole branch at
   the end.
-- **Here, one at a time:** smelt `build next` (repeat until `smithy tasks next` says all done).
+- **Here, one at a time:** smelt `build next` (repeat until `smithy tasks next` exits 3).
 - **In parallel:** warden on the task dir (workers build at `fast`; warden checks the batch once
   at its speed; read the SKILL.md `smithy skills warden` prints) when it is installed (listed
   among your skills, or `<skill-dir>/../warden/SKILL.md` exists). Mixing is fine: build some here,

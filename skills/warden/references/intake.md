@@ -12,7 +12,8 @@ Work out what you were given, in this order, and say in the plan line which it w
 1. **A task dir or task file** (`docs/specs/<slug>/`, `.docs/specs/<slug>/`,
    `~/.smithy/plans/<repo>/<slug>/`; `smithy tasks where` lists them; an `NN-*.md`; or "the tasks we
    just planned"): `smithy tasks ready <dir>` gives what can start; blocked ones wait for their
-   blockers. Id = `<slug>-NN`. Source = the file.
+   blockers. Id = `<slug>-NN`. Source = the file. One file of `## NN · Title` sections:
+   `smithy tasks import <file>` first.
 2. **Board ids** (GitHub issues, Linear, Jira keys): read each with `gh` (when installed), the GitHub API when a token is set, or the harness's tracker
    tools. Id = the key. Source = the key (`owner/repo#n` for GitHub).
 3. **Tasks inline**, one per line: id `task-<slug>`. Source = none (only `batch.json`). When
@@ -34,7 +35,7 @@ Work out what you were given, in this order, and say in the plan line which it w
 Per item: `route: debug` when it is a bug report (a bug label, or it describes broken behaviour):
 its worker reproduces red first (smelt's `references/DEBUG.md`). `risky: true` when it touches
 what smelt's SKILL.md Risky list names (untrusted input parsing included): its worker runs the
-security agent. Route board items with `smithy route --board <owner/repo#n>` so the issue's words count.
+security agent (`smithy batch init --risky <id,id>`). Route board items with `smithy route --board <owner/repo#n>` so the issue's words count.
 
 ## Overlap
 
@@ -75,11 +76,10 @@ intent or the task.
 ## Status back to the source
 
 So smelt and the board stay in sync:
-- Local task dir: `smithy tasks set <file> status=doing` at launch, `status=done pr=<url>` once the PR exists
-  (a follow-up commit on the PR branch),
+- Local task dir: `smithy tasks set <file> status=doing` at launch, `status=done pr=<url>` once the PR exists,
   `status=dropped` when dropped.
 - Committed repo task dir (`docs/specs`): the worker sets `Status: done` and `PR:` in its own
-  branch, so it lands with the PR; you don't commit to the base branch.
+  branch (a follow-up commit on the PR branch), so it lands with the PR; you don't commit to the base branch.
 - Uncommitted repo task dir (`.docs/specs`): update it directly, like a local dir.
 - Board: one comment with the PR when it opens; close or move the issue when merged (only what the
   tracker's tools allow; never delete).

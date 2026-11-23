@@ -728,10 +728,11 @@ Targets (any mix):
   alerts              a new open Dependabot alert (skipped, with a note, without read access)
                       actions and alerts already there on the first run are recorded, not reported
   timer:<minutes>     fires after the minutes (exit 0, "timer: <m>m elapsed"); alone, no GitHub;
-                      the ask timeout: smithy wait timer:$(smithy config get ask.timeout)
+                      the ask timeout: smithy wait timer:$(smithy config get ask.timeout), minimum 0.05;
+                      when ask.timeout is 0 skip the timer (wait for the answer)
   watch[:<scopes>]    tend's watch mode; scopes is a comma list of prs, issues, actions, base,
                       alerts, or all (default tend.watch; issue label from tend.label)
-Finished checks are reported at once. Exit 0 = events, 4 = heartbeat, 2 = bad target, 3 = no GitHub access (gh missing or signed out and no GH_TOKEN).
+Finished checks are reported at once. Exit 0 = events, 4 = heartbeat (plus "pr <n> no-ci" for a PR whose head never got a check), 2 = bad target, 3 = no GitHub access (gh missing or signed out and no GH_TOKEN).
 Defaults: settings watch.events, watch.every (30 s), watch.max (50 min).`
 
 // expandWatch turns `watch[:<scopes>]` into targets, the scopes and issue label coming from
@@ -948,7 +949,22 @@ func Main(args []string) int {
 		time.Sleep(step)
 	}
 	fmt.Printf("heartbeat: nothing within %gm\n", max)
+	for _, l := range noCILines(ws, max) {
+		fmt.Println(l)
+	}
 	return 4
+}
+
+// noCILines names PRs whose head never got a check during the wait, so "still pending" and "CI
+// never ran" (Actions off, out of minutes, workflow not triggered) read differently.
+func noCILines(ws []watcher, max float64) []string {
+	var out []string
+	for _, w := range ws {
+		if p, ok := w.(*prWatcher); ok && p.last != nil && p.last.state == "OPEN" && p.last.checks.state == "none" {
+			out = append(out, fmt.Sprintf("pr %d no-ci: no check ran in %gm; check the repo's Actions settings and minutes %s", p.last.num, max, p.last.url))
+		}
+	}
+	return out
 }
 
 // pushedAhead reports whether this checkout's origin/<branch> is strictly ahead of the PR head

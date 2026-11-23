@@ -15,7 +15,7 @@ import (
 const consultUsage = `One cheap, tool-less call to the user's strongest model to settle a decision without the user.
   smithy consult "<question>" "<options, verbatim and in neutral order>" [--context <file>]
 Prints the answer (≤5 lines). It may start with NEED-INFO: <what> (send the question back with
-that) or ESCALATE: <why> (the user decides). Callers log what they decided and why.
+that) or ESCALATE: <why> (only the hard floor: the user decides). Callers log what they decided and why.
 Model: $CONSULT_MODEL, else the judge tier (the smartest model you have, optional), else strong,
 else the CLI default.
 CLI: $CONSULT_CMD (prompt on stdin) if set; else the CLI of the harness you're in (smithy harness),
@@ -32,8 +32,11 @@ func ConsultPrompt(q, o, ctx string) string {
 		b.WriteString("Context:\n" + ctx + "\n")
 	}
 	b.WriteString("Pick one option and give the reason in at most 5 lines. If none fits or you need more\n")
-	b.WriteString("information, answer NEED-INFO: <what>. If a product owner should decide (customer-visible\n")
-	b.WriteString("behaviour, money, data, security, public API, production, irreversible), answer ESCALATE: <why>.\n")
+	b.WriteString("information, answer NEED-INFO: <what>. Answer ESCALATE: <why> only when the choice itself\n")
+	b.WriteString("merges or deploys to the production branch, deletes or irreversibly rewrites user data,\n")
+	b.WriteString("handles real credentials, secrets or logins (actual values or accounts, not code that implements\n")
+	b.WriteString("auth), or moves or charges real money; code that only computes money,\n")
+	b.WriteString("security or data is yours to pick (the safest option when unsure).\n")
 	b.WriteString("Do not use tools.\n")
 	return b.String()
 }
@@ -58,6 +61,30 @@ func ConsultCLI(h string, have func(string) bool) string {
 		}
 	}
 	return cli
+}
+
+// ConsultModel picks the judge model, else strong, saved for the harness that owns cli: a CLI
+// other than the current harness's never gets the current harness's model names.
+func ConsultModel(h, cli, env string, modelFor func(h, t string) (string, error)) string {
+	if env != "" {
+		return env
+	}
+	if cli == "" {
+		return ""
+	}
+	owner := cli
+	if cli == "claude" {
+		owner = "claude-cli"
+		if strings.HasPrefix(h, "claude-") {
+			owner = h
+		}
+	}
+	for _, t := range []string{"judge", "strong"} {
+		if m, err := modelFor(owner, t); err == nil && m != "" {
+			return m
+		}
+	}
+	return ""
 }
 
 func shell(command, stdinPath, dir string) int {
@@ -89,13 +116,6 @@ func ConsultMain(args []string) int {
 			ctx = strings.TrimRight(string(b), "\n")
 		}
 	}
-	model := os.Getenv("CONSULT_MODEL")
-	if model == "" {
-		model, _ = config.Model("judge")
-	}
-	if model == "" {
-		model, _ = config.Model("strong")
-	}
 	tmp, err := os.MkdirTemp("", "consult.")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -112,6 +132,7 @@ func ConsultMain(args []string) int {
 	}
 	h, _ := harness.Detect()
 	cli := ConsultCLI(h, installed)
+	model := ConsultModel(h, cli, os.Getenv("CONSULT_MODEL"), config.ModelFor)
 	if cli == "claude" {
 		a := []string{"-p"}
 		if model != "" {
@@ -132,8 +153,5 @@ func ConsultMain(args []string) int {
 		return 0
 	}
 	os.Setenv("AGENT_CLI", cli)
-	if model == "" {
-		model = os.Getenv("AGENT_MODEL")
-	}
 	return Run(Options{Cwd: tmp, Model: model, Effort: DefaultEffort(), ReadOnly: true, PromptFile: pf})
 }

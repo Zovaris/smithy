@@ -41,11 +41,11 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
 ## How
 [if hush]- Read {{hush}} once.
 [end][if smelt]
-- Workflow: read {{smelt}} and follow it yourself at speed fast: phase 0, then build to ship
-  (plan and spec skipped at fast), every phase in order (build test-first, check the diff against
-  the Spec-check list in its agents/reviewer.md yourself, verify with `smithy receipt run`,
-  `smithy scan --base {{base}}`, PR body with `smithy receipt list --md`). No test or review agents
-  (a security agent only if the change is risky): the warden checks the merged batch once. Skipping a phase is a failed task, not a shortcut; its references/, agents/ and scripts/ paths are relative to its folder. Not a slash command.
+- Workflow: read {{smelt}} and follow it yourself at speed fast, the phases 0 context, build, check,
+  ship in order (build test-first; check the diff against the Spec-check list in its
+  agents/reviewer.md yourself; ship with `smithy receipt run`, `smithy scan --base {{base}}`, PR body
+  with `smithy receipt list --md`). No test or review agents (a security agent only if the change
+  is risky): the warden checks the merged batch once. A missing phase is a failed task; its references/, agents/ and scripts/ paths are relative to its folder. Not a slash command.
 [end][if debug]- Bug: smelt fast via the debug path (its references/DEBUG.md): commit the repro test alone, then on that
   clean commit `'{{smithy}}' receipt run --claim repro -- <cmd>` (must exit non-zero); then the fix commit,
   the same command green, `'{{smithy}}' receipt check-red` passing.
@@ -100,11 +100,9 @@ as the current step.
   tests_run=<commands actually run> risks=<or none>, then end your turn. Don't wait for CI and
   never merge: the warden waits on every PR's CI at once, merges when merge is auto (otherwise the user does), and comes back to you only
   if CI goes red or the base moves. A draft or unfinished PR is state=blocked, never pr_open.
-- Work found after your PR merged: small and inside this task's intent (a missed case, a typo, a
-  failing edge test) → fix it yourself in a follow-up PR from a new branch `'{{smithy}}' names branch <key> "<title>" fix`, same
-  rules. Anything bigger or outside the intent → write it as a new task file `NN-<slug>.md` in
-  the task dir (or `{{batchdir}}/followups/` without one), keep your card `merged`, and name it in
-  the note: `followup: <file>`. The warden decides whether it becomes a task.
+- Work you find beyond this task's intent: write it as a new task file `NN-<slug>.md` in the task
+  dir (or `{{batchdir}}/followups/` without one) and name it in your card's note: `followup: <file>`.
+  After the merge the warden decides whether it becomes a task; you end at pr_open or ready.
 - Someone else's PR already covers this: close yours with one sentence pointing to theirs;
   state=dropped.
 - Scout: write {{batchdir}}/{{id}}/report.md (answer first, then evidence with file:line and links,

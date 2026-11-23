@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,13 +18,17 @@ import (
 
 const batchUsage = `usage: smithy batch <command>
   init <tasks_dir> --repo <dir> [--base b] [--merge auto|manual] [--max n]
+      [--cleanup auto|ask] [--mode "smelt fast|smelt normal|smelt full|plain"] [--risky <id,id>]
       writes <batch-dir>/batch.json (batch = <repo>-<task dir name>, -2, -3 when taken) from the task
-      files that aren't done or dropped: id <slug>-NN, title, intent = the file's path, speed,
+      files that aren't done or dropped: id <slug>-NN, title, intent = the file's path (relative to the repo when the file is
+      committed on origin/<base>, else absolute), speed,
       prereqs from Blocked by, branch and worktree from smithy names, risky and route: debug from
       the task text (smelt's Risky list; a fix-type title). Prints the batch dir. Blockers that are
       done or dropped aren't prereqs. Refused while another batch has unfinished items from the
-      same task dir or on the same branches. Without --merge, merge stays empty and smithy brief
-      refuses until you set the user's auto/manual answer.
+      same task dir or on the same branches. Without a flag, max, cleanup, mode and merge come from
+      settings (warden.max, warden.cleanup, warden.mode, warden.merge: repo, then user); merge stays
+      empty when unset and smithy brief refuses until you set the user's auto/manual answer. --risky marks each listed item id risky
+      (an unknown id is an error).
   add <batch> --id <id> --title <t> --intent <text> [--base b] [--speed fast|normal|full]
       appends one item (a fix item from the batch check); base defaults to the first item's, speed
       to the batch mode's; refuses a duplicate id, title or branch.
@@ -96,6 +101,23 @@ func batchOpts(args []string, keys ...string) (map[string]string, []string, erro
 	return opts, pos, nil
 }
 
+func validMode(m string) bool {
+	switch m {
+	case "smelt fast", "smelt normal", "smelt full", "plain":
+		return true
+	}
+	return false
+}
+
+// defaultMax is warden.max (5 when unset or not a positive number).
+func defaultMax() int {
+	var n int
+	if _, err := fmt.Sscanf(config.Get("warden.max", "5"), "%d", &n); err != nil || n < 1 {
+		return 5
+	}
+	return n
+}
+
 func num(s string) int { n, _ := strconv.Atoi(s); return n }
 
 func defaultBase(repo string) string {
@@ -106,7 +128,7 @@ func defaultBase(repo string) string {
 }
 
 func batchInit(args []string) error {
-	o, pos, err := batchOpts(args, "--repo", "--base", "--merge", "--max")
+	o, pos, err := batchOpts(args, "--repo", "--base", "--merge", "--max", "--risky", "--cleanup", "--mode")
 	if err != nil {
 		return err
 	}
@@ -121,12 +143,40 @@ func batchInit(args []string) error {
 	if err != nil {
 		return err
 	}
-	if m := o["--merge"]; m != "" && m != "auto" && m != "manual" {
-		return fmt.Errorf("--merge is %q, want auto or manual", m)
+	merge := o["--merge"]
+	if merge == "" {
+		merge = config.Get("warden.merge", "")
+		if merge == "ask" {
+			merge = ""
+		}
+	}
+	if merge != "" && merge != "auto" && merge != "manual" {
+		return fmt.Errorf("merge is %q, want auto or manual", merge)
+	}
+	cleanup := o["--cleanup"]
+	if cleanup == "" {
+		cleanup = config.Get("warden.cleanup", "auto")
+	}
+	if cleanup != "auto" && cleanup != "ask" {
+		return fmt.Errorf("cleanup is %q, want auto or ask", cleanup)
+	}
+	mode := o["--mode"]
+	if mode == "" {
+		mode = config.Get("warden.mode", "smelt normal")
+	}
+	if !validMode(mode) {
+		return fmt.Errorf("mode is %q, want smelt fast, smelt normal, smelt full or plain", mode)
+	}
+	if v, has := o["--risky"]; has && strings.TrimSpace(v) == "" {
+		return fmt.Errorf("--risky needs at least one item id")
 	}
 	ts := tasks.Load(td)
 	if len(ts) == 0 {
 		return fmt.Errorf("no task files in %s", td)
+	}
+	top := gitOut(repo, "rev-parse", "--show-toplevel")
+	if top == "" {
+		top = repo
 	}
 	base := o["--base"]
 	if base == "" {
@@ -162,8 +212,11 @@ func batchInit(args []string) error {
 			speed = "fast"
 		}
 		intent := t.File
-		if rel, err := filepath.Rel(realPath(repo), realPath(t.File)); err == nil && !strings.HasPrefix(rel, "..") {
-			intent = filepath.ToSlash(rel)
+		if rel, err := filepath.Rel(realPath(top), realPath(t.File)); err == nil && !strings.HasPrefix(rel, "..") {
+			rel = filepath.ToSlash(rel)
+			if exec.Command("git", "-C", top, "cat-file", "-e", "origin/"+base+":"+rel).Run() == nil {
+				intent = rel
+			}
 		}
 		it, err := newItem(repo, id, key, t.Title, intent, text, base, speed, pre)
 		if err != nil {
@@ -173,6 +226,20 @@ func batchInit(args []string) error {
 	}
 	if len(items) == 0 {
 		return fmt.Errorf("every task in %s is done or dropped", td)
+	}
+	if r := o["--risky"]; r != "" {
+		for _, id := range strings.Split(r, ",") {
+			id = strings.TrimSpace(id)
+			found := false
+			for i := range items {
+				if items[i].ID == id {
+					items[i].Risky, found = true, true
+				}
+			}
+			if !found {
+				return fmt.Errorf("--risky: no item %q in %s", id, td)
+			}
+		}
 	}
 	if err := clash(td, items); err != nil {
 		return err
@@ -186,15 +253,17 @@ func batchInit(args []string) error {
 		name = fmt.Sprintf("%s-%d", stem, n)
 	}
 	dir := filepath.Join(cards.Home(), name)
-	bt := map[string]any{"batch": name, "repo": repo, "stack": false, "production": "", "mode": "smelt normal",
-		"merge": o["--merge"], "cleanup": "auto", "tasks_dir": td, "items": items}
-	if m := o["--max"]; m != "" {
-		var n int
-		if _, err := fmt.Sscanf(m, "%d", &n); err != nil || n < 1 {
-			return fmt.Errorf("--max is %q, want a number above 0", m)
-		}
-		bt["max"] = n
+	bt := map[string]any{"batch": name, "repo": repo, "stack": false, "production": "", "mode": mode,
+		"merge": merge, "cleanup": cleanup, "tasks_dir": td, "items": items}
+	m := o["--max"]
+	if m == "" {
+		m = config.Get("warden.max", "5")
 	}
+	var n int
+	if _, err := fmt.Sscanf(m, "%d", &n); err != nil || n < 1 {
+		return fmt.Errorf("max is %q, want a number above 0", m)
+	}
+	bt["max"] = n
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}

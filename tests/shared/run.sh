@@ -62,6 +62,9 @@ t "add numbers the next task" '[ "$(basename "$("$S/smithy" tasks add docs/specs
 t "added task is todo and blocked" 'grep -q "^Blocked by: 01" docs/specs/b/02-rate-limit.md && [ "$(basename "$("$S/smithy" tasks next docs/specs/b)")" = 01-add-login.md ]'
 t "board shows the list" '"$S/smithy" tasks board | grep -q "0/2 done, 0 doing, 1 ready"'
 t "board --all finds it from elsewhere" '(cd / && "$S/smithy" tasks board --all) | grep -q "repo/b"'
+mkdir -p "$T/imp"; printf '# Plan\n\n## 01 · First\nbody\n\n## 02 Second\nBlocked by: 01\nmore\n' > "$T/imp/list.md"
+t "import splits a list into tasks" '"$S/smithy" tasks import "$T/imp/list.md" >/dev/null && [ -f "$T/imp/01-first.md" ] && grep -q "^Blocked by: 01" "$T/imp/02-second.md"'
+t "import refuses to overwrite" '! "$S/smithy" tasks import "$T/imp/list.md"'
 rm -rf docs/specs/b
 
 # smithy commit
@@ -73,6 +76,11 @@ t "accepts good message" '$S/smithy commit check "feat(api): add pagination"'
 echo a > a.txt; echo b > b.txt
 t "requires paths" '! $S/smithy commit "feat(api): add a"'
 t "commits only given paths" '$S/smithy commit "feat(api): add a" a.txt && [ "$(git status --short)" = "?? b.txt" ]'
+t "commits a git mv rename" 'git mv a.txt c.txt && $S/smithy commit "refactor: rename a to c" a.txt c.txt && [ "$(git status --short)" = "?? b.txt" ] && git ls-files --error-unmatch c.txt >/dev/null'
+t "refuses staged files outside the paths" 'h=$(git rev-parse HEAD); git add b.txt; o=$($S/smithy commit "feat: add c" c.txt 2>&1); echo "$o" | grep -q "already staged: b.txt" && [ "$(git rev-parse HEAD)" = "$h" ]; r=$?; git reset -q b.txt; [ $r -eq 0 ]'
+t "dot refuses earlier staging" 'git add b.txt; ! $S/smithy commit "feat: add all" . >/dev/null 2>&1; r=$?; git reset -q b.txt; [ $r -eq 0 ]'
+t "subdir cwd sees staging outside it" 'mkdir -p sub && echo s > sub/s.txt && git add b.txt && (cd sub && ! $S/smithy commit "feat: add s" s.txt >/dev/null 2>&1); r=$?; git reset -q b.txt; rm -rf sub; [ $r -eq 0 ]'
+t "path outside the repo refused" 'o=$($S/smithy commit "feat: x" .. 2>&1); echo "$o" | grep -q "outside the repo"'
 
 # smithy pr
 t "no template → none" '$S/smithy pr template | grep -q "^none:"'
@@ -192,7 +200,7 @@ t "launcher: hanging gh download times out with exit 3" 's=$(date +%s); LW "$L/h
 t "launcher: hanging attestation times out with exit 3" 'LW "$L/slowatt" b 1; [ $? -eq 3 ] && grep -q "^smithy: can.t verify .*timed out" "$L/err"'
 t "launcher: install leaves no temp dir" 'rm -rf "$L/tmp"/*; [ "$(LW "$L/okgh" c "")" = fake-smithy ] && [ -z "$(ls "$L/tmp")" ]'
 
-# launcher without gh: curl download, checksum only, warning once
+# launcher without gh: curl download, refused unless SMITHY_ALLOW_UNATTESTED=1
 mkdir -p "$L/nogh" "$L/nogh-bad"
 cat > "$L/fakecurl" <<'EOF'
 #!/bin/sh
@@ -210,8 +218,10 @@ esac
 EOF
 cp "$L/fakecurl" "$L/nogh/curl"; cp "$L/fakecurl" "$L/nogh-bad/curl"; chmod +x "$L/nogh/curl" "$L/nogh-bad/curl"
 LN() { env -u SMITHY_BIN -u SMITHY_ALLOW_UNATTESTED SMITHY_HOME="$L/home$2" TMPDIR="$L/tmp" BAD_SUM="$3" PATH="$1:$L/sys" "$L/smithy" version 2>"$L/err"; }
-t "launcher: no gh installs on checksum with one warning" '[ "$(LN "$L/nogh" d "")" = fake-smithy ] && [ "$(grep -c "installed with checksum only: install the GitHub CLI to verify the build.s origin" "$L/err")" -eq 1 ]'
-t "launcher: no gh, second run is silent" '[ "$(LN "$L/nogh" d "")" = fake-smithy ] && ! grep -q "checksum only" "$L/err"'
+t "launcher: no gh refuses an unattested install" 'LN "$L/nogh" d ""; [ $? -eq 3 ] && grep -q "can.t verify the build attestation" "$L/err" && [ ! -e "$L/home"d/bin/0.0.0/smithy ]'
+LA() { env -u SMITHY_BIN SMITHY_ALLOW_UNATTESTED=1 SMITHY_HOME="$L/home$2" TMPDIR="$L/tmp" BAD_SUM="$3" PATH="$1:$L/sys" "$L/smithy" version 2>"$L/err"; }
+t "launcher: no gh + SMITHY_ALLOW_UNATTESTED=1 installs on checksum with one warning" '[ "$(LA "$L/nogh" f "")" = fake-smithy ] && [ "$(grep -c "installing on checksum only" "$L/err")" -eq 1 ]'
+t "launcher: no gh, second run is silent" '[ "$(LA "$L/nogh" f "")" = fake-smithy ] && ! grep -q "checksum only" "$L/err"'
 t "launcher: no gh + bad checksum refuses" 'LN "$L/nogh-bad" e 1; [ $? -eq 3 ] && grep -q "checksum mismatch" "$L/err" && [ ! -e "$L/home"e/bin/0.0.0/smithy ]'
 t "launcher: no gh + empty checksums.txt refuses" 'LN "$L/nogh-bad" g empty; [ $? -eq 3 ] && [ ! -e "$L/home"g/bin/0.0.0/smithy ]'
 

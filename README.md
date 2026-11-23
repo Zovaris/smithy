@@ -110,9 +110,9 @@ repo's style, waiting on CI) is one small Go binary, `smithy`. You never install
 
 - Each skill ships a launcher that downloads the binary for your platform from the matching
   release on first run and caches it in `~/.smithy/bin/`.
-- With `gh`, it verifies the checksum and the GitHub build attestation. Without `gh`, it verifies
-  the checksum only and warns. A mismatch always refuses; a `gh` too old for attestations refuses
-  unless `SMITHY_ALLOW_UNATTESTED=1`.
+- It verifies the checksum and the GitHub build attestation, so it needs `gh`. Without `gh` (or
+  with one too old for attestations) it installs nothing unless you set
+  `SMITHY_ALLOW_UNATTESTED=1`, which accepts the checksum alone. A mismatch always refuses.
 
 Agents wait on GitHub without spending tokens:
 
@@ -139,7 +139,7 @@ them, with defaults, are in [docs/settings.md](docs/settings.md).
 
 ```bash
 npx skills add Zovaris/smithy -g -y --skill '*' -a claude-code -a codex   # no prompts
-npx skills add Zovaris/smithy@v0.13.0 -g                                   # pin a release
+npx skills add Zovaris/smithy@v0.14.0 -g                                   # pin a release
 npx skills update -g                                                      # update
 ```
 

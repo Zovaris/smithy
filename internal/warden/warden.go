@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -136,7 +135,7 @@ func WaitTurn(args []string) int {
 			fmt.Fprintln(os.Stderr, planErr(batch, err))
 			return 2
 		}
-		max := 5
+		max := defaultMax()
 		if p.Max != nil {
 			max = *p.Max
 		}
@@ -196,14 +195,6 @@ func (r *report) bad(msg, fix string) {
 func have(name string) bool { _, err := exec.LookPath(name); return err == nil }
 
 type claudeSettings struct {
-	Hooks struct {
-		PermissionRequest []struct {
-			Matcher string `json:"matcher"`
-			Hooks   []struct {
-				Command string `json:"command"`
-			} `json:"hooks"`
-		} `json:"PermissionRequest"`
-	} `json:"hooks"`
 	Permissions struct {
 		Allow []string `json:"allow"`
 	} `json:"permissions"`
@@ -226,8 +217,6 @@ func readSettings(f string) (claudeSettings, bool) {
 var findSkill = agents.FindSkill
 
 var missingInHarness = agents.MissingInHarness
-
-var allowRe = regexp.MustCompile(`"behavior"\s*:\s*"allow"`)
 
 func githubMode(r *report) {
 	if ok, origin := ghx.OriginIsGitHub(); !ok && origin != "" {
@@ -310,44 +299,12 @@ func Doctor(args []string) int {
 			r.warn("no "+m+" model set for "+h, "ask the user, then: smithy config set-model "+m+" <name>")
 		}
 	}
-	if h == "claude-desktop" {
-		hook := ""
-	files:
-		for _, f := range claudeFiles() {
-			s, ok := readSettings(f)
-			if !ok {
-				continue
-			}
-			for _, pr := range s.Hooks.PermissionRequest {
-				if re, err := regexp.Compile(pr.Matcher); pr.Matcher == "" || err != nil || !re.MatchString("mcp__ccd_session__start_session") {
-					continue
-				}
-				for _, hk := range pr.Hooks {
-					file := strings.Fields(hk.Command + " ")[0]
-					if strings.HasPrefix(file, "~") {
-						home, _ := os.UserHomeDir()
-						file = home + file[1:]
-					}
-					body, _ := os.ReadFile(file)
-					if allowRe.MatchString(hk.Command) || allowRe.Match(body) {
-						hook = f
-						break files
-					}
-				}
-			}
-		}
-		if hook != "" {
-			r.ok("start_session auto-approve hook (" + hook + ")")
-		} else {
-			r.warn("no start_session auto-approve hook (one 'Allow' click per worker)", `add a PermissionRequest hook, matcher mcp__ccd_session__start_session, printing {"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}`)
-		}
-	}
 	if strings.HasPrefix(h, "claude") {
 		allowed := ""
 		for _, f := range claudeFiles() {
 			if s, ok := readSettings(f); ok {
 				for _, a := range s.Permissions.Allow {
-					if strings.HasPrefix(a, "Bash(gh pr merge") {
+					if allowsMerge(a) {
 						allowed = f
 					}
 				}
@@ -359,7 +316,7 @@ func Doctor(args []string) int {
 		if allowed != "" {
 			r.ok("gh pr merge allowed (" + allowed + ")")
 		} else {
-			r.warn("gh pr merge not in the allow list (auto merges may stop at ready)", `add "Bash(gh pr merge:*)" to permissions.allow in ~/.claude/settings.json, or use merge manual`)
+			r.warn("gh pr merge not in the allow list (auto merges may stop at ready)", `add "Bash(smithy pr merge:*)" (or "Bash(gh pr merge:*)") to permissions.allow in ~/.claude/settings.json, or use merge manual`)
 		}
 	}
 	d := cards.Home()
@@ -407,4 +364,23 @@ func writable(dir string) bool {
 	name := f.Name()
 	f.Close()
 	return os.Remove(name) == nil
+}
+
+// allowsMerge says an allow rule lets the agent run `gh pr merge` or `smithy pr merge`: a Bash rule
+// for gh pr merge, or for smithy (bare or by launcher path) as a whole or its pr merge command.
+func allowsMerge(rule string) bool {
+	cmd, ok := strings.CutPrefix(rule, "Bash(")
+	if !ok {
+		return false
+	}
+	cmd = strings.TrimSuffix(cmd, ")")
+	if strings.HasPrefix(cmd, "gh pr merge") {
+		return true
+	}
+	for _, tail := range []string{"smithy pr merge:*", "smithy:*"} {
+		if cmd == tail || strings.HasSuffix(cmd, "/"+tail) {
+			return true
+		}
+	}
+	return false
 }
