@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/Zovaris/smithy/internal/usage"
 	"github.com/charmbracelet/colorprofile"
 )
 
@@ -335,11 +336,41 @@ func (m Model) cardCap(w, h int) ([]string, string) {
 	if wt.Paused {
 		lines = append(lines, t.fg(t.warn).Bold(!t.plain).Render("intake paused · p resumes"))
 	}
+	lines = append(lines, "", m.spendLine())
+	if len(wt.Spend) > 0 {
+		cents := make([]int, len(wt.Spend))
+		var nums []string
+		for i, v := range wt.Spend {
+			cents[i] = int(v*100 + 0.5)
+			nums = append(nums, fmt.Sprintf("%.0f", v))
+		}
+		lines = append(lines, t.fg(t.muted).Render("7 days  ")+t.fg(t.accent).Render(sparkline(cents, 7, t.g.ticks))+t.fg(t.muted).Render("  $"+strings.Join(nums, " ")))
+	}
 	pct := 0
 	if wt.Cap > 0 {
 		pct = wt.Today * 100 / wt.Cap
 	}
 	return lines, fmt.Sprintf("%d%%", pct)
+}
+
+// spendLine is "Spend today": the reported cost so far, against auto.max_cost_per_day when set.
+func (m Model) spendLine() string {
+	t := m.th
+	wt := m.snap.Watcher
+	today := "-"
+	over := false
+	if n := len(wt.Spend); n > 0 {
+		today = usage.Cost(&wt.Spend[n-1])
+		over = wt.SpendCap != nil && wt.Spend[n-1] >= *wt.SpendCap
+	}
+	s := t.fg(t.muted).Render("spend   ") + t.fg(t.text).Bold(!t.plain).Render(today) + t.fg(t.muted).Render(" today")
+	if wt.SpendCap != nil {
+		s += t.fg(t.muted).Render(" · cap " + usage.Cost(wt.SpendCap))
+	}
+	if over {
+		s += t.fg(t.err).Bold(!t.plain).Render(" · reached")
+	}
+	return s
 }
 
 func hoursWord(w Watcher) string {

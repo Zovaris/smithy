@@ -6,7 +6,38 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/usage"
 )
+
+func TestSpendSumsKnownCostPerLocalDay(t *testing.T) {
+	now := time.Date(2026, 11, 23, 15, 0, 0, 0, time.Local)
+	c1, c2 := 0.5, 1.25
+	es := []Event{
+		{T: now.Add(-time.Hour), Kind: "usage", Usage: &usage.Usage{CostUSD: &c1}},
+		{T: now.Add(-2 * time.Hour), Kind: "usage", Usage: &usage.Usage{CostUSD: &c2}},
+		{T: now.AddDate(0, 0, -1), Kind: "usage", Usage: &usage.Usage{CostUSD: &c1}},
+		{T: now, Kind: "usage", Usage: &usage.Usage{Output: 9}},
+		{T: now.AddDate(0, 0, -9), Kind: "usage", Usage: &usage.Usage{CostUSD: &c2}},
+		{T: now, Kind: "launched"},
+	}
+	got := Spend(es, now, 3)
+	if len(got) != 3 || got[2] != 1.75 || got[1] != 0.5 || got[0] != 0 {
+		t.Fatalf("spend = %v", got)
+	}
+}
+
+func TestAppendKeepsUsage(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	c := 0.3
+	if err := Append(Event{Kind: "usage", Item: "a", Usage: &usage.Usage{Input: 5, CostUSD: &c}}); err != nil {
+		t.Fatal(err)
+	}
+	es, _ := Read(time.Time{}, 0)
+	if len(es) != 1 || es[0].Usage == nil || es[0].Usage.Input != 5 || *es[0].Usage.CostUSD != 0.3 {
+		t.Fatalf("events = %+v", es)
+	}
+}
 
 func TestAppendReadRotate(t *testing.T) {
 	t.Setenv("SMITHY_HOME", t.TempDir())
