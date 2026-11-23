@@ -139,6 +139,7 @@ time it needs a value. `smithy config list` shows every setting and where it cam
 them, with defaults, are in [docs/settings.md](docs/settings.md). API keys (e.g. Linear) live apart
 in `~/.smithy/auth.json` (mode 0600): `smithy auth set linear < keyfile`, never in a config file. Any process running as you (agents
 included) can read it, so use a test or least-privilege key.
+Telegram notifications from `smithy auto serve`: `smithy auth set telegram` (bot token), `smithy config set notify.telegram.chat <id>`, then `smithy notify test`.
 
 ## Autonomous mode
 

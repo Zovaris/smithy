@@ -5,6 +5,14 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: Telegram notifications, sent by `smithy auto serve` (never an agent) from events.jsonl
+  and the cards: PR ready, item blocked, stuck or waiting on a decision, orchestrator failed,
+  serve stopped, daily cap reached. Bot token in `smithy auth set telegram`, chat in
+  `notify.telegram.chat`, kinds in `notify.kinds`. Once per (item, kind), at most 20 a minute
+  (the overflow folded into one summary), no issue bodies or keys; a failure is logged once and
+  never stops serve. `smithy notify test|status`; the TUI System view shows the setup.
+- Added: events `orchestrator_failed`, `cap_reached` (once a day) and `serve_down` in events.jsonl.
+
 ## v0.15.0 — 2026-11-23
 
 - Added: `smithy worktree add <repo> <branch> <from>` creates a task worktree at its standard
