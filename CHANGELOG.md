@@ -11,8 +11,14 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - `smithy batch init --risky <id,id>` marks risky items (security agent required).
 
 ### Fixed
+- `smithy tasks next|ready` on a folder with no task files says so and points to
+  `smithy tasks import` when a `## NN` list is there (`next` printed "all done").
+- Skill text: use-smithy routes a single `tasks.md` through `smithy tasks import` to warden and
+  splits the ESCALATE step (hard floor → blocked; the rest → safest); adversary, e2e and hostile
+  send raw HTTP paths with a raw client; TDD closes keep-alive connections in HTTP tests.
 - `smithy consult` answers ESCALATE only for the hard floor (production, deleting user data, real
-  credentials, moving or charging real money); code that computes money or security is its pick; an ESCALATE with nobody to ask ends blocked.
+  credentials or logins as values, not auth code, moving or charging real money); code that
+  computes money or security is its pick; an ESCALATE with nobody to ask ends blocked.
   The stop list and hard floor say "moving or charging real money"; hush points to use-smithy.
 - `smithy pr create` drops GitHub's "Create a pull request" push hint (other push output stays),
   so the PR URL is the only link printed.

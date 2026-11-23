@@ -18,7 +18,7 @@ a model the user named always wins. A tier whose model is unset prints `-`: use-
 
 ## Loop
 
-`smithy tasks list <dir>` first; work `smithy tasks next <dir>` until it says all done.
+`smithy tasks list <dir>` first; work `smithy tasks next <dir>` until it exits 3 with nothing left.
 For each task:
 
 1. `smithy tasks set <file> status=doing`.

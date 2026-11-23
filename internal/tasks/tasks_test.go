@@ -597,3 +597,20 @@ func TestImportAllOrNothing(t *testing.T) {
 		}
 	}
 }
+
+func TestNextOnAListFileHintsImport(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "tasks.md"), []byte("## 01 · A\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	r, w, _ := os.Pipe()
+	old := os.Stderr
+	os.Stderr = w
+	c := Main([]string{"next", dir})
+	os.Stderr = old
+	w.Close()
+	b, _ := io.ReadAll(r)
+	if c != 3 || !strings.Contains(string(b), "smithy tasks import") {
+		t.Fatalf("exit %d: %s", c, b)
+	}
+}
