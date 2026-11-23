@@ -31,7 +31,7 @@ or, with nobody to ask (hush, a launched session; warden workers ask warden), en
 2. The user answers first → stop the timer (the harness's kill for that background task), use the
    answer. Only exit 0 printing `timer: <m>m elapsed` means it fired → step 3 with `--by timeout`.
 3. `smithy consult "<question>" "<options>"`: neutral options, safest first when security is
-   involved, never "as written" for an insecure request (fails → the safest). Follow the pick, go on.
+   involved, never "as written" for an insecure request (fails or ESCALATE → the safest). Follow it, go on.
 4. `smithy decisions add "<q>" "<choice>" --why "<reason>" --by timeout|consult [--ref <pr|file>]`.
 At the start of each reply (simple does it too): `smithy decisions pending` lists any → show
 them first ("decided without you: … — keep or change?"), then `smithy decisions confirm <n>|--all`

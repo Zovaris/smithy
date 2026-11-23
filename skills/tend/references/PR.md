@@ -42,7 +42,8 @@ inside the repo). Then repeat:
      you said `merge auto`, never a draft, and into the production branch only when the launch
      says the user approved it (use-smithy: merges); otherwise stop at green (or keep waiting when
      told to stay until merged).
-3. Commit fixes with `smithy commit` (style once, one concern per commit); push without force
+3. Commit fixes with `smithy commit` (style once, one concern per commit). After a merge or
+   rebase of the base, the full suite passes before any push (a receipt). Push without force
    unless the rebase rule above allows it.
 
 Done when the PR's `action` is `done` (green), `cleanup` (merged or closed) or it was handed
