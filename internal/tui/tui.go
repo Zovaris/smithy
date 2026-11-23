@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -499,7 +500,7 @@ func (m *Model) show(v view) tea.Cmd {
 func (m Model) decide(n int, accept bool, why string) (tea.Model, tea.Cmd) {
 	cmd := fmt.Sprintf("smithy decisions confirm %d", n)
 	if !accept {
-		cmd = fmt.Sprintf("smithy decisions reject %d %q", n, why)
+		cmd = fmt.Sprintf("smithy decisions reject %d %s", n, sh(why))
 	}
 	if (accept && m.confirm == nil) || (!accept && m.reject == nil) {
 		m.say("demo: would run " + cmd)
@@ -696,7 +697,7 @@ func (m *Model) showMarkdown(title, src string) {
 	out := src
 	if r, err := glamour.NewTermRenderer(glamour.WithStandardStyle(style), glamour.WithWordWrap(w-4)); err == nil {
 		if s, err := r.Render(src); err == nil {
-			out = s
+			out = osc8.ReplaceAllString(s, "")
 		}
 	}
 	m.showText(title, strings.Split(strings.TrimRight(out, "\n"), "\n"))
@@ -739,6 +740,10 @@ func (m Model) open() (tea.Model, tea.Cmd) {
 	}
 	if !webURL(r.url) {
 		m.status = "not a web URL"
+		return m, nil
+	}
+	if m.snap.Demo {
+		m.say("demo: would open " + r.url)
 		return m, nil
 	}
 	m.status = "opening " + r.url
@@ -812,6 +817,17 @@ func (m Model) selected() (row, bool) {
 func webURL(u string) bool {
 	p, err := url.Parse(u)
 	return err == nil && (p.Scheme == "http" || p.Scheme == "https") && p.Host != ""
+}
+
+// osc8 matches terminal hyperlink sequences, dropped so a link's shown text never hides its target.
+var osc8 = regexp.MustCompile("\x1b\\]8;[^\x07\x1b]*(?:\x07|\x1b\\\\)")
+
+// sh quotes s for a POSIX shell when it holds anything beyond a safe set.
+func sh(s string) string {
+	if s != "" && strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./:@%+=,-") == "" {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 func openURL(u string) error {

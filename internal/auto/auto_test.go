@@ -15,6 +15,24 @@ import (
 	"github.com/Zovaris/smithy/internal/tasks"
 )
 
+func TestOpenCodeNonAccessFailureIsOne(t *testing.T) {
+	if c := openCode(errors.New("linear: bad config")); c != 1 {
+		t.Fatalf("non-access open failure: %d", c)
+	}
+	if c := openCode(fmt.Errorf("x: %w", ErrNoAccess)); c != 3 {
+		t.Fatalf("no access: %d", c)
+	}
+}
+
+func TestErrTextCleansEscapes(t *testing.T) {
+	if got := errText(errors.New("bad\x1b]8;;http://x\x07link\x1b[31m")); strings.ContainsRune(got, 0x1b) {
+		t.Fatalf("escape left: %q", got)
+	}
+	if errText(nil) != "no source opened" {
+		t.Fatal("nil error text")
+	}
+}
+
 type fakeSource struct {
 	name     string
 	issues   []Issue

@@ -587,7 +587,7 @@ func TestMainBoardChangedSince(t *testing.T) {
 	mustSet(t, "b1", "a", "state=working")
 
 	_, _, code := capture(t, func() int { return Main([]string{"board", "b1", "--changed-since", "2999-01-01T00:00:00.000Z"}) })
-	if code != 3 {
+	if code != 4 {
 		t.Fatalf("nothing changed: %d", code)
 	}
 	so, _, code := capture(t, func() int { return Main([]string{"board", "b1", "--changed-since", "2000-01-01T00:00:00.000Z"}) })

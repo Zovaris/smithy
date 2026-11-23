@@ -8,11 +8,11 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/text"
 )
 
 // Event is one line of the log.
@@ -38,15 +38,9 @@ var mu sync.Mutex
 // File is the log's path.
 func File() string { return filepath.Join(ghx.Home(), "events.jsonl") }
 
-// flat keeps one short line: control characters dropped, at most n runes.
+// flat keeps one short line (text.Clean), at most n runes.
 func flat(s string, n int) string {
-	s = strings.Map(func(r rune) rune {
-		if r < 0x20 || (r >= 0x7f && r <= 0x9f) {
-			return ' '
-		}
-		return r
-	}, s)
-	s = strings.Join(strings.Fields(s), " ")
+	s = text.Clean(s)
 	if r := []rune(s); len(r) > n {
 		s = string(r[:n-1]) + "…"
 	}
@@ -75,12 +69,15 @@ func Append(e Event) error {
 		return err
 	}
 	if fi, err := os.Stat(f); err == nil && fi.Size()+int64(len(b)) > MaxBytes {
-		_ = os.Rename(f, f+".1")
+		if os.Rename(f, f+".1") == nil {
+			_ = os.Chmod(f+".1", 0o600)
+		}
 	}
 	fh, err := os.OpenFile(f, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return err
 	}
+	_ = fh.Chmod(0o600)
 	_, err = fh.Write(append(b, '\n'))
 	if cerr := fh.Close(); err == nil {
 		err = cerr

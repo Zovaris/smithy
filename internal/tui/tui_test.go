@@ -489,6 +489,41 @@ func TestOpenRequiresWebURL(t *testing.T) {
 	}
 }
 
+func TestMarkdownLinksShowTheirTarget(t *testing.T) {
+	m := demo(t, 160, 48)
+	m.showMarkdown("t", "see [click here](http://evil.example/x)")
+	c := m.text.GetContent()
+	if strings.Contains(c, "\x1b]8") || !strings.Contains(ansi.Strip(c), "evil.example/x") {
+		t.Fatalf("hyperlink hides its target: %q", c)
+	}
+}
+
+func TestDemoOpenOnlySays(t *testing.T) {
+	m := demo(t, 160, 48)
+	m.view = vIncoming
+	opened := false
+	m.opener = func(string) error { opened = true; return nil }
+	nm, cmd := press(m, "o")
+	if cmd != nil || opened || !strings.HasPrefix(nm.toast, "demo: would open ") {
+		t.Fatalf("cmd=%v opened=%v toast=%q", cmd != nil, opened, nm.toast)
+	}
+}
+
+func TestShellQuote(t *testing.T) {
+	for in, want := range map[string]string{
+		"plain/path-1.2":   "plain/path-1.2",
+		"https://x/pull/3": "https://x/pull/3",
+		"a b":              "'a b'",
+		"it's; rm -rf ~":   `'it'\''s; rm -rf ~'`,
+		"$(touch x)":       "'$(touch x)'",
+		"":                 "''",
+	} {
+		if got := sh(in); got != want {
+			t.Errorf("sh(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestOverlappingLoads(t *testing.T) {
 	fixture(t)
 	m := model(160, 48)
