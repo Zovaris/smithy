@@ -152,7 +152,15 @@ the queue and running batches.
 smithy config set auto.sources github,linear
 smithy config set linear.team ENG
 smithy config set auto.max_per_day 20
+smithy auto serve          # the loop outside the LLM; Esc/q stops it, agents keep running
 ```
+
+Security: run unattended mode under a dedicated OS user or machine, with a least-privilege GitHub
+token and a test or least-privilege Linear key. Issue text can carry injected instructions; the
+`smithy agent --profile auto` allow-list (explicit git/gh subcommands, denied config, credential and
+network commands, denied secret files) reduces that risk but cannot remove it. Codex runs in its
+workspace-write sandbox with network on (push needs it) and approvals off, so nothing stops it
+sending data out: least-privilege tokens matter most there.
 
 ## Install
 

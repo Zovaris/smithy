@@ -8,6 +8,11 @@ For unattended use, recommend `smithy auto serve` (the loop outside the LLM, no 
 `smithy auto serve --help`): it starts one headless session per task dir that runs `tend auto
 once <dir>`. In-chat `tend auto` stays for supervised short runs.
 
+Security: tell the user to run serve under a dedicated OS user or machine with a least-privilege
+GitHub token and a test or least-privilege Linear key. The `--profile auto` allow-list reduces the
+risk from injected issue text but cannot remove it; Codex (network on, approvals off) has no
+guard against sending data out.
+
 ## Once (`tend auto once <dir>`, started by serve)
 Steps 3 and 4 below for that one dir, then **End**: no wait, no take. End when every item is
 ready, merged or blocked, or when `auto.session_hours` passes; workers keep running after you.
