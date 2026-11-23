@@ -82,10 +82,11 @@ const ProfileEnv = "SMITHY_AGENT_PROFILE"
 // smithy itself is allowed only by the absolute paths in Options.SmithyBins.
 func AutoTools(smithy []string) []string {
 	t := []string{"Read", "Edit", "Write", "Glob", "Grep"}
-	for _, g := range []string{"status", "diff", "add", "commit", "checkout", "switch", "branch", "log", "fetch", "merge", "rev-parse", "show", "worktree"} {
+	for _, g := range []string{"status", "diff", "add", "commit", "checkout", "switch", "branch", "log", "merge", "rev-parse", "show"} {
 		t = append(t, "Bash(git "+g+" *)", "Bash(git "+g+")")
 	}
-	t = append(t, "Bash(git push origin *)", "Bash(git push -u origin *)")
+	t = append(t, "Bash(git fetch)", "Bash(git fetch origin)", "Bash(git fetch origin *)", "Bash(git fetch --prune)", "Bash(git fetch --prune origin)",
+		"Bash(git push origin *)", "Bash(git push -u origin *)", "Bash(git worktree list)", "Bash(git worktree list *)")
 	for _, g := range []string{"pr create", "pr view", "pr checks", "pr list", "pr comment", "pr diff", "issue view", "issue comment", "run view", "run list"} {
 		t = append(t, "Bash(gh "+g+" *)")
 	}
@@ -102,7 +103,12 @@ func AutoTools(smithy []string) []string {
 // credential commands, network fetchers, secrets on disk and files that run code later.
 func AutoDenied(smithy []string) []string {
 	d := []string{"Bash(git -c *)", "Bash(git config *)", "Bash(gh api *)", "Bash(gh auth *)", "Bash(gh gist *)", "Bash(gh alias *)",
-		"Bash(gh extension *)", "Bash(smithy auth *)", "Bash(smithy config *)", "Bash(curl *)", "Bash(wget *)"}
+		"Bash(gh extension *)", "Bash(smithy auth *)", "Bash(smithy config *)", "Bash(curl *)", "Bash(wget *)",
+		// remote-exec and URL options of fetch/push, and file output of any git command
+		"Bash(git * --upload-pack*)", "Bash(git * --receive-pack*)", "Bash(git * --exec*)", "Bash(git * --repo*)", "Bash(git * --output*)",
+		"Bash(git push * http*)", "Bash(git push * git@*)", "Bash(git push * ssh*)", "Bash(git push * file*)", "Bash(git checkout * -- /*)",
+		// every shell redirect and tee: workers write files with Edit/Write, never through the shell
+		"Bash(*>*)", "Bash(* | tee *)", "Bash(*|tee *)"}
 	for _, b := range smithy {
 		if filepath.IsAbs(b) {
 			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config *)")

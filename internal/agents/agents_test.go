@@ -52,12 +52,15 @@ func TestBuild(t *testing.T) {
 		t.Errorf("claude auto profile = %q", s.Argv)
 	}
 	for _, want := range []string{"\nBash(git commit *)\n", "\nBash(git push origin *)\n", "\nBash(gh pr create *)\n", "\nBash(/opt/smithy/bin/smithy *)\n",
-		"\n--disallowedTools\n", "\nBash(gh api *)\n", "\nBash(git -c *)\n", "\nRead(~/.ssh/**)\n", "\nEdit(**/.git/hooks/**)\n", "\nBash(/opt/smithy/bin/smithy auth *)\n"} {
+		"\n--disallowedTools\n", "\nBash(gh api *)\n", "\nBash(git -c *)\n", "\nRead(~/.ssh/**)\n", "\nEdit(**/.git/hooks/**)\n", "\nBash(/opt/smithy/bin/smithy auth *)\n",
+		"\nBash(git fetch origin)\n", "\nBash(git worktree list)\n", "\nBash(git * --upload-pack*)\n", "\nBash(git * --receive-pack*)\n",
+		"\nBash(git * --exec*)\n", "\nBash(git * --repo*)\n", "\nBash(git * --output*)\n", "\nBash(git push * http*)\n", "\nBash(git push * git@*)\n",
+		"\nBash(git push * ssh*)\n", "\nBash(git push * file*)\n", "\nBash(git checkout * -- /*)\n", "\nBash(*>*)\n", "\nBash(* | tee *)\n"} {
 		if !strings.Contains(argv+"\n", want) {
 			t.Errorf("auto profile lacks %q", strings.TrimSpace(want))
 		}
 	}
-	for _, bad := range []string{"Bash(*)", "bypass", "Bash(git *)", "Bash(gh *)", "Bash(*/", "rel/smithy", "Bash(git push *)"} {
+	for _, bad := range []string{"Bash(*)", "bypass", "Bash(git *)", "Bash(gh *)", "Bash(*/", "rel/smithy", "Bash(git push *)", "Bash(git fetch *)", "Bash(git worktree *)", "Bash(git worktree)"} {
 		if strings.Contains(argv, bad) {
 			t.Errorf("auto profile allows %q: %q", bad, s.Argv)
 		}

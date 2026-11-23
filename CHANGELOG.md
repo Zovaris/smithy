@@ -17,7 +17,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   Codex with `approval_policy=never` in its workspace-write sandbox. Never a full bypass.
 - Security: the auto profile reaches every worker (`SMITHY_AGENT_PROFILE`); its allow-list names
   git and gh subcommands (push only to origin) and smithy by absolute path only, and a deny list
-  blocks `git -c`/`config`, `gh api|auth|gist|alias|extension`, `smithy auth|config`, curl, wget,
+  blocks `git -c`/`config`, fetch/push exec and URL options, shell redirects and tee, `gh api|auth|gist|alias|extension`, `smithy auth|config`, curl, wget,
   secret files and hook/rc/settings edits. `auto.agent` takes an absolute path; doctor runs its
   `--version` and states Codex's network limit. Serve's locks are O_EXCL with atomic rewrites,
   pids carry their start time (a reused pid reads as dead), a failed launch puts the issues back
