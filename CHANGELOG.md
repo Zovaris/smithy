@@ -5,6 +5,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.13.0 — 2026-11-22
+
 - **Release audit fixes.** One owner for the ask flow, decision log, model ask and stop list (use-smithy); warden logs decisions with `smithy decisions add --ref`, not `decisions.md`; plain skill names instead of slash examples; doc corrections.
 - **Ask, with a timeout.** The user's decisions (use-smithy's stop list) are asked and waited on
   for at most `ask.timeout` minutes (new setting, default 10; 0 = don't start the timer) through a background
