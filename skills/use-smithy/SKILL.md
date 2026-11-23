@@ -31,11 +31,11 @@ or, with nobody to ask (hush, a launched session; warden workers ask warden), en
 2. The user answers first → stop the timer (the harness's kill for that background task), use the
    answer. Only exit 0 printing `timer: <m>m elapsed` means it fired → step 3 with `--by timeout`.
 3. `smithy consult "<q>" "<options>"`: neutral, safest first for security, never "as written" for
-   an insecure request. Fails → safest; ESCALATE → warden or the user, nobody → safest. Go on.
+   an insecure request. Fails → safest; ESCALATE → warden or the user, nobody → safest (security:
+   the secure one; else the most reversible, least new surface; name which). Go on.
 4. `smithy decisions add "<q>" "<choice>" --why "<reason>" --by timeout|consult [--ref <pr|file>]`.
-At the start of each reply (simple does it too): `smithy decisions pending` lists any → show
-them first ("decided without you: … — keep or change?"), then `smithy decisions confirm <n>|--all`
-or `change <n> "<choice>"` (n as pending numbers them).
+Each reply starts (simple too) with `smithy decisions pending` → show any ("decided without you:
+… — keep or change?"), then `smithy decisions confirm <n>|--all` or `change <n> "<choice>"`.
 
 **Model tiers.** cheap, mid, strong per harness, plus optional `judge` (only for `smithy
 consult`). `smithy route` picks the tier (`--agent <file>` for a smelt agent); `smithy config
