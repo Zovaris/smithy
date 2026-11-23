@@ -361,6 +361,7 @@ func Import(file, dir string) ([]string, error) {
 		body                      []string
 	}
 	var secs []sec
+	var shared []string
 	fence, titled := false, false
 	text := strings.ReplaceAll(strings.TrimPrefix(string(b), "\ufeff"), "\r\n", "\n")
 	for i, l := range strings.Split(text, "\n") {
@@ -390,7 +391,8 @@ func Import(file, dir string) ([]string, error) {
 				titled = true
 				continue
 			}
-			return nil, fmt.Errorf("%s:%d: text before the first `## NN · Title` section", file, i+1)
+			shared = append(shared, l)
+			continue
 		}
 		cur := &secs[len(secs)-1]
 		if !fence {
@@ -409,6 +411,13 @@ func Import(file, dir string) ([]string, error) {
 	}
 	if len(secs) == 0 {
 		return nil, fmt.Errorf("no `## NN · Title` sections in %s", file)
+	}
+	if len(shared) > 0 {
+		// Text before the first section (stack, rules shared by every task) goes into each task.
+		for i := range secs {
+			secs[i].body = append(secs[i].body, "", "Shared context (from "+filepath.Base(file)+"):")
+			secs[i].body = append(secs[i].body, shared...)
+		}
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err

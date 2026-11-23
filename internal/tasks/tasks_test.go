@@ -524,8 +524,6 @@ func importErr(t *testing.T, name, body, want string) {
 }
 
 func TestImportStrict(t *testing.T) {
-	importErr(t, "text before first section", "# Plan\nintro text\n\n## 01 · A\nx\n", "before the first")
-	importErr(t, "two titles", "# Plan\n# Again\n## 01 · A\nx\n", "before the first")
 	importErr(t, "unnumbered heading", "## 01 · A\nx\n\n## Notes\ny\n", "Notes")
 	importErr(t, "empty title", "## 01 ·\nx\n", "empty title")
 	importErr(t, "empty title bare number", "## 01\nx\n", "empty title")
@@ -612,5 +610,23 @@ func TestNextOnAListFileHintsImport(t *testing.T) {
 	b, _ := io.ReadAll(r)
 	if c != 3 || !strings.Contains(string(b), "smithy tasks import") {
 		t.Fatalf("exit %d: %s", c, b)
+	}
+}
+
+func TestImportCarriesSharedContext(t *testing.T) {
+	dir := t.TempDir()
+	list := filepath.Join(dir, "tasks.md")
+	if err := os.WriteFile(list, []byte("# Plan\nGo 1.22, stdlib only.\n\n## 01 · A\nfirst\n## 02 · B\nsecond\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	ts, err := Import(list, dir)
+	if err != nil || len(ts) != 2 {
+		t.Fatalf("%v %v", ts, err)
+	}
+	for _, tk := range ts {
+		b, _ := os.ReadFile(tk)
+		if !strings.Contains(string(b), "Shared context (from tasks.md):\nGo 1.22, stdlib only.") {
+			t.Fatalf("%s:\n%s", tk, b)
+		}
 	}
 }
