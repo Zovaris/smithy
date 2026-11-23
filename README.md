@@ -138,6 +138,19 @@ never edit them by hand: use-smithy setup asks everything up front, or each skil
 time it needs a value. `smithy config list` shows every setting and where it came from; all of
 them, with defaults, are in [docs/settings.md](docs/settings.md).
 
+## Autonomous mode
+
+tend `auto` watches GitHub issues (and Linear, with `LINEAR_API_KEY` set) and builds each
+qualified one unattended through warden, reporting progress back on the issue. Issues opt in with
+the `auto` label; a daily cap and an optional hours window bound the spend. `smithy tui` shows
+the queue and running batches.
+
+```
+smithy config set auto.sources github,linear
+smithy config set linear.team ENG
+smithy config set auto.max_per_day 20
+```
+
 ## Install
 
 ```bash
