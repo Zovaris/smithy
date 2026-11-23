@@ -21,6 +21,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   separators; one misconfigured source no longer stops the others; Linear polls cap pages, read
   only the last 7 days on the first poll, overlap the last poll by 2 minutes, uppercase team keys
   and reject unknown state types.
+- Fixed: `smithy auto take` writes its task dir to `~/.smithy/plans/<repo>/` whatever
+  `tasks.commit` says, so intake never leaves files in the target repo.
 
 - Added: tend `auto` mode (`references/AUTO.md`): waits on `smithy wait auto`, takes the queue
   into a task dir, runs warden on it with batch values pre-answered and reports each issue
