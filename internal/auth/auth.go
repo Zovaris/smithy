@@ -1,6 +1,7 @@
 // Package auth keeps source API keys in $SMITHY_HOME/auth.json (mode 0600, outside any repo),
 // keyed by service name: {"linear": {"key": "..."}}. The env var named by <service>.key_env
-// wins when it is set. A full key is never printed.
+// wins when it is set. A full key is never printed. Mode 0600 keeps other users out, not other
+// processes running as you (agents included), so store a test or least-privilege key.
 package auth
 
 import (
@@ -13,6 +14,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
@@ -120,7 +122,14 @@ func Set(svc, key string) error {
 	if key = strings.TrimSpace(key); key == "" {
 		return fmt.Errorf("empty key")
 	}
-	if err := os.MkdirAll(filepath.Dir(File()), 0o700); err != nil {
+	if strings.ContainsFunc(key, unicode.IsSpace) {
+		return fmt.Errorf("the key contains whitespace; paste only the key")
+	}
+	dir := filepath.Dir(File())
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
 		return err
 	}
 	return config.WithLock(File(), func() error {
@@ -153,9 +162,9 @@ func Remove(svc string) (bool, error) {
 	return found, err
 }
 
-// Mask shows only the last 4 characters of a key, and none of a short one.
+// Mask shows only the last 4 characters of a key of 16 or more, and none of a shorter one.
 func Mask(key string) string {
-	if len(key) < 8 {
+	if len(key) < 16 {
 		return "****"
 	}
 	return "****" + key[len(key)-4:]

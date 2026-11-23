@@ -23,20 +23,22 @@ func stty(tty *os.File, arg string) error {
 }
 
 // readHidden prompts on stderr and reads one line from the terminal with echo off (stty), so
-// the key is not shown. Echo is restored on return and on Ctrl-C. Without stty (Windows) it
-// warns that the input will be visible.
+// the key is not shown. Echo is restored on return and on interrupt, terminate, hangup and
+// quit. If stty fails it refuses (pipe the key instead); on Windows, which has no stty, it warns
+// that the input will be visible.
 func readHidden(tty *os.File, svc string, stderr io.Writer) (string, error) {
 	fmt.Fprintf(stderr, "paste the %s key, then Enter:", svc)
 	hidden := false
 	if runtime.GOOS == "windows" {
 		fmt.Fprintln(stderr, "\nwarning: echo cannot be turned off here; the key will be visible")
 	} else if err := stty(tty, "-echo"); err != nil {
-		fmt.Fprintln(stderr, "\nwarning: could not turn off echo; the key will be visible")
+		fmt.Fprintln(stderr)
+		return "", fmt.Errorf("could not turn off echo; pipe the key instead: <command that prints it> | smithy auth set %s", svc)
 	} else {
 		hidden = true
 		sig := make(chan os.Signal, 1)
 		done := make(chan struct{})
-		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+		signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 		go func() {
 			select {
 			case <-sig:

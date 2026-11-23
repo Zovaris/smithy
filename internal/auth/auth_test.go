@@ -80,8 +80,26 @@ func TestMissing(t *testing.T) {
 	}
 }
 
+func TestRejectsInnerWhitespaceAndTightensDir(t *testing.T) {
+	h := home(t)
+	if err := Set("linear", "abc def"); err == nil {
+		t.Error("key with a space accepted")
+	}
+	if runtime.GOOS == "windows" {
+		return
+	}
+	os.MkdirAll(h, 0o755)
+	os.Chmod(h, 0o755)
+	if err := Set("linear", "lin_api_key_0000"); err != nil {
+		t.Fatal(err)
+	}
+	if di, _ := os.Stat(h); di.Mode().Perm() != 0o700 {
+		t.Errorf("dir mode %v", di.Mode().Perm())
+	}
+}
+
 func TestMask(t *testing.T) {
-	for in, want := range map[string]string{"abcdefgh": "****efgh", "abc": "****", "": "****"} {
+	for in, want := range map[string]string{"abcdefgh": "****", "abcdefghijklmnop": "****mnop", "abc": "****", "": "****"} {
 		if got := Mask(in); got != want {
 			t.Errorf("Mask(%q) = %q", in, got)
 		}
@@ -97,13 +115,13 @@ func TestMainSetReadsStdinOnly(t *testing.T) {
 	if code := Main([]string{"set", "linear"}, strings.NewReader("  \n"), &out, &errb); code != 2 {
 		t.Errorf("empty key accepted: %d", code)
 	}
-	if code := Main([]string{"set", "linear"}, strings.NewReader("  lin_key_wxyz\n"), &out, &errb); code != 0 {
+	if code := Main([]string{"set", "linear"}, strings.NewReader("  lin_key_0000wxyz\n"), &out, &errb); code != 0 {
 		t.Fatalf("set: %d %s", code, errb.String())
 	}
 	if out.String() != "saved linear ****wxyz\n" || strings.Contains(errb.String(), "paste") {
 		t.Errorf("non-tty set: out %q err %q", out.String(), errb.String())
 	}
-	if k, _, _ := Get("linear"); k != "lin_key_wxyz" {
+	if k, _, _ := Get("linear"); k != "lin_key_0000wxyz" {
 		t.Errorf("stored %q", k)
 	}
 	out.Reset()
@@ -111,7 +129,7 @@ func TestMainSetReadsStdinOnly(t *testing.T) {
 	if out.String() != "linear ****wxyz\n" {
 		t.Errorf("list = %q", out.String())
 	}
-	if strings.Contains(out.String()+errb.String(), "lin_key_wxyz") {
+	if strings.Contains(out.String()+errb.String(), "lin_key_0000wxyz") {
 		t.Error("full key printed")
 	}
 	if code := Main([]string{"remove", "linear"}, nil, &out, &errb); code != 0 {
