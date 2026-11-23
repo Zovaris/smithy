@@ -295,3 +295,13 @@ func TestVerifyConflictExit4(t *testing.T) {
 		}
 	}
 }
+
+func TestWithoutPRHint(t *testing.T) {
+	in := "remote: \nremote: Create a pull request for 'feat/x' on GitHub by visiting:\nremote:      https://github.com/o/r/pull/new/feat/x\nremote: \nhook: lint ok\n"
+	if got := withoutPRHint(in); got != "hook: lint ok\n" {
+		t.Fatalf("got %q", got)
+	}
+	if got := withoutPRHint("error: failed to push\n"); got != "error: failed to push\n" {
+		t.Fatalf("got %q", got)
+	}
+}

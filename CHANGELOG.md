@@ -11,6 +11,13 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - `smithy batch init --risky <id,id>` marks risky items (security agent required).
 
 ### Fixed
+- `smithy consult` answers ESCALATE only for the hard floor (production, deleting user data, real
+  credentials, moving or charging real money); code that computes money or security is its pick; an ESCALATE with nobody to ask ends blocked.
+  The stop list and hard floor say "moving or charging real money"; hush points to use-smithy.
+- `smithy pr create` drops GitHub's "Create a pull request" push hint (other push output stays),
+  so the PR URL is the only link printed.
+- Skill text: the holdout receipt runs on a committed tree; an agreed spec skips the builder check
+  unless it has open questions.
 - `smithy receipt list` keeps the newest holdout receipt from an earlier commit ("holdout commit",
   or "holdout failed" when it failed), so it reaches the PR table.
 - Skill text: use-smithy routes "research, then build" to scout then smelt plan; TDD runs single

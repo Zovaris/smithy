@@ -41,7 +41,7 @@ shared rules); stop with `blocked:` if the task can't go on without acting on on
 
 ## Stop only for
 
-use-smithy's hard floor (merging or deploying to the production branch, deleting or irreversibly rewriting user data, credentials, secrets or logins, money), or the same obstacle hit twice after
+use-smithy's hard floor (its **Decisions**), or the same obstacle hit twice after
 a real fix attempt. Then send one line and stop: `blocked: <why>`. The rest of the stop list is
 decided by `smithy consult` and logged, never asked.
 
