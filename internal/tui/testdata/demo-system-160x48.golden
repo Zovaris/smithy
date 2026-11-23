@@ -23,21 +23,21 @@
 │ github ****9f2c                                                              ││ warden.*                                                                     │
 │ linear ****a41b                                                              ││ warden.max            5                default                               │
 │                                                                              ││ warden.merge          manual           user                                  │
-│ Doctor                                                                       ││ warden.cleanup        auto             default                               │
-│ warden doctor                                                                ││ warden.mode           smelt normal     default                               │
+│ Notify  Telegram, smithy notify test                                         ││ warden.cleanup        auto             default                               │
+│ token  ****x7Qa (/home/dev/.smithy/auth.json)                                ││ warden.mode           smelt normal     default                               │
+│ chat 123456789                                                               ││                                                                              │
+│ kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_r… ││ Read-only here: change with smithy config set <key> <value>.                 │
+│ state  on (smithy auto serve sends)                                          ││                                                                              │
+│ last sent 2026-11-23 09:12                                                   ││                                                                              │
+│                                                                              ││                                                                              │
+│ Doctor                                                                       ││                                                                              │
+│ warden doctor                                                                ││                                                                              │
 │ ok   binary v0.15.0                                                          ││                                                                              │
-│ ok   git found                                                               ││ Read-only here: change with smithy config set <key> <value>.                 │
+│ ok   git found                                                               ││                                                                              │
 │ ok   gh found and authenticated                                              ││                                                                              │
 │ ok   claude found                                                            ││                                                                              │
 │ ok   worktree root /home/dev/worktrees writable                              ││                                                                              │
 │ warn 2 orphaned worktrees (smithy warden cleanup)                            ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
 │                                                                              ││                                                                              │
 │                                                                              ││                                                                              │
 │                                                                              ││                                                                              │

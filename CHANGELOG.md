@@ -15,6 +15,14 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - Added: `auto.max_cost_per_day` (unset by default): when today's reported spend reaches it,
   `smithy auto serve` launches nothing until tomorrow, logs why and records one `cap_reached`
   event per day.
+- Added: Telegram notifications, sent by `smithy auto serve` (never an agent) from events.jsonl
+  and the cards: PR ready, item blocked, stuck or waiting on a decision, orchestrator failed,
+  serve stopped, daily cap reached. Bot token in `smithy auth set telegram`, chat in
+  `notify.telegram.chat`, kinds in `notify.kinds`. Once per (item, kind), at most 20 a minute
+  (the overflow folded into one summary), no issue bodies or keys; a failed send is logged once,
+  retried each cycle for 24 h (then dropped, logged) and never stops serve; unknown kinds are
+  ignored with a warning in `smithy notify status`. `smithy notify test|status`; the TUI System view shows the setup.
+- Added: events `orchestrator_failed`, `cap_reached` (once a day) and `serve_down` in events.jsonl.
 
 ## v0.15.0 — 2026-11-23
 

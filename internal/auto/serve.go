@@ -21,6 +21,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/notify"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -181,7 +182,8 @@ type Server struct {
 	Log    func(string)
 	hb     Heartbeat
 	mkdr   func(string) (string, error)
-	capDay string // local day a cap_reached event was last recorded
+	note   *notify.Notifier
+	capDay string // local day a cap_reached event was last recorded (issue cap or spend cap)
 }
 
 // NewServer checks no other serve is running and writes the first heartbeat.
@@ -211,7 +213,7 @@ func NewServer(o ServeOptions, log func(string)) (*Server, error) {
 		return nil, err
 	}
 	s, _ := LoadSettings()
-	sv := &Server{Opt: o, Log: log, mkdr: taskDir,
+	sv := &Server{Opt: o, Log: log, mkdr: taskDir, note: notify.New(log),
 		hb: Heartbeat{PID: os.Getpid(), PIDStart: procStart(os.Getpid()), Started: now(), Agent: o.Agent, Every: s.Every, State: "idle"}}
 	sv.adopt()
 	return sv, sv.beat()
@@ -350,6 +352,10 @@ func (sv *Server) stopped() {
 		msg += fmt.Sprintf("; orchestrator pid %d keeps running (log %s; smithy tui or smithy cards board shows its workers)", sv.hb.SessionPID, sv.hb.SessionLog)
 	}
 	sv.logf("%s", msg)
+	events.Append(events.Event{Kind: "serve_down", Detail: "serve stopped"})
+	if sv.note != nil {
+		sv.note.Final(now())
+	}
 }
 
 // Cycle polls once and, when no orchestrator is running, takes the queue into a task dir and
@@ -398,6 +404,7 @@ func (sv *Server) Cycle() time.Duration {
 			}
 			for _, id := range gaveUp {
 				sv.logf("giving up on %s: orchestrators started nothing %d times; it stays launched", id, MaxRequeues+1)
+				events.Append(events.Event{Kind: "orchestrator_failed", ID: id, Detail: "orchestrators started nothing; gave up"})
 			}
 			sv.hb.SessionPID, sv.hb.SessionDir = 0, ""
 		}
@@ -422,6 +429,10 @@ func (sv *Server) Cycle() time.Duration {
 			if r.Why != "empty queue" {
 				sv.logf("auto none: %s", r.Why)
 			}
+			if day := now().Format("2006-01-02"); strings.HasPrefix(r.Why, "daily cap") && sv.capDay != day {
+				sv.capDay = day
+				events.Append(events.Event{Kind: "cap_reached", Detail: r.Why})
+			}
 		default:
 			if err := sv.launch(r.Dir); err != nil {
 				os.Remove(LockFile())
@@ -430,6 +441,7 @@ func (sv *Server) Cycle() time.Duration {
 				}
 				os.RemoveAll(r.Dir)
 				sv.logf("serve: orchestrator did not start, %d issue(s) back in the queue: %v", r.Count, err)
+				events.Append(events.Event{Kind: "orchestrator_failed", Detail: fmt.Sprintf("did not start, %d issue(s) back in the queue", r.Count)})
 			} else {
 				sv.hb.State = "orchestrating"
 				sv.logf("orchestrator started: pid %d, %d issue(s), %s, log %s", sv.hb.SessionPID, r.Count, r.Dir, sv.hb.SessionLog)
@@ -437,6 +449,9 @@ func (sv *Server) Cycle() time.Duration {
 		}
 	}
 	_ = sv.beat()
+	if sv.note != nil {
+		go sv.note.Flush(now())
+	}
 	return time.Duration(s.Every) * time.Second
 }
 
