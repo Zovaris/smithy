@@ -2,7 +2,7 @@
 rem smithy launcher for Windows shells without sh: same order as the `smithy` script beside it
 rem ($SMITHY_BIN, then %USERPROFILE%\.smithy\bin\<VERSION>\smithy.exe, downloaded once with gh, or
 rem curl.exe with timeouts when gh is missing, from the GitHub release, checked against its checksums.txt and its build attestation; with an
-rem old gh lacking `gh attestation` nothing is installed unless SMITHY_ALLOW_UNATTESTED=1; with no gh at all it installs on the checksum with a warning).
+rem gh missing or too old for `gh attestation`, nothing is installed unless SMITHY_ALLOW_UNATTESTED=1).
 setlocal enabledelayedexpansion
 set "SMITHY_SKILL_DIR=%~dp0"
 if defined SMITHY_BIN ( "%SMITHY_BIN%" %* & exit /b !errorlevel! )
@@ -30,17 +30,12 @@ if not exist "%bin%" (
   if not defined want ( echo smithy: checksum mismatch for !asset!, not installed 1>&2 & exit /b 3 )
   if not defined got ( echo smithy: checksum mismatch for !asset!, not installed 1>&2 & exit /b 3 )
   if /i not "!want!"=="!got!" ( echo smithy: checksum mismatch for !asset!, not installed 1>&2 & exit /b 3 )
-  where gh >nul 2>&1
-  if !errorlevel! neq 0 (
-    echo smithy: installed with checksum only: install the GitHub CLI to verify the build's origin 1>&2
-  ) else (
   gh attestation verify --help >nul 2>&1
   if !errorlevel! equ 0 (
     gh attestation verify "!tmp!\!asset!" -R Zovaris/smithy >nul 2>&1 || ( echo smithy: !asset! has no valid build attestation for Zovaris/smithy, not installed 1>&2 & exit /b 3 )
   ) else if not "%SMITHY_ALLOW_UNATTESTED%"=="1" (
     echo smithy: can't verify the build attestation of !asset!: install or update gh, or set SMITHY_ALLOW_UNATTESTED=1 to accept a checksum-only install; not installed 1>&2
     exit /b 3
-  )
   )
   mkdir "%home%\bin\%version%" >nul 2>&1
   move /y "!tmp!\!asset!" "%bin%" >nul

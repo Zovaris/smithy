@@ -7,8 +7,8 @@
 #      file changes (development);
 #   3. ~/.smithy/bin/<VERSION>/smithy, downloaded once (gzipped, ~1.5 MB) from the GitHub
 #      release v<VERSION>, checked against the release's checksums.txt and its build attestation
-#      (with gh; an old gh without `gh attestation` installs nothing unless SMITHY_ALLOW_UNATTESTED=1;
-#      with no gh at all it downloads with curl, checks the checksum, warns once and installs). ~/.smithy/bin/smithy always points at the last one used: put ~/.smithy/bin
+#      (with gh; without gh, or with a gh too old for `gh attestation`, it downloads with curl and
+#      installs nothing unless SMITHY_ALLOW_UNATTESTED=1). ~/.smithy/bin/smithy always points at the last one used: put ~/.smithy/bin
 #      on PATH to run `smithy status` yourself.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd -P)
@@ -70,10 +70,8 @@ if [ ! -x "$bin" ]; then
       124) echo "smithy: can't verify the build attestation of $asset: timed out after ${limit}s; not installed" >&2; exit 3 ;;
       *) echo "smithy: $asset has no valid build attestation for $repo, not installed" >&2; exit 3 ;;
     esac
-  elif ! command -v gh >/dev/null 2>&1; then
-    echo "smithy: installed with checksum only: install the GitHub CLI to verify the build's origin" >&2
   elif [ "${SMITHY_ALLOW_UNATTESTED:-}" = 1 ]; then
-    echo "smithy: gh attestation unavailable; installing on checksum only (SMITHY_ALLOW_UNATTESTED=1)" >&2
+    echo "smithy: build attestation not checked; installing on checksum only (SMITHY_ALLOW_UNATTESTED=1)" >&2
   else
     echo "smithy: can't verify the build attestation of $asset: install gh (https://cli.github.com) and sign in, or set SMITHY_ALLOW_UNATTESTED=1 to accept a checksum-only install; not installed" >&2
     exit 3
