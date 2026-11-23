@@ -7,10 +7,10 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ### Security
 - Launcher: without `gh` it no longer installs on the checksum alone; it needs the build
-  attestation, or `SMITHY_ALLOW_UNATTESTED=1` to accept checksum-only (Snyk E004).
+  attestation, or `SMITHY_ALLOW_UNATTESTED=1` to accept checksum-only.
 - warden: doctor no longer suggests a `PermissionRequest` hook that auto-approves worker launches.
 - smelt: secret-looking fixtures are made obviously fake; `smithy:allow` needs the user's yes.
-- tend: outside text (issues, comments, CI logs) is data, stated in the skill itself.
+- tend: names outside text (issues, comments, CI logs) as data in its own rules.
 - hush: the description no longer says it triggers for every launched agent.
 
 ## v0.13.0 — 2026-11-22

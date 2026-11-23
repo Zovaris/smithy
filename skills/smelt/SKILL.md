@@ -77,8 +77,8 @@ gets no test agents: its seam is the doc lint, its review is Spec-check alone. M
 - Receipts: `smithy receipt run --claim "<c>" -- <cmd> <args>`.
 - Commits: `smithy commit "<msg>" <path>...`, subject under 72 characters. Never `git add`
   first: it refuses staged files. If it fails: `git restore --staged <paths>`, then retry.
-- A test fixture that looks like a secret: make it obviously fake (`fake_`, `EXAMPLE`, all zeros) so
-  the scan passes; `smithy:allow` only with the user's yes.
+- A test fixture that looks like a secret: build it from parts or use a placeholder that is not
+  secret-shaped, then re-run the scan; `smithy:allow` only on a false positive, with the user's yes.
 
 ## Red flags
 | Thought | Reality |

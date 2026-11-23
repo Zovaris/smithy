@@ -1,8 +1,9 @@
 @echo off
 rem smithy launcher for Windows shells without sh: same order as the `smithy` script beside it
 rem ($SMITHY_BIN, then %USERPROFILE%\.smithy\bin\<VERSION>\smithy.exe, downloaded once with gh, or
-rem curl.exe with timeouts when gh is missing, from the GitHub release, checked against its checksums.txt and its build attestation; with an
-rem gh missing or too old for `gh attestation`, nothing is installed unless SMITHY_ALLOW_UNATTESTED=1).
+rem curl.exe when gh is missing, from the GitHub release, checked against its checksums.txt and
+rem its build attestation; with gh missing or too old for that, nothing is installed unless
+rem SMITHY_ALLOW_UNATTESTED=1). It skips the shell launcher's dev build from a Go checkout.
 setlocal enabledelayedexpansion
 set "SMITHY_SKILL_DIR=%~dp0"
 if defined SMITHY_BIN ( "%SMITHY_BIN%" %* & exit /b !errorlevel! )
@@ -25,20 +26,23 @@ if not exist "%bin%" (
   if not exist "!tmp!\checksums.txt" goto :nodownload
   set "want=" & set "got="
   for /f "tokens=1,2" %%a in (!tmp!\checksums.txt) do if "%%b"=="!asset!" set "want=%%a"
+  for /f "tokens=1,2" %%a in (!tmp!\checksums.txt) do if "%%b"=="*!asset!" set "want=%%a"
   for /f "tokens=*" %%h in ('certutil -hashfile "!tmp!\!asset!" SHA256 ^| findstr /v ":"') do if not defined got set "got=%%h"
   set "got=!got: =!"
-  if not defined want ( echo smithy: checksum mismatch for !asset!, not installed 1>&2 & exit /b 3 )
-  if not defined got ( echo smithy: checksum mismatch for !asset!, not installed 1>&2 & exit /b 3 )
-  if /i not "!want!"=="!got!" ( echo smithy: checksum mismatch for !asset!, not installed 1>&2 & exit /b 3 )
+  if not defined want ( echo smithy: checksum mismatch for !asset!, not installed 1>&2 & rmdir /s /q "!tmp!" & exit /b 3 )
+  if not defined got ( echo smithy: checksum mismatch for !asset!, not installed 1>&2 & rmdir /s /q "!tmp!" & exit /b 3 )
+  if /i not "!want!"=="!got!" ( echo smithy: checksum mismatch for !asset!, not installed 1>&2 & rmdir /s /q "!tmp!" & exit /b 3 )
   gh attestation verify --help >nul 2>&1
   if !errorlevel! equ 0 (
-    gh attestation verify "!tmp!\!asset!" -R Zovaris/smithy >nul 2>&1 || ( echo smithy: !asset! has no valid build attestation for Zovaris/smithy, not installed 1>&2 & exit /b 3 )
-  ) else if not "%SMITHY_ALLOW_UNATTESTED%"=="1" (
-    echo smithy: can't verify the build attestation of !asset!: install or update gh, or set SMITHY_ALLOW_UNATTESTED=1 to accept a checksum-only install; not installed 1>&2
-    exit /b 3
+    gh attestation verify "!tmp!\!asset!" -R Zovaris/smithy >nul 2>&1 || ( echo smithy: !asset! has no valid build attestation for Zovaris/smithy, not installed 1>&2 & rmdir /s /q "!tmp!" & exit /b 3 )
+  ) else if "%SMITHY_ALLOW_UNATTESTED%"=="1" (
+    echo smithy: build attestation not checked; installing on checksum only ^(SMITHY_ALLOW_UNATTESTED=1^) 1>&2
+  ) else (
+    echo smithy: can't verify the build attestation of !asset!: install or update gh and sign in, or set SMITHY_ALLOW_UNATTESTED=1 to accept a checksum-only install; not installed 1>&2
+    rmdir /s /q "!tmp!" & exit /b 3
   )
   mkdir "%home%\bin\%version%" >nul 2>&1
-  move /y "!tmp!\!asset!" "%bin%" >nul
+  move /y "!tmp!\!asset!" "%bin%" >nul || ( echo smithy: can't install !asset! 1>&2 & rmdir /s /q "!tmp!" & exit /b 3 )
   copy /y "%bin%" "%home%\bin\smithy.exe" >nul
   rmdir /s /q "!tmp!"
 )

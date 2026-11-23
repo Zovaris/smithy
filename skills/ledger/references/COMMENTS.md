@@ -12,7 +12,7 @@ Code carries no explanatory comments. Allowed:
 - Tool directives **with a reason**: `eslint-disable-next-line rule -- reason`,
   `@ts-expect-error reason`, `# noqa: E501 reason`, `# type: ignore[code]`, `//nolint:name // reason`.
 - `//go:build`, `//go:generate`, Rust `// SAFETY:` on unsafe blocks.
-- `smithy:allow` markers (a secret-looking fixture's line), bare or with a reason.
+- `smithy:allow` markers (a scan false positive the user approved), bare or with a reason.
 
 Forbidden: explanatory inline or block comments, commented-out code, TODO/FIXME/HACK/XXX (open
 an issue), bare directives without a reason (except `smithy:allow`). Enforce with the stack's linter
