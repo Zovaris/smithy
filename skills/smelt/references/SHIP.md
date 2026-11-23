@@ -14,7 +14,8 @@ else update the docs the change touched (`references/DOCS.md`). Then:
   concern (`smithy commit "<msg>" <paths>`), each building and passing on its own, in dependency order
   (no commit imports a file a later one adds). Never
   `git add -A`, never `--no-verify`. Prove it before the PR, on a clean tree:
-  `git rebase -x "<typecheck> && <test>" origin/<base>`, with the runner's no-tests flag in
+  `git rebase -x "<typecheck> && <test>" origin/<base>` (debug's red repro commit goes first on the
+  branch; start after it: `git rebase -x "…" <repro-sha>`), with the runner's no-tests flag in
   `<test>` (`--passWithNoTests` or its equivalent); run it only when more than one commit
   touches source. Commit a task file's status change first (a dirty tree stops the rebase). Docs-only commits before the build file exists: start the command with
   `[ -f <build file> ] || exit 0;`, or `[ -d tests ] || exit 0;` for a language without a build file. A red commit gets a fixup, then re-run.

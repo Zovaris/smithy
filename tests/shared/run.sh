@@ -76,6 +76,11 @@ t "accepts good message" '$S/smithy commit check "feat(api): add pagination"'
 echo a > a.txt; echo b > b.txt
 t "requires paths" '! $S/smithy commit "feat(api): add a"'
 t "commits only given paths" '$S/smithy commit "feat(api): add a" a.txt && [ "$(git status --short)" = "?? b.txt" ]'
+t "commits a git mv rename" 'git mv a.txt c.txt && $S/smithy commit "refactor: rename a to c" a.txt c.txt && [ "$(git status --short)" = "?? b.txt" ] && git ls-files --error-unmatch c.txt >/dev/null'
+t "refuses staged files outside the paths" 'h=$(git rev-parse HEAD); git add b.txt; o=$($S/smithy commit "feat: add c" c.txt 2>&1); echo "$o" | grep -q "already staged: b.txt" && [ "$(git rev-parse HEAD)" = "$h" ]; r=$?; git reset -q b.txt; [ $r -eq 0 ]'
+t "dot refuses earlier staging" 'git add b.txt; ! $S/smithy commit "feat: add all" . >/dev/null 2>&1; r=$?; git reset -q b.txt; [ $r -eq 0 ]'
+t "subdir cwd sees staging outside it" 'mkdir -p sub && echo s > sub/s.txt && git add b.txt && (cd sub && ! $S/smithy commit "feat: add s" s.txt >/dev/null 2>&1); r=$?; git reset -q b.txt; rm -rf sub; [ $r -eq 0 ]'
+t "path outside the repo refused" 'o=$($S/smithy commit "feat: x" .. 2>&1); echo "$o" | grep -q "outside the repo"'
 
 # smithy pr
 t "no template → none" '$S/smithy pr template | grep -q "^none:"'

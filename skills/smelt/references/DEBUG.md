@@ -15,7 +15,8 @@ Phases with gates; don't skip ahead. No fix before a root cause.
 5. **Probe.** Test the top hypothesis with the cheapest probe, one change at a time. Tag every
    debug log line (`[smelt-debug]`) so cleanup is a grep. Update the ranking after each probe.
 6. **Fix.** You write the regression test: turn the repro into one at the right seam; it must fail. Fix the root
-   cause, not the symptom. Test green, full suite green.
+   cause, not the symptom. Test green, full suite green, then the repro receipt again on the final
+   clean HEAD (`--claim repro`) so `check-red` sees red then green.
 7. **Clean.** `grep -rn "\[smelt-debug\]"` returns nothing. Note the root cause in the PR body.
    A cause that will bite again (bad pattern, missing guard) → propose a check in retro.
 
