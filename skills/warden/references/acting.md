@@ -100,12 +100,9 @@ line each, grouped as **Decisions** and **Followups**, each with the PR it came 
 ## reported · dropped
 
 `reported`: read the report's first lines, then `smithy cleanup`. `dropped`: `smithy cleanup`.
-## stuck (`blocked`, `failed`, or `working` with no heartbeat for `warden.stuck_minutes`)
-
-The heartbeat is the card's `last_beat` (`smithy cards beat`, and every `cards set`); the board's
-`beat` column and `smithy wait batch`'s `stale:` line show its age (default limit 15 min).
-
-A session (background) worker whose closing line is `done: <id> waiting` is parked in `smithy wait-turn`: its stage is
+## stuck (`blocked`, `failed`, or `working` with no `last_beat` for `warden.stuck_minutes`)
+The heartbeat comes from `smithy cards beat` and every `cards set`; the board's `beat` column
+and `wait batch`'s `stale:` line show its age (default limit 15 min). A session (background) worker whose closing line is `done: <id> waiting` is parked in `smithy wait-turn`: its stage is
 `waiting`, not stuck; nothing to do until its turn comes.
 
 Recovery ladder, one rung per wake:
