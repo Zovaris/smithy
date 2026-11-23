@@ -34,10 +34,10 @@ bin="$home/bin/$version/smithy"
 [ -x "$bin" ] || [ ! -x "$bin.exe" ] || bin="$bin.exe"  # Git Bash on Windows
 if [ ! -x "$bin" ]; then
   if [ -x "$home/bin/smithy" ]; then
-    echo "smithy: v$version is not installed; using $home/bin/smithy. Install v$version: https://github.com/$repo#install" >&2
+    echo "smithy: v$version is not installed; using $home/bin/smithy. Ask the user whether to install v$version now: curl -fsSL https://raw.githubusercontent.com/$repo/main/install.sh | sh -s $version" >&2
     exec "$home/bin/smithy" "$@"
   fi
-  echo "smithy: the smithy binary v$version is not installed. Ask the user to install it (https://github.com/$repo#install), then retry." >&2
+  echo "smithy: the smithy binary v$version is not installed; the smithy skills need it. Ask the user whether you install it or they do: curl -fsSL https://raw.githubusercontent.com/$repo/main/install.sh | sh -s $version" >&2
   exit 3
 fi
 link "$bin"

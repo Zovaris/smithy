@@ -2,6 +2,7 @@
 # Installs the smithy binary that the smithy skills run. Run it yourself, once per version:
 #   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh            # latest
 #   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.14.1   # pinned
+#   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # skills + binary
 # Downloads smithy-<os>-<arch> from the GitHub release, checks it against the release's
 # checksums.txt and its build attestation (gh), and puts it in ~/.smithy/bin/<version>/, with
 # ~/.smithy/bin/smithy pointing at it. Without gh (or a gh too old for `gh attestation`) nothing
@@ -10,6 +11,12 @@ set -eu
 repo=Zovaris/smithy
 home=${SMITHY_HOME:-$HOME/.smithy}
 limit=${SMITHY_DOWNLOAD_TIMEOUT:-120}
+if [ "${1:-}" = --update ]; then
+  shift
+  command -v npx >/dev/null 2>&1 || { echo "smithy install: --update needs npx (Node) for npx skills update" >&2; exit 3; }
+  echo "smithy install: updating the skills (npx skills update -g)" >&2
+  npx -y skills update -g >&2 || { echo "smithy install: npx skills update failed" >&2; exit 3; }
+fi
 version=${1:-${SMITHY_VERSION:-}}
 version=${version#v}
 

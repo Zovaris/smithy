@@ -114,7 +114,8 @@ repo's style, waiting on CI) is one small Go binary, `smithy`, that you install 
   needs `gh`). Without `gh` it installs nothing unless you set `SMITHY_ALLOW_UNATTESTED=1`, which
   accepts the checksum alone. A mismatch always refuses.
 - Each skill ships a small launcher that runs that binary and never downloads anything. If the
-  skills' version isn't installed, it says so and points here.
+  skills' version isn't installed (or `smithy doctor` sees a mismatch), the agent asks whether it
+  should run `install.sh` for you or you will. Update both at once with `sh -s -- --update`.
 
 Agents wait on GitHub without spending tokens:
 
@@ -144,7 +145,7 @@ curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.14.1    # binary, pinned
 npx skills add Zovaris/smithy -g -y --skill '*' -a claude-code -a codex   # no prompts
 npx skills add Zovaris/smithy@v0.14.0 -g                                   # pin a release
-npx skills update -g                                                      # update (then rerun install.sh)
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # skills + binary
 ```
 
 Drop `-g` to install into the current project only. Requires the

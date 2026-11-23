@@ -228,8 +228,8 @@ t "install.sh: no gh + empty checksums.txt refuses" 'LN "$L/nogh-bad" g empty; [
 t "install.sh: rejects a bad version" 'env -u SMITHY_BIN SMITHY_HOME="$L/bad" PATH="$L/sys" "$L/install.sh" "../x" 2>"$L/err"; [ $? -eq 3 ] && grep -q "bad version" "$L/err"'
 # launcher never downloads: no binary → exit 3 naming the install page
 LM() { env -u SMITHY_BIN SMITHY_HOME="$L/empty$1" PATH="$L/curl:$L/sys" "$L/smithy" version 2>"$L/err"; }
-t "launcher: missing binary exits 3, no download" 'rm -f "$L/curl.args"; LM a; [ $? -eq 3 ] && grep -q "not installed. Ask the user to install it" "$L/err" && [ ! -e "$L/curl.args" ]'
+t "launcher: missing binary exits 3, no download" 'rm -f "$L/curl.args"; LM a; [ $? -eq 3 ] && grep -q "not installed; the smithy skills need it" "$L/err" && [ ! -e "$L/curl.args" ]'
 t "launcher: falls back to ~/.smithy/bin/smithy with a notice" 'mkdir -p "$L/emptyb/bin"; ln -sfn "$L/homef/bin/0.0.0/smithy" "$L/emptyb/bin/smithy"; echo 9.9.9 > "$L/VERSION"; [ "$(LM b)" = fake-smithy ] && grep -q "v9.9.9 is not installed; using" "$L/err"'
 echo 0.0.0 > "$L/VERSION"
-t "skills contain no download commands" '! grep -rlE "gh release download|releases/download|install\.sh \||curl [^|]*\| *sh" "$S/../skills"'
+t "skills contain no download commands" '! grep -rlE "gh release download|releases/download" "$S/../skills"'
 echo "shared: $pass passed, $fail failed"; [ $fail -eq 0 ]

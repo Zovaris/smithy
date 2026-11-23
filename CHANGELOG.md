@@ -8,7 +8,9 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - Fixed: hush failed to install (unquoted `: ` in its YAML `description`).
 - Changed: the skills never download the smithy binary. Install it once with the new
   `install.sh` (checksum + build attestation, as before); the launcher only runs an installed
-  binary and, when it is missing, says so with the install link.
+  binary. When it is missing or older than the skills, the agent asks whether to run install.sh
+  for you (on your yes) or you will; `smithy doctor` and unknown-command errors name the mismatch.
+  `install.sh --update` updates the skills and the binary together.
 
 ## v0.14.0 — 2026-11-23
 

@@ -458,3 +458,23 @@ func TestWaitTurnMaxFlag(t *testing.T) {
 		}
 	}
 }
+
+func TestVersionHint(t *testing.T) {
+	d := t.TempDir()
+	os.WriteFile(filepath.Join(d, "VERSION"), []byte("0.14.1\n"), 0o644)
+	t.Setenv("SMITHY_SKILL_DIR", d)
+	old := BinaryVersion
+	defer func() { BinaryVersion = old }()
+	BinaryVersion = "0.14.0"
+	if h := VersionHint(); !strings.Contains(h, "binary v0.14.0 but skills v0.14.1") || !strings.Contains(h, "sh -s 0.14.1") {
+		t.Fatalf("hint: %q", h)
+	}
+	BinaryVersion = "0.14.1"
+	if h := VersionHint(); h != "" {
+		t.Fatalf("match should be silent: %q", h)
+	}
+	BinaryVersion = "dev"
+	if h := VersionHint(); h != "" {
+		t.Fatalf("dev should be silent: %q", h)
+	}
+}

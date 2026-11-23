@@ -23,6 +23,7 @@ over it. `smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's fo
 | Clean up after merge | Whoever sees a PR merge or close removes its worktrees and local branches (`smithy cleanup <repo> <branch> [<worktree>]`, never forced) and ends the agents it launched, naming any it can't. |
 | One task list | Plans become `NN-<slug>.md` task files (smelt `TASKS.md`; one `tasks.md` of `## NN · Title` sections: `smithy tasks import`); smelt builds them one at a time, warden in parallel. Never keep a second list. |
 | Repo style | Atomic commits (`smithy commit`), PRs from the template (`smithy pr`). ADR-worthy decisions → ledger; no explanatory code comments. |
+| smithy binary | A smithy line saying the binary is missing or doesn't match the skills: tell the user once, with the command it prints, and ask "install it now, or will you?"; run it only on their yes. |
 | Delegation | Delegate to a fresh-context agent if the harness can (its subagent tool, or `smithy agent [--readonly] <prompt-file>` with a headless CLI), else run the work yourself, one item after another. |
 
 **Decisions** (the stop list). **Hard floor**: never consult, never auto-decided: merging or deploying to the production branch, deleting or irreversibly rewriting user data, real credentials, secrets or logins (values, not auth code), moving or charging real money. Wait for the user;
@@ -58,9 +59,7 @@ Run `smithy skills --list` once per session; skip only when the brief gives the 
 | a decision recorded, docs, comment policy, a map, past decisions | **ledger** (search before re-deciding) |
 | open PRs kept green, PRs or labeled issues watched | **tend** (accepted issues become task files for warden) |
 | no conversation | **hush**; every launched agent's brief names it too |
-| every reply | **simple**, if installed, unless the user says "normal mode" |
-
-Not installed? Work plainly; mention the skill once.
+| every reply | **simple**, if installed, unless the user says "normal mode" (a skill not installed: work plainly, mention it once) |
 
 ## Scripts
 
