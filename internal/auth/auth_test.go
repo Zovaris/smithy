@@ -100,6 +100,9 @@ func TestMainSetReadsStdinOnly(t *testing.T) {
 	if code := Main([]string{"set", "linear"}, strings.NewReader("  lin_key_wxyz\n"), &out, &errb); code != 0 {
 		t.Fatalf("set: %d %s", code, errb.String())
 	}
+	if out.String() != "saved linear ****wxyz\n" || strings.Contains(errb.String(), "paste") {
+		t.Errorf("non-tty set: out %q err %q", out.String(), errb.String())
+	}
 	if k, _, _ := Get("linear"); k != "lin_key_wxyz" {
 		t.Errorf("stored %q", k)
 	}

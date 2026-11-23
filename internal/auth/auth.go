@@ -21,7 +21,7 @@ import (
 // Usage is the text for `smithy auth --help`.
 const Usage = `usage: smithy auth set <service> < keyfile | list | remove <service>
 Source API keys in ~/.smithy/auth.json (mode 0600). set reads the key from stdin only, never
-from arguments. The env var named by <service>.key_env (e.g. LINEAR_API_KEY) wins when set.`
+from arguments; in a terminal it prompts with echo off. The env var named by <service>.key_env (e.g. LINEAR_API_KEY) wins when set.`
 
 type entry struct {
 	Key string `json:"key"`
@@ -186,18 +186,27 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		if stdin == nil {
 			return fail(2, fmt.Errorf("pipe the key on stdin"))
 		}
-		b, err := io.ReadAll(io.LimitReader(stdin, 64<<10))
-		if err != nil {
-			return fail(1, err)
+		var k string
+		if f, ok := stdin.(*os.File); ok && isTTY(f) {
+			line, err := readHidden(f, args[1], stderr)
+			if err != nil {
+				return fail(1, err)
+			}
+			k = strings.TrimSpace(line)
+		} else {
+			b, err := io.ReadAll(io.LimitReader(stdin, 64<<10))
+			if err != nil {
+				return fail(1, err)
+			}
+			k = strings.TrimSpace(string(b))
 		}
-		k := strings.TrimSpace(string(b))
 		if k == "" {
 			return fail(2, fmt.Errorf("no key on stdin (smithy auth set %s < keyfile)", args[1]))
 		}
 		if err := Set(args[1], k); err != nil {
 			return fail(1, err)
 		}
-		fmt.Fprintf(stdout, "auth set %s %s\n", args[1], Mask(k))
+		fmt.Fprintf(stdout, "saved %s %s\n", args[1], Mask(k))
 		return 0
 	case len(args) > 2 && args[0] == "set":
 		return fail(2, fmt.Errorf("the key is read from stdin only, never from arguments"))
