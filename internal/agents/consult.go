@@ -95,7 +95,7 @@ func shell(command, stdinPath, dir string) int {
 	}
 	defer in.Close()
 	cmd := exec.Command("bash", "-c", command)
-	cmd.Dir, cmd.Stdin, cmd.Stdout, cmd.Stderr = dir, in, os.Stdout, os.Stderr
+	cmd.Dir, cmd.Env, cmd.Stdin, cmd.Stdout, cmd.Stderr = dir, Scrub(os.Environ()), in, os.Stdout, os.Stderr
 	if err := cmd.Run(); err != nil {
 		return exitCode(err)
 	}
@@ -146,7 +146,7 @@ func ConsultMain(args []string) int {
 		}
 		defer in.Close()
 		cmd := exec.Command("claude", a...)
-		cmd.Dir, cmd.Stdin, cmd.Stdout, cmd.Stderr = tmp, in, os.Stdout, os.Stderr
+		cmd.Dir, cmd.Env, cmd.Stdin, cmd.Stdout, cmd.Stderr = tmp, Scrub(os.Environ()), in, os.Stdout, os.Stderr
 		if err := cmd.Run(); err != nil {
 			return exitCode(err)
 		}

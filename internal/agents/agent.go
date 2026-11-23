@@ -99,8 +99,21 @@ func supervisor(o Options, log string) (*exec.Cmd, error) {
 		a = append(a, "--readonly")
 	}
 	cmd := exec.Command(exe, append(a, o.PromptFile)...)
-	cmd.Dir = o.Cwd
+	cmd.Dir, cmd.Env = o.Cwd, Scrub(os.Environ())
 	return cmd, nil
+}
+
+// Scrub drops the source API key env vars (LINEAR_API_KEY and the one named by linear.key_env)
+// so a child process, which may read injected issue text, cannot read them.
+func Scrub(base []string) []string {
+	drop := map[string]bool{"LINEAR_API_KEY": true, config.Get("linear.key_env", "LINEAR_API_KEY"): true}
+	var env []string
+	for _, kv := range base {
+		if k, _, _ := strings.Cut(kv, "="); !drop[k] {
+			env = append(env, kv)
+		}
+	}
+	return env
 }
 
 // Spec is what to execute for one run: the argv, whether stdin is the prompt file (else the null
@@ -272,7 +285,7 @@ func Env(base []string, s Spec, o Options) []string {
 		drop[k] = true
 	}
 	var env []string
-	for _, kv := range base {
+	for _, kv := range Scrub(base) {
 		k, _, _ := strings.Cut(kv, "=")
 		if !drop[k] {
 			env = append(env, kv)

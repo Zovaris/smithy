@@ -999,7 +999,10 @@ func newAuto() (*autoWatcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.Open(""); err != nil {
+	if srcs, err := s.Open(""); len(srcs) == 0 {
+		if err == nil {
+			err = fmt.Errorf("auto.sources is empty")
+		}
 		return nil, err
 	}
 	return &autoWatcher{s}, nil

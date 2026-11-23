@@ -115,6 +115,21 @@ func TestEnv(t *testing.T) {
 	}
 }
 
+func TestEnvDropsLinearKey(t *testing.T) {
+	h := t.TempDir()
+	t.Setenv("SMITHY_HOME", h)
+	t.Setenv("SMITHY_CONFIG", filepath.Join(h, "config.json"))
+	t.Chdir(t.TempDir())
+	os.WriteFile(filepath.Join(h, "config.json"), []byte(`{"linear":{"key_env":"MY_LIN"}}`), 0o644)
+	got := Scrub([]string{"MY_LIN=s1", "LINEAR_API_KEY=s2", "PATH=/bin"})
+	if !reflect.DeepEqual(got, []string{"PATH=/bin"}) {
+		t.Errorf("Scrub = %q", got)
+	}
+	if e := Env([]string{"MY_LIN=s1", "PATH=/bin"}, Spec{}, Options{}); strings.Contains(strings.Join(e, " "), "s1") {
+		t.Errorf("Env kept the key: %q", e)
+	}
+}
+
 func TestSplitArgs(t *testing.T) {
 	got := SplitArgs(`--a 'b c' "d \"e\"" f\ g  `)
 	want := []string{"--a", "b c", `d "e"`, "f g"}

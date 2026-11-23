@@ -136,7 +136,9 @@ To use `smithy` in your own terminal, accept the PATH offer in use-smithy setup 
 Two JSON files, the repo's first: `<repo>/.smithy/config.json` and `~/.smithy/config.json`. You
 never edit them by hand: use-smithy setup asks everything up front, or each skill asks the first
 time it needs a value. `smithy config list` shows every setting and where it came from; all of
-them, with defaults, are in [docs/settings.md](docs/settings.md).
+them, with defaults, are in [docs/settings.md](docs/settings.md). API keys (e.g. Linear) live apart
+in `~/.smithy/auth.json` (mode 0600): `smithy auth set linear < keyfile`, never in a config file. Any process running as you (agents
+included) can read it, so use a test or least-privilege key.
 
 ## Autonomous mode
 
