@@ -357,7 +357,7 @@ func (m Model) agentRows() []row {
 			chip: st, chipC: m.stageColor(st),
 			search: it.Batch + " " + it.Branch, url: it.PR, copy: firstNonDash(it.PR, it.Worktree, it.Branch), title: it.Batch + "/" + it.ID,
 			detail: m.itemDetail(it), logPath: logPath, logTail: it.LogTail, timeline: m.timeline(it),
-			cmd: "smithy cards get " + it.Batch + " " + it.ID})
+			cmd: "smithy cards get " + sh(it.Batch) + " " + sh(it.ID)})
 	}
 	return out
 }
@@ -464,7 +464,7 @@ func (m Model) needRows() []row {
 			if st == "pr_open" && it.CI != "green" {
 				continue
 			}
-			cmd := "gh pr merge " + it.PR
+			cmd := "gh pr merge " + sh(it.PR)
 			out = append(out, row{cells: []cell{{s: t.g.pass, c: t.ok, bold: true}, {s: "Review PR " + shortPR(it.PR) + ": " + or(it.Title), c: t.text},
 				{s: it.Batch + "/" + it.ID, c: t.muted}, {s: "o open · y merge cmd", c: t.accent}},
 				url: it.PR, copy: it.PR, cmd: cmd, title: "PR " + shortPR(it.PR) + " · " + or(it.Title), detail: m.itemDetail(it), logTail: it.LogTail,
@@ -472,7 +472,7 @@ func (m Model) needRows() []row {
 				explain: []string{"CI is " + it.CI + ". Review it on GitHub (o), then merge there or with the command y copies:",
 					cmd, "smithy never merges from here."}})
 		case "blocked":
-			cmd := fmt.Sprintf("smithy cards set %s %s state=working note=\"unblocked: <what changed>\"", it.Batch, it.ID)
+			cmd := fmt.Sprintf("smithy cards set %s %s state=working %s", sh(it.Batch), sh(it.ID), sh("note=unblocked: <what changed>"))
 			logPath := it.Log
 			if m.snap.Demo {
 				logPath = ""
@@ -593,7 +593,7 @@ func (m Model) worktreeRows() []row {
 		}
 		out = append(out, row{cells: []cell{{s: home(w.Path), c: t.text}, {s: or(w.Branch), c: t.muted}, {s: or(w.Item), c: t.muted},
 			{s: age, c: t.muted}, dirty, {s: ab, c: t.muted}, state},
-			copy: w.Path, cmd: "git worktree remove " + w.Path, title: home(w.Path), detail: d, chip: state.s, chipC: state.c})
+			copy: w.Path, cmd: "git worktree remove " + sh(w.Path), title: home(w.Path), detail: d, chip: state.s, chipC: state.c})
 	}
 	return out
 }
