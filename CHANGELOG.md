@@ -23,6 +23,9 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   and reject unknown state types.
 - Fixed: `smithy auto take` writes its task dir to `~/.smithy/plans/<repo>/` whatever
   `tasks.commit` says, so intake never leaves files in the target repo.
+- Fixed: auto task files use the issue's human id: file `NN-tes-1-<slug>.md`, `Key: TES-1`
+  (so branches read `feat/TES-1-…`); the stable id moves to `Ref: <source>:<uuid>`.
+  `smithy auto report` takes `linear:TES-1`, `linear:<uuid>` or a bare id it launched.
 
 - Added: tend `auto` mode (`references/AUTO.md`): waits on `smithy wait auto`, takes the queue
   into a task dir, runs warden on it with batch values pre-answered and reports each issue

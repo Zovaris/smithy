@@ -339,14 +339,42 @@ func TestLastPollIsFetchStart(t *testing.T) {
 	}
 }
 
-func TestTaskKeyHeaderUsesStableKey(t *testing.T) {
-	f, err := writeTask(t.TempDir(), "01", Queued{Source: "linear", Key: "uuid-9", ID: "ENG-9", Title: "x", URL: "u"})
+func TestTaskUsesHumanIDAndKeepsStableRef(t *testing.T) {
+	f, err := writeTask(t.TempDir(), "01", Queued{Source: "linear", Key: "uuid-9", ID: "TES-9", Title: "Fix login", URL: "u"})
 	if err != nil {
 		t.Fatal(err)
 	}
+	if got := filepath.Base(f); got != "01-tes-9-fix-login.md" {
+		t.Errorf("file = %s", got)
+	}
 	b, _ := os.ReadFile(f)
-	if !strings.Contains(string(b), "Key: linear:uuid-9\n") {
-		t.Errorf("task = %s", b)
+	for _, want := range []string{"Key: TES-9\n", "Ref: linear:uuid-9\n", "Issue linear TES-9"} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("task lacks %q:\n%s", want, b)
+		}
+	}
+}
+
+func TestReportBareIDFindsSourceFromState(t *testing.T) {
+	home(t)
+	lin, gh := &fakeSource{name: "linear"}, &fakeSource{name: "github"}
+	err := update(func(st *State) error {
+		st.Launched["2026-01-01"] = []Launch{{Source: "linear", Key: "uuid-1", ID: "TES-1"}}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ref := range []string{"TES-1", "uuid-1", "linear:TES-1", "linear:uuid-1"} {
+		if err := Report([]Source{lin, gh}, ref, "started", ""); err != nil {
+			t.Errorf("%s: %v", ref, err)
+		}
+	}
+	if len(lin.reported) != 4 || len(gh.reported) != 0 {
+		t.Errorf("linear %v, github %v", lin.reported, gh.reported)
+	}
+	if err := Report([]Source{lin, gh}, "OPS-3", "started", ""); err == nil {
+		t.Error("unknown bare id with two sources accepted")
 	}
 }
 
