@@ -445,8 +445,19 @@ func TestDoctorSkillNotInHarness(t *testing.T) {
 func TestDoctorAutoAgent(t *testing.T) {
 	newDoctor(t, "git", "gh")
 	config.Set(config.UserFile(), "auto.agent", "codex")
-	if o, _ := doctor(t, "--quiet"); !strings.Contains(o, "auto.agent codex not on PATH") {
+	if o, _ := doctor(t, "--quiet"); !strings.Contains(o, "auto.agent codex not found") {
 		t.Errorf("missing CLI not flagged:\n%s", o)
+	}
+	dir := filepath.Join(t.TempDir(), "Claude Code", "2.1")
+	os.MkdirAll(dir, 0o755)
+	cx := filepath.Join(dir, "codex")
+	os.WriteFile(cx, []byte("#!/bin/sh\necho codex-cli 9.9\n"), 0o755)
+	config.Set(config.UserFile(), "auto.agent", cx)
+	if o, _ := doctor(t, "--quiet"); !strings.Contains(o, "auto.agent codex: workspace-write sandbox with network on") {
+		t.Errorf("codex limit not stated:\n%s", o)
+	}
+	if o, _ := doctor(t, ""); !strings.Contains(o, "auto.agent: "+cx+" (codex-cli 9.9)") {
+		t.Errorf("absolute path not accepted:\n%s", o)
 	}
 	config.Set(config.UserFile(), "auto.agent", "vim")
 	if o, _ := doctor(t, "--quiet"); !strings.Contains(o, "auto.agent vim can't run headless") {

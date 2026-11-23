@@ -55,8 +55,17 @@ func TestAgentAutoProfileFlags(t *testing.T) {
 	}
 	b, _ := os.ReadFile(rec)
 	got := string(b)
-	if !strings.Contains(got, "--permission-mode\ndontAsk\n--allowedTools\n") || strings.Contains(got, "bypass") || !strings.Contains(got, "Bash(git *)") {
+	if !strings.Contains(got, "--permission-mode\ndontAsk\n--allowedTools\n") || strings.Contains(got, "bypass") || !strings.Contains(got, "Bash(git commit *)") || strings.Contains(got, "Bash(git *)") {
 		t.Errorf("claude argv = %q", got)
+	}
+	// A worker the orchestrator starts with a plain `smithy agent` inherits the profile.
+	os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" \"env=$SMITHY_AGENT_PROFILE\" > "+rec+"\ncat > /dev/null\n"), 0o755)
+	if _, errOut, code := run(t, repo, append(env, "SMITHY_AGENT_PROFILE=auto"), "agent", prompt); code != 0 {
+		t.Fatalf("worker: %d %s", code, errOut)
+	}
+	b, _ = os.ReadFile(rec)
+	if got := string(b); !strings.Contains(got, "dontAsk\n--allowedTools\n") || !strings.Contains(got, "--disallowedTools\n") || !strings.Contains(got, "env=auto") {
+		t.Errorf("worker argv = %q", got)
 	}
 	if _, _, code := run(t, repo, env, "agent", "--profile", "yolo", prompt); code != 2 {
 		t.Errorf("unknown profile exit %d", code)

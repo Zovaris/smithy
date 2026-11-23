@@ -45,13 +45,29 @@ func TestBuild(t *testing.T) {
 			t.Errorf("Build(%s, %+v) = %+v, %v; want %q stdin=%v %s", c.cli, c.o, s, err, c.want, c.stdin, c.h)
 		}
 	}
-	auto := Options{Profile: "auto"}
-	s, _ := Build("claude", auto, "", nil, "", env(map[string]string{"AGENT_PERMISSION_MODE": "bypassPermissions"}))
-	if want := []string{"claude", "-p", "--permission-mode", "dontAsk", "--allowedTools", strings.Join(AutoTools, ",")}; !reflect.DeepEqual(s.Argv, want) {
+	auto := Options{Profile: "auto", SmithyBins: []string{"/opt/smithy/bin/smithy", "rel/smithy"}}
+	s, _ := Build("/Apps/Claude Code/2.1/claude", auto, "", nil, "", env(map[string]string{"AGENT_PERMISSION_MODE": "bypassPermissions"}))
+	argv := strings.Join(s.Argv, "\n")
+	if s.Argv[0] != "/Apps/Claude Code/2.1/claude" || s.Harness != "claude-cli" || !strings.HasPrefix(argv, "/Apps/Claude Code/2.1/claude\n-p\n--permission-mode\ndontAsk\n--allowedTools\n") {
 		t.Errorf("claude auto profile = %q", s.Argv)
 	}
-	if strings.Contains(strings.Join(s.Argv, " "), "Bash(*)") || strings.Contains(strings.Join(s.Argv, " "), "bypass") {
-		t.Errorf("auto profile is a bypass: %q", s.Argv)
+	for _, want := range []string{"\nBash(git commit *)\n", "\nBash(git push origin *)\n", "\nBash(gh pr create *)\n", "\nBash(/opt/smithy/bin/smithy *)\n",
+		"\n--disallowedTools\n", "\nBash(gh api *)\n", "\nBash(git -c *)\n", "\nRead(~/.ssh/**)\n", "\nEdit(**/.git/hooks/**)\n", "\nBash(/opt/smithy/bin/smithy auth *)\n"} {
+		if !strings.Contains(argv+"\n", want) {
+			t.Errorf("auto profile lacks %q", strings.TrimSpace(want))
+		}
+	}
+	for _, bad := range []string{"Bash(*)", "bypass", "Bash(git *)", "Bash(gh *)", "Bash(*/", "rel/smithy", "Bash(git push *)"} {
+		if strings.Contains(argv, bad) {
+			t.Errorf("auto profile allows %q: %q", bad, s.Argv)
+		}
+	}
+	e := strings.Join(Env([]string{ProfileEnv + "=x", "A=1"}, s, auto), " ")
+	if !strings.Contains(e, ProfileEnv+"=auto") || strings.Contains(e, ProfileEnv+"=x") {
+		t.Errorf("workers don't inherit the profile: %s", e)
+	}
+	if e := strings.Join(Env([]string{ProfileEnv + "=auto"}, s, Options{}), " "); strings.Contains(e, ProfileEnv) {
+		t.Errorf("profile leaked into a plain run: %s", e)
 	}
 	s, _ = Build("codex", auto, "", nil, "/r/.git", none)
 	if want := []string{"codex", "exec", "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true", "--add-dir", "/r/.git", "-c", "approval_policy=never", "-"}; !reflect.DeepEqual(s.Argv, want) {
