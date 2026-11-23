@@ -7,42 +7,42 @@
         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
   1 Overview   2 Agents   3 Incoming   4 Needs you 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System                                                   
 ╭─ Done · 117 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│   issue       title                                                                                                 PR       result    took      when        │
-│ ▸ TES-1118    Split the billing service                                                                             #1118    ready     1h07m     3m ago      │
-│   #520        Drop the legacy CSV importer                                                                          #1120    closed    56m       7m ago      │
-│   TES-1104    Drop the legacy CSV importer                                                                          #1104    merged    4h39m     10m ago     │
-│   #508        Show CI time per PR                                                                                   #1108    merged    2h05m     10m ago     │
-│   TES-1115    Cache board queries                                                                                   #1115    blocked   1h30m     12m ago     │
-│   #511        Stream large downloads                                                                                #1111    merged    2h36m     16m ago     │
-│   #517        Retry webhooks with backoff                                                                           #1117    blocked   45m       24m ago     │
-│   TES-1110    Make search fuzzy                                                                                     #1110    merged    2h34m     31m ago     │
-│   #514        Rate-limit the export API                                                                             #1114    ready     49m       44m ago     │
-│   TES-1112    Add dark mode to the report                                                                           #1112    closed    1h19m     46m ago     │
-│   TES-1101    Retry webhooks with backoff                                                                           #1101    merged    4h46m     50m ago     │
-│   TES-1100    Paginate the audit log                                                                                #1100    merged    4h02m     1h ago      │
-│   TES-209     Add SSO for admins                                                                                    #2009    ready     38m       1h ago      │
-│   TES-210     Speed up cold start                                                                                   #2010    ready     38m       1h ago      │
-│   TES-211     Typed config loader                                                                                   #2011    blocked   38m       1h ago      │
-│   TES-1109    Archive stale branches                                                                                #1109    ready     1h20m     1h ago      │
-│   #505        Add SSO for admins                                                                                    #1105    ready     2h15m     1h ago      │
-│   TES-1106    Speed up cold start                                                                                   #1106    ready     1h51m     1h ago      │
-│   TES-213     Archive stale branches                                                                                #2013    merged    38m       1h ago      │
-│   TES-1107    Typed config loader                                                                                   #1107    blocked   1h54m     2h ago      │
-│   #496        Add dark mode to the report                                                                           #1096    merged    4h02m     2h ago      │
-│   #502        Split the billing service                                                                             #1102    merged    2h39m     2h ago      │
-│   TES-1091    Typed config loader                                                                                   #1091    merged    5h12m     2h ago      │
-│   TES-1097    Fix flaky login test                                                                                  #1097    merged    3h28m     3h ago      │
-│   TES-1103    Upgrade to Go 1.27                                                                                    #1103    ready     1h18m     3h ago      │
-│   TES-1098    Rate-limit the export API                                                                             #1098    merged    2h50m     3h ago      │
-│   #499        Cache board queries                                                                                   #1099    merged    2h28m     3h ago      │
-│   #493        Archive stale branches                                                                                #1093    merged    2h41m     3h ago      │
-│   TES-1089    Add SSO for admins                                                                                    #1089    merged    4h27m     4h ago      │
-│   TES-1094    Make search fuzzy                                                                                     #1094    merged    2h21m     4h ago      │
-│   TES-1092    Show CI time per PR                                                                                   #1092    merged    2h42m     5h ago      │
-│   TES-1085    Retry webhooks with backoff                                                                           #1085    merged    4h41m     5h ago      │
-│   #487        Upgrade to Go 1.27                                                                                    #1087    merged    3h06m     5h ago      │
-│   TES-1095    Stream large downloads                                                                                #1095    merged    1h44m     5h ago      │
-│   TES-1088    Drop the legacy CSV importer                                                                          #1088    merged    2h46m     5h ago      │
-│   TES-1080    Add dark mode to the report                                                                           #1080    merged    4h49m     6h ago      │
+│   issue       title                                                                                        PR       result    took      cost     when        │
+│ ▸ TES-1118    Split the billing service                                                                    #1118    ready     1h07m     $0.22    3m ago      │
+│   #520        Drop the legacy CSV importer                                                                 #1120    closed    56m       $2.03    7m ago      │
+│   TES-1104    Drop the legacy CSV importer                                                                 #1104    merged    4h39m     $0.64    10m ago     │
+│   #508        Show CI time per PR                                                                          #1108    merged    2h05m     $1.86    10m ago     │
+│   TES-1115    Cache board queries                                                                          #1115    blocked   1h30m     $1.43    12m ago     │
+│   #511        Stream large downloads                                                                       #1111    merged    2h36m     $1.19    16m ago     │
+│   #517        Retry webhooks with backoff                                                                  #1117    blocked   45m       $0.94    24m ago     │
+│   TES-1110    Make search fuzzy                                                                            #1110    merged    2h34m     $1.69    31m ago     │
+│   #514        Rate-limit the export API                                                                    #1114    ready     49m       $1.88    44m ago     │
+│   TES-1112    Add dark mode to the report                                                                  #1112    closed    1h19m     $2.72    46m ago     │
+│   TES-1101    Retry webhooks with backoff                                                                  #1101    merged    4h46m     $0.36    50m ago     │
+│   TES-1100    Paginate the audit log                                                                       #1100    merged    4h02m     $0.85    1h ago      │
+│   TES-209     Add SSO for admins                                                                           #2009    ready     38m       -        1h ago      │
+│   TES-210     Speed up cold start                                                                          #2010    ready     38m       $1.14    1h ago      │
+│   TES-211     Typed config loader                                                                          #2011    blocked   38m       $0.59    1h ago      │
+│   TES-1109    Archive stale branches                                                                       #1109    ready     1h20m     $1.53    1h ago      │
+│   #505        Add SSO for admins                                                                           #1105    ready     2h15m     $1.08    1h ago      │
+│   TES-1106    Speed up cold start                                                                          #1106    ready     1h51m     $2.13    1h ago      │
+│   TES-213     Archive stale branches                                                                       #2013    merged    38m       $1.51    1h ago      │
+│   TES-1107    Typed config loader                                                                          #1107    blocked   1h54m     $0.72    2h ago      │
+│   #496        Add dark mode to the report                                                                  #1096    merged    4h02m     $1.04    2h ago      │
+│   #502        Split the billing service                                                                    #1102    merged    2h39m     $1.05    2h ago      │
+│   TES-1091    Typed config loader                                                                          #1091    merged    5h12m     $2.61    2h ago      │
+│   TES-1097    Fix flaky login test                                                                         #1097    merged    3h28m     $2.72    3h ago      │
+│   TES-1103    Upgrade to Go 1.27                                                                           #1103    ready     1h18m     $1.06    3h ago      │
+│   TES-1098    Rate-limit the export API                                                                    #1098    merged    2h50m     $1.05    3h ago      │
+│   #499        Cache board queries                                                                          #1099    merged    2h28m     $1.72    3h ago      │
+│   #493        Archive stale branches                                                                       #1093    merged    2h41m     $2.41    3h ago      │
+│   TES-1089    Add SSO for admins                                                                           #1089    merged    4h27m     $0.32    4h ago      │
+│   TES-1094    Make search fuzzy                                                                            #1094    merged    2h21m     $1.10    4h ago      │
+│   TES-1092    Show CI time per PR                                                                          #1092    merged    2h42m     $2.41    5h ago      │
+│   TES-1085    Retry webhooks with backoff                                                                  #1085    merged    4h41m     $1.08    5h ago      │
+│   #487        Upgrade to Go 1.27                                                                           #1087    merged    3h06m     $2.00    5h ago      │
+│   TES-1095    Stream large downloads                                                                       #1095    merged    1h44m     $1.75    5h ago      │
+│   TES-1088    Drop the legacy CSV importer                                                                 #1088    merged    2h46m     $0.73    5h ago      │
+│   TES-1080    Add dark mode to the report                                                                  #1080    merged    4h49m     $1.75    6h ago      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
  ↑↓ move  enter details  o open  c copy  / filter                                                                                     tab views  ? help  q quit 

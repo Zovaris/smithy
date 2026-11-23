@@ -13,6 +13,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/text"
+	"github.com/Zovaris/smithy/internal/usage"
 )
 
 // Event is one line of the log.
@@ -25,6 +26,25 @@ type Event struct {
 	ID     string    `json:"id,omitempty"`
 	PR     string    `json:"pr,omitempty"`
 	Detail string    `json:"detail,omitempty"`
+	// Usage is set on kind "usage": what one finished agent run reported (tokens, cost when known).
+	Usage *usage.Usage `json:"usage,omitempty"`
+}
+
+// Spend is the known cost per local day of the "usage" events, the last days days (today last).
+func Spend(es []Event, now time.Time, days int) []float64 {
+	out := make([]float64, days)
+	first := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -(days - 1))
+	for _, e := range es {
+		if e.Kind != "usage" || e.Usage == nil || e.Usage.CostUSD == nil {
+			continue
+		}
+		t := e.T.In(now.Location())
+		d := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, now.Location())
+		if i := int(d.Sub(first).Hours()/24 + 0.5); !d.Before(first) && i < days {
+			out[i] += *e.Usage.CostUSD
+		}
+	}
+	return out
 }
 
 // MaxBytes is the size at which the log rotates to events.jsonl.1 (the one older file kept).
