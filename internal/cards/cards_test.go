@@ -480,8 +480,8 @@ func TestMainSetGet(t *testing.T) {
 	if code != 1 || !strings.Contains(se, "no card missing") {
 		t.Fatalf("%d %q", code, se)
 	}
-	_, se, code = capture(t, func() int { return Main([]string{"set", "b1", "a", "state=bogus"}) })
-	if code != 1 || !strings.Contains(se, "state must be one of") {
+	_, se, code = capture(t, func() int { return Main([]string{"set", "b1", "a", "state=done"}) })
+	if code != 1 || !strings.Contains(se, `unknown state "done"`) || !strings.Contains(se, "pr_open, ready, merged") {
 		t.Fatalf("%d %q", code, se)
 	}
 }
@@ -579,5 +579,25 @@ func TestPROpenNeedsAPR(t *testing.T) {
 	}
 	if _, err := Set("b", "p", []string{"state=pr_open", "pr=https://github.com/o/r/pull/1"}); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestGate(t *testing.T) {
+	h := setup(t)
+	os.MkdirAll(filepath.Join(h, "g"), 0o755)
+	os.WriteFile(filepath.Join(h, "g", "batch.json"), []byte(`{"items":[{"id":"r","risky":true},{"id":"p"}]}`), 0o644)
+	if err := Gate("g", "p"); err != nil {
+		t.Errorf("plain item: %v", err)
+	}
+	if err := Gate("g", "r"); err == nil || !strings.Contains(err.Error(), "security=unset") {
+		t.Errorf("risky without card: %v", err)
+	}
+	Set("g", "r", []string{"security=not-run:no agent"})
+	if err := Gate("g", "r"); err == nil || !strings.Contains(err.Error(), "not-run:no agent") {
+		t.Errorf("not-run: %v", err)
+	}
+	Set("g", "r", []string{"security=ran"})
+	if err := Gate("g", "r"); err != nil {
+		t.Errorf("ran: %v", err)
 	}
 }

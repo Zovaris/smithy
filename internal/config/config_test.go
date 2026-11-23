@@ -523,3 +523,28 @@ func TestRepoFileInWorktreeIsTheMainCheckouts(t *testing.T) {
 		t.Fatalf("RepoFile in worktree = %s, want under %s", RepoFile(), main)
 	}
 }
+
+func TestAskTimeoutDefault(t *testing.T) {
+	for _, s := range Known {
+		if s.Key == "ask.timeout" {
+			if s.Default != "10" {
+				t.Fatalf("ask.timeout default %q", s.Default)
+			}
+			return
+		}
+	}
+	t.Fatal("ask.timeout not a known setting")
+}
+
+func TestAskTimeoutValidated(t *testing.T) {
+	for _, v := range []string{"0", "10", "2.5"} {
+		if _, _, err := Normalize("ask.timeout", v); err != nil {
+			t.Errorf("%s: %v", v, err)
+		}
+	}
+	for _, v := range []string{"-1", "x", "NaN", "Inf", ""} {
+		if _, _, err := Normalize("ask.timeout", v); err == nil {
+			t.Errorf("%q accepted", v)
+		}
+	}
+}

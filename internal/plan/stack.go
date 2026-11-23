@@ -65,7 +65,7 @@ func (r repo) dep(name string) bool {
 }
 
 func (r repo) pydep(name string) bool {
-	re := regexp.MustCompile(`(?i)^[^#]*\b` + regexp.QuoteMeta(name) + `\b`)
+	re := regexp.MustCompile(`(?i)^[^#]*(^|["'\[,])\s*` + regexp.QuoteMeta(name) + `\b`)
 	files := append([]string{filepath.Join(r.dir, "pyproject.toml")}, r.glob("requirements*.txt")...)
 	files = append(files, filepath.Join(r.dir, "setup.cfg"))
 	for _, f := range files {
@@ -84,6 +84,19 @@ func (r repo) pydep(name string) bool {
 		fh.Close()
 	}
 	return false
+}
+
+// pytest reports whether the repo uses pytest: a dependency or a pytest config.
+func (r repo) pytest() bool {
+	if r.pydep("pytest") || r.file("pytest.ini") || r.file("conftest.py") || r.file("tests/conftest.py") || r.file("test/conftest.py") {
+		return true
+	}
+	b, _ := os.ReadFile(filepath.Join(r.dir, "pyproject.toml"))
+	if strings.Contains(string(b), "[tool.pytest") {
+		return true
+	}
+	t, _ := os.ReadFile(filepath.Join(r.dir, "tox.ini"))
+	return regexp.MustCompile(`(?im)^\[pytest\]|^\s*(deps\s*=\s*)?pytest\b`).Match(t)
 }
 
 func or(v, fallback string) string {
@@ -171,7 +184,7 @@ func Stack(dir string) []Line {
 			}
 		} else if r.dep("jest") {
 			single, cov = "npx jest <file>", "npx jest --coverage --changedSince=<base>"
-		} else if sc, _ := r.pkg["scripts"].(map[string]any); strings.TrimSpace(fmt.Sprint(sc["test"])) == "node --test" || strings.HasPrefix(fmt.Sprint(sc["test"]), "node --test ") {
+		} else if sc, _ := r.pkg["scripts"].(map[string]any); runsNodeTest(fmt.Sprint(sc["test"])) {
 			single = "node --test <file>"
 		}
 		if r.script("typecheck") {
@@ -203,11 +216,16 @@ func Stack(dir string) []Line {
 		if r.file("poetry.lock") {
 			run = "poetry run "
 		}
-		if unittest {
-			test, single = or(test, "python3 -m unittest"), or(single, "python3 -m unittest <module>")
+		if unittest || !r.pytest() {
+			discover := "python3 -m unittest discover"
+			if st, err := os.Stat(filepath.Join(dir, "tests")); err == nil && st.IsDir() {
+				discover += " -s tests"
+			}
+			test, single = or(test, run+discover), or(single, run+"python3 -m unittest <module>")
+		} else {
+			test = or(test, run+"pytest -q")
+			single = or(single, run+"pytest -q <file>")
 		}
-		test = or(test, run+"pytest -q")
-		single = or(single, run+"pytest -q <file>")
 		if r.pydep("mypy") {
 			typecheck = join(typecheck, "; ", run+"mypy .")
 		}
@@ -246,6 +264,7 @@ func Stack(dir string) []Line {
 	if gomod {
 		test, single = or(test, "go test -count=1 ./..."), or(single, "go test ./<pkg> -run <Name>")
 		typecheck, pbt = or(typecheck, "go vet ./..."), or(pbt, "go fuzz (go test -fuzz)")
+		lint = or(lint, "x=$(gofmt -l .) && test -z \"$x\"")
 	}
 
 	var over struct {
@@ -339,4 +358,16 @@ func StackMain(args []string) int {
 		fmt.Printf("%-12s %s\n", l.Key+":", or(l.Value, "none"))
 	}
 	return 0
+}
+
+// runsNodeTest reports whether a package.json test script runs `node --test` as one of its
+// commands (split on &&, || and ;), not just mentions it.
+func runsNodeTest(script string) bool {
+	for _, part := range regexp.MustCompile(`&&|\|\||;`).Split(script, -1) {
+		p := strings.TrimSpace(part)
+		if p == "node --test" || strings.HasPrefix(p, "node --test ") {
+			return true
+		}
+	}
+	return false
 }

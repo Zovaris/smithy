@@ -7,9 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/cards"
 )
 
 func TestSummarize(t *testing.T) {
@@ -157,6 +160,7 @@ func TestPRWatcherFirstPoll(t *testing.T) {
 		want []string
 	}{
 		{"green", prFixture{rollup: green}, allOpts(), []string{"pr 5 checks=green u5"}},
+		{"green but conflicting", prFixture{rollup: green, mergeable: "CONFLICTING"}, allOpts(), []string{"pr 5 conflict u5"}},
 		{"red", prFixture{rollup: red}, allOpts(), []string{"pr 5 checks=red failed=unit-tests u5"}},
 		{"pending is quiet", prFixture{rollup: pending}, allOpts(), nil},
 		{"no checks is quiet", prFixture{}, allOpts(), nil},
@@ -755,5 +759,120 @@ func TestPRWatcherLegacyStatusesAreNotHeldBack(t *testing.T) {
 	got, _ := w.poll()
 	if !reflect.DeepEqual(got, []string{"pr 5 push head=fff9999 u5", "pr 5 checks=green u5"}) {
 		t.Errorf("got %v", got)
+	}
+}
+
+func TestBatchWatcherPRs(t *testing.T) {
+	e := sandbox(t)
+	prEvery = 0
+	t.Cleanup(func() { prEvery = 30 * time.Second })
+	e.put(t, "pr.json", prFixture{rollup: green}.json())
+	writeCard(t, "b1", "a", `{"state":"pr_open","pr":"u5","updated":"`+stamp(0)+`"}`)
+	writeCard(t, "b1", "m", `{"state":"merged","pr":"u9","updated":"`+stamp(0)+`"}`)
+	w, err := newBatch("b1", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := w.poll(); got != nil {
+		t.Fatalf("a PR's state at the first read must not wake: %v", got)
+	}
+	if _, ok := w.prs["u9"]; ok {
+		t.Error("a final card's PR was watched")
+	}
+	e.put(t, "pr.json", prFixture{rollup: red}.json())
+	if got, _ := w.poll(); !reflect.DeepEqual(got, []string{"batch b1 a pr 5 checks=red failed=unit-tests u5"}) {
+		t.Errorf("red: %q", got)
+	}
+	e.put(t, "pr.json", prFixture{rollup: red, mergeable: "CONFLICTING"}.json())
+	if got, _ := w.poll(); !reflect.DeepEqual(got, []string{"batch b1 a pr 5 conflict u5"}) {
+		t.Errorf("conflict: %q", got)
+	}
+	e.put(t, "fail-pr-view", "")
+	if got, err := w.poll(); got != nil || err != nil {
+		t.Errorf("a PR read error must not end the wait: %q %v", got, err)
+	}
+	e.rm("fail-pr-view")
+	e.put(t, "pr.json", prFixture{rollup: green, mergeable: "CONFLICTING"}.json())
+	writeCard(t, "b1", "c", `{"state":"working","pr":"u7","updated":"`+stamp(0)+`"}`)
+	got, _ := w.poll()
+	if !reflect.DeepEqual(got, []string{"batch b1 a pr 5 conflict u5", "batch b1 c pr 5 conflict u5"}) {
+		t.Errorf("a PR first seen during the wait reports its state: %q", got)
+	}
+	if got, _ := w.poll(); got != nil {
+		t.Errorf("unchanged after the first sighting: %q", got)
+	}
+	e.put(t, "signedout", "")
+	off, _ := newBatch("b1", false)
+	if off.gh {
+		t.Error("signed out: PRs must not be watched")
+	}
+}
+
+func TestBatchWatcherStartReports(t *testing.T) {
+	e := sandbox(t)
+	prEvery = 0
+	t.Cleanup(func() { prEvery = 30 * time.Second })
+	e.put(t, "pr.json", prFixture{rollup: green}.json())
+	dir := filepath.Join(os.Getenv("WARDEN_HOME"), "b1")
+	writeCard(t, "b1", "a", `{"state":"pr_open","pr":"u5","updated":"`+stamp(0)+`"}`)
+	writeCard(t, "b1", "r", `{"state":"ready","pr":"u6","updated":"`+stamp(0)+`"}`)
+	writeCard(t, "b1", "q", `{"state":"pr_open","pr":"u7","updated":"`+stamp(0)+`"}`)
+	if err := os.WriteFile(filepath.Join(dir, "batch.json"), []byte(`{"merge":"auto","items":[{"id":"a"},{"id":"r"},{"id":"q","merge":"manual"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	w, err := newBatch("b1", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := w.poll(); !reflect.DeepEqual(got, []string{"batch b1 a pr 5 checks=green u5"}) {
+		t.Errorf("an auto PR already green at the start must wake, ready and manual ones not: %q", got)
+	}
+	again, _ := newBatch("b1", false)
+	if got, _ := again.poll(); got != nil {
+		t.Errorf("a relaunched wait re-reported a handled event: %q", got)
+	}
+	writeCard(t, "b1", "a", `{"state":"merged","pr":"u5","updated":"`+stamp(time.Minute)+`"}`)
+	if got, _ := again.poll(); got != nil {
+		t.Errorf("the warden's own merged card woke the wait: %q", got)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".wait-seen")); err != nil {
+		t.Errorf("seen file: %v", err)
+	}
+	if rows, _ := cards.Rows("b1"); len(rows) != 3 {
+		t.Errorf("the seen file became a card: %+v", rows)
+	}
+}
+
+func TestBatchWatcherStartRedOnReady(t *testing.T) {
+	e := sandbox(t)
+	prEvery = 0
+	t.Cleanup(func() { prEvery = 30 * time.Second })
+	e.put(t, "pr.json", prFixture{rollup: red}.json())
+	dir := filepath.Join(os.Getenv("WARDEN_HOME"), "b1")
+	writeCard(t, "b1", "r", `{"state":"ready","pr":"u6","updated":"`+stamp(0)+`"}`)
+	writeCard(t, "b1", "n", `{"state":"pr_open","pr":"u8","updated":"`+stamp(0)+`"}`)
+	if err := os.WriteFile(filepath.Join(dir, "batch.json"), []byte(`{"merge":"auto","items":[{"id":"r"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	w, _ := newBatch("b1", false)
+	got, _ := w.poll()
+	want := []string{"batch b1 n pr 5 checks=red failed=unit-tests u5", "batch b1 r pr 5 checks=red failed=unit-tests u5"}
+	sort.Strings(got)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("red on a ready card, and a card missing from batch.json on the batch default: %q", got)
+	}
+}
+
+func TestRelaunchLineWhileCardsOpen(t *testing.T) {
+	sandbox(t)
+	writeCard(t, "b1", "a", `{"state":"merged"}`)
+	writeCard(t, "b1", "b", `{"state":"pr_open"}`)
+	w, _ := newBatch("b1", false)
+	if got := relaunchLines([]watcher{w}); !reflect.DeepEqual(got, []string{"relaunch: smithy wait batch:b1"}) {
+		t.Errorf("open card: %q", got)
+	}
+	writeCard(t, "b1", "b", `{"state":"dropped"}`)
+	if got := relaunchLines([]watcher{w}); got != nil {
+		t.Errorf("all final: %q", got)
 	}
 }

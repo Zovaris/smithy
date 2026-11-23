@@ -68,27 +68,64 @@ func TestStack(t *testing.T) {
 			"typecheck": "npx tsc --noEmit", "lint": "pnpm run lint", "e2e": "npx playwright test",
 			"property": "fast-check", "coverage": "npx vitest run --coverage --changed", "dev": "", "adrs": "2",
 		}},
+		{"tsc-node-test", map[string]string{
+			"package.json": `{"scripts":{"test":"tsc && node --test dist/test/*.test.js"}}`,
+		}, map[string]string{"test": "npm test", "single": "node --test <file>"}},
+		{"mentions-node-test", map[string]string{
+			"package.json": `{"scripts":{"test":"echo node --test is unused && mocha"}}`,
+		}, map[string]string{"test": "npm test", "single": ""}},
 		{"node-test", map[string]string{
 			"package.json": `{"scripts":{"test":"node --test"}}`,
 		}, map[string]string{"test": "npm test", "single": "node --test <file>"}},
 		{"pytest-bare", map[string]string{"test_a.py": "import pytest\nimport unittest\n"}, map[string]string{"test": ""}},
 		{"go-with-py", map[string]string{"go.mod": "module x\n", "test_h.py": "import unittest\n"}, map[string]string{"test": "go test -count=1 ./..."}},
 		{"unittest", map[string]string{"tests/test_a.py": "import unittest\n"}, map[string]string{
-			"lang": "python", "test": "python3 -m unittest", "single": "python3 -m unittest <module>",
+			"lang": "python", "test": "python3 -m unittest discover -s tests", "single": "python3 -m unittest <module>",
 		}},
 		{"python", map[string]string{
 			"pyproject.toml":       "[project]\ndependencies = [\"Mypy\", \"ruff\"]\n# pyright\n",
 			"requirements-dev.txt": "hypothesis\ncosmic-ray\n",
 			"poetry.lock":          "",
 		}, map[string]string{
-			"lang": "python", "test": "poetry run pytest -q", "typecheck": "poetry run mypy .",
+			"lang": "python", "test": "poetry run python3 -m unittest discover", "typecheck": "poetry run mypy .",
 			"lint": "poetry run ruff check .", "mutation": "poetry run cosmic-ray (see its config)", "property": "hypothesis",
+		}},
+		{"py-requirements-no-pytest", map[string]string{"requirements.txt": "flask\n"}, map[string]string{
+			"test": "python3 -m unittest discover", "single": "python3 -m unittest <module>",
+		}},
+		{"py-unittest-poetry", map[string]string{"pyproject.toml": "[project]\nname = \"x\"\n", "poetry.lock": ""}, map[string]string{
+			"test": "poetry run python3 -m unittest discover", "single": "poetry run python3 -m unittest <module>",
+		}},
+		{"py-unittest-tests-dir", map[string]string{"requirements.txt": "flask\n", "tests/test_a.py": "import unittest\n"}, map[string]string{
+			"test": "python3 -m unittest discover -s tests",
+		}},
+		{"py-description-mentions-pytest", map[string]string{"pyproject.toml": "[project]\ndescription = \"a pytest-free tool\"\n"}, map[string]string{
+			"test": "python3 -m unittest discover",
+		}},
+		{"py-tox-pytest-section", map[string]string{"setup.py": "", "tox.ini": "[pytest]\naddopts = -q\n"}, map[string]string{"test": "pytest -q"}},
+		{"py-tox-deps", map[string]string{"setup.py": "", "tox.ini": "[testenv]\ndeps =\n    pytest\n"}, map[string]string{"test": "pytest -q"}},
+		{"py-test-conftest", map[string]string{"setup.py": "", "test/conftest.py": ""}, map[string]string{"test": "pytest -q"}},
+		{"py-poetry-pytest", map[string]string{"pyproject.toml": "[project]\ndependencies = [\"pytest\"]\n", "poetry.lock": ""}, map[string]string{
+			"test": "poetry run pytest -q", "single": "poetry run pytest -q <file>",
+		}},
+		{"py-pytest-dep", map[string]string{"requirements.txt": "flask\npytest>=8\n"}, map[string]string{
+			"test": "pytest -q", "single": "pytest -q <file>",
+		}},
+		{"py-pytest-ini", map[string]string{"pyproject.toml": "[project]\nname = \"x\"\n", "pytest.ini": "[pytest]\n"}, map[string]string{
+			"test": "pytest -q",
+		}},
+		{"py-pytest-pyproject", map[string]string{"pyproject.toml": "[tool.pytest.ini_options]\naddopts = \"-q\"\n"}, map[string]string{
+			"test": "pytest -q",
+		}},
+		{"py-conftest", map[string]string{"setup.py": "", "conftest.py": ""}, map[string]string{"test": "pytest -q"}},
+		{"py-pyproject-no-pytest", map[string]string{"pyproject.toml": "[project]\nname = \"x\"\n"}, map[string]string{
+			"test": "python3 -m unittest discover",
 		}},
 		{"rust", map[string]string{"Cargo.toml": "[dev-dependencies]\nproptest = \"1\"\n"}, map[string]string{
 			"lang": "rust", "test": "cargo test", "lint": "cargo clippy", "property": "proptest",
 		}},
 		{"go", map[string]string{"go.mod": "module x\n", "CLAUDE.md": ""}, map[string]string{
-			"lang": "go", "test": "go test -count=1 ./...", "typecheck": "go vet ./...", "doc": "CLAUDE.md",
+			"lang": "go", "test": "go test -count=1 ./...", "typecheck": "go vet ./...", "doc": "CLAUDE.md", "lint": "x=$(gofmt -l .) && test -z \"$x\"",
 		}},
 		{"bun over yarn, jest", map[string]string{"package.json": `{"dependencies":{"jest":"1"}}`, "yarn.lock": "", "bun.lock": ""}, map[string]string{
 			"pkg-manager": "bun", "test": "", "single": "npx jest <file>",
@@ -322,5 +359,46 @@ func TestStackIgnoresABranchsOwnOverride(t *testing.T) {
 		if l.Key == "test" && l.Value == "true" {
 			t.Fatal("a committed branch override set the test command")
 		}
+	}
+}
+
+func TestTaskDirDefault(t *testing.T) {
+	dir := newRepo(t)
+	home := t.TempDir()
+	t.Setenv("SMITHY_CONFIG", filepath.Join(home, "config.json"))
+	t.Setenv("SMITHY_HOME", home)
+	t.Chdir(dir)
+	if code := TaskDirMain([]string{"s1"}); code != 3 {
+		t.Fatalf("unset without --default: exit %d, want 3", code)
+	}
+	if code := TaskDirMain([]string{"s1", "--default"}); code != 0 {
+		t.Fatalf("--default: exit %d", code)
+	}
+	if st, err := os.Stat(filepath.Join(dir, "docs", "specs", "s1")); err != nil || !st.IsDir() {
+		t.Error("--default did not create docs/specs/s1")
+	}
+	if _, _, err := config.Effective("tasks.commit"); err == nil {
+		t.Error("--default saved tasks.commit")
+	}
+	if err := config.Set(config.RepoFile(), "tasks.commit", "false"); err != nil {
+		t.Fatal(err)
+	}
+	if d, _, err := taskDir("s2", true); err != nil || d != filepath.Join(dir, ".docs", "specs", "s2") {
+		t.Errorf("ignore default: %q %v", d, err)
+	}
+	if ex, _ := os.ReadFile(filepath.Join(dir, ".git", "info", "exclude")); !strings.Contains(string(ex), ".docs/\n") {
+		t.Errorf("ignore default is exclude: %q", ex)
+	}
+}
+
+func TestTaskDirDefaultKeepsConfigErrors(t *testing.T) {
+	dir := newRepo(t)
+	home := t.TempDir()
+	t.Setenv("SMITHY_CONFIG", filepath.Join(home, "config.json"))
+	t.Setenv("SMITHY_HOME", home)
+	t.Chdir(dir)
+	write(t, config.RepoFile(), "not json")
+	if _, _, err := taskDir("s1", true); err == nil {
+		t.Fatal("--default hid a malformed config")
 	}
 }

@@ -5,6 +5,109 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.13.0 — 2026-11-22
+
+- **Release audit fixes.** One owner for the ask flow, decision log, model ask and stop list (use-smithy); warden logs decisions with `smithy decisions add --ref`, not `decisions.md`; plain skill names instead of slash examples; doc corrections.
+- **Ask, with a timeout.** The user's decisions (use-smithy's stop list) are asked and waited on
+  for at most `ask.timeout` minutes (new setting, default 10; 0 = don't start the timer) through a background
+  `smithy wait timer:<min>` (new target, exit 0 when it fires). No answer in time, or nobody to
+  ask (hush, launched sessions, warden workers through warden): one `smithy consult` with neutral
+  options, safest first for security, and the pick is logged with the new `smithy decisions add`
+  (`~/.smithy/decisions/<repo>.md`; `pending` numbers the unconfirmed ones and `confirm <n>|--all` / `change <n>` take that
+  number; `list` shows all; locked, atomic writes; fields can't contain `·` or `→`). A hard
+  floor is never auto-decided: merging or deploying to the production branch, deleting or irreversibly rewriting user data, credentials, secrets or logins, money. use-smithy owns the rule and shows pending
+  decisions at the start of each reply (simple too, as a statement under hush); hush, smelt (Always, EXECUTE rulings) and
+  warden (decide stage, batch end, worker brief) point to it.
+
+- **R15 warden risky-task-list frictions.** New `smithy batch init <tasks_dir> --repo <dir>
+  [--base b] [--merge auto|manual] [--max n]` writes `batch.json` from a task dir (ids, titles,
+  paths as intent, speed, prereqs from unfinished blockers, branch and worktree names, risky and
+  route from the task text; named `<repo>-<task dir>`, `-2` when taken; refused while another
+  batch has unfinished items from the same task dir or branches), and `smithy batch add` appends
+  one item (the batch check's fix; refuses a duplicate id, title or branch; speed from the mode). `smithy brief` copies every line of the task dir's `rulings.md` for any task
+  file, committed or not; a task file not on the base is read by absolute path. Risky workers set
+  card `security=ran` (or `not-run:<reason>`); `smithy cards gate` fails without `security=ran`
+  and the warden never merges such an item (`not-run` goes to the user with its reason). `smithy cards set` names the
+  unknown `state=` value. `smithy route` usage says it routes the task when `--agent` is omitted;
+  `backfill`, `stored data`, `stored records` and `in place` count as risky, and smelt's Risky list names data migrations and
+  in-place rewrites of stored data. smelt's RECEIVING.md: a pre-existing finding outside every
+  task's scope is a follow-up (a high security one goes to the user).
+- **R14 warden bug-fix frictions.** Intake marks bug reports `route: debug` and risky items
+  `risky: true` in `batch.json`; `smithy brief` then tells the worker to take smelt's debug path
+  (a failing `smithy receipt run --claim repro` committed before the fix) or run the security
+  agent. New `smithy receipt check-red` passes only when the `repro` receipt failed on an earlier
+  commit and passes on HEAD; `receipt list` shows that red receipt as `red before fix`. Board items
+  render as `Board item <owner/repo>#<n>: read it with gh issue view …` (no "Board item board").
+  `smithy route --board <owner/repo#n>` reads the issue so its words count, `--batch` floors the
+  batch check at mid (without gh, `--board` warns and routes on the text); its risky words follow smelt's
+  Risky list (specific injection kinds, personal data, untrusted input, file or shell access) and
+  `auth` no longer matches `author`. Overlap needs the same
+  top-level function, not just the same file. Under the subagent fallback, dependents launch only
+  after their prereq merges. `smithy wait batch:` ends with `relaunch: smithy wait batch:<b>`
+  while a card is open. `smithy cleanup` fast-forwards a clean local base branch.
+- **R13 warden + tend frictions.** `wait-turn` takes `--max <min>` (the positional still works) and
+  a `--subagent` brief calls `wait-turn … --max 1` per foreground call, so no harness moves it to
+  the background. `smithy brief` says the intent is the spec for source `none` (no "Board item
+  none") and prints a task-file item's path once. `smithy wait` prints `conflict` instead of
+  `checks=green` for a conflicting PR; `smithy verify` has its own `conflict` verdict (exit 4),
+  no longer `red`, and it wins over `pending` and `red`. Tend never merges a PR with a warden card
+  (batch input, a batch's PR under `watch prs`, or `--card`): it stops at green and updates the
+  card only via `smithy cards set`; the warden merges when merge is auto, otherwise the user does. Append-only shared files (CHANGELOG, API lists, index
+  files) don't count as overlap; their conflicts go to tend. Workers ask (`needs_decision`) before
+  editing CI config or check scripts outside their task's files. smelt plan waits for the builder
+  check's report before writing tasks. `smithy task-dir <slug> --default` takes unset defaults
+  instead of exiting 3.
+- **R12 warden frictions.** `smithy brief` reads a task-file path given as the intent, puts the
+  task's `Spec:` file in Spec, includes every line of the task dir's `rulings.md` for a task-file
+  item, and exits 2 when the task file or its `Spec:` file doesn't exist. `smithy wait batch:`
+  reports PRs already green, red or conflicting at the start for merge-auto cards that aren't
+  `ready`, skips the warden's own `merged` cards, and keeps reported PR events in the batch's
+  `.wait-seen` so a relaunched wait doesn't repeat them (ready or manual cards: red and conflicts
+  only). `wait-turn` exits 5 when a prereq was dropped. A `--subagent` brief runs one `wait-turn`
+  per foreground shell call, again on exit 4 or a killed call; session workers parked in
+  `wait-turn` close with `done: <id> waiting`. Template paths to smithy are quoted.
+  `smithy doctor` says `workers: subagent fallback; they end with this session` when no spawn path
+  exists. warden's batch check runs the reviewer on at least mid with the test command, runs a
+  `zz_` holdout against the fix branch before merging it, and says tend starts only on red CI,
+  conflicts or review comments.
+- **warden trial frictions.** `smithy brief <batch> <id> [--to <name>] [--subagent]` renders a
+  worker brief from `batch.json` and the template block in `warden/references/worker-brief.md`
+  (the single source, read from the installed skill), filling every slot (stack, task file,
+  wait-turn, relaunch, rulings, the harness's channel line from `harness.md`, hush and smelt
+  paths) and refusing with exit 2 when a field is missing or the worktree isn't on the item's
+  branch; warden renders briefs instead of writing them. `smithy wait batch:<batch>` also wakes
+  when a card's PR turns green or red, conflicts, merges or closes (PRs polled every 30 s), so
+  one waiter covers a batch. `smithy doctor` warns when an installed smithy skill isn't in the
+  current harness's skills folder, with the link or `npx skills add` fix.
+- **A/B trial frictions (r10 warden, r11 smelt from a vague idea).** `smithy stack` reports
+  `pytest -q` for Python only when pytest is a dependency or configured (`pytest.ini`,
+  `conftest.py`, `[tool.pytest`), else `python3 -m unittest discover`; `smithy route` with
+  neither `--file` nor `--text` prints its usage. warden: `start_session` may need loading
+  through the tool search (else the subagent fallback, named in the plan line), an item is
+  `merged` only after `smithy verify` says so, a committed task dir must be pushed to the base
+  before launch, the batch reviewer gets the `<smithy>` path, and briefs carry a `<rulings>` slot.
+  smelt: task files default to `Speed: fast` with one stated rule, "nobody to ask" opens
+  brainstorm and grilling, DEBUG needs a red reproduction first, TDD stops on a third identical
+  failure or a diff outside the task's files, the reviewer skips behaviour-free files and style
+  preferences, unittest repos name adversary and property tests `test_zz_*.py`, and ship's rebase
+  guard covers languages without a build file, commits status changes first and stops background
+  waits. The v0.12 trial doc gains a Skills column and R10-R11.
+
+- **A/B trial frictions (r9, Haiku at every speed).** `smithy tasks add --speed` works (the flag
+  was missing from the CLI's flag table, so every call failed with "unknown option"). `smithy
+  stack` reports `node --test <file>` when the test script runs `node --test` after a build
+  step. `smithy route --domain` is accepted too, and a test now checks that every flag a command's
+  usage documents is in its flag table. smelt's ship step switches the main checkout off the
+  branch before `smithy cleanup`.
+
+- **A/B trial frictions (r8) and skill-writing practices.** `smithy stack` reports
+  `gofmt -l` as Go's lint. Skills: smelt's "Nobody to ask" and commit rules are one instruction
+  per bullet, property tests at `normal` are yours (no agent), intent-to-add entries are reset
+  before committing, docs-only commits are exempt from the rebase check, a test of existing
+  behaviour is seen failing once, a failed `smithy consult` falls back to your own decision,
+  only exported API gets doc comments, a refused to-do tool isn't retried; the longest
+  references open with a contents line.
+
 ## v0.12.0 — 2026-11-22
 
 - **Full audit fixes.** `warden.max` falls back to 5 in `smithy wait-turn`, matching the

@@ -3,7 +3,7 @@
 ## 1 · Prepare
 1. Base: `git fetch origin <base>`, then `git merge-base HEAD origin/<base>` (base = PR target,
    else the default branch; never the local `<base>`). Diff = `git diff <merge-base>` after
-   `git add -N <new files>`. Empty diff → say so and stop.
+   `git add -N <new files>` (SHIP resets it). Empty diff → say so and stop.
 2. Spec: the task/spec path, commit messages, the PR body or `docs/specs/`. None → the reviewer
    uses the PR description and says so.
 
@@ -64,7 +64,7 @@ deps there, and give the agents that path.
 ## 3 · Read the reports
 Show each report as returned (the reviewer's two stay two): never merge, dedupe or rerank.
 - **Blocking:** spec-check `missing`, `partial` or `wrong`; a failing holdout, adversary or
-  regression test (unless declined as spec-ambiguous, holdout rule above); a violation of a written repo rule. A **high security** finding is shown to the user.
+  regression test (unless declined as spec-ambiguous, holdout rule above); a violation of a written repo rule. A **high security** finding goes to the user by use-smithy's **Decisions**.
 - Everything else is advisory.
 - Scripts first: coverage on changed lines (the coverage command `smithy stack` prints, if any),
   shuffle/repeat runs (`pytest -p randomly --count 3`, `playwright --repeat-each 3`). If the old

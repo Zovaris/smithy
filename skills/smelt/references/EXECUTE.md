@@ -1,6 +1,6 @@
 # Execute a task list here
 
-`/smelt build all [dir]` works every task of a task list in this session. Three tasks or fewer,
+smelt `build all [dir]` works every task of a task list in this session. Three tasks or fewer,
 or under ~1 hour of work in all: build them yourself in order, no implementer subagents. More:
 one fresh-context implementer agent per task, so your own context only holds briefs, diffs and
 rulings. For tasks that can run at the same time in separate worktrees and PRs, warden on
@@ -53,13 +53,12 @@ the re-review (`references/RECEIVING.md`, step 5), then ship.
 Decisions that come up without the user, by impact:
 - **low** (local, cheap to undo): decide yourself.
 - **medium** (shapes a module or an internal contract): `smithy consult "<question>"
-  "<options, neutral order>" [--context <file>]`, one tool-less call to the user's judge model (else strong)
-  in whatever harness you're in. Follow its pick; `NEED-INFO` → find that out and ask again;
+  "<options>" [--context <file>]` (options per use-smithy **Decisions**, step 3). Follow its pick (the call fails → decide yourself); `NEED-INFO` → find that out and ask again;
   `ESCALATE` → it's high.
-- **high** (scope, customer-visible behaviour, money, data, security, public API or schema,
-  production, irreversible): the user decides.
+- **high**: anything on use-smithy's stop list: the user's, by its **Decisions**.
 
-Every decision made without the user is one line in `<dir>/rulings.md`:
+`rulings.md` is the per-task record of every ruling; each one that was the user's call is also
+`smithy decisions add`. One line per ruling in `<dir>/rulings.md`:
 `- NN · <question> → <choice> (why)`, with its exact boundary ("multi-column rows only"): agents grade against the words. Rulings bind later tasks (pass the relevant ones in each
 brief) and become the PR's "Decided without you". A ruling that turns out to be the user's call
 goes to them before ship.

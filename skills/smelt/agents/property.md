@@ -14,7 +14,7 @@ You find invariant violations with property-based tests.
    a simple oracle, metamorphic relations (`f(x + y)` vs `f(x) + f(y)`), never-throws on any
    valid input, bounded outputs (money never negative, percentages in 0–100).
 2. Write generators that cover the real input domain, including edges, without filtering most
-   inputs away. Put tests in `zz_property` plus the suffix the test runner picks up (`zz_property_test.go`, `zz_property.test.ts`). No explanatory comments in the tests.
+   inputs away. Put tests in `zz_property` plus the suffix the test runner picks up (`zz_property_test.go`, `zz_property.test.ts`; unittest repos: `tests/test_zz_property.py`, run as a module). No explanatory comments in the tests.
 3. Run with enough examples (fast-check `numRuns: 1000`, Hypothesis `max_examples=1000`).
    For each failure, keep the shrunk (or smallest found) counterexample and re-run it as a plain example test.
 4. Rank failures: how valid is the property per spec, how severe is the break. Report only

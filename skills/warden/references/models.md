@@ -8,16 +8,14 @@ warden.worker_model` decides:
   features, strong: risky, hard or large). Look at each pick and move it one tier when you know
   better, saying why. A domain noun is not risk: in a secret scanner or a crypto library,
   "secret" or "crypto" in every task says what the product is, not that the task is risky: pass
-  them in `--domain` (or save them once in `route.domain`).
+  them in `--domain` (or save them once in `route.domain`) Route's risky words are a superset of smelt's Risky list; `--board <owner/repo#n>` adds the issue's text.
 - `session`: every worker on the parent session's model.
 - Any other value: that model for every worker.
 
 A `model` the user named, for the batch or one item, always wins. The plan line shows each item's
 tier and model; `batch.json` stores it as `model`.
 
-Unset tiers print `-`: in the plan line ask the user to name each unset tier (not `judge`, which is optional) and save them with
-`smithy config set-model <tier> <name>`. Until then that item uses the session default. Under
-hush, or in a session another one launched, don't ask: use the session's model and say so.
+Unset tiers print `-`: ask in the plan line as use-smithy's Model tiers say; until then that item uses the session default.
 
 Other roles: `smithy consult` uses `judge` (optional, the smartest model), else `strong`; tend runs on `cheap` and hands code fixes to `strong`.
 

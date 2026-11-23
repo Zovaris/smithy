@@ -1,5 +1,7 @@
 # Brainstorm
 
+Nobody to ask: decide per SKILL.md Always; also list behaviours the request leaves open in the spec's Decisions so agents treat them as settled.
+
 Find out what the user actually wants, and why, before designing anything. Your belief about
 what they want is usually thinner than it feels.
 
@@ -39,7 +41,7 @@ approval. It becomes the top of `spec.md`.
 
 Then grill the remaining open decisions (the plan phase's next step) and write the spec and tasks.
 
-## `/smelt brainstorm`
+## `brainstorm`
 
 Stops after step 3: the design is saved (`spec.md` with `Status: draft`) and nothing is split or
-built. Under hush: skip the questions, pick the approach yourself (unless it is on use-smithy's stop list: `blocked:`) and list what you assumed.
+built. Under hush: skip the questions, pick the approach yourself (on use-smithy's stop list: its **Decisions**) and list what you assumed.

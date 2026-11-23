@@ -5,6 +5,8 @@ For each behaviour in the acceptance criteria, in tracer-bullet order:
 1. **Red.** One test at an agreed seam (one table of cases for one rule counts as one test); run that file (a single-file command skips pretest
    hooks: build first when tests spawn the built CLI). It fails on an assertion naming the
    missing behaviour (an import, syntax or setup error is not red: stub the export returning an empty value first).
+   A test of behaviour that already exists passes at once: see it fail once with a one-line
+   edit you undo right after (or the mutation tool); never `git checkout` uncommitted work.
 2. **Green.** The least code that passes; run the file again.
 3. Next behaviour; never all tests up front.
 4. **Refactor** once green: behaviour unchanged, tests untouched. Untested code: snapshot it
@@ -30,6 +32,7 @@ doc lint, or a grep that the required line exists (review reads the meaning).
 | "I'll keep the code I wrote as reference" | Code before its test gets deleted; start from red. |
 | "The test is wrong, I'll adjust it to green" | Stop, say why, fix it as its own red step. |
 | "Mocking this is easier" | Mock only boundaries, or you test the mock. |
+| "One more try, same error" or "I'll touch this other file too" | The same failure three times, or a diff outside the task's files: stop and re-plan. |
 | "Skip the failing test just this once" | `skip`, `only`, `xfail`, loosened asserts and snapshot updates are refused. |
 
 Optional guard: `smithy guard-tests` blocks test-file edits while `.smelt/green` exists (`touch`

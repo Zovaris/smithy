@@ -36,7 +36,9 @@ inside the repo). Then repeat:
    - **changes requested or review still required with no open thread, or blocked** (`needs-you`)
      → "needs you <url>: <why>" (a card: `state=blocked`).
    - **green, mergeable, approved or no review required** (`done`) → `green` (`smithy verify` says `draft`
-     for a draft PR: report `green (draft)` and leave it a draft). Merge (`smithy pr merge <pr>`) only if whoever launched
+     for a draft PR: report `green (draft)` and leave it a draft). A PR with a warden card (batch input, a `watch prs` PR of a batch, or `--card`): never merge;
+     stop at green and update the card only with `smithy cards set <batch> <id> note=<what you fixed>`;
+     the warden merges when merge is auto, otherwise the user does. Otherwise merge (`smithy pr merge <pr>`) only if whoever launched
      you said `merge auto`, never a draft, and into the production branch only when the launch
      says the user approved it (use-smithy: merges); otherwise stop at green (or keep waiting when
      told to stay until merged).
@@ -53,7 +55,7 @@ Tend fixes red PRs itself; it hands a PR back only when it hits something it mus
 | Situation | Card (warden launched you) | Without warden |
 |---|---|---|
 | Red twice after real fixes, or a conflict it can't resolve safely | `state=blocked note=<why>` | `needs you <url>: <why>` |
-| A technical choice inside the PR's scope (which fix, which approach) | settled with `smithy consult` (the user's judge model (else strong)), noted in the commit or reply; `ESCALATE` → next row | same |
+| A technical choice inside the PR's scope (which fix, which approach) | settled with `smithy consult` (options per use-smithy **Decisions**, step 3), noted in the commit or reply; `ESCALATE` → next row | same |
 | A decision the user owns (scope, API, data, security) | `state=needs_decision` with question, options, recommendation, `impact=high` | `needs you <url>: <question>` |
 | 3 review rounds used, or a force push it isn't allowed to do | `state=blocked note=<why>` | `needs you <url>: <why>` |
 | Green | `state=pr_open pr=<url>` (or `ready` for manual merge), `ci=green` | `green <url>` |

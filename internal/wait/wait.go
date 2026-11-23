@@ -5,9 +5,11 @@ package wait
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -163,7 +165,15 @@ func checksLine(s *prState) string {
 	if len(s.checks.failed) > 0 {
 		f = " failed=" + strings.Join(s.checks.failed, ",")
 	}
+	if s.mergeable == "CONFLICTING" && s.checks.state == "green" {
+		return conflictLine(s)
+	}
 	return fmt.Sprintf("pr %d checks=%s%s %s", s.num, s.checks.state, f, s.url)
+}
+
+// conflictLine replaces checks=green for a PR that can't merge: green alone would read as done.
+func conflictLine(s *prState) string {
+	return fmt.Sprintf("pr %d conflict %s", s.num, s.url)
 }
 
 func finished(c checks) bool { return c.state == "green" || c.state == "red" }
@@ -217,8 +227,8 @@ func (w *prWatcher) poll() ([]string, error) {
 	if o.on("checks") && finished(s.checks) && (s.checks.state != last.checks.state || s.head != last.head) {
 		out = append(out, checksLine(s))
 	}
-	if s.mergeable == "CONFLICTING" && last.mergeable != "CONFLICTING" && o.on("conflict") {
-		out = append(out, fmt.Sprintf("pr %d conflict %s", s.num, s.url))
+	if s.mergeable == "CONFLICTING" && last.mergeable != "CONFLICTING" && o.on("conflict") && !slices.Contains(out, conflictLine(s)) {
+		out = append(out, conflictLine(s))
 	}
 	if (s.reviews > last.reviews || s.review != last.review) && o.on("review") {
 		r := strings.ToLower(s.review)
@@ -452,11 +462,163 @@ func (w *listWatcher) poll() ([]string, error) {
 	return out, nil
 }
 
-// batchWatcher wakes on cards that need the warden, or any change with --all.
+// batchWatcher wakes on cards that need the warden, or any change with --all, and on a change
+// of CI verdict, mergeability or merge/close of any card's PR (when GitHub is reachable).
 type batchWatcher struct {
 	name, since, stuckBefore string
-	all                      bool
+	all, gh                  bool
 	seen                     map[string]string
+	prs                      map[string]*prWatcher
+	prNext                   time.Time
+	merge                    map[string]string
+	reported                 map[string]bool
+	pending                  []string
+}
+
+// prEvery spaces the PR reads of a batch wait apart; card reads stay at the batch interval.
+var prEvery = 30 * time.Second
+
+var prEvents = opts{events: map[string]bool{"checks": true, "conflict": true, "merged": true, "closed": true}}
+
+var final = map[string]bool{"merged": true, "reported": true, "dropped": true}
+
+// prLines polls the PR of every non-final card. A PR read for the first time reports a state it
+// already has (green, red, conflicting, merged, closed), unless a previous wait of this batch
+// reported it at the same head, or (at the start of the wait) the card is `ready` or its merge
+// mode isn't auto: a green PR left for the user must not wake every new wait.
+func (w *batchWatcher) prLines(rows []cards.Row, start bool) []string {
+	if !w.gh || time.Now().Before(w.prNext) {
+		return nil
+	}
+	w.prNext = time.Now().Add(prEvery)
+	var out []string
+	for _, r := range rows {
+		if r.PR == "" || final[r.State] {
+			continue
+		}
+		pw, known := w.prs[r.PR]
+		if !known {
+			pw = newPR(r.PR, prEvents)
+		}
+		lines, err := pw.poll()
+		if err != nil {
+			continue
+		}
+		w.prs[r.PR] = pw
+		if !known {
+			lines = w.firstSight(r, pw, lines, start)
+		}
+		out = append(out, w.record(r.ID, pw, lines)...)
+	}
+	return out
+}
+
+// firstSight filters the lines of a PR's first read and adds a conflict it doesn't report itself.
+func (w *batchWatcher) firstSight(r cards.Row, pw *prWatcher, lines []string, start bool) []string {
+	quiet := start && (r.State == "ready" || w.mergeOf(r.ID) != "auto")
+	if quiet {
+		// Left for the user: a green, merged or closed PR is no news; red and conflicts are.
+		var keep []string
+		for _, l := range lines {
+			if strings.Contains(l, " checks=red") {
+				keep = append(keep, l)
+			}
+		}
+		lines = keep
+	}
+	if pw.last.mergeable == "CONFLICTING" && pw.last.state == "OPEN" && !slices.Contains(lines, conflictLine(pw.last)) {
+		lines = append(lines, conflictLine(pw.last))
+	}
+	var out []string
+	for _, l := range lines {
+		if !w.reported[r.ID+" "+pw.last.head+" "+l] {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// record prefixes lines with the batch and card and saves them in the batch's wait-seen.json,
+// so a relaunched wait doesn't report them again.
+func (w *batchWatcher) record(id string, pw *prWatcher, lines []string) []string {
+	var out []string
+	for _, l := range lines {
+		w.reported[id+" "+pw.last.head+" "+l] = true
+		out = append(out, fmt.Sprintf("batch %s %s %s", w.name, id, l))
+	}
+	if len(lines) > 0 {
+		if err := w.saveSeen(); err != nil {
+			fmt.Fprintf(os.Stderr, "smithy wait: %v\n", err)
+		}
+	}
+	return out
+}
+
+// seenFile is not a .json file, so the card listing never takes it for a card.
+func seenFile(name string) string { return filepath.Join(cards.Home(), name, ".wait-seen") }
+
+// loadSeen reads the reported keys, one per line, into w.reported.
+func (w *batchWatcher) loadSeen() {
+	b, err := os.ReadFile(seenFile(w.name))
+	if err != nil {
+		return
+	}
+	for _, k := range strings.Split(string(b), "\n") {
+		if k != "" {
+			w.reported[k] = true
+		}
+	}
+}
+
+// saveSeen merges the keys on disk (another waiter may have written some) with this one's and
+// replaces the file atomically.
+func (w *batchWatcher) saveSeen() error {
+	w.loadSeen()
+	keys := make([]string, 0, len(w.reported))
+	for k := range w.reported {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	f := seenFile(w.name)
+	tmp, err := os.CreateTemp(filepath.Dir(f), ".wait-seen-*")
+	if err != nil {
+		return err
+	}
+	_, err = tmp.WriteString(strings.Join(keys, "\n") + "\n")
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Rename(tmp.Name(), f)
+	}
+	if err != nil {
+		os.Remove(tmp.Name())
+	}
+	return err
+}
+
+// mergeOf is the item's merge mode: its own, else the batch's (also for an item batch.json lacks).
+func (w *batchWatcher) mergeOf(id string) string {
+	if m, ok := w.merge[id]; ok && m != "" {
+		return m
+	}
+	return w.merge[""]
+}
+
+// mergeModes reads each item's merge mode from batch.json; key "" holds the batch default.
+func mergeModes(name string) map[string]string {
+	var bt struct {
+		Merge string
+		Items []struct{ ID, Merge string }
+	}
+	out := map[string]string{}
+	if b, err := os.ReadFile(filepath.Join(cards.Home(), name, "batch.json")); err == nil && json.Unmarshal(b, &bt) == nil {
+		out[""] = bt.Merge
+		for _, it := range bt.Items {
+			out[it.ID] = it.Merge
+		}
+	}
+	return out
 }
 
 // mark is what makes a card worth a wake: its stage, state, CI verdict and PR. Other field
@@ -491,7 +653,14 @@ func newBatch(name string, all bool) (*batchWatcher, error) {
 	for _, r := range rows {
 		seen[r.ID] = mark(r)
 	}
-	return &batchWatcher{name: name, since: time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), stuckBefore: stuck(rows), all: all, seen: seen}, nil
+	w := &batchWatcher{name: name, since: time.Now().UTC().Format("2006-01-02T15:04:05.000Z"), stuckBefore: stuck(rows), all: all, seen: seen,
+		gh: ghx.Ready() == nil, prs: map[string]*prWatcher{}, merge: mergeModes(name), reported: map[string]bool{}}
+	w.loadSeen()
+	if w.gh {
+		w.pending = w.prLines(rows, true)
+		w.prNext = time.Time{}
+	}
+	return w, nil
 }
 
 func (w *batchWatcher) poll() ([]string, error) {
@@ -499,19 +668,44 @@ func (w *batchWatcher) poll() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var out []string
+	out := w.pending
+	w.pending = nil
 	for _, r := range rows {
-		if r.Updated != nil && *r.Updated > w.since && (w.all || (act[r.Stage] && w.seen[r.ID] != mark(r))) {
+		// A card the warden itself set to merged is not news.
+		if r.Updated != nil && *r.Updated > w.since && (w.all || (act[r.Stage] && r.State != "merged" && w.seen[r.ID] != mark(r))) {
 			out = append(out, fmt.Sprintf("batch %s %s  %s  %s  %s  %s", w.name, r.ID, r.Stage, r.Phase, r.Progress, r.Text))
 		}
 	}
-	if len(out) > 0 {
-		return out, nil
+	out = append(out, w.prLines(rows, false)...)
+	if len(out) == 0 {
+		if s := stuck(rows); s != "" && s != w.stuckBefore {
+			out = []string{fmt.Sprintf("batch %s stale: %s", w.name, s)}
+		}
 	}
-	if s := stuck(rows); s != "" && s != w.stuckBefore {
-		return []string{fmt.Sprintf("batch %s stale: %s", w.name, s)}, nil
+	return out, nil
+}
+
+// relaunchLines asks for a new wait on each batch that still has a non-final card.
+func relaunchLines(ws []watcher) []string {
+	var out []string
+	for _, w := range ws {
+		if b, ok := w.(*batchWatcher); ok {
+			if rows, err := cards.Rows(b.name); err == nil && open(rows) {
+				out = append(out, "relaunch: smithy wait batch:"+b.name)
+			}
+		}
 	}
-	return nil, nil
+	return out
+}
+
+// open reports whether any card is not final (merged, reported, dropped): the warden must wait again.
+func open(rows []cards.Row) bool {
+	for _, r := range rows {
+		if r.State != "merged" && r.State != "reported" && r.State != "dropped" {
+			return true
+		}
+	}
+	return false
 }
 
 const usage = `usage: smithy wait <target>... [--events a,b] [--all] [--every <sec>] [--max <min>]
@@ -523,12 +717,18 @@ Targets (any mix):
   branch:<name>       every workflow run on the branch's latest commit finished
   prs[:<label>]       a PR opened or updated: yours, a warden batch's, or with the label
   issues[:<label>]    an issue opened or updated with the label (default agent)
-  batch:<name>        a warden card needs the warden (--all: any card change); polls every 10 s
+  batch:<name>        a warden card needs the warden (--all: any card change), or a card's PR
+                      turned green/red, conflicts, merged or closed (already so at the start: only for
+                      merge-auto cards not ready, else red/conflict only; events in the batch's .wait-seen are skipped);
+                      polls cards every 10 s, PRs every 30 s; while a card is not final the
+                      output ends with "relaunch: smithy wait batch:<name>"
   actions[:<branch>]  a workflow run on the branch (default: origin's default) finished red,
                       push, schedule or manual
   base[:<branch>]     the branch (default: origin's default) moved on origin
   alerts              a new open Dependabot alert (skipped, with a note, without read access)
                       actions and alerts already there on the first run are recorded, not reported
+  timer:<minutes>     fires after the minutes (exit 0, "timer: <m>m elapsed"); alone, no GitHub;
+                      the ask timeout: smithy wait timer:$(smithy config get ask.timeout)
   watch[:<scopes>]    tend's watch mode; scopes is a comma list of prs, issues, actions, base,
                       alerts, or all (default tend.watch; issue label from tend.label)
 Finished checks are reported at once. Exit 0 = events, 4 = heartbeat, 2 = bad target, 3 = no GitHub access (gh missing or signed out and no GH_TOKEN).
@@ -574,6 +774,27 @@ func onlyBatches(targets []string) bool {
 	return true
 }
 
+var sleep = time.Sleep
+
+// timer handles `smithy wait timer:<minutes>`, which takes no other target.
+func timer(targets []string) (int, bool) {
+	for _, t := range targets {
+		arg, ok := strings.CutPrefix(t, "timer:")
+		if !ok {
+			continue
+		}
+		m, err := strconv.ParseFloat(arg, 64)
+		if len(targets) > 1 || err != nil || math.IsNaN(m) || math.IsInf(m, 0) || m < 0.05 {
+			fmt.Fprintf(os.Stderr, "smithy wait: timer takes at least 0.05 minutes and no other target: %s\n", strings.Join(targets, " "))
+			return 2, true
+		}
+		sleep(time.Duration(m * float64(time.Minute)))
+		fmt.Printf("timer: %gm elapsed\n", m)
+		return 0, true
+	}
+	return 0, false
+}
+
 // Main runs `smithy wait`.
 func Main(args []string) int {
 	var targets []string
@@ -612,6 +833,9 @@ func Main(args []string) int {
 	if len(targets) == 0 {
 		fmt.Fprintln(os.Stderr, usage)
 		return 2
+	}
+	if code, ok := timer(targets); ok {
+		return code
 	}
 	targets, watchMode := expandWatch(targets)
 	for _, t := range targets {
@@ -714,6 +938,7 @@ func Main(args []string) int {
 			out = append(out, lines...)
 		}
 		if len(out) > 0 {
+			out = append(out, relaunchLines(ws)...)
 			fmt.Println(strings.Join(out, "\n"))
 			return 0
 		}

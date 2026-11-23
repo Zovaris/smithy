@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -151,6 +152,9 @@ func TestRouteMainRejectsBadFlags(t *testing.T) {
 		{"--text", "x", "--speed", "turbo"},
 		{"--text", "x", "--kind"},
 		{"--text"},
+		{},
+		{"--kind", "review"},
+		{"--json"},
 		{"--text", "x", "--speed", "--json"},
 	} {
 		if got := RouteMain(args); got != 2 {
@@ -200,6 +204,21 @@ func TestSkills(t *testing.T) {
 	}
 	if _, ok := FindSkill("tend"); ok {
 		t.Error("tend found")
+	}
+	if m, d := MissingInHarness("claude-cli"); len(m) != 0 || d != filepath.Join(home, ".claude", "skills") {
+		t.Errorf("claude-cli has scout linked: %q %s", m, d)
+	}
+	if m, _ := MissingInHarness("codex"); len(m) != 1 || m[0] != "scout" {
+		t.Errorf("codex can't load scout: %q", m)
+	}
+	if d := HarnessSkillDirs("claude-cli", "/r", "/h", env(nil)); len(d) != 2 || d[0] != "/h/.claude/skills" || d[1] != "/r/.claude/skills" {
+		t.Errorf("claude-cli reads ~/.claude and <repo>/.claude only: %q", d)
+	}
+	if d := HarnessSkillDirs("codex", "/r", "/h", env(nil)); d[len(d)-1] != "/r/.agents/skills" || strings.Contains(strings.Join(d, " "), ".claude") {
+		t.Errorf("codex: %q", d)
+	}
+	if m, d := MissingInHarness("unknown"); m != nil || d != "" {
+		t.Errorf("unknown harness: %q %s", m, d)
 	}
 	c := SkillCandidates("x", "/s/use-smithy/scripts", "/top", "/h", env(nil))
 	if c[0] != "/s/x/SKILL.md" || c[1] != "/top/.agents/skills/x/SKILL.md" || c[len(c)-1] != "/h/.dsh/skills/x/SKILL.md" {
@@ -413,5 +432,58 @@ func TestRouteDomainNounsAreNotRisk(t *testing.T) {
 	}
 	if tier, _ := RouteDomain("Fix the auth check", "ship", "normal", "au"); tier != "strong" {
 		t.Errorf("short noun au must not drop auth: %s", tier)
+	}
+}
+
+func routeOut(t *testing.T, args ...string) (int, string) {
+	t.Helper()
+	r, w, _ := os.Pipe()
+	old := os.Stdout
+	os.Stdout = w
+	code := RouteMain(args)
+	w.Close()
+	os.Stdout = old
+	out, _ := io.ReadAll(r)
+	return code, string(out)
+}
+
+func TestRouteBoardAndBatchFloor(t *testing.T) {
+	old := issueText
+	defer func() { issueText = old }()
+	issueText = func(repo, n string) (string, error) {
+		if repo != "acme/invoicer" || n != "7" {
+			t.Errorf("read %s#%s", repo, n)
+		}
+		return "totals are off\nfloat money rounds wrong", nil
+	}
+	if c, out := routeOut(t, "--text", "fix totals", "--board", "acme/invoicer#7"); c != 0 || !strings.HasPrefix(out, "strong ") || !strings.Contains(out, "money") {
+		t.Errorf("--board = %d %q, want strong for money", c, out)
+	}
+	issueText = func(string, string) (string, error) { return "", fmt.Errorf("no gh") }
+	if c, out := routeOut(t, "--text", "fix a typo in README", "--board", "acme/invoicer#7"); c != 0 || !strings.HasPrefix(out, "cheap ") {
+		t.Errorf("--board without gh = %d %q, want fallback to text", c, out)
+	}
+	if c, _ := routeOut(t, "--board", "not-a-key"); c != 2 {
+		t.Errorf("bad --board exit %d", c)
+	}
+	if c, out := routeOut(t, "--agent", "reviewer", "--text", "fix a typo", "--speed", "fast", "--batch"); c != 0 || !strings.HasPrefix(out, "mid ") {
+		t.Errorf("--batch reviewer = %d %q, want mid", c, out)
+	}
+}
+
+func TestRouteRiskWordsAreSpecific(t *testing.T) {
+	for text, want := range map[string]string{
+		"show the author name on the list":      "mid",
+		"fix auth redirect":                     "strong",
+		"block formula injection in CSV export": "strong",
+		"handle personal data on export":        "strong",
+		"add dependency injection container":    "mid",
+		"rewrite the notes file in place":       "strong",
+		"convert stored records to v2":          "strong",
+		"fix button placement in placeholder":   "mid",
+	} {
+		if got, r := Route(text, "ship", "normal"); got != want {
+			t.Errorf("Route(%q) = %s %q, want %s", text, got, r, want)
+		}
 	}
 }

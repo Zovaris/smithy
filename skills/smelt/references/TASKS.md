@@ -8,8 +8,8 @@ reads and updates it; use it instead of hand-editing status lines.
 
 An agreed spec in a folder of its own: that folder is the task dir (no second folder). A spec at the repo root stays there: make the task dir with `smithy task-dir` and point `Spec:` at it. Otherwise run
 `smithy task-dir <slug>`: it reads the user's settings, creates the dir and prints it.
-Exit 3 prints `ask <key>: <question> (default: <value> → <dir>)`: ask the user (recommendation first; nobody
-to ask, hush or a launched session: take `<value>`, say so at the end), save it with `smithy config set --repo <key> <value>`, rerun.
+Exit 3 prints `ask <key>: <question> (default: <value> → <dir>)`: ask the user (recommendation first), save it with `smithy config set --repo <key> <value>`, rerun.
+Nobody to ask (hush, a launched session): `smithy task-dir <slug> --default` takes the defaults unsaved; say so at the end.
 It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `git rm --cached` it if committed):
 
 1. `tasks.commit` — commit the specs and tasks to git? `true` → `docs/specs/<slug>/`, reviewed
@@ -23,10 +23,8 @@ It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `g
 (GitHub Issues via `gh` when installed, or Linear/Jira through the harness's tools) and keeps the spec where
 `tasks.commit` says. `smithy config list` shows the current values.
 
-Other places: list them in `$SMELT_TASKS_DIRS` (colon-separated) so `smithy tasks` finds them.
-
-Board tasks still get the same fields (status, blocked by, PR) in the issue body or labels; the
-spec stays in the repo or local dir and the issues link to it.
+Other places: list them in `$SMELT_TASKS_DIRS` (colon-separated). Board tasks keep the same fields
+(status, blocked by, PR) in the issue body or labels; the spec stays in the repo or local dir and the issues link to it.
 
 ## Splitting
 
@@ -37,7 +35,7 @@ spec stays in the repo or local dir and the issues link to it.
 - **Fewest tasks that work.** One task per part that can be built and tested on its own; a
   CLI or a feature one agent builds in under an hour is 1 to 3 tasks, not one per file. Each task
   costs a warden worker and a PR (or a slice of `build all`'s one PR), so split only where it buys real parallel time.
-- Each fits one fresh context window; split anything bigger than ~1 day of human work.
+- Each fits one fresh context window (nothing bigger than ~1 day of human work).
 - `Blocked by` only for real dependencies (one task needs another's code or schema). Tasks that
   merely touch nearby files are not blocked; tasks that would edit the same lines are.
 - **Width over tidiness:** tasks run in parallel, so the wall time is the longest chain, not the
@@ -52,8 +50,7 @@ spec stays in the repo or local dir and the issues link to it.
   3. Collisions: unblocked tasks share no file, test files too (each task gets its own).
   4. Proportion: no task is a horizontal layer, none is bigger than a day, none is trivial
      enough to merge into its neighbour. A test of a stub never asserts the stub's output.
-  5. Width: the longest `Blocked by` chain, and each task's speed (its `Speed:` line: fast
-     unless it holds logic; a task file defaults to fast, a smelt session to normal).
+  5. Width: the longest `Blocked by` chain and each task's `Speed:`.
 - Show the list (number, title, one line, blocked by); wait for approval (else SKILL.md Always).
 
 ## Task file — `NN-<slug>.md`
@@ -83,8 +80,10 @@ Spec: <relative path to the spec: ./spec.md, or the agreed spec where it already
 <seams, risks>
 ```
 
-Files and Interfaces are what lets a fresh implementer (or a warden worker) start without
-reading the whole plan, and what tells you two tasks would collide.
+`Speed:` defaults to fast (a smelt session: normal): each task is small, and the check wave runs
+once, on the branch or batch, at the highest `Speed:` in the list (`build all`) or the batch's
+mode (warden). Set normal or full only on a task that holds logic. Files and Interfaces let a
+fresh implementer start without reading the plan and show where two tasks would collide.
 
 Status moves `todo → doing → done` (or `dropped` with a line saying why). Whoever starts a task
 sets `doing`; whoever lands it sets `done` and `PR`. In a repo task dir the `done` + `PR` change is
@@ -112,7 +111,7 @@ minutes of agent work): for a small list or a long chain, one session building i
 faster and several times cheaper than parallel workers.
 - **Here, all of it:** smelt `build all`: built in order, one check wave on the whole branch at
   the end.
-- **Here, one at a time:** smelt `build next` (e.g. `/smelt build next`; repeat until `smithy tasks next` says all done).
+- **Here, one at a time:** smelt `build next` (repeat until `smithy tasks next` says all done).
 - **In parallel:** warden on the task dir (workers build at `fast`; warden checks the batch once
   at its speed; read the SKILL.md `smithy skills warden` prints) when it is installed (listed
   among your skills, or `<skill-dir>/../warden/SKILL.md` exists). Mixing is fine: build some here,

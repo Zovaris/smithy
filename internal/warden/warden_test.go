@@ -7,10 +7,19 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func init() {
+	missingInHarness = func(string) ([]string, string) {
+		return strings.Fields(os.Getenv("WARDEN_TEST_UNLINKED")), "/h/skills"
+	}
 	findSkill = func(name string) (string, bool) {
+		if root := os.Getenv("WARDEN_TEST_SKILL_ROOT"); root != "" {
+			p := filepath.Join(root, name, "SKILL.md")
+			_, err := os.Stat(p)
+			return p, err == nil
+		}
 		for _, s := range strings.Fields(os.Getenv("WARDEN_TEST_SKILLS")) {
 			if s == name {
 				return "/skills/" + s, true
@@ -96,7 +105,7 @@ func TestWaitTurn(t *testing.T) {
 		{"stack accepts pr_open", `{"stack":true,` + items + `}`, map[string]string{"a": "pr_open"}, "b", 0, "go b", "working", "start", ""},
 		{"stack accepts ready", `{"stack":true,` + items + `}`, map[string]string{"a": "ready"}, "b", 0, "go b", "working", "start", ""},
 		{"stack still waits on working", `{"stack":true,` + items + `}`, map[string]string{"a": "working"}, "b", 4, "waiting b", "waiting", "waiting", ""},
-		{"dropped prereq blocks", `{` + items + `}`, map[string]string{"a": "dropped"}, "d", 0, "", "blocked", "waiting", "prereq a was dropped"},
+		{"dropped prereq blocks", `{` + items + `}`, map[string]string{"a": "dropped"}, "d", 5, "", "blocked", "waiting", "prereq a was dropped"},
 		{"slot limit by max", `{"max":1,` + items + `}`, map[string]string{"a": "merged", "c": "working"}, "b", 4, "waiting b", "waiting", "waiting", ""},
 		{"slot free under max", `{"max":2,` + items + `}`, map[string]string{"a": "merged", "c": "working"}, "b", 0, "go b", "working", "start", ""},
 		{"max zero never starts", `{"max":0,` + items + `}`, nil, "c", 4, "waiting c", "waiting", "waiting", ""},
@@ -425,4 +434,32 @@ func TestDoctorClaudeSettings(t *testing.T) {
 			t.Errorf("%d\n%s", c, o)
 		}
 	})
+}
+
+func TestDoctorSkillNotInHarness(t *testing.T) {
+	newDoctor(t, "git", "gh")
+	t.Setenv("WARDEN_TEST_UNLINKED", "tend hush")
+	o, c := doctor(t, "--quiet")
+	if c != 0 || !strings.Contains(o, "  warn  codex can't load tend, hush (installed elsewhere, not in its skills folder)\n        fix: link each into /h/skills") {
+		t.Errorf("%d\n%s", c, o)
+	}
+}
+
+func TestWaitTurnMaxFlag(t *testing.T) {
+	newBatch(t, `{"max":0,"items":[{"id":"c"}]}`)
+	old := waitStep
+	waitStep = 50 * time.Millisecond
+	defer func() { waitStep = old }()
+	for _, args := range [][]string{{"b1", "c", "--max", "0.01"}, {"b1", "c", "--max=0.01"}, {"b1", "c", "0.01"}} {
+		start := time.Now()
+		o, _, code := capture(t, func() int { return WaitTurn(args) })
+		if el := time.Since(start); code != 4 || strings.TrimSpace(o) != "waiting c" || el < 500*time.Millisecond || el > 3*time.Second {
+			t.Errorf("%v: code %d out %q after %v", args, code, o, el)
+		}
+	}
+	for _, bad := range []string{"x", "NaN", "Inf", "-1"} {
+		if _, e, c := capture(t, func() int { return WaitTurn([]string{"b1", "c", "--max", bad}) }); c != 2 || !strings.Contains(e, "usage") {
+			t.Errorf("bad --max %s: %d %q", bad, c, e)
+		}
+	}
 }

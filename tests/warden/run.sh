@@ -30,8 +30,8 @@ t "brief: branch wait is not a slot" '! grep -q "branch:<name>" "$WB"'
 t "brief: PR body file stays out of the worktrees folder" 'grep -q "body file.*\.smelt/" "$WB"'
 t "ship: PR body file stays out of the worktrees folder" 'grep -q "body file.*\.smelt/" "$F/../../smelt/references/SHIP.md"'
 AC="$F/../references/acting.md"
-t "acting: batch end lists decisions and followups" 'grep -q "batch end" "$AC" && grep -q "decisions.md" "$AC" && grep -q "followup:" "$AC"'
+t "acting: batch end lists decisions and followups" 'grep -q "batch end" "$AC" && grep -q "smithy decisions list" "$AC" && grep -q "followup:" "$AC"'
 t "acting: candidate standards are proposal only" 'grep -q "candidate standard:" "$AC" && grep -q "without the user.s yes" "$AC"'
 t "acting: empty batch end line" 'grep -q "no decisions or followups" "$AC"'
-t "state: decisions.md is read at batch end" 'grep -q "Read at batch end" "$F/../references/state.md"'
+t "state: no per-batch decisions.md" '! grep -rq "decisions\.md" "$F/../references"'
 echo "warden: $pass passed, $fail failed"; [ $fail -eq 0 ]
