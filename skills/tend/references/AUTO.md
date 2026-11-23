@@ -14,8 +14,9 @@ risk from injected issue text but cannot remove it; Codex (network on, approvals
 guard against sending data out.
 
 ## Once (`tend auto once <dir>`, started by serve)
-Steps 3 and 4 below for that one dir, then **End**: no wait, no take. End when every item is
-ready, merged or blocked, or when `auto.session_hours` passes; workers keep running after you.
+Steps 3 and 4 below for that one dir, then warden's batch check (its `references/acting.md`)
+once every item is ready or merged, then **End**: no wait, no take. End when that is done and
+every item is ready, merged or blocked, or when `auto.session_hours` passes; workers keep running.
 
 ## Loop
 1. `smithy wait auto` in the background (use-smithy's background waits). It wakes with
