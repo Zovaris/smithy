@@ -12,6 +12,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/text"
 )
 
 // Usage is the text for `smithy decisions --help`.
@@ -59,7 +60,7 @@ func slug(url, dir string) string {
 // File is the decisions log of the current repo.
 func File() string { return filepath.Join(ghx.Home(), "decisions", repoSlug()+".md") }
 
-func flat(s string) string { return strings.Join(strings.Fields(s), " ") }
+func flat(s string) string { return text.Clean(s) }
 
 // clean flattens a field and rejects the separators the line format parses by position.
 func clean(name, s string) (string, error) {

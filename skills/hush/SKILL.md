@@ -15,10 +15,8 @@ disclosure: the done line names every change, command and PR, and nothing is hid
 - The user asked for this mode: keep chat text between tool calls to what the harness or the
   user requires. No "Now let me…", "Next I'll…", "Good, that works" or step summaries; your
   report is the last message. The user can end hush mode at any time by asking.
-- No questions and no option lists, except the `blocked:` line below. Choices that aren't the
-  user's: low → decide; medium → `smithy consult`. The user's: use-smithy **Decisions** (hard floor →
-  `blocked:`, the rest consult and log). Record each where the work lands (PR body under
-  "Decided without you" if there is a PR, else the final message).
+- No questions and no option lists, except the `blocked:` line below. Decide by use-smithy's
+  stop-list rule and **Decisions** (hard floor → `blocked:`); with no PR, the logged decisions go in the final message.
 - Don't commit, push or open a PR unless the task or the workflow it runs asks for it. Hush
   changes how you talk, not what you deliver.
 - Progress is shown, not told: if the harness has a to-do / task-list tool, set the plan once

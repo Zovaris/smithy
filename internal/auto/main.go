@@ -25,8 +25,12 @@ Autonomous intake (settings auto.*; state in ~/.smithy/auto/state.json).
           the workflow state and the PR attached); the issue is <source>:<id> (linear:TES-1 or
           linear:<uuid>) or a bare id taken by auto take
   status  queue, today's count and cap, hours, last poll per source, watcher alive or stale, serve
-  serve   the unattended loop in the foreground (smithy auto serve --help)
-Exit 2 = bad usage or settings, 3 = no access to a source.`
+  serve   the unattended loop in the foreground, no tokens while idle: polls every auto.every and per
+          task dir from take starts one headless orchestrator (smithy agent with the auto profile, running
+          tend auto once <dir>, log in ~/.smithy/auto/sessions/), one at a time; --agent <cli> (default
+          auto.agent), --once (one cycle), --max-hours <n>; a live view in a terminal (Esc, q or Ctrl+C
+          asks first), one line per event otherwise; stopping leaves the orchestrator and workers running
+Exit 1 = a source failed to open, 2 = bad usage or settings, 3 = no access to a source.`
 
 // taskDir makes the task dir for take, always out of git (~/.smithy/plans/<repo>/<slug>), so
 // intake never leaves files in the target repo; tests replace it.
@@ -40,7 +44,7 @@ func Main(args []string) int {
 	}
 	s, err := LoadSettings()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "smithy auto:", err)
+		fmt.Fprintln(os.Stderr, "smithy auto:", errText(err))
 		return 2
 	}
 	flags := map[string]string{}
@@ -84,7 +88,7 @@ func Main(args []string) int {
 		}
 		r, err := Take(s, max, taskDir)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "smithy auto:", err)
+			fmt.Fprintln(os.Stderr, "smithy auto:", errText(err))
 			return 1
 		}
 		if r.Count == 0 {
@@ -99,7 +103,7 @@ func Main(args []string) int {
 		}
 		srcs, openErr := s.Open("")
 		if len(srcs) == 0 {
-			fmt.Fprintln(os.Stderr, "smithy auto:", openErr)
+			fmt.Fprintln(os.Stderr, "smithy auto:", errText(openErr))
 			return openCode(openErr)
 		}
 		if err := Report(srcs, pos[0], pos[1], flags["--pr"]); err != nil {
@@ -123,7 +127,7 @@ func Main(args []string) int {
 		}
 		st, err := StatusOf(s)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "smithy auto: state:", err)
+			fmt.Fprintln(os.Stderr, "smithy auto: state:", errText(err))
 			return 1
 		}
 		if flags["--json"] != "" {
@@ -199,10 +203,17 @@ func printStatus(st Status) {
 	}
 }
 
-// openCode is the exit code when no source opened: 3 for no access, else 2.
+// openCode is the exit code when no source opened: 3 for no access, else 1.
 func openCode(err error) int {
 	if err == nil || errors.Is(err, ErrNoAccess) {
 		return 3
 	}
-	return 2
+	return 1
+}
+
+func errText(err error) string {
+	if err == nil {
+		return "no source opened"
+	}
+	return Clean(err.Error())
 }

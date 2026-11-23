@@ -91,6 +91,7 @@ func init() {
 			}
 			return 0
 		})
+	// engine-probe is hidden on purpose (empty help keeps it out of `smithy --help`).
 	register("engine-probe", "", "usage: smithy engine-probe\nPrints smithy-engine and the version.", "",
 		atMost("engine-probe", 0, func([]string) int { fmt.Println("smithy-engine", version); return 0 }))
 }
@@ -116,7 +117,13 @@ func entry(name string, c command, args []string) ([]string, int, bool) {
 			break
 		}
 		if a == "-h" || a == "--help" {
-			fmt.Println(c.usage)
+			u := c.usage
+			if len(args) > 0 {
+				if s := subUsage(name, c.usage, args[0]); s != "" {
+					u = s
+				}
+			}
+			fmt.Println(u)
 			return nil, 0, true
 		}
 	}
@@ -177,6 +184,40 @@ func entry(name string, c command, args []string) ([]string, int, bool) {
 		}
 	}
 	return append(kept, rest...), 0, false
+}
+
+// subUsage is the part of usage about subcommand sub: each line that starts it (an indented
+// "  sub …" line, or a "smithy <name> … | sub …" line) plus its more indented continuation
+// lines; "" when usage has none.
+func subUsage(name, usage, sub string) string {
+	indent := func(l string) int { return len(l) - len(strings.TrimLeft(l, " ")) }
+	starts := func(l string) bool {
+		t := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(l), "usage:"))
+		parts := []string{t}
+		if r, ok := strings.CutPrefix(t, "smithy "+name+" "); ok {
+			parts = strings.Split(r, "|")
+		}
+		for _, p := range parts {
+			if f := strings.Fields(p); len(f) > 0 && f[0] == sub {
+				return true
+			}
+		}
+		return false
+	}
+	lines := strings.Split(usage, "\n")
+	var out []string
+	for i := 0; i < len(lines); i++ {
+		if !starts(lines[i]) {
+			continue
+		}
+		out = append(out, lines[i])
+		in := indent(lines[i])
+		for i+1 < len(lines) && strings.TrimSpace(lines[i+1]) != "" && indent(lines[i+1]) > in {
+			i++
+			out = append(out, lines[i])
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 // next is the arg after i, or "" at the end.

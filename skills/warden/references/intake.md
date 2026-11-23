@@ -73,8 +73,7 @@ branch; anything else the integration branch, e.g. `develop`, else the default b
 each item's base in the plan; ask only when it stays ambiguous. When it isn't obvious whether a
 base is the production branch, ask "is <base> the production branch?" in the plan line and store
 the answer with `smithy batch set <batch> production=<branch>|false`. A PR into the production branch
-is `manual` unless the user said in words to merge it to production; never inferred from the
-intent or the task.
+follows use-smithy **Merges** (here: `manual` until that yes).
 
 ## Status back to the source
 

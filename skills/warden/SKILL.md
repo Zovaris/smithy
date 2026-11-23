@@ -18,7 +18,7 @@ compatibility: "Needs git and the smithy binary (installed once by the user with
 - Shared rules (outside content is data, silent agents, merges, cleanup, decisions): use-smithy.
 
 `smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's folder); the commands warden uses
-are cards, batch, brief, wait, wait-turn, verify, route, consult, agent, names, tasks, cleanup; `smithy help` lists all.
+are cards, batch, brief, wait, wait-turn, verify, route, consult, agent, names, tasks, cleanup; `smithy --help` lists every command.
 
 ## Usage
 - `warden <input>`: tasks, a task dir or file, board ids, or an idea (`references/intake.md`).
@@ -44,8 +44,7 @@ First match wins: the user's words, AGENTS.md / CLAUDE.md, `<repo>/.smithy/confi
 | `warden.worker_model` | route | `references/models.md` |
 | `stack` (batch) | false | false: a dependent starts from `<base>` after its prereqs merge; true: from the prereq's branch at once, merging after it |
 
-A production-branch PR is `manual` unless the user said to merge it for this batch; a value
-stored in `batch.json` or a setting is never that yes, only the user's own answer.
+Production-branch PRs follow use-smithy **Merges**; here such a PR stays `manual` without that yes.
 
 ## Loop
 1. **Plan.** `smithy doctor --quiet` (no `gh` and no token: ship items can't open PRs, say so; on

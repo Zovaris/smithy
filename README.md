@@ -142,7 +142,8 @@ included) can read it, so use a test or least-privilege key.
 
 ## Autonomous mode
 
-tend `auto` watches GitHub issues (and Linear, with `LINEAR_API_KEY` set) and builds each
+tend `auto` watches GitHub issues (and Linear, once `linear.team` is set and a key is stored with
+`smithy auth set linear` or in `LINEAR_API_KEY`) and builds each
 qualified one unattended through warden, reporting progress back on the issue. Issues opt in with
 the `auto` label; a daily cap and an optional hours window bound the spend. `smithy tui` shows
 the queue and running batches.

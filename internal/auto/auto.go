@@ -20,6 +20,7 @@ import (
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/names"
 	"github.com/Zovaris/smithy/internal/tasks"
+	"github.com/Zovaris/smithy/internal/text"
 )
 
 var (
@@ -660,39 +661,10 @@ func StatusOf(s Settings) (Status, error) {
 	return out, nil
 }
 
-// stripEscapes drops ANSI escape sequences (CSI, OSC and two-byte ones) and turns every other
-// control character, and the Unicode line and paragraph separators, into a space.
-func stripEscapes(s string, keepTab bool) string {
-	var b strings.Builder
-	r := []rune(s)
-	for i := 0; i < len(r); i++ {
-		c := r[i]
-		switch {
-		case c == 0x1b && i+1 < len(r) && r[i+1] == '[':
-			for i += 2; i < len(r) && (r[i] < 0x40 || r[i] > 0x7e); i++ {
-			}
-		case c == 0x1b && i+1 < len(r) && r[i+1] == ']':
-			for i += 2; i < len(r) && r[i] != 0x07 && !(r[i] == 0x1b && i+1 < len(r) && r[i+1] == '\\'); i++ {
-			}
-			if i < len(r) && r[i] == 0x1b {
-				i++
-			}
-		case c == 0x1b:
-			i++
-		case c == '\t' && keepTab:
-			b.WriteRune(c)
-		case c < 0x20 || c == 0x7f || (c >= 0x80 && c < 0xa0) || c == '\u2028' || c == '\u2029':
-			b.WriteRune(' ')
-		default:
-			b.WriteRune(c)
-		}
-	}
-	return b.String()
-}
+func stripEscapes(s string, keepTab bool) string { return text.StripEscapes(s, keepTab) }
 
-// Clean makes s one safe line: no escape sequences, control characters or line breaks, and
-// runs of spaces collapsed. Use it for headers and for source text printed to a terminal.
-func Clean(s string) string { return strings.Join(strings.Fields(stripEscapes(s, false)), " ") }
+// Clean is text.Clean: one safe line for headers and source text printed to a terminal.
+func Clean(s string) string { return text.Clean(s) }
 
 // bodyLines splits on every line break (\r\n, \r, \n, U+2028, U+2029) and cleans each line.
 func bodyLines(s string) []string {

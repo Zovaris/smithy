@@ -2,6 +2,7 @@ package events
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -36,6 +37,41 @@ func TestAppendReadRotate(t *testing.T) {
 	}
 	if es, _ := Read(time.Time{}, 2); len(es) != 2 {
 		t.Fatalf("max = %d", len(es))
+	}
+}
+
+func TestAppendStripsWholeEscapeSequences(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	if err := Append(Event{Kind: "queued", ID: "4\x1b[2J2", Detail: "a\x1b]8;;http://x\x07b"}); err != nil {
+		t.Fatal(err)
+	}
+	es, _ := Read(time.Time{}, 0)
+	if len(es) != 1 || es[0].ID != "42" || es[0].Detail != "ab" {
+		t.Fatalf("%+v", es)
+	}
+}
+
+func TestLogIsPrivateAfterOpenAndRotation(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	old := MaxBytes
+	MaxBytes = 200
+	defer func() { MaxBytes = old }()
+	if err := os.MkdirAll(filepath.Dir(File()), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(File(), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		if err := Append(Event{Kind: "x", Detail: strings.Repeat("y", 100)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, f := range []string{File(), File() + ".1"} {
+		fi, err := os.Stat(f)
+		if err != nil || fi.Mode().Perm() != 0o600 {
+			t.Fatalf("%s: %v %v", f, fi.Mode(), err)
+		}
 	}
 }
 

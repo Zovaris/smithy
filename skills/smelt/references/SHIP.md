@@ -43,7 +43,7 @@ else update the docs the change touched (`references/DOCS.md`). Then:
   pushes the branch and prints the compare URL: end there, report the branch and URL, and skip
   the wait (the user opens the PR by hand). Merge with `smithy pr merge <pr>`, never
   `gh pr merge`.
-  (2) **Merge** the PR or locally into the base only when the user asks (use-smithy's merge rule). (3) **Keep** the branch for later. Discard
+  (2) **Merge** the PR or locally into the base only when the user asks (use-smithy **Merges**; production needs their explicit yes). (3) **Keep** the branch for later. Discard
   work only when the user explicitly says to.
 - **No remote, or not GitHub** (`git remote` prints nothing, or `smithy pr create` exits 3:
   origin is another forge or a local repo): commit, branch, receipts and scan as above, then

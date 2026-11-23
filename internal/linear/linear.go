@@ -98,7 +98,7 @@ func Open(s auto.Settings) (*Source, error) {
 	}
 	key, _, err := auth.Get("linear")
 	if err != nil {
-		return nil, fmt.Errorf("linear: %v: %w", err, auto.ErrNoAccess)
+		return nil, fmt.Errorf("linear: %s: %w", auto.Clean(err.Error()), auto.ErrNoAccess)
 	}
 	if key == "" {
 		return nil, fmt.Errorf("linear: no API key: run smithy auth set linear (key on stdin) or set %s: %w", auth.EnvVar("linear"), auto.ErrNoAccess)
@@ -290,7 +290,7 @@ func (s *Source) do(query string, vars map[string]any, out any) error {
 	body, _ := json.Marshal(map[string]any{"query": query, "variables": vars})
 	req, err := http.NewRequest("POST", Endpoint, bytes.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("linear: %v", err)
+		return fmt.Errorf("linear: %s", auto.Clean(err.Error()))
 	}
 	req.Header.Set("Authorization", s.key)
 	req.Header.Set("Content-Type", "application/json")
@@ -329,7 +329,7 @@ func (s *Source) do(query string, vars map[string]any, out any) error {
 	}
 	if out != nil {
 		if err := json.Unmarshal(res.Data, out); err != nil {
-			return fmt.Errorf("linear: bad response: %v", err)
+			return fmt.Errorf("linear: bad response: %s", auto.Clean(err.Error()))
 		}
 	}
 	return nil

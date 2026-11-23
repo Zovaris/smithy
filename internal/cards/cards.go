@@ -432,7 +432,7 @@ const usage = `usage: smithy cards <command>
                                          beat for warden.stuck_minutes (15) is stuck
   get <batch> <id>                       print one card
   board [batch] [--changed-since <iso>] [--json]   one line per item with its stage; newest batch by default
-                                         (--changed-since exits 3 when nothing changed)
+                                         (--changed-since exits 4 when nothing changed)
   live [batch] [--every 5]               redraws the board in a terminal for humans
   gate <batch> <id>                      exit 1 when batch.json marks the item risky and its card
                                          lacks security=ran (never merge it); 0 otherwise
@@ -550,7 +550,7 @@ func Main(args []string) int {
 				}
 			}
 			if !changed {
-				return 3
+				return 4
 			}
 		}
 		out, err := Board(batch, asJSON)
