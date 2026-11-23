@@ -8,7 +8,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - Added: token use and cost per run. `smithy agent` runs Claude Code with `--output-format json`,
   then turns the log back into the plain answer and writes `<log>.usage.json` (input, output,
   cache read/write tokens, `cost_usd` from `total_cost_usd`) plus a `usage` event. `smithy cards
-  board --json` shows each item's `usage` and the batch total. Other CLIs report nothing yet and
+  board --json` shows each item's `usage` and the batch total. An error result keeps a readable
+  `error: <subtype>: <message>` line in the log; runs without `--log` (consult) still count. Other CLIs report nothing yet and
   show `-`: never an estimate.
 - Added: the TUI shows a cost column in Agents and Done, and "spend today" with a 7-day sparkline
   in the Overview's Daily cap card.

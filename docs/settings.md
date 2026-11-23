@@ -34,7 +34,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `auto.label` | `auto` | Label that opts an issue in (`auto.mode labeled`). |
 | `auto.model_prefix` / `auto.speed_prefix` | `model:` / `speed:` | Label prefixes for the worker tier (`model:cheap`…) and the smelt speed (`speed:fast`…). |
 | `auto.max_per_day` | `20` | Issues launched per local calendar day; the rest stay queued (an `auto.hours` window across midnight can launch up to 2x this overnight). |
-| `auto.max_cost_per_day` | | USD of reported agent cost per local day; at or over it `smithy auto serve` launches nothing until tomorrow and records `cap_reached`. Empty = no cap; runs whose CLI reports no cost (all but Claude Code today) don't count. |
+| `auto.max_cost_per_day` | | USD of reported agent cost per local day. At or over it `smithy auto serve` starts no new orchestrator until tomorrow and records `cap_reached`; workers already running finish. Only cost a CLI reports counts (Claude Code today); runs with unknown cost (codex, opencode, killed or timed-out runs) count as 0. Empty = no cap. |
 | `auto.hours` | unset (always) | Launch window `HH:MM-HH:MM` in local time (`22:00-07:00` wraps midnight). |
 | `auto.every` | `60` | Seconds between polls of each source. |
 | `auto.paused` | `false` | `true` holds `smithy auto take`: nothing launches until it is `false` again (`p` in `smithy tui`). |

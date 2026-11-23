@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -53,10 +54,13 @@ func Cost(c *float64) string {
 // and total_cost_usd. text is the run's final answer (the `result` field).
 func FromClaude(line []byte) (u Usage, text string, ok bool) {
 	var r struct {
-		Type   string   `json:"type"`
-		Result string   `json:"result"`
-		Cost   *float64 `json:"total_cost_usd"`
-		Usage  *struct {
+		Type    string            `json:"type"`
+		Subtype string            `json:"subtype"`
+		IsError bool              `json:"is_error"`
+		Errors  []json.RawMessage `json:"errors"`
+		Result  string            `json:"result"`
+		Cost    *float64          `json:"total_cost_usd"`
+		Usage   *struct {
 			Input      int64 `json:"input_tokens"`
 			Output     int64 `json:"output_tokens"`
 			CacheRead  int64 `json:"cache_read_input_tokens"`
@@ -67,7 +71,43 @@ func FromClaude(line []byte) (u Usage, text string, ok bool) {
 	if len(line) == 0 || line[0] != '{' || json.Unmarshal(line, &r) != nil || r.Type != "result" || r.Usage == nil {
 		return u, "", false
 	}
-	return Usage{Input: r.Usage.Input, Output: r.Usage.Output, CacheRead: r.Usage.CacheRead, CacheWrite: r.Usage.CacheWrite, CostUSD: r.Cost}, r.Result, true
+	text = r.Result
+	if strings.TrimSpace(text) == "" && (r.IsError || (r.Subtype != "" && r.Subtype != "success")) {
+		text = "error: " + r.Subtype
+		if r.Subtype == "" {
+			text = "error"
+		}
+		if len(r.Errors) > 0 {
+			var s string
+			if json.Unmarshal(r.Errors[0], &s) != nil {
+				s = string(r.Errors[0])
+			}
+			if s = strings.TrimSpace(strings.SplitN(s, "\n", 2)[0]); s != "" {
+				text += ": " + s
+			}
+		}
+	}
+	return Usage{Input: r.Usage.Input, Output: r.Usage.Output, CacheRead: r.Usage.CacheRead, CacheWrite: r.Usage.CacheWrite, CostUSD: r.Cost}, text, true
+}
+
+// writeAtomic replaces file through a temp file and a rename, so a reader never sees half a log.
+func writeAtomic(file string, b []byte) error {
+	f, err := os.CreateTemp(filepath.Dir(file), filepath.Base(file)+".tmp*")
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(b)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		_ = os.Chmod(f.Name(), 0o600)
+		err = os.Rename(f.Name(), file)
+	}
+	if err != nil {
+		os.Remove(f.Name())
+	}
+	return err
 }
 
 // Sidecar is the usage file of a log.
@@ -88,11 +128,15 @@ func Finish(log string) (Usage, bool) {
 			continue
 		}
 		lines[i] = strings.TrimRight(text, "\n")
-		if err := os.WriteFile(log, []byte(strings.Join(lines, "\n")), 0o600); err != nil {
+		out := strings.Join(lines, "\n")
+		if !strings.HasSuffix(out, "\n") {
+			out += "\n"
+		}
+		if err := writeAtomic(log, []byte(out)); err != nil {
 			return Usage{}, false
 		}
 		j, _ := json.Marshal(u)
-		if os.WriteFile(Sidecar(log), append(j, '\n'), 0o600) != nil {
+		if writeAtomic(Sidecar(log), append(j, '\n')) != nil {
 			return u, false
 		}
 		return u, true

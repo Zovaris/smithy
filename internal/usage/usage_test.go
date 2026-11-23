@@ -43,6 +43,24 @@ func TestFinishRewritesLogAndWritesSidecar(t *testing.T) {
 	}
 }
 
+func TestFinishKeepsAReadableErrorLine(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "w.log")
+	os.WriteFile(log, []byte(`{"type":"result","subtype":"error_max_turns","is_error":true,"errors":["Reached max turns (3)","more"],"total_cost_usd":0.1,"usage":{"input_tokens":1,"output_tokens":2}}`), 0o600)
+	u, ok := Finish(log)
+	if !ok || u.Output != 2 {
+		t.Fatalf("usage %+v %v", u, ok)
+	}
+	b, _ := os.ReadFile(log)
+	if string(b) != "error: error_max_turns: Reached max turns (3)\n" {
+		t.Fatalf("log %q", b)
+	}
+	os.WriteFile(log, []byte(`{"type":"result","subtype":"error_during_execution","is_error":true,"usage":{"input_tokens":1}}`+"\n"), 0o600)
+	Finish(log)
+	if b, _ := os.ReadFile(log); string(b) != "error: error_during_execution\n" {
+		t.Fatalf("log %q", b)
+	}
+}
+
 func TestFinishWithoutResultLeavesLog(t *testing.T) {
 	log := filepath.Join(t.TempDir(), "w.log")
 	os.WriteFile(log, []byte("smithy agent: timed out after 1m\n"), 0o600)

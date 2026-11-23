@@ -406,15 +406,28 @@ func jsonResult(argv []string) bool {
 // log and a "usage" event (batch and item from a <warden home>/<batch>/<item>.log path).
 func finish(log string, named bool) {
 	u, ok := usage.Finish(log)
-	if !ok || !named {
+	if !named {
 		os.Remove(usage.Sidecar(log))
+	}
+	if !ok {
 		return
 	}
-	e := events.Event{Kind: "usage", Detail: filepath.Base(log), Usage: &u}
-	if dir := filepath.Dir(log); filepath.Dir(dir) == cards.Home() {
-		e.Batch, e.Item = filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log")
+	e := events.Event{Kind: "usage", Usage: &u}
+	if named {
+		e.Detail = filepath.Base(log)
+		if dir := filepath.Dir(log); realPath(filepath.Dir(dir)) == realPath(cards.Home()) {
+			e.Batch, e.Item = filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log")
+		}
 	}
 	_ = events.Append(e)
+}
+
+// realPath resolves symlinks so a linked warden home still matches; p as given when it can't.
+func realPath(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return filepath.Clean(p)
 }
 
 // withPath runs an absolute or relative CLI path in place of the bare name.

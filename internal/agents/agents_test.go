@@ -646,6 +646,40 @@ func TestAgentClaudeKeepsATextLogAndWritesUsage(t *testing.T) {
 	}
 }
 
+func usageEvents(t *testing.T, home string) string {
+	t.Helper()
+	b, _ := os.ReadFile(filepath.Join(home, "events.jsonl"))
+	return string(b)
+}
+
+func TestAgentUnnamedRunStillRecordsUsage(t *testing.T) {
+	p, _ := fakeClaude(t)
+	if rc := AgentMain([]string{"--timeout", "0", p}); rc != 0 {
+		t.Fatalf("rc = %d", rc)
+	}
+	ev := usageEvents(t, os.Getenv("SMITHY_HOME"))
+	if !strings.Contains(ev, `"kind":"usage"`) || strings.Contains(ev, `"batch"`) {
+		t.Fatalf("events = %s", ev)
+	}
+}
+
+func TestAgentUsageAttributesBatchThroughSymlinkedHome(t *testing.T) {
+	p, _ := fakeClaude(t)
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "wh")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skip(err)
+	}
+	t.Setenv("WARDEN_HOME", link)
+	os.MkdirAll(filepath.Join(real, "b1"), 0o755)
+	if rc := AgentMain([]string{"--timeout", "0", "--log", filepath.Join(real, "b1", "01-x.log"), p}); rc != 0 {
+		t.Fatalf("rc = %d", rc)
+	}
+	if ev := usageEvents(t, os.Getenv("SMITHY_HOME")); !strings.Contains(ev, `"batch":"b1","item":"01-x"`) {
+		t.Fatalf("events = %s", ev)
+	}
+}
+
 func TestAgentClaudeBackgroundWritesUsage(t *testing.T) {
 	p, log := fakeClaude(t)
 	t.Setenv("SMITHY_TEST_AGENT_MAIN", "1")
