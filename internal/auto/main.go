@@ -39,7 +39,7 @@ func Main(args []string) int {
 	}
 	s, err := LoadSettings()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "smithy auto:", err)
+		fmt.Fprintln(os.Stderr, "smithy auto:", errText(err))
 		return 2
 	}
 	flags := map[string]string{}
@@ -83,7 +83,7 @@ func Main(args []string) int {
 		}
 		r, err := Take(s, max, taskDir)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "smithy auto:", err)
+			fmt.Fprintln(os.Stderr, "smithy auto:", errText(err))
 			return 1
 		}
 		if r.Count == 0 {
@@ -98,7 +98,7 @@ func Main(args []string) int {
 		}
 		srcs, openErr := s.Open("")
 		if len(srcs) == 0 {
-			fmt.Fprintln(os.Stderr, "smithy auto:", openErr)
+			fmt.Fprintln(os.Stderr, "smithy auto:", errText(openErr))
 			return openCode(openErr)
 		}
 		if err := Report(srcs, pos[0], pos[1], flags["--pr"]); err != nil {
@@ -122,7 +122,7 @@ func Main(args []string) int {
 		}
 		st, err := StatusOf(s)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "smithy auto: state:", err)
+			fmt.Fprintln(os.Stderr, "smithy auto: state:", errText(err))
 			return 1
 		}
 		if flags["--json"] != "" {
@@ -190,10 +190,17 @@ func printStatus(st Status) {
 	}
 }
 
-// openCode is the exit code when no source opened: 3 for no access, else 2.
+// openCode is the exit code when no source opened: 3 for no access, else 1.
 func openCode(err error) int {
 	if err == nil || errors.Is(err, ErrNoAccess) {
 		return 3
 	}
-	return 2
+	return 1
+}
+
+func errText(err error) string {
+	if err == nil {
+		return "no source opened"
+	}
+	return Clean(err.Error())
 }
