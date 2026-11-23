@@ -19,16 +19,17 @@ Autonomous intake (settings auto.*; state in ~/.smithy/auto/state.json).
   poll    polls each source in auto.sources once and queues new qualified issues, one line each:
           auto <source> <id> queued <model|-> <speed|-> <url>
   take    moves the issues the daily cap (auto.max_per_day) and window (auto.hours) allow into a
-          new task dir (smithy task-dir auto-<date>-<n>); prints "<dir> <count>" or "auto none: <why>"
-  report  writes back to the issue: started, completed or blocked (GitHub: a comment)
+          new task dir out of git (~/.smithy/plans/<repo>/auto-<date>-<n>); prints "<dir> <count>" or
+          "auto none: <why>"
+  report  writes back to the issue: started, completed or blocked (GitHub: a comment; Linear: a comment,
+          the workflow state and the PR attached); the issue is <source>:<id> (linear:TES-1 or
+          linear:<uuid>) or a bare id taken by auto take
   status  queue, today's count and cap, hours, last poll per source, watcher alive or stale
 Exit 2 = bad usage or settings, 3 = no access to a source.`
 
-// taskDir makes the task dir for take; tests replace it.
-var taskDir = func(slug string) (string, error) {
-	d, _, err := plan.TaskDirDefault(slug)
-	return d, err
-}
+// taskDir makes the task dir for take, always out of git (~/.smithy/plans/<repo>/<slug>), so
+// intake never leaves files in the target repo; tests replace it.
+var taskDir = plan.LocalTaskDir
 
 // Main runs `smithy auto`.
 func Main(args []string) int {
@@ -95,15 +96,21 @@ func Main(args []string) int {
 		if len(pos) != 2 {
 			break
 		}
-		srcs, err := s.Open("")
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "smithy auto:", err)
-			return 2
+		srcs, openErr := s.Open("")
+		if len(srcs) == 0 {
+			fmt.Fprintln(os.Stderr, "smithy auto:", openErr)
+			return openCode(openErr)
 		}
 		if err := Report(srcs, pos[0], pos[1], flags["--pr"]); err != nil {
-			fmt.Fprintln(os.Stderr, "smithy auto:", err)
-			if errors.Is(err, ghx.ErrNoGitHub) {
+			fmt.Fprintln(os.Stderr, "smithy auto:", Clean(err.Error()))
+			if openErr != nil {
+				fmt.Fprintln(os.Stderr, "smithy auto:", Clean(openErr.Error()))
+			}
+			if errors.Is(err, ghx.ErrNoGitHub) || errors.Is(err, ErrNoAccess) {
 				return 3
+			}
+			if errors.Is(err, ErrAmbiguous) {
+				return 2
 			}
 			return 1
 		}
@@ -133,10 +140,12 @@ func Main(args []string) int {
 // PollLines polls once (all sources, or only) and returns the queued lines and an exit code.
 // smithy wait auto uses it too.
 func PollLines(s Settings, only string) ([]string, int) {
-	srcs, err := s.Open(only)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "smithy auto:", err)
-		return nil, 2
+	srcs, openErr := s.Open(only)
+	if openErr != nil {
+		fmt.Fprintln(os.Stderr, "smithy auto:", Clean(openErr.Error()))
+	}
+	if len(srcs) == 0 {
+		return nil, openCode(openErr)
 	}
 	got, err := Poll(s, srcs, os.Stderr)
 	var lines []string
@@ -144,8 +153,8 @@ func PollLines(s Settings, only string) ([]string, int) {
 		lines = append(lines, q.Line())
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "smithy auto: poll:", err)
-		if errors.Is(err, ghx.ErrNoGitHub) || strings.Contains(err.Error(), ghx.ErrNoGitHub.Error()) {
+		fmt.Fprintln(os.Stderr, "smithy auto: poll:", Clean(err.Error()))
+		if errors.Is(err, ErrNoAccess) || errors.Is(err, ghx.ErrNoGitHub) || strings.Contains(err.Error(), ghx.ErrNoGitHub.Error()) {
 			return lines, 3
 		}
 		return lines, 1
@@ -179,4 +188,12 @@ func printStatus(st Status) {
 	for _, q := range st.Queue {
 		fmt.Printf("  %s %s %s %s %s\n", q.Source, q.ID, dash(q.Model), dash(q.Speed), q.URL)
 	}
+}
+
+// openCode is the exit code when no source opened: 3 for no access, else 2.
+func openCode(err error) int {
+	if err == nil || errors.Is(err, ErrNoAccess) {
+		return 3
+	}
+	return 2
 }

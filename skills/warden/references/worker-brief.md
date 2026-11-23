@@ -91,7 +91,9 @@ PR target: {{base}}. Merge mode: {{merge}}.[if stack] Stacked on {{prereq}}: mer
 `'{{smithy}}' cards set {{batch}} {{id}} key=value…` at every phase change and before
 every end of turn. `state` is one of: waiting, working, needs_decision, blocked, failed, pr_open,
 ready, merged, dropped, reported. Keep `progress` as <done>/<total> of your task list and `phase`
-as the current step.
+as the current step. During a long step (tests, CI), run
+`'{{smithy}}' cards beat {{batch}} {{id}}` at least every 10 minutes, and before and after each
+`smithy wait`: no beat (every `cards set` counts) for `warden.stuck_minutes` (15) marks you stuck.
 - Decision needed: state=needs_decision with decision_key (short slug), question, options (JSON
   list, each with its trade-off and the code lines that matter, neutral), recommendation and
   impact (low, medium or high: smelt's `references/EXECUTE.md`, Rulings). End

@@ -69,8 +69,8 @@ func taskDir(slug string, def bool) (dir string, board bool, err error) {
 	excludeRepoConfig(top)
 	loc := config.Get("tasks.location", "repo")
 	if loc == "local" {
-		dir = filepath.Join(tasks.PlansHome(), filepath.Base(top), slug)
-		return dir, false, os.MkdirAll(dir, 0o755)
+		dir, err = LocalTaskDir(slug)
+		return dir, false, err
 	}
 	commit, cerr := effective("tasks.commit", "true")
 	if cerr != nil {
@@ -108,6 +108,17 @@ func taskDir(slug string, def bool) (dir string, board bool, err error) {
 		dir = filepath.Join(top, ".docs", "specs", slug)
 	}
 	return dir, loc == "board", os.MkdirAll(dir, 0o755)
+}
+
+// LocalTaskDir creates the out-of-git task dir <plans home>/<repo>/<slug> for the repo at the
+// working directory, whatever tasks.location and tasks.commit say.
+func LocalTaskDir(slug string) (string, error) {
+	top, err := ghx.Run("git", "rev-parse", "--show-toplevel")
+	if err != nil || top == "" {
+		return "", ErrNotRepo
+	}
+	dir := filepath.Join(tasks.PlansHome(), filepath.Base(top), slug)
+	return dir, os.MkdirAll(dir, 0o755)
 }
 
 // excludeRepoConfig keeps an untracked .smithy/config.json out of git via the local

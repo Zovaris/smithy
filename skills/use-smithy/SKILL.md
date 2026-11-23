@@ -58,6 +58,7 @@ Run `smithy skills --list` once per session; skip only when the brief gives the 
 | a fact, a comparison, "why does X", "can we Y" | **scout** (read-only, cited); "research, then build": scout, then smelt `plan` with its report |
 | a decision recorded, docs, comment policy, a map, past decisions | **ledger** (search before re-deciding) |
 | open PRs kept green, PRs or labeled issues watched | **tend** (accepted issues become task files for warden) |
+| to watch Linear/GitHub issues and build them unattended | **tend** `auto` |
 | no conversation | **hush**; every launched agent's brief names it too |
 | every reply | **simple**, if installed, unless the user says "normal mode" (a skill not installed: work plainly, mention it once) |
 

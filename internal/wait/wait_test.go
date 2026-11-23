@@ -489,7 +489,7 @@ func TestBatchWatcherStale(t *testing.T) {
 	}
 	writeCard(t, "b1", "a", `{"state":"working","updated":"2020-01-01T00:00:00.000Z"}`)
 	got, _ := w.poll()
-	if !reflect.DeepEqual(got, []string{"batch b1 stale: a"}) {
+	if len(got) != 1 || !strings.HasPrefix(got[0], "batch b1 stale: a (last beat ") {
 		t.Errorf("got %q", got)
 	}
 }
