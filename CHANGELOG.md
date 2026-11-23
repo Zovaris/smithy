@@ -11,6 +11,11 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   `auto-<date>-<n>` task dir (`Source:` header, issue text quoted as data). Settings `auto.*` and
   `linear.*`; state in `~/.smithy/auto/state.json`.
 
+- Added: tend `auto` mode (`references/AUTO.md`): waits on `smithy wait auto`, takes the queue
+  into a task dir, runs warden on it with batch values pre-answered and reports each issue
+  started, completed or blocked. use-smithy routes "build issues unattended" to it; README
+  "Autonomous mode".
+
 ## v0.14.1 — 2026-11-23
 
 - Fixed: hush failed to install (unquoted `: ` in its YAML `description`).
