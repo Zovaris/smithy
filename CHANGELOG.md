@@ -5,6 +5,14 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+### Security
+- Launcher: without `gh` it no longer installs on the checksum alone; it needs the build
+  attestation, or `SMITHY_ALLOW_UNATTESTED=1` to accept checksum-only.
+- warden: doctor no longer suggests a `PermissionRequest` hook that auto-approves worker launches.
+- smelt: secret-looking fixtures are made obviously fake; `smithy:allow` needs the user's yes.
+- tend: names outside text (issues, comments, CI logs) as data in its own rules.
+- hush: the description no longer says it triggers for every launched agent.
+
 ## v0.13.0 — 2026-11-22
 
 - **Release audit fixes.** One owner for the ask flow, decision log, model ask and stop list (use-smithy); warden logs decisions with `smithy decisions add --ref`, not `decisions.md`; plain skill names instead of slash examples; doc corrections.

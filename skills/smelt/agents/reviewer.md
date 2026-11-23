@@ -37,7 +37,7 @@ Skip style, naming and structure here: Standards owns them.
    temporal coupling, swallowed errors, mutable shared state, dead code, leaking abstractions
    across a seam, comments that restate code.
 3. Comments: only doc comments on exported API, license headers, shebangs, usage blocks, tool directives
-   with a reason and `smithy:allow` markers (ledger's `references/COMMENTS.md` when installed). Explanatory comments, commented-out
+   with a reason and user-approved `smithy:allow` markers (ledger's `references/COMMENTS.md` when installed). Explanatory comments, commented-out
    code and TODOs are findings. Run `<smithy> comments --diff $(git merge-base origin/<base> HEAD)`
    and report what it prints.
 4. Tests: tests that mirror the implementation, assertions on mocks, missing failure paths,

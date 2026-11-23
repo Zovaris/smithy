@@ -54,5 +54,4 @@ skills don't need to call `gh pr merge` themselves.
 
 | Hook | Harness | Does |
 |---|---|---|
-| `start_session` auto-approve (`PermissionRequest`) | Claude Code desktop | Skips the "Allow" click per warden worker. `/warden doctor` checks it only there. |
 | `skills/smelt/scripts/smithy guard-tests` | any with a pre-edit hook | Blocks test-file edits during TDD's green phase. |
