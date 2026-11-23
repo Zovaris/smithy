@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -196,14 +195,6 @@ func (r *report) bad(msg, fix string) {
 func have(name string) bool { _, err := exec.LookPath(name); return err == nil }
 
 type claudeSettings struct {
-	Hooks struct {
-		PermissionRequest []struct {
-			Matcher string `json:"matcher"`
-			Hooks   []struct {
-				Command string `json:"command"`
-			} `json:"hooks"`
-		} `json:"PermissionRequest"`
-	} `json:"hooks"`
 	Permissions struct {
 		Allow []string `json:"allow"`
 	} `json:"permissions"`
@@ -226,8 +217,6 @@ func readSettings(f string) (claudeSettings, bool) {
 var findSkill = agents.FindSkill
 
 var missingInHarness = agents.MissingInHarness
-
-var allowRe = regexp.MustCompile(`"behavior"\s*:\s*"allow"`)
 
 func githubMode(r *report) {
 	if ok, origin := ghx.OriginIsGitHub(); !ok && origin != "" {
@@ -308,38 +297,6 @@ func Doctor(args []string) int {
 			r.ok("model " + m + ": " + v)
 		} else {
 			r.warn("no "+m+" model set for "+h, "ask the user, then: smithy config set-model "+m+" <name>")
-		}
-	}
-	if h == "claude-desktop" {
-		hook := ""
-	files:
-		for _, f := range claudeFiles() {
-			s, ok := readSettings(f)
-			if !ok {
-				continue
-			}
-			for _, pr := range s.Hooks.PermissionRequest {
-				if re, err := regexp.Compile(pr.Matcher); pr.Matcher == "" || err != nil || !re.MatchString("mcp__ccd_session__start_session") {
-					continue
-				}
-				for _, hk := range pr.Hooks {
-					file := strings.Fields(hk.Command + " ")[0]
-					if strings.HasPrefix(file, "~") {
-						home, _ := os.UserHomeDir()
-						file = home + file[1:]
-					}
-					body, _ := os.ReadFile(file)
-					if allowRe.MatchString(hk.Command) || allowRe.Match(body) {
-						hook = f
-						break files
-					}
-				}
-			}
-		}
-		if hook != "" {
-			r.ok("start_session auto-approve hook (" + hook + ")")
-		} else {
-			r.warn("no start_session auto-approve hook (one 'Allow' click per worker)", `add a PermissionRequest hook, matcher mcp__ccd_session__start_session, printing {"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}`)
 		}
 	}
 	if strings.HasPrefix(h, "claude") {
