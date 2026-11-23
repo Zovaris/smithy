@@ -5,6 +5,21 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Changed: `smithy cards board --changed-since` exits 4 (not 3) when nothing changed;
+  `smithy auto` exits 1 (not 2) when a source fails to open for a reason other than access.
+- Added: `smithy <cmd> <sub> --help` prints only that subcommand's usage.
+- Fixed: every error `smithy auto` and the Linear source print goes through one cleaner
+  (`internal/text`, also used by the event log and decisions); `events.jsonl` stays 0600 after
+  open and rotation.
+- Fixed (`smithy tui`): copied commands shell-quote every value; markdown links show their
+  target (no OSC 8 hyperlinks); `--demo` never opens a URL, it says what it would open.
+- Changed (skills): the merge and production rule lives once in use-smithy **Merges** (tend never
+  merges a warden batch's PR); decisions, "Decided without you" and the heartbeat each have one
+  home; warden points to `smithy --help` for the full command list and has workers merge the base
+  instead of `gh pr update-branch`.
+- Docs: `docs/settings.md` lists every `auto.*` and `linear.*` key and the real model key names;
+  README says Linear needs `linear.team` and a key; tend AUTO.md notes `auth.json` is readable by
+  same-user processes.
 - Added: `smithy tui`, a live dashboard (Bubble Tea v2): a dithered animated anvil header with
   the watcher, daily cap, agents and PRs; full-size views behind a tab bar (Overview charts of
   work per hour, agents by stage, the cap, CI health and how long work takes; Agents with a
