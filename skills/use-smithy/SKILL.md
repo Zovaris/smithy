@@ -33,7 +33,7 @@ or, with nobody to ask (hush, a launched session; warden workers ask warden), en
 3. `smithy consult "<q>" "<options>"`: neutral, safest first for security, never "as written" for
    an insecure request. Fails → safest; ESCALATE → warden or the user, nobody → safest (security:
    the secure one; else the most reversible, least new surface; name which). Go on.
-4. `smithy decisions add "<q>" "<choice>" --why "<reason>" --by timeout|consult|self [--ref <pr|file>]` (self: no consult ran).
+4. `smithy decisions add "<q>" "<choice>" --why "<reason>" --by timeout|consult|self [--ref <pr|file>]` (consult that failed: `consult`).
 Each reply starts (simple too) with `smithy decisions pending` → show any ("decided without you:
 … — keep or change?"), then `smithy decisions confirm <n>|--all` or `change <n> "<choice>"`.
 
