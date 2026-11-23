@@ -76,11 +76,10 @@ intent or the task.
 ## Status back to the source
 
 So smelt and the board stay in sync:
-- Local task dir: `smithy tasks set <file> status=doing` at launch, `status=done pr=<url>` once the PR exists
-  (a follow-up commit on the PR branch),
+- Local task dir: `smithy tasks set <file> status=doing` at launch, `status=done pr=<url>` once the PR exists,
   `status=dropped` when dropped.
 - Committed repo task dir (`docs/specs`): the worker sets `Status: done` and `PR:` in its own
-  branch, so it lands with the PR; you don't commit to the base branch.
+  branch (a follow-up commit on the PR branch), so it lands with the PR; you don't commit to the base branch.
 - Uncommitted repo task dir (`.docs/specs`): update it directly, like a local dir.
 - Board: one comment with the PR when it opens; close or move the issue when merged (only what the
   tracker's tools allow; never delete).

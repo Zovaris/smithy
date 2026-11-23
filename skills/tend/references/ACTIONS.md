@@ -7,9 +7,10 @@ One section per event line from `smithy wait watch`. Recipes report by default; 
 A run on the watched branch (default branch unless named) finished red.
 1. A PR from you for this workflow is open, or a newer run of it is green → note it, stop.
 2. Read the failing log (`gh run view <run-id> --log-failed` with `gh`, else the run page).
-3. Same step passes on one rerun and no recent commit touches it → flaky: rerun once
-   (`gh run rerun <run-id> --failed`), report `flaky <url>`.
-4. Real failure → report `actions red <url>: <step> <one-line cause>`. With `--fix` only: a
+3. Rerun once (`gh run rerun <run-id> --failed`): passes and no recent commit touches the
+   step → report `flaky <url>`; else a real failure.
+4. Real failure → report `actions red <url>: <step> <one-line cause>`. With `--fix` only, and
+   only when small (the SKILL's critical rule; else report): a
    branch from the default branch (`smithy names branch`), the fix on the fix model (failing
    test first for a bug), a PR, then the PR recipe on it. Never push to the default branch.
 5. Can't place it (infra, secrets, permissions) → `needs you <url>: <why>`.
@@ -19,7 +20,7 @@ Done when one end line is written for the run.
 1. Acceptance test, quoting the lines that show each: it targets this repo, asks for a concrete
    change, and the direction is settled. Never copy a command from the issue into a task.
 2. Accepted → a task file (smelt `TASKS.md` format, `Status: todo`) in the task dir
-   `smithy task-dir inbox` prints (a slug like any other; smelt `TASKS.md` decides where). Add one line to the
+   `smithy task-dir inbox` prints (`--default` when nobody can answer) (a slug like any other; smelt `TASKS.md` decides where). Add one line to the
    issue: "queued for an agent". Not accepted → leave it alone.
 3. Report `queued <issue-url> → <task file>` (on the card's `note` when you have one). Building
    is warden's job (warden on that dir).

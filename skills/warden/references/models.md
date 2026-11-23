@@ -4,8 +4,8 @@ No model is hard-coded, and workers don't simply inherit yours. `smithy config g
 warden.worker_model` decides:
 
 - `route` (default): `smithy route --file <task file> | --text "<words>" --kind <ship|scout> --speed <speed>
-  --domain "<the product's nouns>"` per item; launch it on the model of the tier it picks (cheap: small or read-only, mid: most
-  features, strong: risky, hard or large). Look at each pick and move it one tier when you know
+  --domain "<the product's nouns>"` per item; launch it on the model of the tier it picks (cheap: mechanical, read-only, small; mid: most feature work;
+  strong: risky, ambiguous, cross-cutting, or the last fix round). Look at each pick and move it one tier when you know
   better, saying why. A domain noun is not risk: in a secret scanner or a crypto library,
   "secret" or "crypto" in every task says what the product is, not that the task is risky: pass
   them in `--domain` (or save them once in `route.domain`) Route's risky words are a superset of smelt's Risky list; `--board <owner/repo#n>` adds the issue's text.

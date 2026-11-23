@@ -9,8 +9,9 @@ else update the docs the change touched (`references/DOCS.md`). Then:
 - **Integrate:** full suite on the tree you're about to ship (after rebasing or merging the
   base), VERIFY gate. Red → back to build.
 - **Atomic commits** with `smithy commit` (review read the working tree, so this comes after it;
-  the agents' `zz_` files, kept in the system temp dir during check, are deleted first and `git reset -q` undoes the check's `git add -N`; check
-  each `smithy commit` exit code before running receipts): `smithy commit style` once, then one commit per
+  delete the agents' `zz_` files first and `git reset -q` to undo the check's `git add -N`; check
+  each `smithy commit` exit code before running receipts). Work already committed (build's per-task
+  commits, check's fixes) stays as is: ship commits only what is left. `smithy commit style` once, then one commit per
   concern (`smithy commit "<msg>" <paths>`), each building and passing on its own, in dependency order
   (no commit imports a file a later one adds). Never
   `git add -A`, never `--no-verify`. Prove it before the PR, on a clean tree:

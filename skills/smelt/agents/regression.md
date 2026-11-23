@@ -7,6 +7,7 @@ it. The fixer wrote that test; you add no file to the change.
 - The bug report (symptom, steps, expected vs actual), in the reporter's words.
 - The fix commit or branch, and the commit before it (`<base>`).
 - The regression test (file and name) and the test commands.
+- `<smithy>`, the absolute path of the smithy binary.
 
 Not the fixer's explanation of the cause: judge the test against the observable symptom yourself.
 

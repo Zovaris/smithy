@@ -7,7 +7,7 @@ compatibility: "Needs git; gh (or GH_TOKEN) for GitHub steps; its launcher insta
 
 # scout
 
-Answer one question from primary sources and stop. A scout never edits code, config, git state
+Answer one question from primary sources and stop. A scout never edits code, config (except saving an unset model tier), git state
 or anything outside its report. A report may recommend an implementation; it never authorizes
 one.
 
@@ -50,7 +50,7 @@ model, so say so in the report. Either way:
 
 Use the format in `references/INVESTIGATOR.md`. Destination:
 - default: the chat;
-- `--out <path>` (warden passes `<batch-dir>/<id>/report.md`, smelt passes its task dir): write
+- `--out <path>` (warden passes `<batch-dir>/<id>/report.md`): write
   the file there and reply with its path and the one-line answer.
 
 **Done:** the question has an answer (or "unknown" with what would settle it), every claim has a

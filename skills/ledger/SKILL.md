@@ -59,8 +59,8 @@ on every run, and `smithy drift` reports their size; write only what the code do
   Done when `smithy drift` reports nothing left unhandled.
 - **comments `[paths]`** — `smithy comments <paths>` (or `--diff <base>`). For each finding:
   move the content to the module README or an ADR, turn it into a doc comment if it documents
-  public API, or delete it. A TODO/FIXME is first opened as an issue, or its text listed for the
-  user, then deleted. Re-run until clean.
+  public API, or delete it. A TODO/FIXME: list its text for the
+  user; open an issue only on a yes, then delete it. Re-run until clean.
 - **search `<query>`** — `smithy search "<query>"`: ADRs first, then glossary, module
   READMEs, other docs. Read the hits you need; quote file:line when you use them.
 

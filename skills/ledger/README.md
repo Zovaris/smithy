@@ -12,6 +12,7 @@ Started by the agent when a decision or doc is involved, or by you: `/ledger …
 |---|---|
 | `init` | Sets up `docs/`: ADR 0000, glossary, standards, a pointer in your agent instructions |
 | `adr <title>` | The next numbered ADR, filled from the conversation and the code |
+| `standard <rule>` | Adds, merges or retires a rule in `docs/agents/STANDARDS.md` |
 | `module <path>` | A README for that module: purpose, entry points, invariants |
 | `map` | `docs/agents/MAP.md`, so agents stop re-exploring the repo |
 | `sync [base]` | Finds docs the diff made stale (`smithy drift`) and updates them |

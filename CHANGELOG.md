@@ -11,10 +11,18 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - `smithy batch init --risky <id,id>` marks risky items (security agent required).
 
 ### Fixed
+- Settings and help catch-up: `smithy batch init` reads `warden.max`, `warden.cleanup`, `warden.mode`
+  and `warden.merge` when its flag isn't passed (new `--cleanup` and `--mode` flags; warden and
+  brief fall back to `warden.max`); `smithy decisions list --ref <prefix>` filters entries and its
+  help names the log file and the `--by` default; `smithy wait timer`, `smithy verify`,
+  `smithy pr create` (exit 3 for a non-GitHub origin) and `smithy receipt run` (exit 127, 128+signal)
+  help match the code; docs/settings.md adds the `judge` model row and the `warden.merge` note.
 - `smithy tasks import` keeps text before the first section (stack, shared rules) as shared
   context in every task file instead of refusing the list.
 - warden harness: a returning subagent worker is the wake; no batch wait needed.
-- `smithy verify`: checks that are all skipped or neutral are `none` (no proof), not green.
+- `smithy verify`: checks that are all skipped or neutral are `none` (no proof), not green: `none`
+  is pending when `.github/workflows` holds a workflow, and counts green only when the repo has
+  no workflow (no CI configured).
 - tend reads a foreign PR's agent instructions from the base, never from the PR head.
 - Skills that ship the launcher declare a `compatibility` line (git, gh or GH_TOKEN, attestation);
   `tests/skills.sh` limits the SKILL.md body, not the frontmatter.

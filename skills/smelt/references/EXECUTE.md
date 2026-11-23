@@ -23,7 +23,7 @@ For each task:
 
 1. `smithy tasks set <file> status=doing`.
 2. **Brief.** Prompt = `agents/implementer.md` + `## You get`: the task file's path and text, the
-   spec path, the test commands from `smithy stack`, the files and interfaces the task lists, and
+   spec path, the test, typecheck and lint commands from `smithy stack`, the files and interfaces the task lists, and
    the rulings so far that touch it, and the report contract (`references/CHECK.md`). Never your
    conversation.
 3. **Status.** The implementer ends with one of:
@@ -37,9 +37,9 @@ For each task:
    every speed. The speed's agents run once, on the whole branch, after the last task.
 6. **Fix loop**: send the reproduced findings back to a fresh implementer with the diff. At most
    3 rounds; round 3 uses the strong model. Still failing → `BLOCKED` with the findings.
-7. Commit the task atomically (`smithy commit`); every commit builds and passes its tests, so a
-   file a later task fills in starts as a stub here. Its `status=done pr=<url>` is set at ship, once
-   the PR exists.
+7. Commit the task by SHIP's atomic-commit rules; every commit builds and passes its tests, so a
+   file a later task fills in starts as a stub here. Ship then commits only what is left; its
+   `status=done pr=<url>` is set there, once the PR exists.
 
 The branch ships as one PR, or two when a skeleton/CI task ships first as its own PR so CI
 exists on the base before the rest.

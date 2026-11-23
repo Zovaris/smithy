@@ -1,6 +1,6 @@
 # Harness adapters
 
-The only file in these skills that names vendor tools. The loop uses five operations;
+The only file in these skills that names vendor tools. The loop uses the operations below;
 `smithy harness` prints the adapter (`any`, `cli` or `desktop`). If you clearly have tools it
 didn't detect, use the matching row. State lives in the batch dir and git, so any harness can
 pick up a batch. Always render the brief (`smithy brief <batch> <id>`, writing `<batch-dir>/<id>.brief.md`)
@@ -16,8 +16,8 @@ before spawning: a respawn reuses it; a relaunch renders it again (`references/a
 | **end** worker | `kill <pid>` if alive |
 | auto-end on PR close | none: the final message says to run warden cleanup |
 | worker closing line | the card's `note` |
-| **channel line** (the brief's `<warden channel>`) | "Put it in the card's note." |
-| **subagent** (short read-only job, or a fallback worker) | the harness's own subagent tool; none: `smithy agent --readonly [--model <m>] <prompt-file>` |
+| **channel line** (the brief's `{{channel}}`) | "Put it in the card's note." |
+| **subagent** (short read-only job, or a fallback worker) | the harness's own subagent tool; none: `smithy agent --readonly [--model <m>] <prompt-file>` for a read-only job (no worker fallback: tell the user and stop) |
 
 `smithy agent` picks the installed CLI (`AGENT_CLI`, or `AGENT_CMD` for any other command, with no
 unattended flags added) and adds its unattended flags. Workers get `WARDEN_HARNESS` set.
@@ -27,8 +27,8 @@ Headless workers are one-shot and can't receive messages mid-run:
   from what exists.
 - Record `pid` and `log` in the item; `kill -0 <pid>` tells if it is alive. A dead pid with a
   non-final card is `stuck`.
-- No PR auto-fix: on each wake `smithy verify` the `pr_open` items; respawn a red one with
-  "fix CI on <pr>" in its inbox.
+- No PR auto-fix: on each wake `smithy verify` the `pr_open` items; a red one follows
+  `references/acting.md` (verify): tend when installed, else respawn with "fix CI on <pr>" in its inbox.
 
 ## Subagent workers (fallback)
 
