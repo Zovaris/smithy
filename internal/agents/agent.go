@@ -91,10 +91,13 @@ func AutoTools(smithy []string) []string {
 	for _, g := range []string{"pr create", "pr view", "pr checks", "pr list", "pr comment", "pr diff", "issue view", "issue comment", "run view", "run list"} {
 		t = append(t, "Bash(gh "+g+" *)")
 	}
-	t = append(t, "Bash(ls)", "Bash(ls *)", "Bash(pwd)", "Bash(go test *)", "Bash(go vet *)", "Bash(npm test *)", "Bash(npm run test *)")
+	for _, c := range []string{"ls", "pwd", "cat", "head", "tail", "wc", "grep", "rg", "find", "which", "echo", "cd", "sort", "uniq", "diff", "test", "true", "sed -n", "basename", "dirname", "realpath", "date", "jq"} {
+		t = append(t, "Bash("+c+")", "Bash("+c+" *)")
+	}
+	t = append(t, "Bash(go test *)", "Bash(go vet *)", "Bash(go build *)", "Bash(gofmt -l *)", "Bash(go fmt *)", "Bash(npm test *)", "Bash(npm run test *)")
 	for _, b := range smithy {
 		if filepath.IsAbs(b) {
-			t = append(t, "Bash("+b+" *)")
+			t = append(t, "Bash("+b+" *)", "Bash('"+b+"' *)", "Bash(\""+b+"\" *)")
 		}
 	}
 	return t
@@ -109,7 +112,10 @@ func AutoDenied(smithy []string) []string {
 		"Bash(git * --upload-pack*)", "Bash(git * --receive-pack*)", "Bash(git * --exec*)", "Bash(git * --repo*)", "Bash(git * --output*)",
 		"Bash(git push * http*)", "Bash(git push * git@*)", "Bash(git push * ssh*)", "Bash(git push * file*)", "Bash(git checkout * -- /*)",
 		// every shell redirect and tee: workers write files with Edit/Write, never through the shell
-		"Bash(*>*)", "Bash(* | tee *)", "Bash(*|tee *)"}
+		"Bash(*>*)", "Bash(* | tee *)", "Bash(*|tee *)",
+		// shell readers must not reach the secrets the Read rules protect
+		"Bash(*auth.json*)", "Bash(*.ssh*)", "Bash(*.config/gh*)", "Bash(*.aws*)", "Bash(*.netrc*)", "Bash(*.git-credentials*)",
+		"Bash(find * -exec*)", "Bash(find * -delete*)", "Bash(sed -n *w *)"}
 	for _, b := range smithy {
 		if filepath.IsAbs(b) {
 			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config set *)", "Bash("+b+" config set-model *)")
@@ -296,6 +302,7 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if o.Profile == "auto" && !o.ReadOnly {
 			a = append(append(a, "--allowedTools"), AutoTools(o.SmithyBins)...)
 			a = append(append(a, "--disallowedTools"), AutoDenied(o.SmithyBins)...)
+			a = append(a, "--append-system-prompt", AutoNote)
 			for _, d := range o.AddDirs {
 				a = append(a, "--add-dir", d)
 			}
@@ -761,3 +768,10 @@ func AutoDirs(bins []string) []string {
 	}
 	return out
 }
+
+// AutoNote tells an unattended agent how to live with the allow-list instead of giving up.
+const AutoNote = "Unattended run: shell access is limited by policy. If a command is denied, " +
+	"use the Read, Grep and Glob tools for files, split chained commands into single ones, and " +
+	"use smithy commands (smithy worktree add, smithy commit, smithy pr) instead of raw git or gh " +
+	"where they exist. Report blocked only when a git, gh, test or smithy step your task needs " +
+	"is denied in its simplest form."
