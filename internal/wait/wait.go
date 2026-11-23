@@ -728,7 +728,8 @@ Targets (any mix):
   alerts              a new open Dependabot alert (skipped, with a note, without read access)
                       actions and alerts already there on the first run are recorded, not reported
   timer:<minutes>     fires after the minutes (exit 0, "timer: <m>m elapsed"); alone, no GitHub;
-                      the ask timeout: smithy wait timer:$(smithy config get ask.timeout)
+                      the ask timeout: smithy wait timer:$(smithy config get ask.timeout), minimum 0.05;
+                      when ask.timeout is 0 skip the timer (wait for the answer)
   watch[:<scopes>]    tend's watch mode; scopes is a comma list of prs, issues, actions, base,
                       alerts, or all (default tend.watch; issue label from tend.label)
 Finished checks are reported at once. Exit 0 = events, 4 = heartbeat, 2 = bad target, 3 = no GitHub access (gh missing or signed out and no GH_TOKEN).

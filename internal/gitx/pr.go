@@ -16,7 +16,9 @@ const prUsage = `Pull requests that follow the repo's PR template.
   smithy pr template                        print the template path(s), or a line starting 'none:' when the repo has none
   smithy pr create --base <b> --title "<t>" --body-file <f> [--draft]
                                             open the PR for the current branch, or print the open one;
-                                            without gh or GH_TOKEN, push and print the compare URL
+                                            without gh or GH_TOKEN, push and print the compare URL;
+                                            exit 3 when origin is not a GitHub remote (no PR opened,
+                                            branch not pushed)
   smithy pr merge <pr> [--rebase|--merge|--squash]
                                             merge a PR (default --merge) with gh or the GitHub API
 With a template, the body must keep every heading of the template (fill them, write "N/A" when
