@@ -192,6 +192,36 @@ func (r *report) bad(msg, fix string) {
 	r.failed = true
 }
 
+// BinaryVersion is the running binary's version, set by main.
+var BinaryVersion = "dev"
+
+// InstallCmd is the line the user (or the agent, on the user's yes) runs to install a version.
+func InstallCmd(v string) string {
+	return "curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s " + v
+}
+
+// SkillsVersion is the VERSION file next to the launcher that started this binary, if any.
+func SkillsVersion() string {
+	d := os.Getenv("SMITHY_SKILL_DIR")
+	if d == "" {
+		return ""
+	}
+	b, err := os.ReadFile(filepath.Join(d, "VERSION"))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(b))
+}
+
+// VersionHint names a binary/skills version mismatch, or "" when they match or either is unknown.
+func VersionHint() string {
+	sv := SkillsVersion()
+	if sv == "" || sv == "dev" || BinaryVersion == "dev" || sv == BinaryVersion {
+		return ""
+	}
+	return "smithy: binary v" + BinaryVersion + " but skills v" + sv + "; ask the user to install v" + sv + ": " + InstallCmd(sv)
+}
+
 func have(name string) bool { _, err := exec.LookPath(name); return err == nil }
 
 type claudeSettings struct {
@@ -244,6 +274,11 @@ func Doctor(args []string) int {
 	r := &report{quiet: len(args) > 0 && args[0] == "--quiet"}
 	if !r.quiet {
 		fmt.Println("warden doctor")
+	}
+	if sv := SkillsVersion(); VersionHint() != "" {
+		r.bad("binary v"+BinaryVersion+" does not match skills v"+sv, "ask the user, then: "+InstallCmd(sv))
+	} else if BinaryVersion != "dev" {
+		r.ok("binary v" + BinaryVersion)
 	}
 	if have("git") {
 		r.ok("git found")

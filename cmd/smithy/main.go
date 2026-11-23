@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/Zovaris/smithy/internal/warden"
 	"io"
 	"os"
 	"path/filepath"
@@ -207,6 +208,7 @@ func usage(w io.Writer) {
 }
 
 func main() {
+	warden.BinaryVersion = version
 	if len(os.Args) < 2 {
 		usage(os.Stderr)
 		os.Exit(2)
@@ -223,6 +225,9 @@ func main() {
 	c, ok := commands[name]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "unknown command %s\n", name)
+		if hint := warden.VersionHint(); hint != "" {
+			fmt.Fprintln(os.Stderr, hint)
+		}
 		usage(os.Stderr)
 		os.Exit(2)
 	}

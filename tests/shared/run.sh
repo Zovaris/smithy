@@ -166,7 +166,7 @@ t "harness ignores CODEX_HOME" '[ "$(env -i PATH=/usr/bin:/bin CODEX_HOME=/x SMI
 t "smithy agent pipes prompt to AGENT_CMD" '[ "$(AGENT_CMD=cat $S/smithy agent "$T/p.md")" = hi ]'
 
 # launcher download failures (copied away from the checkout so it can't build)
-L="$T/launch"; mkdir -p "$L/curl" "$L/gh"; cp "$S/smithy" "$L/smithy"; echo 0.0.0 > "$L/VERSION"
+L="$T/launch"; mkdir -p "$L/curl" "$L/gh"; cp "$S/../install.sh" "$L/install.sh"; cp "$S/smithy" "$L/smithy"; echo 0.0.0 > "$L/VERSION"
 printf '#!/bin/sh\necho "$@" > "%s/curl.args"\necho "curl: (22) The requested URL returned error: 404" >&2\nexit 22\n' "$L" > "$L/curl/curl"
 printf '#!/bin/sh\necho "release not found" >&2\nexit 1\n' > "$L/gh/gh"
 chmod +x "$L/curl/curl" "$L/gh/gh"
@@ -174,10 +174,10 @@ mkdir -p "$L/sys"
 for p in /bin/* /usr/bin/*; do
   n=${p##*/}; [ "$n" = gh ] || [ "$n" = curl ] || [ -e "$L/sys/$n" ] || ln -s "$p" "$L/sys/$n"
 done
-LR() { env -u SMITHY_BIN SMITHY_HOME="$L/home" PATH="$1:$L/sys" "$L/smithy" version 2>"$L/err"; }
-t "launcher: curl 404 exits 3 with one line" 'LR "$L/curl"; [ $? -eq 3 ] && [ "$(wc -l < "$L/err")" -eq 2 ] && grep -q "^smithy: can.t download v0.0.0 (smithy-.*\.gz): .*404" "$L/err" && ! grep -q awk "$L/err"'
-t "launcher: curl has timeouts" 'grep -q -- "--connect-timeout 10 --max-time 120" "$L/curl.args"'
-t "launcher: gh failure exits 3 with one line" 'LR "$L/gh"; [ $? -eq 3 ] && grep -q "^smithy: can.t download v0.0.0 (smithy-.*\.gz): release not found" "$L/err" && ! grep -q awk "$L/err"'
+LR() { env -u SMITHY_BIN SMITHY_HOME="$L/home" PATH="$1:$L/sys" "$L/install.sh" 0.0.0 2>"$L/err"; }
+t "install.sh: curl 404 exits 3 with one line" 'LR "$L/curl"; [ $? -eq 3 ] && [ "$(wc -l < "$L/err")" -eq 2 ] && grep -q "^smithy install: can.t download v0.0.0 (smithy-.*\.gz): .*404" "$L/err" && ! grep -q awk "$L/err"'
+t "install.sh: curl has timeouts" 'grep -q -- "--connect-timeout 10 --max-time 120" "$L/curl.args"'
+t "install.sh: gh failure exits 3 with one line" 'LR "$L/gh"; [ $? -eq 3 ] && grep -q "^smithy install: can.t download v0.0.0 (smithy-.*\.gz): release not found" "$L/err" && ! grep -q awk "$L/err"'
 
 # launcher watchdog: a hanging gh is stopped (SMITHY_DOWNLOAD_TIMEOUT shortens the wait)
 mkdir -p "$L/hang" "$L/slowatt" "$L/okgh" "$L/tmp"
@@ -195,10 +195,10 @@ fi
 exit 0
 EOF
 cp "$L/fakegh" "$L/slowatt/gh"; cp "$L/fakegh" "$L/okgh/gh"; chmod +x "$L/hang/gh" "$L/slowatt/gh" "$L/okgh/gh"
-LW() { env -u SMITHY_BIN SMITHY_HOME="$L/home$2" TMPDIR="$L/tmp" SMITHY_DOWNLOAD_TIMEOUT=1 HANG_ATTEST="$3" PATH="$1:$L/sys" "$L/smithy" version 2>"$L/err"; }
-t "launcher: hanging gh download times out with exit 3" 's=$(date +%s); LW "$L/hang" a ""; c=$?; [ $c -eq 3 ] && [ $(( $(date +%s) - s )) -lt 10 ] && grep -q "^smithy: can.t download v0.0.0 (smithy-.*\.gz): timed out" "$L/err"'
-t "launcher: hanging attestation times out with exit 3" 'LW "$L/slowatt" b 1; [ $? -eq 3 ] && grep -q "^smithy: can.t verify .*timed out" "$L/err"'
-t "launcher: install leaves no temp dir" 'rm -rf "$L/tmp"/*; [ "$(LW "$L/okgh" c "")" = fake-smithy ] && [ -z "$(ls "$L/tmp")" ]'
+LW() { env -u SMITHY_BIN SMITHY_HOME="$L/home$2" TMPDIR="$L/tmp" SMITHY_DOWNLOAD_TIMEOUT=1 HANG_ATTEST="$3" PATH="$1:$L/sys" "$L/install.sh" 0.0.0 2>"$L/err" && env -u SMITHY_BIN SMITHY_HOME="$L/home$2" "$L/smithy" version; }
+t "install.sh: hanging gh download times out with exit 3" 's=$(date +%s); LW "$L/hang" a ""; c=$?; [ $c -eq 3 ] && [ $(( $(date +%s) - s )) -lt 10 ] && grep -q "^smithy install: can.t download v0.0.0 (smithy-.*\.gz): timed out" "$L/err"'
+t "install.sh: hanging attestation times out with exit 3" 'LW "$L/slowatt" b 1; [ $? -eq 3 ] && grep -q "^smithy install: can.t verify .*timed out" "$L/err"'
+t "install.sh: install leaves no temp dir" 'rm -rf "$L/tmp"/*; [ "$(LW "$L/okgh" c "")" = fake-smithy ] && [ -z "$(ls "$L/tmp")" ]'
 
 # launcher without gh: curl download, refused unless SMITHY_ALLOW_UNATTESTED=1
 mkdir -p "$L/nogh" "$L/nogh-bad"
@@ -217,12 +217,19 @@ case $f in
 esac
 EOF
 cp "$L/fakecurl" "$L/nogh/curl"; cp "$L/fakecurl" "$L/nogh-bad/curl"; chmod +x "$L/nogh/curl" "$L/nogh-bad/curl"
-LN() { env -u SMITHY_BIN -u SMITHY_ALLOW_UNATTESTED SMITHY_HOME="$L/home$2" TMPDIR="$L/tmp" BAD_SUM="$3" PATH="$1:$L/sys" "$L/smithy" version 2>"$L/err"; }
-t "launcher: no gh refuses an unattested install" 'LN "$L/nogh" d ""; [ $? -eq 3 ] && grep -q "can.t verify the build attestation" "$L/err" && [ ! -e "$L/home"d/bin/0.0.0/smithy ]'
-LA() { env -u SMITHY_BIN SMITHY_ALLOW_UNATTESTED=1 SMITHY_HOME="$L/home$2" TMPDIR="$L/tmp" BAD_SUM="$3" PATH="$1:$L/sys" "$L/smithy" version 2>"$L/err"; }
-t "launcher: no gh + SMITHY_ALLOW_UNATTESTED=1 installs on checksum with one warning" '[ "$(LA "$L/nogh" f "")" = fake-smithy ] && [ "$(grep -c "installing on checksum only" "$L/err")" -eq 1 ]'
-t "launcher: no gh, second run is silent" '[ "$(LA "$L/nogh" f "")" = fake-smithy ] && ! grep -q "checksum only" "$L/err"'
-t "launcher: no gh + bad checksum refuses" 'LN "$L/nogh-bad" e 1; [ $? -eq 3 ] && grep -q "checksum mismatch" "$L/err" && [ ! -e "$L/home"e/bin/0.0.0/smithy ]'
-t "launcher: no gh + empty checksums.txt refuses" 'LN "$L/nogh-bad" g empty; [ $? -eq 3 ] && [ ! -e "$L/home"g/bin/0.0.0/smithy ]'
+LN() { env -u SMITHY_BIN -u SMITHY_ALLOW_UNATTESTED SMITHY_HOME="$L/home$2" TMPDIR="$L/tmp" BAD_SUM="$3" PATH="$1:$L/sys" "$L/install.sh" 0.0.0 2>"$L/err" && env -u SMITHY_BIN SMITHY_HOME="$L/home$2" "$L/smithy" version; }
+t "install.sh: no gh refuses an unattested install" 'LN "$L/nogh" d ""; [ $? -eq 3 ] && grep -q "can.t verify the build attestation" "$L/err" && [ ! -e "$L/home"d/bin/0.0.0/smithy ]'
+LA() { env -u SMITHY_BIN SMITHY_ALLOW_UNATTESTED=1 SMITHY_HOME="$L/home$2" TMPDIR="$L/tmp" BAD_SUM="$3" PATH="$1:$L/sys" "$L/install.sh" 0.0.0 2>"$L/err" && env -u SMITHY_BIN SMITHY_HOME="$L/home$2" "$L/smithy" version; }
+t "install.sh: no gh + SMITHY_ALLOW_UNATTESTED=1 installs on checksum with one warning" '[ "$(LA "$L/nogh" f "")" = fake-smithy ] && [ "$(grep -c "installing on checksum only" "$L/err")" -eq 1 ]'
+t "launcher: installed binary runs silently" '[ "$(env -u SMITHY_BIN SMITHY_HOME="$L/homef" "$L/smithy" version 2>"$L/err")" = fake-smithy ] && [ ! -s "$L/err" ]'
+t "install.sh: no gh + bad checksum refuses" 'LN "$L/nogh-bad" e 1; [ $? -eq 3 ] && grep -q "checksum mismatch" "$L/err" && [ ! -e "$L/home"e/bin/0.0.0/smithy ]'
+t "install.sh: no gh + empty checksums.txt refuses" 'LN "$L/nogh-bad" g empty; [ $? -eq 3 ] && [ ! -e "$L/home"g/bin/0.0.0/smithy ]'
 
+t "install.sh: rejects a bad version" 'env -u SMITHY_BIN SMITHY_HOME="$L/bad" PATH="$L/sys" "$L/install.sh" "../x" 2>"$L/err"; [ $? -eq 3 ] && grep -q "bad version" "$L/err"'
+# launcher never downloads: no binary → exit 3 naming the install page
+LM() { env -u SMITHY_BIN SMITHY_HOME="$L/empty$1" PATH="$L/curl:$L/sys" "$L/smithy" version 2>"$L/err"; }
+t "launcher: missing binary exits 3, no download" 'rm -f "$L/curl.args"; LM a; [ $? -eq 3 ] && grep -q "not installed; the smithy skills need it" "$L/err" && [ ! -e "$L/curl.args" ]'
+t "launcher: falls back to ~/.smithy/bin/smithy with a notice" 'mkdir -p "$L/emptyb/bin"; ln -sfn "$L/homef/bin/0.0.0/smithy" "$L/emptyb/bin/smithy"; echo 9.9.9 > "$L/VERSION"; [ "$(LM b)" = fake-smithy ] && grep -q "v9.9.9 is not installed; using" "$L/err"'
+echo 0.0.0 > "$L/VERSION"
+t "skills contain no download commands" '! grep -rlE "gh release download|releases/download" "$S/../skills"'
 echo "shared: $pass passed, $fail failed"; [ $fail -eq 0 ]
