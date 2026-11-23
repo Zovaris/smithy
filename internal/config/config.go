@@ -30,7 +30,7 @@ var Known = []Setting{
 	{"git.worktree", "{parent}/worktrees/{repo}-{branch}", "smelt warden tend", "worktree path template ({branch} with / as -)"},
 	{"tasks.ignore", "ask", "smelt plan", "with tasks.commit false: gitignore (commit a .gitignore line) or exclude (local .git/info/exclude)"},
 	{"warden.merge", "ask", "warden", "auto: warden merges green PRs (workers never do); manual: warden lists green PRs for the user; unset: warden asks per batch"},
-	{"warden.cleanup", "auto", "warden", "auto: end finished workers and remove worktrees and local branches without asking"},
+	{"warden.cleanup", "auto", "warden", "auto: end finished workers and remove worktrees and local branches without asking; ask: warden asks before ending them"},
 	{"warden.max", "5", "warden", "parallel workers (a token-cost cap)"},
 	{"warden.mode", "smelt normal", "warden", "batch check speed: smelt fast, smelt normal, smelt full or plain"},
 	{"warden.stuck_minutes", "15", "warden", "minutes without a worker heartbeat (cards beat or cards set) before its item is stuck"},
@@ -404,7 +404,8 @@ func Normalize(key, value string) (string, string, error) {
 		return v, "", nil
 	}
 	if key != "agent.effort" {
-		return value, "", nil
+		v, err := typed(key, value)
+		return v, "", err
 	}
 	switch v := strings.ToLower(strings.TrimSpace(value)); v {
 	case "low", "medium":
@@ -536,16 +537,13 @@ func Main(args []string) int {
 		}
 		fmt.Println(v)
 	case "set", "unset":
-		rest, file := args[1:], UserFile()
+		rest, repo := args[1:], false
 		if len(rest) > 0 && rest[0] == "--repo" {
-			if file = RepoFile(); file == "" {
-				fmt.Fprintln(os.Stderr, "not in a git repo")
+			if _, err := scopeFile(true); err != nil {
+				fmt.Fprintln(os.Stderr, err)
 				return 2
 			}
-			if strings.HasSuffix(file, filepath.Join(".agents", "config.json")) {
-				file = filepath.Join(filepath.Dir(filepath.Dir(file)), ".smithy", "config.json")
-			}
-			rest = rest[1:]
+			rest, repo = rest[1:], true
 		}
 		if args[0] == "unset" {
 			if len(rest) != 1 {
@@ -556,7 +554,7 @@ func Main(args []string) int {
 				fmt.Fprintln(os.Stderr, err)
 				return 2
 			}
-			ok, err := Unset(file, rest[0])
+			file, ok, err := Remove(repo, rest[0])
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return 1
@@ -576,20 +574,19 @@ func Main(args []string) int {
 			fmt.Fprintln(os.Stderr, err)
 			return 2
 		}
-		val, note, err := Normalize(rest[0], rest[1])
-		if err != nil {
+		if _, _, err := Normalize(rest[0], rest[1]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 2
 		}
+		file, val, note, err := Apply(repo, rest[0], rest[1])
 		if note != "" {
 			fmt.Fprintln(os.Stderr, note)
 		}
-		rest[1] = val
-		if err := Set(file, rest[0], rest[1]); err != nil {
+		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
-		fmt.Printf("saved %s = %s (%s)\n", rest[0], rest[1], file)
+		fmt.Printf("saved %s = %s (%s)\n", rest[0], val, file)
 	case "migrate":
 		moved := Migrate()
 		if len(moved) == 0 {

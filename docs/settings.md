@@ -23,7 +23,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `tasks.ignore` | ask (no default: asked once when `tasks.commit` is false) | `gitignore`: a committed `.gitignore` line; `exclude`: `.git/info/exclude` (this machine only). |
 | `tasks.location` | `repo` | `repo`, `local` (`~/.smithy/plans`) or `board`. |
 | `warden.merge` | unset (warden asks once per batch) | Merge mode only. Unset: warden asks once per batch in its plan line (auto or manual); `auto`: warden merges green PRs (workers never merge); `manual`: warden lists each green PR for you. A value you save counts as your words, except for the production branch (use-smithy **Merges**: only your yes). |
-| `warden.cleanup` | `auto` | End finished workers and remove their worktrees and branches without asking. |
+| `warden.cleanup` | `auto` | End finished workers and remove their worktrees and branches without asking; `ask`: warden asks before ending them. |
 | `warden.stuck_minutes` | `15` | Minutes without a worker heartbeat before a working item counts as stuck. |
 | `warden.max` / `warden.mode` | `5` / `smelt normal` | Parallel workers; the speed of the one check wave warden runs on the whole batch (`smelt fast`, `smelt normal`, `smelt full`) or `plain`. Workers always build at `fast`. |
 | `tend.watch` / `tend.label` | `prs` / `agent` | What `/tend watch` follows (comma list of `prs`, `issues`, `actions`, `base`, `alerts`, or `all`); the issue label it may queue. |

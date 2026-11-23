@@ -764,7 +764,7 @@ func TestSystemView(t *testing.T) {
 	nm, _ := m.Update(cmd())
 	m = nm.(Model)
 	out := ansi.Strip(m.render())
-	for _, want := range []string{"Versions", "Doctor", "auto.*", "linear.*", "warden.*", "****9f2c", "events.jsonl", "Read-only"} {
+	for _, want := range []string{"Versions", "Doctor", "auto.*", "linear.*", "warden.*", "****9f2c", "events.jsonl", "enter edits"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("System lacks %q", want)
 		}
@@ -780,7 +780,7 @@ func TestSystemView(t *testing.T) {
 	if len(s.Doctor) != 0 {
 		t.Fatal("loadSystem ran a binary that is not smithy")
 	}
-	if len(s.Settings) == 0 || !strings.HasPrefix(s.Settings[0][0], "auto.") {
+	if len(s.Settings) == 0 || !strings.HasPrefix(s.Settings[0].Key, "auto.") {
 		t.Fatalf("settings = %v", s.Settings)
 	}
 }

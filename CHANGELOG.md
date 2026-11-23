@@ -5,6 +5,17 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: edit settings from `smithy tui` System view. Every known key plus the harness's models,
+  grouped, with value, source and meaning; enter opens a typed input (bool/enum choice, number,
+  list, text), a confirm step shows old → new and the scope (tab: user or repo), `u` unsets back to
+  the default. Writes go through `config.Apply`/`config.Remove`, the same path as
+  `smithy config set|unset`; secret-valued keys are locked (auth stays in `smithy auth`); demo mode
+  only says the command it would run.
+- Changed: `smithy config set` validates typed keys the way the code reads them: booleans
+  (`auto.paused`, `decide.enabled`), whole numbers (`warden.max`, `auto.every` at least 1), non-negative
+  numbers (`watch.every`, `auto.session_hours`, `auto.max_cost_per_day`, …) and choices (`auto.mode`, `warden.merge`,
+  `warden.mode`, `tasks.location`, …); comma lists are trimmed.
+
 - Added: token use and cost per run. `smithy agent` runs Claude Code with `--output-format json`,
   then turns the log back into the plain answer and writes `<log>.usage.json` (input, output,
   cache read/write tokens, `cost_usd` from `total_cost_usd`) plus a `usage` event. `smithy cards

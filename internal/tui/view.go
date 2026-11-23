@@ -131,6 +131,8 @@ func (m Model) render() string {
 		over = m.textBox()
 	case m.helpOpen:
 		over = m.helpBox(w, h)
+	case m.edit != nil:
+		over = m.editBox(w)
 	case m.modal:
 		over = m.modalBox(w, h-tabY-2)
 	}
@@ -218,9 +220,13 @@ func (m Model) body() []*lipgloss.Layer {
 	if v == vSystem {
 		_, _, b, _ := m.frame()
 		lw := b.w / 2
-		l, r := m.systemLines(lw - 4)
 		lr, rr := rect{b.x, b.y, lw, b.h}, rect{b.x + lw, b.y, b.w - lw, b.h}
-		return []*lipgloss.Layer{layer(m.box("Health", "read-only", false, nil, lr, l), lr), layer(m.box("Settings", "auto · linear · warden", false, nil, rr, r), rr)}
+		l, r := m.systemLines(lw-4, rr.w-4, rr.h-2)
+		badge := "enter edits"
+		if m.sys != nil {
+			badge = fmt.Sprint(len(m.sys.Settings)) + " " + t.g.dot + " enter edits"
+		}
+		return []*lipgloss.Layer{layer(m.box("Health", "read-only", false, nil, lr, l), lr), layer(m.box("Settings", badge, true, nil, rr, r), rr)}
 	}
 	ps := m.panes()
 	var out []*lipgloss.Layer
@@ -573,6 +579,8 @@ func (m Model) footer(w int) string {
 	switch {
 	case m.textOpen:
 		left = kst.Render("↑↓ pgup pgdn") + " " + lbl.Render("scroll") + "  " + render([]key.Binding{keys.Close})
+	case m.edit != nil:
+		left = lbl.Render("editing " + m.edit.set.Key)
 	case m.modal:
 		left = render(m.actionKeys())
 	default:
@@ -656,7 +664,7 @@ func (m Model) helpBox(w, h int) string {
 	k, l := t.fg(t.accent), t.fg(t.muted)
 	lines := []string{t.fg(t.accent).Bold(true).Render("smithy tui " + t.g.dot + " help"), ""}
 	for _, b := range []key.Binding{keys.Next, keys.Prev, keys.Jump, keys.Up, keys.Left, keys.Enter, keys.Close, keys.Open,
-		keys.Log, keys.Copy, keys.Cmd, keys.Accept, keys.Reject, keys.Sort, keys.Type, keys.Pause, keys.Filter, keys.Refresh, keys.Help, keys.Quit} {
+		keys.Log, keys.Copy, keys.Cmd, keys.Accept, keys.Reject, keys.Unset, keys.Sort, keys.Type, keys.Pause, keys.Filter, keys.Refresh, keys.Help, keys.Quit} {
 		lines = append(lines, k.Render(fmt.Sprintf("%-9s", b.Help().Key))+l.Render(b.Help().Desc))
 	}
 	lines = append(lines, k.Render(fmt.Sprintf("%-9s", "mouse"))+l.Render("click a tab or a row, double-click opens, wheel moves"), "")

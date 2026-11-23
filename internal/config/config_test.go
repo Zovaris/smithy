@@ -399,11 +399,11 @@ func TestMainSetRepoLegacyRedirect(t *testing.T) {
 	gitInit(t, e.repo)
 	old := filepath.Join(e.repo, ".agents", "config.json")
 	write(t, old, `{"warden":{"max":9}}`)
-	_, _, code := capture(t, func() int { return Main([]string{"set", "--repo", "warden.cleanup", "manual"}) })
+	_, _, code := capture(t, func() int { return Main([]string{"set", "--repo", "warden.cleanup", "ask"}) })
 	if code != 0 {
 		t.Fatal(code)
 	}
-	if got, _ := readKey(filepath.Join(e.repo, ".smithy", "config.json"), "warden.cleanup"); got != "manual" {
+	if got, _ := readKey(filepath.Join(e.repo, ".smithy", "config.json"), "warden.cleanup"); got != "ask" {
 		t.Fatalf("got %q", got)
 	}
 	if b, _ := os.ReadFile(old); strings.Contains(string(b), "cleanup") {
