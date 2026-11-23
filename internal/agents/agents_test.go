@@ -516,7 +516,13 @@ func TestConsultModelUsesTheCLIsOwnHarness(t *testing.T) {
 
 func TestConsultPromptEscalatesOnlyTheHardFloor(t *testing.T) {
 	p := ConsultPrompt("Cap amount digits?", "18, 28", "")
-	if !strings.Contains(p, "ESCALATE: <why> only when") || !strings.Contains(p, "moves or charges real money") || strings.Contains(p, "product owner") {
+	for _, want := range []string{"ESCALATE: <why> only when", "production branch", "irreversibly rewrites user data",
+		"credentials, secrets or logins", "moves or charges real money"} {
+		if !strings.Contains(p, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	if strings.Contains(p, "product owner") {
 		t.Fatalf("prompt:\n%s", p)
 	}
 }

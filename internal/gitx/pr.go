@@ -152,10 +152,13 @@ func PRMain(args []string) int {
 			return die(p, "body drops template headings from %s: %s", rel, strings.Join(miss, "|"))
 		}
 	}
-	// The push's output (GitHub's "Create a pull request" hint) only shows on failure: the PR URL
-	// printed below is the one to use.
-	if out, err := exec.Command("git", "push", "-q", "-u", "origin", branch).CombinedOutput(); err != nil {
-		os.Stderr.Write(out)
+	// GitHub's "Create a pull request for ..." hint is dropped (the PR URL printed below is the one
+	// to use); every other line of the push's output is kept.
+	push := exec.Command("git", "push", "-q", "-u", "origin", branch)
+	push.Stdin = os.Stdin
+	out, err := push.CombinedOutput()
+	os.Stderr.WriteString(withoutPRHint(string(out)))
+	if err != nil {
 		return code(err)
 	}
 	if ghx.Mode() == "none" {
@@ -200,4 +203,29 @@ func prMerge(args []string) int {
 	}
 	fmt.Println("merged " + ref)
 	return 0
+}
+
+// withoutPRHint drops the remote's "Create a pull request" hint block from git push output.
+func withoutPRHint(out string) string {
+	var keep []string
+	skip := false
+	for _, l := range strings.SplitAfter(out, "\n") {
+		t := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(l), "remote:"))
+		switch {
+		case strings.HasPrefix(t, "Create a pull request for"):
+			skip = true
+			continue
+		case skip && strings.HasPrefix(t, "https://"):
+			skip = false
+			continue
+		case skip && t == "":
+			continue
+		}
+		skip = false
+		if t == "" && strings.HasPrefix(strings.TrimSpace(l), "remote:") {
+			continue
+		}
+		keep = append(keep, l)
+	}
+	return strings.Join(keep, "")
 }

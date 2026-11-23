@@ -33,8 +33,8 @@ func ConsultPrompt(q, o, ctx string) string {
 	}
 	b.WriteString("Pick one option and give the reason in at most 5 lines. If none fits or you need more\n")
 	b.WriteString("information, answer NEED-INFO: <what>. Answer ESCALATE: <why> only when the choice itself\n")
-	b.WriteString("merges or deploys to production, deletes or irreversibly rewrites user data, handles real\n")
-	b.WriteString("credentials or secrets, or moves or charges real money; code that only computes money,\n")
+	b.WriteString("merges or deploys to the production branch, deletes or irreversibly rewrites user data,\n")
+	b.WriteString("handles credentials, secrets or logins, or moves or charges real money; code that only computes money,\n")
 	b.WriteString("security or data is yours to pick (the safest option when unsure).\n")
 	b.WriteString("Do not use tools.\n")
 	return b.String()
