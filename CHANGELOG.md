@@ -31,6 +31,9 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   (the base when it is the default branch, else `false`).
 - Added: `smithy batch set <batch> key=value…` sets `merge`, `production`, `cleanup`, `mode` and
   `base_sha` with validation; warden's docs use it instead of hand edits.
+- Added: worker heartbeat: `smithy cards beat <batch> <id>` (and every `cards set`) stamps
+  `last_beat`; the board shows a `beat` column and `wait batch`'s `stale:` line its age. A working
+  item is stuck after `warden.stuck_minutes` (default 15, was 45 min of no update) without a beat.
 
 - Added: tend `auto` mode (`references/AUTO.md`): waits on `smithy wait auto`, takes the queue
   into a task dir, runs warden on it with batch values pre-answered and reports each issue

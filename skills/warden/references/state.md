@@ -36,7 +36,8 @@ An `auto-*` task dir (tend auto) comes pre-answered: merge from `auto.merge`, ea
 Fields: `state`, `phase`, `progress` (`3/7`, the worker's own task list), `branch`, `pr`, `ci`,
 `decision_key`, `question`, `options`, `recommendation`, `impact` (`impact_by=decide` when the
 decision model raised it), `tests_run`, `risks`,
-`review_rounds`, `security` (risky items: `ran` or `not-run:<reason>`), `note`.
+`review_rounds`, `security` (risky items: `ran` or `not-run:<reason>`), `note`, `last_beat`
+(heartbeat: `smithy cards beat <batch> <id>` or any `cards set`).
 
 | State | Meaning |
 |---|---|
@@ -49,8 +50,8 @@ decision model raised it), `tests_run`, `risks`,
 | `merged` · `reported` · `dropped` | Final: PR merged, scout report written, nothing to do |
 
 `smithy cards board` adds a **stage** per item (what you do with it): `waiting`, `working`, `decide`
-(needs_decision), `verify` (pr_open, ready), `stuck` (blocked, failed, or working with no update
-for 45 min), `merged`, `reported`, `dropped`, and `held` / `queued` / `starting` for items without
+(needs_decision), `verify` (pr_open, ready), `stuck` (blocked, failed, or working with no
+`last_beat` for `warden.stuck_minutes`, default 15), `merged`, `reported`, `dropped`, and `held` / `queued` / `starting` for items without
 a running worker.
 
 ## Other files

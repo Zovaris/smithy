@@ -33,6 +33,7 @@ var Known = []Setting{
 	{"warden.cleanup", "auto", "warden", "auto: end finished workers and remove worktrees and local branches without asking"},
 	{"warden.max", "5", "warden", "parallel workers (a token-cost cap)"},
 	{"warden.mode", "smelt normal", "warden", "batch check speed: smelt fast, smelt normal, smelt full or plain"},
+	{"warden.stuck_minutes", "15", "warden", "minutes without a worker heartbeat (cards beat or cards set) before its item is stuck"},
 	{"warden.worker_model", "route", "warden", "route: pick cheap/mid/strong per task; session: same model as the parent session; or one model name for every worker"},
 	{"route.domain", "", "smithy route", "comma list of the product's own nouns (secret for a secret scanner) that never count as risk"},
 	{"agent.effort", "medium", "smelt warden scout tend", "reasoning effort for every agent smithy starts: low or medium; anything higher is capped at medium"},

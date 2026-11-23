@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
 )
 
@@ -32,11 +33,42 @@ func Home() string {
 	return filepath.Join(ghx.Home(), "warden")
 }
 
+// staleMin is the minutes without a heartbeat before a working item is stuck:
+// $WARDEN_STALE_MIN, else warden.stuck_minutes, else 15.
 func staleMin() float64 {
 	if v, err := strconv.ParseFloat(os.Getenv("WARDEN_STALE_MIN"), 64); err == nil {
 		return v
 	}
-	return 45
+	if v, err := strconv.ParseFloat(config.Get("warden.stuck_minutes", "15"), 64); err == nil && v > 0 {
+		return v
+	}
+	return 15
+}
+
+func stampNow() string { return time.Now().UTC().Format("2006-01-02T15:04:05.000Z") }
+
+// Beat stamps last_beat on an existing card without touching updated, so a worker's heartbeat
+// keeps it off the stuck list without waking a batch wait.
+func Beat(batch, id string) error {
+	if !idRe.MatchString(batch) || !idRe.MatchString(id) {
+		return fmt.Errorf("batch and id must match [A-Za-z0-9._-]+")
+	}
+	file := filepath.Join(Home(), batch, id+".json")
+	cur := read(file)
+	if cur == nil {
+		return fmt.Errorf("no card %s in batch %s (%s)", id, batch, file)
+	}
+	cur["last_beat"] = stampNow()
+	return write(file, cur)
+}
+
+func write(file string, cur map[string]any) error {
+	b, _ := json.MarshalIndent(cur, "", "  ")
+	tmp := fmt.Sprintf("%s.%d.tmp", file, os.Getpid())
+	if err := os.WriteFile(tmp, append(b, '\n'), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, file)
 }
 
 func read(file string) map[string]any {
@@ -140,13 +172,9 @@ func Set(batch, id string, pairs []string) (map[string]any, error) {
 			}
 		}
 	}
-	cur["updated"] = time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
-	b, _ := json.MarshalIndent(cur, "", "  ")
-	tmp := fmt.Sprintf("%s.%d.tmp", file, os.Getpid())
-	if err := os.WriteFile(tmp, append(b, '\n'), 0o644); err != nil {
-		return nil, err
-	}
-	return cur, os.Rename(tmp, file)
+	cur["updated"] = stampNow()
+	cur["last_beat"] = cur["updated"]
+	return cur, write(file, cur)
 }
 
 // Row is one board line.
@@ -159,12 +187,24 @@ type Row struct {
 	PR       string  `json:"pr"`
 	CI       string  `json:"ci"`
 	Age      string  `json:"age"`
+	Beat     string  `json:"beat"`
+	LastBeat *string `json:"last_beat"`
 	Updated  *string `json:"updated"`
 	Text     string  `json:"text"`
 }
 
-func ageMin(card map[string]any) (float64, bool) {
-	t, err := time.Parse(time.RFC3339, s(card, "updated"))
+func ageMin(card map[string]any) (float64, bool) { return since(card, "updated") }
+
+// beatMin is the minutes since the worker's last heartbeat (last_beat, else updated).
+func beatMin(card map[string]any) (float64, bool) {
+	if a, ok := since(card, "last_beat"); ok {
+		return a, true
+	}
+	return ageMin(card)
+}
+
+func since(card map[string]any, key string) (float64, bool) {
+	t, err := time.Parse(time.RFC3339, s(card, key))
 	if err != nil {
 		return 0, false
 	}
@@ -205,7 +245,7 @@ func Stage(card, item map[string]any) string {
 	case "merged", "reported", "dropped":
 		return s(card, "state")
 	}
-	if a, ok := ageMin(card); ok && a > staleMin() {
+	if a, ok := beatMin(card); ok && a > staleMin() {
 		return "stuck"
 	}
 	return "working"
@@ -288,6 +328,13 @@ func Rows(batch string) ([]Row, error) {
 				r.Age = fmt.Sprintf("%dm", int(a+0.5))
 			}
 		}
+		r.Beat = "-"
+		if b := s(card, "last_beat"); b != "" {
+			r.LastBeat = &b
+		}
+		if a, ok := beatMin(card); ok {
+			r.Beat = fmt.Sprintf("%dm", int(a+0.5))
+		}
 		rows = append(rows, r)
 	}
 	return rows, nil
@@ -310,10 +357,10 @@ func Board(batch string, asJSON bool) (string, error) {
 		b, _ := json.MarshalIndent(map[string]any{"batch": batch, "items": rows}, "", "  ")
 		return string(b), nil
 	}
-	head := []string{"item", "stage", "state", "phase", "done", "pr", "ci", "age", "question / note"}
+	head := []string{"item", "stage", "state", "phase", "done", "pr", "ci", "age", "beat", "question / note"}
 	table := [][]string{head}
 	for _, r := range rows {
-		table = append(table, []string{r.ID, r.Stage, r.State, r.Phase, r.Progress, r.PR, r.CI, r.Age, r.Text})
+		table = append(table, []string{r.ID, r.Stage, r.State, r.Phase, r.Progress, r.PR, r.CI, r.Age, r.Beat, r.Text})
 	}
 	return "batch " + batch + "\n" + Table(table), nil
 }
@@ -349,6 +396,9 @@ func Table(rows [][]string) string {
 
 const usage = `usage: smithy cards <command>
   set <batch> <id> key=value...          merge into <id>.json (JSON values parsed), stamps updated
+                                         and last_beat
+  beat <batch> <id>                      heartbeat: stamps last_beat only; a working item with no
+                                         beat for warden.stuck_minutes (15) is stuck
   get <batch> <id>                       print one card
   board [batch] [--changed-since <iso>] [--json]   one line per item with its stage; newest batch by default
                                          (--changed-since exits 3 when nothing changed)
@@ -388,6 +438,15 @@ func Main(args []string) int {
 		}
 		b, _ := json.Marshal(cur)
 		fmt.Println(string(b))
+	case "beat":
+		if len(args) != 2 {
+			fmt.Fprintln(os.Stderr, usage)
+			return 2
+		}
+		if err := Beat(args[0], args[1]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 1
+		}
 	case "get":
 		if len(args) != 2 {
 			fmt.Fprintln(os.Stderr, usage)
