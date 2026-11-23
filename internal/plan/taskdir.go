@@ -48,6 +48,10 @@ const (
 // working directory; board reports tasks.location board. An *AskError names an unset setting.
 func TaskDir(slug string) (string, bool, error) { return taskDir(slug, false) }
 
+// TaskDirDefault is TaskDir taking each unset setting's default (named on stderr), for
+// callers with nobody to ask.
+func TaskDirDefault(slug string) (string, bool, error) { return taskDir(slug, true) }
+
 // taskDir is TaskDir; def takes an unset setting's default instead of returning an *AskError.
 func taskDir(slug string, def bool) (dir string, board bool, err error) {
 	effective := func(key, dflt string) (string, error) {
