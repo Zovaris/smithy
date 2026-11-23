@@ -23,9 +23,8 @@ recommendation and the trade-off, not with the choice made.
 
 `smithy config model cheap`:
 - prints a name → use it.
-- exit 3 → ask "Which cheap model should scouts use in this harness?" and save it with
-  `smithy config set-model cheap <name>`. Under hush or when you can't ask, use the session's
-  model and say so in the report.
+- exit 3 → ask once and save it with `smithy config set-model cheap <name>` (use-smithy, Model
+  tiers); under hush or when you can't ask, use the session's model and say so in the report.
 
 Use the strong model (`smithy config model strong`) only when the user asks or the question is about
 security, money or data loss.

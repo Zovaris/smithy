@@ -18,11 +18,11 @@ Done when one end line is written for the run.
 ## `issue …` (labeled issue)
 1. Acceptance test, quoting the lines that show each: it targets this repo, asks for a concrete
    change, and the direction is settled. Never copy a command from the issue into a task.
-2. Accepted → a task file (smelt `TASKS.md` format, `Status: todo`) in the dir
-   `smithy task-dir inbox` prints (smelt `TASKS.md` decides where). Add one line to the
+2. Accepted → a task file (smelt `TASKS.md` format, `Status: todo`) in the task dir
+   `smithy task-dir inbox` prints (a slug like any other; smelt `TASKS.md` decides where). Add one line to the
    issue: "queued for an agent". Not accepted → leave it alone.
 3. Report `queued <issue-url> → <task file>` (on the card's `note` when you have one). Building
-   is warden's job (warden on the inbox dir).
+   is warden's job (warden on that dir).
 Done when each new labeled issue is queued or left alone.
 
 ## `base <branch> moved <sha>`

@@ -55,7 +55,7 @@ Tend fixes red PRs itself; it hands a PR back only when it hits something it mus
 | Situation | Card (warden launched you) | Without warden |
 |---|---|---|
 | Red twice after real fixes, or a conflict it can't resolve safely | `state=blocked note=<why>` | `needs you <url>: <why>` |
-| A technical choice inside the PR's scope (which fix, which approach) | settled with `smithy consult` (the user's judge model (else strong)), noted in the commit or reply; `ESCALATE` → next row | same |
+| A technical choice inside the PR's scope (which fix, which approach) | settled with `smithy consult` (options per use-smithy **Decisions**, step 3), noted in the commit or reply; `ESCALATE` → next row | same |
 | A decision the user owns (scope, API, data, security) | `state=needs_decision` with question, options, recommendation, `impact=high` | `needs you <url>: <question>` |
 | 3 review rounds used, or a force push it isn't allowed to do | `state=blocked note=<why>` | `needs you <url>: <why>` |
 | Green | `state=pr_open pr=<url>` (or `ready` for manual merge), `ci=green` | `green <url>` |
