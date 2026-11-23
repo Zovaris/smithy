@@ -73,7 +73,7 @@ gets no test agents: its seam is the doc lint, its review is Spec-check alone. M
   worker asks warden) and record it in the PR's "Decided without you".
 - **Nobody to ask** (hush, or a launched session) or no answer in time: use-smithy's **Decisions**
   (`smithy:allow` on a real secret is its hard floor too). Record each in `rulings.md` (task dir;
-  a single task: `.smelt/rulings.md`) and the PR's "Decided without you"; a user-call one also `smithy decisions add`.
+  a single task: `.smelt/rulings.md`) and the PR's "Decided without you", and `smithy decisions add` (use-smithy **Decisions** step 4).
 - Lessons: `references/SHIP.md`.
 - Receipts: `smithy receipt run --claim "<c>" -- <cmd> <args>`.
 - Commits: `smithy commit "<msg>" <path>...`, subject under 72 characters. Never `git add`

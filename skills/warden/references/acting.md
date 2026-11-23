@@ -11,7 +11,7 @@ do it on the user's yes.
 By `impact`, with the levels of smelt's `references/EXECUTE.md` (Rulings); you may raise it, never
 lower it; `impact_by=decide` means the decision model raised it:
 - **low**: decide on the merits.
-- **medium**: `smithy consult` with the worker's question and options (neutral, per use-smithy **Decisions**, step 3; fails → decide yourself).
+- **medium**: `smithy consult` with the worker's question and options (neutral, per use-smithy **Decisions**, step 3; fails → its safest rule; log with `smithy decisions add`).
   `NEED-INFO` goes back to the worker; `ESCALATE` makes it high.
 - **high** (also: the same kind of finding recurring): the user's. One
   message with all of them; each gives the intent, the proposed change, the smallest alternative
@@ -79,8 +79,8 @@ names the repo's test command (from AGENTS.md / CI) so findings come with a fail
 Findings follow smelt's `references/RECEIVING.md`. The blocking ones become one new `fix` item: one worker
 (same brief, speed `fast`, intent = the findings verbatim, branch from `smithy names branch -
 "<batch> review" fix`), one PR, merged like the others; then smelt's re-review (smelt's `references/RECEIVING.md`, step 5)
-at the fix's commit, at the batch's speed even though the fix was built at `fast`. Before merging the fix PR, run any `zz_` holdout test in a fresh
-worktree of `origin/<fix-branch>`. You write the fix PR's dispositions (every finding, including declined
+at the fix's commit, at the batch's speed even though the fix was built at `fast`. Before merging the fix PR, copy the batch check's `zz_` holdout file (kept in its worktree until
+then) into a fresh worktree of `origin/<fix-branch>` and run it there. You write the fix PR's dispositions (every finding, including declined
 ones and why) in its body. A high security finding also goes to the user (decide stage). Non-blocking ones
 go under **Followups**.
 

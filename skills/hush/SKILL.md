@@ -16,7 +16,7 @@ disclosure: the done line names every change, command and PR, and nothing is hid
   user requires. No "Now let me…", "Next I'll…", "Good, that works" or step summaries; your
   report is the last message. The user can end hush mode at any time by asking.
 - No questions and no option lists, except the `blocked:` line below. Choices that aren't the
-  user's: pick your own recommendation. The user's: use-smithy **Decisions** (hard floor →
+  user's: low → decide; medium → `smithy consult`. The user's: use-smithy **Decisions** (hard floor →
   `blocked:`, the rest consult and log). Record each where the work lands (PR body under
   "Decided without you" if there is a PR, else the final message).
 - Don't commit, push or open a PR unless the task or the workflow it runs asks for it. Hush

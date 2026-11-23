@@ -56,7 +56,7 @@ Tend fixes red PRs itself; it hands a PR back only when it hits something it mus
 | Red twice after real fixes, or a conflict it can't resolve safely | `state=blocked note=<why>` | `needs you <url>: <why>` |
 | A technical choice inside the PR's scope (which fix, which approach) | settled with `smithy consult` (options per use-smithy **Decisions**, step 3), noted in the commit or reply; `ESCALATE` → next row | same |
 | ESCALATE, the hard floor (use-smithy **Decisions**) | `state=needs_decision` with question, options, recommendation, `impact=high` | `needs you <url>: <question>`; nobody to ask: `blocked: <why>` |
-| Another stop-list decision (scope, API, data, security) | use-smithy **Decisions** (`smithy consult`, `smithy decisions add`), noted in the reply | same |
+| Another stop-list decision (scope, API, data, security) | use-smithy **Decisions** (nobody to ask: `smithy consult`, `smithy decisions add`), noted in the card | `needs you <url>: <question>` while the user can answer, else **Decisions** |
 | 3 review rounds used, or a force push it isn't allowed to do | `state=blocked note=<why>` | `needs you <url>: <why>` |
 | Green | `state=ready pr=<url> ci=green` | `green <url>` |
 | Merged / closed | `state=merged` / `state=dropped` | `merged <url>` / `closed <url>` |

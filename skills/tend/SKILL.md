@@ -1,6 +1,6 @@
 ---
 name: tend
-description: "Use for open PRs that must get green and mergeable (red CI, rebases, review comments), a warden batch's PRs, or watching a GitHub repo for red runs, labeled issues, base moves and Dependabot alerts; smelt and warden start it after opening PRs."
+description: "Use for open PRs that must get green and mergeable (red CI, rebases, review comments), a warden batch's PRs, or watching a GitHub repo for red runs, labeled issues, base moves and Dependabot alerts; smelt hands it red CI, conflicts or review comments; warden only PRs whose worker has ended."
 argument-hint: "<pr-url|number|branch> [...] | batch <warden batch> | watch [<scopes>|all] [--fix] [--label <l>] [--model <m>] [--fix-model <m>] [--card <batch> <id>] [--max-hours <h>]"
 compatibility: "Needs git; gh (or GH_TOKEN) for GitHub steps; its launcher installs the smithy binary only with gh build attestation or SMITHY_ALLOW_UNATTESTED=1."
 ---
