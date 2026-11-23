@@ -1,6 +1,6 @@
 ---
 name: hush
-description: Use when the user asks for no talk or no questions, and for every agent another skill launches; composes with other skills (hush + smelt build).
+description: Use when the user asks for no talk or no questions, or a launching skill's brief names it for its agent; composes with other skills (hush + smelt build). Cuts narration only: every change, command and PR is still reported.
 argument-hint: "<task, or empty to run what was just agreed>"
 ---
 
