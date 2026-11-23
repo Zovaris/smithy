@@ -10,6 +10,10 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   and `Speed:` headers, and `take` writes the ones the daily cap and hours window allow into an
   `auto-<date>-<n>` task dir (`Source:` header, issue text quoted as data). Settings `auto.*` and
   `linear.*`; state in `~/.smithy/auto/state.json`.
+- Added: Linear source for `smithy auto` (`auto.sources=linear`): GraphQL over net/http with the
+  key from `linear.key_env`, never printed; `linear.team` is a required allow-list (filtered in
+  the query and re-checked per issue); `report` comments, moves the workflow state and attaches
+  the PR. Missing team or key exits 3. The last poll time is now the fetch start.
 
 ## v0.14.1 — 2026-11-23
 

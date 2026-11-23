@@ -20,7 +20,8 @@ Autonomous intake (settings auto.*; state in ~/.smithy/auto/state.json).
           auto <source> <id> queued <model|-> <speed|-> <url>
   take    moves the issues the daily cap (auto.max_per_day) and window (auto.hours) allow into a
           new task dir (smithy task-dir auto-<date>-<n>); prints "<dir> <count>" or "auto none: <why>"
-  report  writes back to the issue: started, completed or blocked (GitHub: a comment)
+  report  writes back to the issue: started, completed or blocked (GitHub: a comment; Linear: a comment,
+          the workflow state and the PR attached)
   status  queue, today's count and cap, hours, last poll per source, watcher alive or stale
 Exit 2 = bad usage or settings, 3 = no access to a source.`
 
@@ -98,11 +99,11 @@ func Main(args []string) int {
 		srcs, err := s.Open("")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "smithy auto:", err)
-			return 2
+			return openCode(err)
 		}
 		if err := Report(srcs, pos[0], pos[1], flags["--pr"]); err != nil {
 			fmt.Fprintln(os.Stderr, "smithy auto:", err)
-			if errors.Is(err, ghx.ErrNoGitHub) {
+			if errors.Is(err, ghx.ErrNoGitHub) || errors.Is(err, ErrNoAccess) {
 				return 3
 			}
 			return 1
@@ -136,7 +137,7 @@ func PollLines(s Settings, only string) ([]string, int) {
 	srcs, err := s.Open(only)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "smithy auto:", err)
-		return nil, 2
+		return nil, openCode(err)
 	}
 	got, err := Poll(s, srcs, os.Stderr)
 	var lines []string
@@ -145,7 +146,7 @@ func PollLines(s Settings, only string) ([]string, int) {
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "smithy auto: poll:", err)
-		if errors.Is(err, ghx.ErrNoGitHub) || strings.Contains(err.Error(), ghx.ErrNoGitHub.Error()) {
+		if errors.Is(err, ErrNoAccess) || errors.Is(err, ghx.ErrNoGitHub) || strings.Contains(err.Error(), ghx.ErrNoGitHub.Error()) {
 			return lines, 3
 		}
 		return lines, 1
@@ -179,4 +180,12 @@ func printStatus(st Status) {
 	for _, q := range st.Queue {
 		fmt.Printf("  %s %s %s %s %s\n", q.Source, q.ID, dash(q.Model), dash(q.Speed), q.URL)
 	}
+}
+
+// openCode is the exit code for a source that failed to open: 3 for no access, else 2.
+func openCode(err error) int {
+	if errors.Is(err, ErrNoAccess) {
+		return 3
+	}
+	return 2
 }

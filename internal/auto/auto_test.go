@@ -3,6 +3,7 @@ package auto
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -310,5 +311,50 @@ func TestTakeRemovesPartialFilesOnFailure(t *testing.T) {
 	st, _ := Load()
 	if len(ms) != 0 || len(st.Queue) != 2 {
 		t.Errorf("left files %v, queue %d", ms, len(st.Queue))
+	}
+}
+
+type slowSource struct {
+	fakeSource
+	tick func()
+}
+
+func (s *slowSource) Poll(since time.Time) ([]Issue, error) {
+	s.tick()
+	return s.fakeSource.Poll(since)
+}
+
+func TestLastPollIsFetchStart(t *testing.T) {
+	home(t)
+	start := at("2026-01-01 10:00")()
+	defer func(f func() time.Time) { now = f }(now)
+	now = func() time.Time { return start }
+	src := &slowSource{fakeSource: fakeSource{name: "linear"}, tick: func() { now = at("2026-01-01 10:05") }}
+	if _, err := Poll(defaults(), []Source{src}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	st, _ := Load()
+	if !st.LastPoll["linear"].Equal(start) {
+		t.Errorf("last poll = %v, want fetch start %v", st.LastPoll["linear"], start)
+	}
+}
+
+func TestTaskKeyHeaderUsesStableKey(t *testing.T) {
+	f, err := writeTask(t.TempDir(), "01", Queued{Source: "linear", Key: "uuid-9", ID: "ENG-9", Title: "x", URL: "u"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(f)
+	if !strings.Contains(string(b), "Key: linear:uuid-9\n") {
+		t.Errorf("task = %s", b)
+	}
+}
+
+func TestNoAccessExitsThree(t *testing.T) {
+	home(t)
+	Sources["noaccess"] = func(Settings) (Source, error) { return nil, fmt.Errorf("x: set y: %w", ErrNoAccess) }
+	defer delete(Sources, "noaccess")
+	if _, code := PollLines(defaults(), "noaccess"); code != 3 {
+		t.Errorf("code = %d, want 3", code)
 	}
 }
