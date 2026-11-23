@@ -10,8 +10,9 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   folders with the same name no longer share one (logs under the old folder name stay as they are).
 - `smithy consult`: a fallback CLI uses the models saved for its own harness, never the current
   harness's names (desktop without `claude` on PATH sent `opus` to opencode).
-- smelt SHIP: full `smithy verify` form, red CI from the base goes to tend, commits in dependency
-  order; tend commits only with `smithy commit`; Decisions: the timer is only for a human.
+- smelt SHIP: full `smithy verify` form, commits in dependency order, base red noted in the PR;
+  tend fixes base red only when small, else reports it; Decisions: the timer is only for a user
+  who can answer.
 
 ### Security
 - Launcher: without `gh` it no longer installs on the checksum alone; it needs the build

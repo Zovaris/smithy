@@ -490,7 +490,8 @@ func TestRouteRiskWordsAreSpecific(t *testing.T) {
 }
 
 func TestConsultModelUsesTheCLIsOwnHarness(t *testing.T) {
-	saved := map[string]string{"claude-desktop/strong": "opus", "opencode/judge": "anthropic/claude-opus"}
+	saved := map[string]string{"claude-desktop/strong": "opus", "opencode/judge": "anthropic/claude-opus",
+		"opencode/strong": "other", "claude-cli/strong": "sonnet"}
 	mf := func(h, tier string) (string, error) {
 		if m, ok := saved[h+"/"+tier]; ok {
 			return m, nil
@@ -502,6 +503,9 @@ func TestConsultModelUsesTheCLIsOwnHarness(t *testing.T) {
 		{"claude-desktop", "opencode", "", "anthropic/claude-opus"},
 		{"claude-desktop", "codex", "", ""},
 		{"claude-desktop", "codex", "x", "x"},
+		{"codex", "claude", "", "sonnet"},
+		{"opencode", "opencode", "", "anthropic/claude-opus"},
+		{"codex", "", "", ""},
 	}
 	for _, c := range cases {
 		if got := ConsultModel(c.h, c.cli, c.env, mf); got != c.want {

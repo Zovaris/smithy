@@ -66,9 +66,15 @@ func ConsultModel(h, cli, env string, modelFor func(h, t string) (string, error)
 	if env != "" {
 		return env
 	}
+	if cli == "" {
+		return ""
+	}
 	owner := cli
-	if cli == "claude" && strings.HasPrefix(h, "claude-") {
-		owner = h
+	if cli == "claude" {
+		owner = "claude-cli"
+		if strings.HasPrefix(h, "claude-") {
+			owner = h
+		}
 	}
 	for _, t := range []string{"judge", "strong"} {
 		if m, err := modelFor(owner, t); err == nil && m != "" {
@@ -144,8 +150,5 @@ func ConsultMain(args []string) int {
 		return 0
 	}
 	os.Setenv("AGENT_CLI", cli)
-	if model == "" {
-		model = os.Getenv("AGENT_MODEL")
-	}
 	return Run(Options{Cwd: tmp, Model: model, Effort: DefaultEffort(), ReadOnly: true, PromptFile: pf})
 }

@@ -26,8 +26,8 @@ over it. `smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's fo
 
 **Decisions** (the stop list). **Hard floor**, never auto-decided: merging or deploying to the production branch, deleting or irreversibly rewriting user data, credentials, secrets or logins, money. Wait for the user,
 or, with nobody to ask (hush, a launched session; warden workers ask warden), end `blocked: <why>`. The rest:
-1. Nobody to ask (hush, a launched agent, a subagent) → step 3 at once, `--by consult`; the timer is only for a human who may answer. Else ask, then run `smithy wait timer:<m>` in the background
-   (foreground where the harness can't wake on exit), m = `smithy config get ask.timeout` (0: no timer, wait).
+1. Nobody to ask (as above; the timer is for a user who can answer) → step 3, `--by consult`. Else
+   ask, then `smithy wait timer:<m>` in the background, m = `smithy config get ask.timeout` (0: wait).
 2. The user answers first → stop the timer (the harness's kill for that background task), use the
    answer. Only exit 0 printing `timer: <m>m elapsed` means it fired → step 3 with `--by timeout`.
 3. `smithy consult "<question>" "<options>"`: neutral options, safest first when security is
