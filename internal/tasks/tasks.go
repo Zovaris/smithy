@@ -336,6 +336,77 @@ func Add(dir, title, blockedBy, key, speed string) (string, error) {
 	return file, nil
 }
 
+var sectionRe = regexp.MustCompile(`^##\s+(\d+)\s*(?:·|-|\.)\s*(.+?)\s*$`)
+
+// Import splits a task-list file whose sections are `## NN · Title` into task files in dir
+// (default: the file's folder) and returns their paths. It refuses to overwrite an NN that exists.
+func Import(file, dir string) ([]string, error) {
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	if dir == "" {
+		dir = filepath.Dir(file)
+	}
+	type sec struct {
+		nn, title string
+		body      []string
+	}
+	var secs []sec
+	fence := false
+	for _, l := range strings.Split(string(b), "\n") {
+		if strings.HasPrefix(strings.TrimSpace(l), "```") {
+			fence = !fence
+		}
+		if m := sectionRe.FindStringSubmatch(l); m != nil && !fence {
+			secs = append(secs, sec{nn: fmt.Sprintf("%02d", num(m[1])), title: m[2]})
+			continue
+		}
+		if len(secs) > 0 {
+			secs[len(secs)-1].body = append(secs[len(secs)-1].body, l)
+		}
+	}
+	if len(secs) == 0 {
+		return nil, fmt.Errorf("no `## NN · Title` sections in %s", file)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	entries, _ := os.ReadDir(dir)
+	for _, s := range secs {
+		if seen[s.nn] {
+			return nil, fmt.Errorf("section %s appears twice in %s", s.nn, file)
+		}
+		seen[s.nn] = true
+		for _, e := range entries {
+			if isTask(e.Name()) && num(numRe.FindString(e.Name())) == num(s.nn) {
+				return nil, fmt.Errorf("task %s exists: %s", s.nn, filepath.Join(dir, e.Name()))
+			}
+		}
+	}
+	var paths []string
+	for _, s := range secs {
+		slug := names.Slug(s.title)
+		if slug == "" {
+			slug = "task"
+		}
+		p := filepath.Join(dir, s.nn+"-"+slug+".md")
+		body := strings.TrimSpace(strings.Join(s.body, "\n"))
+		txt := fmt.Sprintf("# %s · %s\nStatus: todo\nBlocked by: none\nSpeed: fast\nPR: -\n", s.nn, s.title)
+		if _, err := os.Stat(filepath.Join(dir, "spec.md")); err == nil {
+			txt += "Spec: ./spec.md\n"
+		}
+		txt += "\n" + body + "\n"
+		if err := os.WriteFile(p, []byte(txt), 0o644); err != nil {
+			return paths, err
+		}
+		paths = append(paths, p)
+	}
+	remember(dir)
+	return paths, nil
+}
+
 func indexFile() string { return filepath.Join(ghx.Home(), "tasks-index.json") }
 
 func readIndex() map[string]map[string]string {
@@ -454,6 +525,7 @@ const usage = `usage: smithy tasks <command>
   ready [dir]                       every todo task whose blockers are done
   set   <file> key=value...         update header lines (Status, PR, Owner...)
   add   [dir] "<title>" [--blocked-by 01,02] [--key PROJ-12] [--speed fast|normal|full]   next NN file from the full template
+  import <file> [dir]               split a list of "## NN · Title" sections into task files (default dir: the file's folder; never overwrites)
   board [--all]                     one line per task list and warden batch: this repo, or every repo
   where                             task dirs found for this repo
 Status: todo | doing | done | dropped. Blocked by: 01, 03 | none. PR: <url> | -`
@@ -565,6 +637,28 @@ func Main(args []string) int {
 			return fail(err)
 		}
 		fmt.Println(f)
+	case "import":
+		if len(args) < 2 || len(args) > 3 {
+			fmt.Fprintln(os.Stderr, "usage: smithy tasks import <tasks.md> [dir]")
+			return 2
+		}
+		dir := ""
+		if len(args) == 3 {
+			d, err := filepath.Abs(args[2])
+			if err != nil {
+				return fail(err)
+			}
+			dir = d
+		}
+		file, err := filepath.Abs(args[1])
+		if err != nil {
+			return fail(err)
+		}
+		ps, err := Import(file, dir)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Println(strings.Join(ps, "\n"))
 	case "board":
 		lines := Board(contains(args, "--all"))
 		if lines == nil {
