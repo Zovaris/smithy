@@ -60,6 +60,24 @@ func ConsultCLI(h string, have func(string) bool) string {
 	return cli
 }
 
+// ConsultModel picks the judge model, else strong, saved for the harness that owns cli: a CLI
+// other than the current harness's never gets the current harness's model names.
+func ConsultModel(h, cli, env string, modelFor func(h, t string) (string, error)) string {
+	if env != "" {
+		return env
+	}
+	owner := cli
+	if cli == "claude" && strings.HasPrefix(h, "claude-") {
+		owner = h
+	}
+	for _, t := range []string{"judge", "strong"} {
+		if m, err := modelFor(owner, t); err == nil && m != "" {
+			return m
+		}
+	}
+	return ""
+}
+
 func shell(command, stdinPath, dir string) int {
 	in, err := os.Open(stdinPath)
 	if err != nil {
@@ -89,13 +107,6 @@ func ConsultMain(args []string) int {
 			ctx = strings.TrimRight(string(b), "\n")
 		}
 	}
-	model := os.Getenv("CONSULT_MODEL")
-	if model == "" {
-		model, _ = config.Model("judge")
-	}
-	if model == "" {
-		model, _ = config.Model("strong")
-	}
 	tmp, err := os.MkdirTemp("", "consult.")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -112,6 +123,7 @@ func ConsultMain(args []string) int {
 	}
 	h, _ := harness.Detect()
 	cli := ConsultCLI(h, installed)
+	model := ConsultModel(h, cli, os.Getenv("CONSULT_MODEL"), config.ModelFor)
 	if cli == "claude" {
 		a := []string{"-p"}
 		if model != "" {
