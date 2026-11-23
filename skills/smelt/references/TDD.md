@@ -2,7 +2,7 @@
 
 ## Loop
 For each behaviour in the acceptance criteria, in tracer-bullet order:
-1. **Red.** One test at an agreed seam (one table of cases for one rule counts as one test); run that file (a single-file command skips pretest
+1. **Red.** One test at an agreed seam (one table of cases for one rule counts as one test); run that file under a timeout (`timeout 60 <cmd>`: a hung test is red too; a single-file command skips pretest
    hooks: build first when tests spawn the built CLI). It fails on an assertion naming the
    missing behaviour (an import, syntax or setup error is not red: stub the export returning an empty value first).
    A test of behaviour that already exists passes at once: see it fail once with a one-line

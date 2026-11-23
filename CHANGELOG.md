@@ -10,6 +10,11 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - `smithy batch init --risky <id,id>` marks risky items (security agent required).
 
 ### Fixed
+- `smithy receipt list` keeps the holdout receipt from its earlier commit (state "holdout commit"),
+  so it reaches the PR table as CHECK.md requires.
+- `smithy decisions add --by self` labels a decision taken without consult honestly.
+- Skill text: use-smithy routes "research, then build" to scout then smelt plan; TDD runs single
+  test files under a timeout so a hung test counts as red.
 - `smithy commit` accepts a staged `git mv` rename (both paths named), refuses paths outside the
   repo, and checks earlier staging against repo-root paths (also from a subfolder, and for `.`).
 - Skill text: Decisions define "safest" outside security (most reversible, least new surface);
