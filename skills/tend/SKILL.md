@@ -7,7 +7,8 @@ argument-hint: "<pr-url|number|branch> [...] | batch <warden batch> | watch [<sc
 # tend
 
 ## Critical rules
-- Fix what blocks a PR; never add scope.
+- Fix what blocks a PR; never add scope. Red the base has too: fix it only when it is in the
+  PR's way and small (a test glob, a lint rule), else report it as a base issue and end.
 - Needs `gh` or `GH_TOKEN`/`GITHUB_TOKEN` (API mode: log and rerun steps need `gh` and are
   skipped). Neither: say "needs gh or GH_TOKEN" up front and stop (`smithy doctor`).
 - Merge only when the launcher said `merge auto`; never a draft; production only with the

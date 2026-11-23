@@ -33,13 +33,24 @@ const (
 	arw  = " → "
 )
 
-// repoSlug names the log: the folder of the main checkout, so worktrees share one log.
+// repoSlug names the log: origin's owner-repo, else the folder of the main checkout, so worktrees
+// share one log and two checkouts named alike don't.
 var repoSlug = func() string {
 	out, err := ghx.Run("git", "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if err != nil || strings.TrimSpace(out) == "" {
 		return "no-repo"
 	}
-	return filepath.Base(filepath.Dir(strings.TrimSpace(out)))
+	url, _ := ghx.Run("git", "remote", "get-url", "origin")
+	return slug(strings.TrimSpace(url), filepath.Base(filepath.Dir(strings.TrimSpace(out))))
+}
+
+func slug(url, dir string) string {
+	u := strings.TrimSuffix(strings.TrimSuffix(url, "/"), ".git")
+	parts := strings.FieldsFunc(u, func(r rune) bool { return r == '/' || r == ':' })
+	if len(parts) >= 2 {
+		return parts[len(parts)-2] + "-" + parts[len(parts)-1]
+	}
+	return dir
 }
 
 // File is the decisions log of the current repo.
