@@ -14,6 +14,8 @@ import (
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/notify"
+	"github.com/Zovaris/smithy/internal/pool"
+	"github.com/Zovaris/smithy/internal/usage"
 	"github.com/Zovaris/smithy/internal/warden"
 )
 
@@ -27,6 +29,7 @@ type System struct {
 	Home     string
 	Events   string   // events.jsonl path and size
 	Notify   []string // notify.Status lines (token masked)
+	Pool     []pool.Row
 	Err      []string
 }
 
@@ -49,6 +52,11 @@ func loadSystem() System {
 		s.Err = append(s.Err, "auth: "+clean(err.Error()))
 	}
 	s.Notify = cleanAll(notify.Status())
+	if rows, err := pool.Rows(time.Now()); err == nil {
+		s.Pool = rows
+	} else {
+		s.Err = append(s.Err, "pool: "+clean(err.Error()))
+	}
 	s.Events = events.File() + "  (none yet)"
 	if fi, err := os.Stat(events.File()); err == nil {
 		s.Events = fmt.Sprintf("%s  (%.1f KB)", events.File(), float64(fi.Size())/1024)
@@ -62,11 +70,16 @@ func demoSystem() System {
 			"ok   worktree root /home/dev/worktrees writable", "warn 2 orphaned worktrees (smithy warden cleanup)"},
 		Settings: settingRows("claude", demoEffective),
 		Auth:     []string{"github ****9f2c", "linear ****a41b"},
-		Notify: []string{"token  ****x7Qa (/home/dev/.smithy/auth.json)", "chat 123456789", "kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached",
+		Notify: []string{"token  ****x7Qa (/home/dev/.smithy/auth.json)", "chat 123456789", "kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited",
 			"state  on (smithy auto serve sends)", "last sent 2026-11-23 09:12"},
+		Pool: []pool.Row{{Name: "work", Harness: "claude", Status: "ok", Resets: "-", Runs: 6, Cost: ptr(3.42)},
+			{Name: "home", Harness: "claude", Status: "limited", Resets: "11-23 14:00", Runs: 9, Cost: ptr(5.10)},
+			{Name: "codex", Harness: "codex", Status: "ok", Resets: "-", Runs: 2}},
 		Binary: "0.15.0", Skills: "0.15.0", Home: "/home/dev/.smithy", Events: "/home/dev/.smithy/events.jsonl  (412.7 KB)",
 	}
 }
+
+func ptr(f float64) *float64 { return &f }
 
 var demoValues = map[string]string{"auto.sources": "github,linear", "auto.max_per_day": "80", "linear.team": "TES",
 	"warden.merge": "manual", "notify.telegram.chat": "123456789", "models.claude.cheap": "haiku", "models.claude.strong": "opus"}
@@ -136,6 +149,19 @@ func (m Model) systemLines(w, rw, rh int) (left, right []string) {
 			c = t.muted
 		}
 		left = append(left, t.fg(c).Render(short(l, w)))
+	}
+	left = append(left, "", head.Render("Pool")+mut.Render("  smithy pool"))
+	if len(s.Pool) == 0 {
+		left = append(left, mut.Render("off (smithy pool add <name> claude|codex)"))
+	} else {
+		left = append(left, mut.Render(fmt.Sprintf("%-10s %-7s %-8s %-11s %4s %7s", "account", "harness", "status", "resets", "runs", "cost")))
+	}
+	for _, p := range s.Pool {
+		c := t.text
+		if p.Status == "limited" {
+			c = t.warn
+		}
+		left = append(left, t.fg(c).Render(short(fmt.Sprintf("%-10s %-7s %-8s %-11s %4d %7s", clean(p.Name), p.Harness, p.Status, p.Resets, p.Runs, usage.Cost(p.Cost)), w)))
 	}
 	left = append(left, "", head.Render("Doctor"))
 	for _, d := range s.Doctor {

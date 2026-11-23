@@ -163,6 +163,26 @@ network commands, denied secret files) reduces that risk but cannot remove it. C
 workspace-write sandbox with network on (push needs it) and approvals off, so nothing stops it
 sending data out: least-privilege tokens matter most there.
 
+### Account pool
+
+Off until you add an account. Each one is your own account on an official CLI, signed in once in
+its own config dir; smithy agent picks the least recently used one that is not rate limited and,
+when a run hits a usage limit, marks it until its reset and reruns once on the next account.
+
+```
+smithy pool add work claude          # dir ~/.smithy/accounts/work (CLAUDE_CONFIG_DIR)
+smithy pool add home claude
+smithy pool add cx codex             # CODEX_HOME
+smithy pool login work               # opens the CLI with that dir: sign in, then exit
+smithy pool list                     # status, resets at, runs and cost today (also smithy tui, System)
+smithy config set auto.agent pool    # optional: serve's orchestrator may use any harness in the pool
+```
+
+When every account is limited, `smithy agent` exits 75 and serve launches nothing until the
+earliest reset (Telegram kind `limited`). Use only accounts you own, through the official CLIs,
+with no proxy or relay in between: each provider's terms apply to each account. Unattended workers
+are denied reading `~/.smithy/accounts`; keep account dirs there.
+
 ## Install
 
 ```bash

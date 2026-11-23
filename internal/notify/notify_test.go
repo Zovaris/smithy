@@ -118,6 +118,18 @@ func TestFirstFlushStartsAtNowThenMapsEvents(t *testing.T) {
 	}
 }
 
+func TestLimitedNotifiesOnlyWhenEveryAccountIs(t *testing.T) {
+	f, _ := setup(t)
+	n := New(nil)
+	n.Flush(time.Now())
+	appendEv(t, events.Event{Kind: "limited", Account: "a", Detail: "until 2026-11-23T15:00:00Z"})
+	appendEv(t, events.Event{Kind: "limited", Detail: "every pool account is limited; earliest reset 2026-11-23 15:00"})
+	n.Flush(time.Now().Add(time.Second))
+	if len(f.msgs) != 1 || !strings.Contains(f.msgs[0].Get("text"), "earliest reset 2026-11-23 15:00") {
+		t.Fatalf("msgs %v", f.msgs)
+	}
+}
+
 func TestKindsToggle(t *testing.T) {
 	f, _ := setup(t)
 	home := os.Getenv("SMITHY_HOME")
