@@ -1,0 +1,48 @@
+                                                                                                                                                                
+     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄       ╔═╗╔╦╗╦╔╦╗╦ ╦╦ ╦                                                     watcher  ● watching github, linear (TES) · next poll 35s 
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀       ╚═╗║║║║ ║ ╠═╣╚╦╝                                                     today    ███████████░░  69 / 80 launched                 
+          ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ╚═╝╩ ╩╩ ╩ ╩ ╩ ╩                                                      agents   5 working · 0 waiting · 2 stuck                 
+              ▀▀▀▀▀▀▀              DEMO  autonomous forge · dev · smithy                               PRs      3 ready for you · 1 CI running                  
+         ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
+        ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                                                     14:30:00                                        
+  1 Overview   2 Agents   3 Incoming   4 Needs you 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System                                                   
+╭─ Health · read-only ─────────────────────────────────────────────────────────╮╭─ Settings · auto · linear · warden ──────────────────────────────────────────╮
+│ Versions                                                                     ││ auto.*                                                                       │
+│ binary  0.15.0                                                               ││ auto.sources          github,linear    user                                  │
+│ skills  0.15.0  ✓ match                                                      ││ auto.mode             labeled          default                               │
+│                                                                              ││ auto.label            auto             default                               │
+│ Paths                                                                        ││ auto.max_per_day      80               user                                  │
+│ home    /home/dev/.smithy                                                    ││ auto.hours            -                unset                                 │
+│ events  /home/dev/.smithy/events.jsonl  (412.7 KB)                           ││ auto.every            60               default                               │
+│                                                                              ││ auto.paused           false            default                               │
+│ Auth  keys are masked                                                        ││                                                                              │
+│ github ****9f2c                                                              ││ linear.*                                                                     │
+│ linear ****a41b                                                              ││ linear.team           TES              user                                  │
+│                                                                              ││ linear.project        -                unset                                 │
+│ Doctor                                                                       ││                                                                              │
+│ warden doctor                                                                ││ warden.*                                                                     │
+│ ok   binary v0.15.0                                                          ││ warden.max            5                default                               │
+│ ok   git found                                                               ││ warden.merge          manual           user                                  │
+│ ok   gh found and authenticated                                              ││ warden.cleanup        auto             default                               │
+│ ok   claude found                                                            ││ warden.mode           smelt normal     default                               │
+│ ok   worktree root /home/dev/worktrees writable                              ││                                                                              │
+│ warn 2 orphaned worktrees (smithy warden cleanup)                            ││ Read-only here: change with smithy config set <key> <value>.                 │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+│                                                                              ││                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────╯
+ r refresh                                                                                                                            tab views  ? help  q quit 

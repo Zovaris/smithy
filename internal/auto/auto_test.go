@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/tasks"
 )
 
@@ -168,6 +169,11 @@ func TestTakeCapHoursAndTaskFiles(t *testing.T) {
 		t.Fatalf("outside hours: %+v %v", r, err)
 	}
 	s.Hours = "22:00-07:00"
+	s.Paused = true
+	if r, err = Take(s, 0, mk); err != nil || r.Count != 0 || !strings.Contains(r.Why, "paused") {
+		t.Fatalf("paused: %+v %v", r, err)
+	}
+	s.Paused = false
 	r, err = Take(s, 0, mk)
 	if err != nil || r.Count != 2 || filepath.Base(r.Dir) != "auto-2026-01-01-1" {
 		t.Fatalf("take = %+v %v", r, err)
@@ -435,5 +441,35 @@ func TestNoAccessExitsThree(t *testing.T) {
 	defer delete(Sources, "noaccess")
 	if _, code := PollLines(defaults(), "noaccess"); code != 3 {
 		t.Errorf("code = %d, want 3", code)
+	}
+}
+
+type ratedSource struct{ fakeSource }
+
+func (ratedSource) Remaining() (int, bool) { return 1234, true }
+
+func TestPollLogsEventsAndRate(t *testing.T) {
+	home(t)
+	now = at("2026-01-01 10:00")
+	defer func() { now = time.Now }()
+	src := &ratedSource{fakeSource{name: "linear", issues: []Issue{
+		{ID: "TES-1", Title: "in", URL: "https://x/1", Body: "secret body", Labels: []string{"auto"}},
+		{ID: "TES-2", Title: "out", URL: "https://x/2", Body: "secret body"}}}}
+	if _, err := Poll(defaults(), []Source{src}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	es, _ := events.Read(time.Time{}, 0)
+	var kinds []string
+	for _, e := range es {
+		kinds = append(kinds, e.Kind+":"+e.ID)
+		if strings.Contains(e.Detail, "secret") {
+			t.Fatal("issue body logged")
+		}
+	}
+	if strings.Join(kinds, ",") != "poll:,skipped:TES-2,queued:TES-1" {
+		t.Fatalf("events = %v", kinds)
+	}
+	if st, _ := Load(); st.Rate["linear"] != 1234 {
+		t.Fatalf("rate = %v", st.Rate)
 	}
 }

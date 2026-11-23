@@ -4,7 +4,7 @@ set -uo pipefail
 F="$(cd "$(dirname "$0")/../../skills/warden/scripts" && pwd -P)"
 pass=0; fail=0
 t() { if eval "$2" >/dev/null 2>&1; then pass=$((pass+1)); else fail=$((fail+1)); echo "FAIL: $1"; fi; }
-export WARDEN_HOME="$(mktemp -d)"; trap 'rm -rf "$WARDEN_HOME"' EXIT
+export WARDEN_HOME="$(mktemp -d)" SMITHY_HOME="$(mktemp -d)"; trap 'rm -rf "$WARDEN_HOME" "$SMITHY_HOME"' EXIT
 B="$WARDEN_HOME/b1"; mkdir -p "$B"
 echo '{"batch":"b1","max":1,"items":[{"id":"a"},{"id":"b","prereqs":["a"]},{"id":"c"},{"id":"d","prereqs":["x"]},{"id":"x"}]}' > "$B/batch.json"
 "$F/smithy" cards set b1 a state=working phase=build >/dev/null

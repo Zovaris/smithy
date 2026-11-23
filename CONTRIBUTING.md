@@ -1,6 +1,8 @@
 # Contributing
 
-- The binary's source is in `cmd/smithy` and `internal/` (Go, standard library only). Inside a
+- The binary's source is in `cmd/smithy` and `internal/` (Go, standard library only, except
+  `internal/tui`, which uses Charm's Bubble Tea, Lip Gloss, Bubbles and Glamour v2 under `charm.land/...` plus harmonica,
+  always at their latest release; keep `go.sum` committed). Inside a
   checkout the launcher builds it from source when a `.go` file changed, so symlinked skills
   always run your working copy.
 - Pull requests run `check` (gofmt, vet, `go test`, every offline test through the binary, a
