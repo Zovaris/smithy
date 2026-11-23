@@ -5,7 +5,17 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+### Added
+- `smithy tasks import <tasks.md>` splits one file of `## NN · Title` sections into task files.
+- `smithy batch init --risky <id,id>` marks risky items (security agent required).
+
 ### Fixed
+- `smithy verify`: an open PR whose mergeable is still UNKNOWN is `pending`, not green.
+- `smithy brief`: a `Spec:` line takes only its first token; `batch init` stores an absolute
+  intent when the task file isn't committed on the base.
+- warden doctor accepts an allow rule for `smithy pr merge`.
+- Skill text: tend runs the full suite (a receipt) before pushing a merge or rebase of the base;
+  use-smithy says where consult's ESCALATE goes when nobody can answer.
 - `smithy decisions`: the log is named after origin's owner and repo, so two checkouts in
   folders with the same name no longer share one (logs under the old folder name stay as they are).
 - `smithy consult`: a fallback CLI uses the models saved for its own harness, never the current

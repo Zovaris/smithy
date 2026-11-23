@@ -111,6 +111,9 @@ func TestVerdict(t *testing.T) {
 		{"OPEN", "green", "CONFLICTING", false, "", no, "conflict"},
 		{"OPEN", "red", "CONFLICTING", false, "", no, "conflict"},
 		{"OPEN", "none", "MERGEABLE", false, "head", no, "green"},
+		{"OPEN", "green", "UNKNOWN", false, "", no, "pending"},
+		{"OPEN", "green", "UNKNOWN", true, "", no, "pending"},
+		{"OPEN", "red", "UNKNOWN", false, "", no, "red"},
 	}
 	for _, c := range cases {
 		if got := Verdict(c.state, c.checks, c.mergeable, c.draft, c.local, "head", c.anc); got != c.want {

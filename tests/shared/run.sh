@@ -62,6 +62,9 @@ t "add numbers the next task" '[ "$(basename "$("$S/smithy" tasks add docs/specs
 t "added task is todo and blocked" 'grep -q "^Blocked by: 01" docs/specs/b/02-rate-limit.md && [ "$(basename "$("$S/smithy" tasks next docs/specs/b)")" = 01-add-login.md ]'
 t "board shows the list" '"$S/smithy" tasks board | grep -q "0/2 done, 0 doing, 1 ready"'
 t "board --all finds it from elsewhere" '(cd / && "$S/smithy" tasks board --all) | grep -q "repo/b"'
+mkdir -p "$T/imp"; printf '# Plan\n\n## 01 · First\nbody\n\n## 02 Second\nBlocked by: 01\nmore\n' > "$T/imp/list.md"
+t "import splits a list into tasks" '"$S/smithy" tasks import "$T/imp/list.md" >/dev/null && [ -f "$T/imp/01-first.md" ] && grep -q "^Blocked by: 01" "$T/imp/02-second.md"'
+t "import refuses to overwrite" '! "$S/smithy" tasks import "$T/imp/list.md"'
 rm -rf docs/specs/b
 
 # smithy commit

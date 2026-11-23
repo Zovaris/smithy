@@ -304,7 +304,7 @@ func Doctor(args []string) int {
 		for _, f := range claudeFiles() {
 			if s, ok := readSettings(f); ok {
 				for _, a := range s.Permissions.Allow {
-					if strings.HasPrefix(a, "Bash(gh pr merge") {
+					if allowsMerge(a) {
 						allowed = f
 					}
 				}
@@ -316,7 +316,7 @@ func Doctor(args []string) int {
 		if allowed != "" {
 			r.ok("gh pr merge allowed (" + allowed + ")")
 		} else {
-			r.warn("gh pr merge not in the allow list (auto merges may stop at ready)", `add "Bash(gh pr merge:*)" to permissions.allow in ~/.claude/settings.json, or use merge manual`)
+			r.warn("gh pr merge not in the allow list (auto merges may stop at ready)", `add "Bash(smithy pr merge:*)" (or "Bash(gh pr merge:*)") to permissions.allow in ~/.claude/settings.json, or use merge manual`)
 		}
 	}
 	d := cards.Home()
@@ -364,4 +364,23 @@ func writable(dir string) bool {
 	name := f.Name()
 	f.Close()
 	return os.Remove(name) == nil
+}
+
+// allowsMerge says an allow rule lets the agent run `gh pr merge` or `smithy pr merge`: a Bash rule
+// for gh pr merge, or for smithy (bare or by launcher path) as a whole or its pr merge command.
+func allowsMerge(rule string) bool {
+	cmd, ok := strings.CutPrefix(rule, "Bash(")
+	if !ok {
+		return false
+	}
+	cmd = strings.TrimSuffix(cmd, ")")
+	if strings.HasPrefix(cmd, "gh pr merge") {
+		return true
+	}
+	for _, tail := range []string{"smithy pr merge:*", "smithy:*"} {
+		if cmd == tail || strings.HasSuffix(cmd, "/"+tail) {
+			return true
+		}
+	}
+	return false
 }

@@ -10,5 +10,5 @@ func init() {
 	register("brief", "render a warden worker's brief from batch.json", warden.BriefUsage,
 		"--to= --subagent", warden.Brief)
 	register("batch", "write or extend a warden batch.json (init, add)", warden.BatchUsage,
-		"--repo= --base= --merge= --max= --id= --title= --intent= --speed=", warden.Batch)
+		"--repo= --base= --merge= --max= --risky= --id= --title= --intent= --speed=", warden.Batch)
 }
