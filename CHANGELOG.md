@@ -5,6 +5,12 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+### Fixed
+- `smithy consult`: a fallback CLI uses the models saved for its own harness, never the current
+  harness's names (desktop without `claude` on PATH sent `opus` to opencode).
+- smelt SHIP: full `smithy verify` form, red CI from the base goes to tend, commits in dependency
+  order; tend commits only with `smithy commit`; Decisions: the timer is only for a human.
+
 ### Security
 - Launcher: without `gh` it no longer installs on the checksum alone; it needs the build
   attestation, or `SMITHY_ALLOW_UNATTESTED=1` to accept checksum-only.
