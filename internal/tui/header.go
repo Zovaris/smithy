@@ -15,34 +15,34 @@ import (
 const fps = 24
 
 // anvilBig is the 30×14-pixel anvil (7 text rows of half blocks): three rows of headroom for
-// sparks, a face with the horn to the left and the heel to the right, a narrow waist and a
-// flared base. anvilSmall is the 16×8 one for narrow terminals.
+// sparks, a flat three-pixel face that ends in a pointed horn on the left and a square heel on
+// the right, a narrow waist and a wide base on two feet. anvilSmall is the 16×8 one.
 var anvilBig = []string{
 	"                              ",
 	"                              ",
 	"                              ",
-	"  ##########################  ",
-	"     #######################  ",
-	"         ###################  ",
-	"            ##############    ",
-	"              ##########      ",
-	"               ########       ",
-	"               ########       ",
-	"             ############     ",
-	"           ################   ",
-	"          ##################  ",
-	"          ##################  ",
+	"    ######################    ",
+	"##########################    ",
+	"    ######################    ",
+	"         ###############      ",
+	"            #########         ",
+	"             #######          ",
+	"             #######          ",
+	"           ###########        ",
+	"        #################     ",
+	"       ###################    ",
+	"       #######     #######    ",
 }
 
 var anvilSmall = []string{
 	"                ",
-	"  ############  ",
-	"     #########  ",
-	"       ######   ",
-	"        ####    ",
-	"        ####    ",
-	"      ########  ",
-	"      ########  ",
+	"  ###########   ",
+	"#############   ",
+	"  ###########   ",
+	"     #####      ",
+	"      ###       ",
+	"    #######     ",
+	"   ###   ###    ",
 }
 
 // wordB is the Calvin S name.
@@ -69,8 +69,8 @@ type sprite struct {
 }
 
 var (
-	bigAnvil   = sprite{anvilBig, 3, 18}
-	smallAnvil = sprite{anvilSmall, 1, 9}
+	bigAnvil   = sprite{anvilBig, 3, 16}
+	smallAnvil = sprite{anvilSmall, 1, 8}
 )
 
 func (s sprite) w() int { return len(s.mask[0]) }
@@ -82,10 +82,12 @@ func (s sprite) on(x, y int) bool {
 // shade is the steel lightness of an anvil pixel: lit from the top left, with a bright face, a
 // highlight on every top edge and darker flanks.
 func (s sprite) shade(x, y int) float64 {
-	v := 0.62 - 0.05*float64(y-s.faceY) - 0.22*float64(x)/float64(s.w())
+	v := 0.5 - 0.04*float64(y-s.faceY) - 0.2*float64(x)/float64(s.w())
 	switch {
 	case y == s.faceY:
-		v = 0.95 - 0.15*float64(x)/float64(s.w())
+		v = 0.97 - 0.12*float64(x)/float64(s.w())
+	case y <= s.faceY+2:
+		v = 0.78 - 0.12*float64(y-s.faceY) - 0.15*float64(x)/float64(s.w())
 	case !s.on(x, y-1):
 		v += 0.28
 	case !s.on(x-1, y):

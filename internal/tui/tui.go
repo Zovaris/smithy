@@ -15,18 +15,22 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/harmonica"
 )
 
 // Usage is the text for `smithy tui --help`.
-const Usage = `usage: smithy tui [--no-anim]
-A live dashboard of the autonomous forge: Incoming issues, Agents at work, what Needs you,
-Activity, Worktrees and Plans. It refreshes every 2 s from local files only (no network).
-Keys: 1-6 or tab/shift+tab panels, up/down select, enter details, o open, l log, c copy,
-p pause/resume intake (auto.paused), / filter, r refresh, ? help, q quit. Mouse works too.
---no-anim (or SMITHY_REDUCE_MOTION=1) draws still frames; NO_COLOR=1 drops color.
+const Usage = `usage: smithy tui [--no-anim] [--demo]
+A live dashboard of the autonomous forge. Views: Overview, Agents, Incoming, Needs you,
+Activity, Worktrees, Plans. It refreshes every 2 s from local files only (no network).
+Keys: tab/shift+tab or 1-7 switch views; up/down (j/k) move inside a view; left/right switch
+panes or cards; enter details; esc close; o open; l log; c copy; y copy the action command;
+s sort (Agents); t event type (Activity); p pause/resume intake (auto.paused); / filter;
+r refresh; ? help; q quit. Mouse: click, double-click, wheel.
+--demo shows a rich fake world (reads and writes nothing); --no-anim (or
+SMITHY_REDUCE_MOTION=1) draws still frames; NO_COLOR=1 drops color.
 Exit 0 = quit, 1 = the terminal could not run it, 2 = bad usage.`
 
 // Version is the binary's version, shown in the header.
@@ -34,46 +38,52 @@ var Version = "dev"
 
 const refreshEvery = 2 * time.Second
 
-type panel int
+type view int
 
 const (
-	pIncoming panel = iota
-	pAgents
-	pNeeds
-	pActivity
-	pWorktrees
-	pPlans
-	nPanels
+	vOverview view = iota
+	vAgents
+	vIncoming
+	vNeeds
+	vActivity
+	vWorktrees
+	vPlans
+	nViews
 )
 
-var titles = [nPanels]string{"Incoming", "Agents at work", "Needs you", "Activity", "Worktrees", "Plans"}
-var tabs = [nPanels]string{"Incoming", "Agents", "Needs you", "Activity", "Worktrees", "Plans"}
+var viewNames = [nViews]string{"Overview", "Agents", "Incoming", "Needs you", "Activity", "Worktrees", "Plans"}
 
-// meaning is what each panel holds, for empty states and the help overlay.
-var meaning = [nPanels]string{
-	"Issues from Linear or GitHub waiting to start (daily cap, hours).",
-	"Each warden run and its workers: issue, branch, stage, CI, PR.",
-	"Decisions, PRs ready for your review or merge, blocked work.",
-	"A live feed: polls, queued issues, launches, PRs, CI, merges.",
-	"Every smithy worktree on disk; orphans (no live item) in yellow.",
-	"Task lists and their progress.",
+// meaning is what each view holds, for empty states and the help overlay.
+var meaning = [nViews]string{
+	"Charts of the forge: throughput, agents by stage, the daily cap, CI health, lead time.",
+	"Every worker: issue, repo, branch, model, stage, CI, PR, heartbeat; a timeline and log preview.",
+	"Issues waiting to start, the ones recently skipped and why, and each source's status.",
+	"Decisions taken without you, PRs ready for review or merge, blocked work.",
+	"Every event, newest first: polls, queued, skipped, launches, stages, CI, reports, merges.",
+	"Every smithy worktree on disk: branch, item, age, dirty, ahead/behind, orphaned.",
+	"Task lists and their progress; enter opens a task file.",
 }
 
 type keyMap struct {
-	Next, Prev, Up, Down, Jump, Enter, Close, Open, Log, Copy, Pause, Filter, Refresh, Help, Quit key.Binding
+	Next, Prev, Up, Down, Left, Right, Jump, Enter, Close, Open, Log, Copy, Cmd, Sort, Type, Pause, Filter, Refresh, Help, Quit key.Binding
 }
 
 var keys = keyMap{
-	Next:    key.NewBinding(key.WithKeys("tab", "right"), key.WithHelp("tab", "next panel")),
-	Prev:    key.NewBinding(key.WithKeys("shift+tab", "left"), key.WithHelp("⇧tab", "previous panel")),
-	Up:      key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑/k", "up")),
+	Next:    key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "next view")),
+	Prev:    key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("⇧tab", "previous view")),
+	Up:      key.NewBinding(key.WithKeys("up", "k"), key.WithHelp("↑↓", "move")),
 	Down:    key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
-	Jump:    key.NewBinding(key.WithKeys("1", "2", "3", "4", "5", "6"), key.WithHelp("1-6", "jump to panel")),
+	Left:    key.NewBinding(key.WithKeys("left"), key.WithHelp("←→", "pane")),
+	Right:   key.NewBinding(key.WithKeys("right"), key.WithHelp("→", "pane")),
+	Jump:    key.NewBinding(key.WithKeys("1", "2", "3", "4", "5", "6", "7"), key.WithHelp("1-7", "view")),
 	Enter:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "details")),
 	Close:   key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
-	Open:    key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open url")),
+	Open:    key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open")),
 	Log:     key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "log")),
 	Copy:    key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "copy")),
+	Cmd:     key.NewBinding(key.WithKeys("y"), key.WithHelp("y", "copy command")),
+	Sort:    key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "sort")),
+	Type:    key.NewBinding(key.WithKeys("t"), key.WithHelp("t", "type")),
 	Pause:   key.NewBinding(key.WithKeys("p"), key.WithHelp("p", "pause intake")),
 	Filter:  key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "filter")),
 	Refresh: key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
@@ -81,22 +91,27 @@ var keys = keyMap{
 	Quit:    key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 }
 
-// context is the footer's keys for the focused panel.
-func context(p panel) []key.Binding {
-	switch p {
-	case pIncoming:
-		return []key.Binding{keys.Enter, keys.Open, keys.Copy, keys.Pause, keys.Filter}
-	case pAgents:
-		return []key.Binding{keys.Enter, keys.Log, keys.Open, keys.Copy, keys.Filter}
-	case pNeeds:
-		return []key.Binding{keys.Enter, keys.Open, keys.Copy, keys.Filter}
-	case pActivity:
-		return []key.Binding{keys.Enter, keys.Open, keys.Filter}
-	case pWorktrees:
-		return []key.Binding{keys.Enter, keys.Copy, keys.Filter}
+// context is the footer's keys for a view.
+func context(v view) []key.Binding {
+	switch v {
+	case vOverview:
+		return []key.Binding{keys.Up, keys.Enter}
+	case vAgents:
+		return []key.Binding{keys.Up, keys.Left, keys.Enter, keys.Log, keys.Open, keys.Copy, keys.Sort, keys.Filter}
+	case vIncoming:
+		return []key.Binding{keys.Up, keys.Left, keys.Enter, keys.Open, keys.Copy, keys.Pause, keys.Filter}
+	case vNeeds:
+		return []key.Binding{keys.Up, keys.Enter, keys.Open, keys.Cmd, keys.Filter}
+	case vActivity:
+		return []key.Binding{keys.Up, keys.Enter, keys.Open, keys.Type, keys.Filter}
+	case vWorktrees:
+		return []key.Binding{keys.Up, keys.Enter, keys.Copy, keys.Filter}
 	}
-	return []key.Binding{keys.Enter, keys.Copy, keys.Filter}
+	return []key.Binding{keys.Up, keys.Left, keys.Enter, keys.Copy}
 }
+
+var activityTypes = []string{"all", "poll", "queued", "skipped", "launched", "stage", "ci", "report", "merged"}
+var agentSorts = []string{"stage", "beat", "age", "issue"}
 
 type tickMsg time.Time
 type frameMsg struct{}
@@ -111,16 +126,20 @@ type pausedMsg struct {
 // Model is the dashboard's Bubble Tea model.
 type Model struct {
 	snap      Snapshot
-	focus     panel
-	sel       [nPanels]int
+	view      view
+	sel       [nViews]int
+	sel2      [nViews]int // selection in a view's second pane
+	pane      [nViews]int // 0 main pane, 1 second pane
+	agentSort int
+	actType   int
 	modal     bool
 	helpOpen  bool
-	logOpen   bool
-	logView   viewport.Model
-	logTitle  string
+	textOpen  bool
+	text      viewport.Model
+	textTitle string
 	filtering bool
 	input     textinput.Model
-	filter    [nPanels]string
+	filter    [nViews]string
 	loading   bool // a load is running; ticks skip theirs until it lands
 	width     int
 	height    int
@@ -163,34 +182,45 @@ func newModel(o options) Model {
 		now: o.now, load: o.load, opener: openURL, pauser: setPaused, fx: newFX(o.seed),
 		spring: harmonica.NewSpring(harmonica.FPS(fps), 4.0, 0.95), input: textinput.New()}
 	m.input.Prompt = "/ "
-	m.input.Placeholder = "filter this panel"
+	m.input.Placeholder = "filter this view"
 	m.th = newTheme(m.dark, m.profile, m.unicode)
 	m.snap = m.load(m.now())
 	m.capPos = capPercent(m.snap.Watcher)
 	if o.toast {
-		m.toast = "tab or 1-6 to move · enter for details · ? for help"
+		m.toast = "tab switches views · ↑↓ move · enter for details · ? for help"
 		m.toastTill = m.now().Add(4 * time.Second)
 	}
 	return m
 }
 
 // New builds the model from the environment: NO_COLOR, SMITHY_REDUCE_MOTION, the locale, and
-// ~/.smithy/tui.seen for the first-run hint.
-func New(noAnim bool) Model {
+// ~/.smithy/tui.seen for the first-run hint. In demo mode nothing is read or written.
+func New(noAnim, demo bool) Model {
 	p := colorprofile.TrueColor
 	if os.Getenv("NO_COLOR") != "" {
 		p = colorprofile.Ascii
 	}
-	seen := filepath.Join(ghx.Home(), "tui.seen")
-	_, err := os.Stat(seen)
-	first := os.IsNotExist(err)
-	if first {
-		_ = os.MkdirAll(filepath.Dir(seen), 0o700)
-		_ = os.WriteFile(seen, []byte(time.Now().Format(time.RFC3339)+"\n"), 0o600)
+	first := false
+	if !demo {
+		seen := filepath.Join(ghx.Home(), "tui.seen")
+		_, err := os.Stat(seen)
+		if first = os.IsNotExist(err); first {
+			_ = os.MkdirAll(filepath.Dir(seen), 0o700)
+			_ = os.WriteFile(seen, []byte(time.Now().Format(time.RFC3339)+"\n"), 0o600)
+		}
+	}
+	load := Load
+	if demo {
+		events.Off = true
+		load = Demo
 	}
 	motion := !noAnim && os.Getenv("SMITHY_REDUCE_MOTION") == "" && p != colorprofile.Ascii
-	return newModel(options{profile: p, dark: true, unicode: utf8Locale(), motion: motion, toast: first,
-		seed: uint64(time.Now().UnixNano()), now: time.Now, load: Load})
+	m := newModel(options{profile: p, dark: true, unicode: utf8Locale(), motion: motion, toast: first || demo,
+		seed: uint64(time.Now().UnixNano()), now: time.Now, load: load})
+	if demo {
+		m.pauser = func(bool) error { return fmt.Errorf("demo: intake is not real") }
+	}
+	return m
 }
 
 func setPaused(on bool) error {
@@ -266,7 +296,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.sizeLog()
+		m.sizeText()
 	case tea.BackgroundColorMsg:
 		m.dark = msg.IsDark()
 		m.th = newTheme(m.dark, m.profile, m.unicode)
@@ -311,7 +341,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.capPos = capPercent(m.snap.Watcher)
 			return m, nil
 		}
-		if events(prev, m.snap) {
+		if happened(prev, m.snap) {
 			return m, m.strike(12)
 		}
 		return m, m.animate()
@@ -335,18 +365,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.click(msg.Mouse())
 	case tea.MouseWheelMsg:
 		mm := msg.Mouse()
-		if m.logOpen {
+		if m.textOpen {
 			var cmd tea.Cmd
-			m.logView, cmd = m.logView.Update(msg)
+			m.text, cmd = m.text.Update(msg)
 			return m, cmd
 		}
-		if p, ok := m.panelAt(mm.X, mm.Y); ok {
-			m.focus = p
-			if mm.Button == tea.MouseWheelUp {
-				m.move(-1)
-			} else if mm.Button == tea.MouseWheelDown {
-				m.move(1)
-			}
+		if mm.Button == tea.MouseWheelUp {
+			m.move(-1)
+		} else if mm.Button == tea.MouseWheelDown {
+			m.move(1)
 		}
 	case tea.KeyPressMsg:
 		return m.key(msg)
@@ -354,8 +381,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// events reports a real change worth a strike: something queued or launched, a PR ready, a merge.
-func events(prev, cur Snapshot) bool {
+// happened reports a real change worth a strike: something queued or launched, a PR ready, a merge.
+func happened(prev, cur Snapshot) bool {
 	count := func(s Snapshot, stages ...string) int {
 		n := 0
 		for _, b := range s.Batches {
@@ -373,9 +400,19 @@ func events(prev, cur Snapshot) bool {
 		count(cur, "merged", "reported") > count(prev, "merged", "reported") || count(cur, "verify") > count(prev, "verify")
 }
 
+// move moves the selection of the focused pane of the current view.
 func (m *Model) move(d int) {
-	n := len(m.visible(m.focus))
-	m.sel[m.focus] = max(min(m.sel[m.focus]+d, n-1), 0)
+	v := m.view
+	if m.pane[v] == 1 {
+		n := len(m.rows2(v))
+		m.sel2[v] = max(min(m.sel2[v]+d, n-1), 0)
+		return
+	}
+	n := len(m.rows(v))
+	if v == vOverview {
+		n = 6
+	}
+	m.sel[v] = max(min(m.sel[v]+d, n-1), 0)
 }
 
 func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
@@ -385,7 +422,7 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "esc":
 			m.filtering = false
-			m.filter[m.focus] = ""
+			m.filter[m.view] = ""
 			m.input.SetValue("")
 			m.input.Blur()
 			return m, nil
@@ -396,22 +433,24 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
-		m.filter[m.focus] = m.input.Value()
-		m.sel[m.focus] = 0
+		m.filter[m.view] = m.input.Value()
+		m.sel[m.view] = 0
 		return m, cmd
 	}
-	if m.logOpen {
+	if m.textOpen {
 		switch {
-		case key.Matches(msg, keys.Quit) && msg.String() == "ctrl+c":
+		case msg.String() == "ctrl+c":
 			return m, tea.Quit
-		case key.Matches(msg, keys.Close, keys.Log, keys.Quit):
-			m.logOpen = false
+		case key.Matches(msg, keys.Close, keys.Log, keys.Quit, keys.Enter):
+			m.textOpen = false
 			return m, nil
 		}
 		var cmd tea.Cmd
-		m.logView, cmd = m.logView.Update(msg)
+		m.text, cmd = m.text.Update(msg)
 		return m, cmd
 	}
+	m.status = ""
+	v := m.view
 	switch {
 	case key.Matches(msg, keys.Quit):
 		return m, tea.Quit
@@ -420,8 +459,8 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.modal = false
 	case key.Matches(msg, keys.Close):
 		m.modal, m.helpOpen, m.toast = false, false, ""
-		if m.filter[m.focus] != "" {
-			m.filter[m.focus] = ""
+		if m.filter[v] != "" {
+			m.filter[v] = ""
 			m.input.SetValue("")
 		}
 	case m.helpOpen:
@@ -430,26 +469,52 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case key.Matches(msg, keys.Open):
 		return m.open()
 	case key.Matches(msg, keys.Copy):
-		return m.copy()
+		return m.copyField(false)
+	case key.Matches(msg, keys.Cmd):
+		return m.copyField(true)
 	case key.Matches(msg, keys.Log):
 		return m.openLog()
 	case m.modal:
 	case key.Matches(msg, keys.Jump):
-		m.focus = panel(msg.String()[0] - '1')
+		m.view = view(msg.String()[0] - '1')
 	case key.Matches(msg, keys.Next):
-		m.focus = (m.focus + 1) % nPanels
+		m.view = (v + 1) % nViews
 	case key.Matches(msg, keys.Prev):
-		m.focus = (m.focus + nPanels - 1) % nPanels
+		m.view = (v + nViews - 1) % nViews
 	case key.Matches(msg, keys.Up):
-		m.move(-1)
+		if v == vOverview {
+			m.move(-3)
+		} else {
+			m.move(-1)
+		}
 	case key.Matches(msg, keys.Down):
-		m.move(1)
+		if v == vOverview {
+			m.move(3)
+		} else {
+			m.move(1)
+		}
+	case key.Matches(msg, keys.Left, keys.Right):
+		d := 1
+		if key.Matches(msg, keys.Left) {
+			d = -1
+		}
+		switch v {
+		case vOverview:
+			m.move(d)
+		case vAgents, vIncoming, vPlans:
+			m.pane[v] = max(min(m.pane[v]+d, 1), 0)
+		}
 	case key.Matches(msg, keys.Enter):
-		_, ok := m.selected()
-		m.modal = ok
+		return m.enter()
+	case key.Matches(msg, keys.Sort) && v == vAgents:
+		m.agentSort = (m.agentSort + 1) % len(agentSorts)
+		m.status = "sorted by " + agentSorts[m.agentSort]
+	case key.Matches(msg, keys.Type) && v == vActivity:
+		m.actType = (m.actType + 1) % len(activityTypes)
+		m.sel[v] = 0
 	case key.Matches(msg, keys.Filter):
 		m.filtering = true
-		m.input.SetValue(m.filter[m.focus])
+		m.input.SetValue(m.filter[v])
 		return m, m.input.Focus()
 	case key.Matches(msg, keys.Pause):
 		on := !m.snap.Watcher.Paused
@@ -465,96 +530,132 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// click focuses the panel under the pointer and selects the row; a second click on it opens it.
+// enter opens the selected row's details; on the Overview it jumps to the card's view, and on a
+// plan's task it opens the task file.
+func (m Model) enter() (tea.Model, tea.Cmd) {
+	v := m.view
+	if v == vOverview {
+		m.view = []view{vActivity, vAgents, vIncoming, vAgents, vActivity, vNeeds}[m.sel[vOverview]]
+		return m, nil
+	}
+	if v == vPlans && m.pane[v] == 1 {
+		rs := m.rows2(v)
+		if i := m.sel2[v]; i < len(rs) {
+			m.showText(rs[i].title, rs[i].text)
+		}
+		return m, nil
+	}
+	if _, ok := m.selected(); ok {
+		m.modal = true
+	}
+	return m, nil
+}
+
+func (m *Model) showText(title string, lines []string) {
+	m.textOpen, m.modal = true, false
+	m.textTitle = title
+	m.text = viewport.New()
+	m.sizeText()
+	m.text.SetContentLines(lines)
+}
+
+// click: a tab switches views, a row selects (a second click on it opens), elsewhere closes overlays.
 func (m Model) click(mm tea.Mouse) (tea.Model, tea.Cmd) {
-	if m.modal || m.helpOpen || m.logOpen {
-		m.modal, m.helpOpen, m.logOpen = false, false, false
+	if m.modal || m.helpOpen || m.textOpen {
+		m.modal, m.helpOpen, m.textOpen = false, false, false
 		return m, nil
 	}
-	if p, ok := m.tabAt(mm.X, mm.Y); ok {
-		m.focus = p
+	if v, ok := m.tabAt(mm.X, mm.Y); ok {
+		m.view = v
 		return m, nil
 	}
-	p, ok := m.panelAt(mm.X, mm.Y)
-	if !ok {
-		return m, nil
-	}
-	m.focus = p
-	if i, ok := m.rowAt(p, mm.Y); ok {
-		double := m.sel[p] == i && m.clickPos == [2]int{mm.X, mm.Y} && m.now().Sub(m.clickAt) < 500*time.Millisecond
-		m.sel[p] = i
+	if i, ok := m.rowAt(mm.X, mm.Y); ok {
+		v := m.view
+		double := m.sel[v] == i && m.clickPos == [2]int{mm.X, mm.Y} && m.now().Sub(m.clickAt) < 500*time.Millisecond
+		m.sel[v], m.pane[v] = i, 0
 		m.clickAt, m.clickPos = m.now(), [2]int{mm.X, mm.Y}
 		if double {
-			m.modal = true
+			return m.enter()
 		}
 	}
 	return m, nil
 }
 
 func (m Model) open() (tea.Model, tea.Cmd) {
-	e, ok := m.selected()
-	if !ok || e.url == "" || e.url == "-" {
+	r, ok := m.selected()
+	if !ok || r.url == "" || r.url == "-" {
 		m.status = "no URL for this row"
 		return m, nil
 	}
-	if !webURL(e.url) {
+	if !webURL(r.url) {
 		m.status = "not a web URL"
 		return m, nil
 	}
-	m.status = "opening " + e.url
-	opener, u := m.opener, e.url
+	m.status = "opening " + r.url
+	opener, u := m.opener, r.url
 	return m, func() tea.Msg { return openedMsg{opener(u)} }
 }
 
-func (m Model) copy() (tea.Model, tea.Cmd) {
-	e, ok := m.selected()
-	if !ok || e.copy == "" {
+func (m Model) copyField(command bool) (tea.Model, tea.Cmd) {
+	r, ok := m.selected()
+	s := r.copy
+	if command {
+		s = r.cmd
+	}
+	if !ok || s == "" {
 		m.status = "nothing to copy on this row"
 		return m, nil
 	}
-	m.status = "copied " + e.copy
-	return m, tea.SetClipboard(e.copy)
+	m.status = "copied " + s
+	return m, tea.SetClipboard(s)
 }
 
 func (m Model) openLog() (tea.Model, tea.Cmd) {
-	e, ok := m.selected()
-	if !ok || e.log == "" {
+	r, ok := m.selected()
+	if !ok || (r.logPath == "" && r.logTail == nil) {
 		m.status = "no log for this row"
 		return m, nil
 	}
-	lines := tail(e.log, 2000)
+	lines := r.logTail
+	if r.logPath != "" {
+		lines = tail(r.logPath, 2000)
+	}
 	if lines == nil {
-		m.status = "no log yet at " + e.log
+		m.status = "no log yet at " + r.logPath
 		return m, nil
 	}
-	m.logOpen, m.modal = true, false
-	m.logTitle = e.log
-	m.logView = viewport.New()
-	m.sizeLog()
-	m.logView.SetContentLines(lines)
-	m.logView.GotoBottom()
+	m.showText("log "+home(r.logPath), lines)
+	m.text.GotoBottom()
 	return m, nil
 }
 
-func (m *Model) sizeLog() {
-	m.logView.SetWidth(max(min(m.width-8, 140), 20))
-	m.logView.SetHeight(max(m.height-12, 5))
+func (m *Model) sizeText() {
+	m.text.SetWidth(max(min(m.width-8, 140), 20))
+	m.text.SetHeight(max(m.height-14, 5))
 }
 
 func (m *Model) clamp() {
-	for p := panel(0); p < nPanels; p++ {
-		if n := len(m.visible(p)); m.sel[p] >= n {
-			m.sel[p] = max(n-1, 0)
+	for v := view(1); v < nViews; v++ {
+		if n := len(m.rows(v)); m.sel[v] >= n {
+			m.sel[v] = max(n-1, 0)
+		}
+		if n := len(m.rows2(v)); m.sel2[v] >= n {
+			m.sel2[v] = max(n-1, 0)
 		}
 	}
 }
 
-func (m Model) selected() (entry, bool) {
-	es := m.visible(m.focus)
-	if i := m.sel[m.focus]; i < len(es) {
-		return es[i], true
+// selected is the row the keys act on: the focused pane's selection.
+func (m Model) selected() (row, bool) {
+	v := m.view
+	rs, i := m.rows(v), m.sel[v]
+	if m.pane[v] == 1 {
+		rs, i = m.rows2(v), m.sel2[v]
 	}
-	return entry{}, false
+	if i < len(rs) {
+		return rs[i], true
+	}
+	return row{}, false
 }
 
 // webURL accepts only http(s) URLs with a host, so `o` never hands the opener a file or script URL.
@@ -586,6 +687,16 @@ func ago(d time.Duration) string {
 	return fmt.Sprintf("%dd ago", int(d.Hours()/24))
 }
 
+func dur(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	return fmt.Sprintf("%dh%02dm", int(d.Hours()), int(d.Minutes())%60)
+}
+
 func plural(n int, one, many string) string {
 	if n == 1 {
 		return "1 " + one
@@ -602,7 +713,7 @@ func shortPR(pr string) string {
 
 // Main runs `smithy tui`.
 func Main(args []string) int {
-	noAnim := false
+	noAnim, demo := false, false
 	for _, a := range args {
 		switch a {
 		case "-h", "--help":
@@ -610,12 +721,14 @@ func Main(args []string) int {
 			return 0
 		case "--no-anim":
 			noAnim = true
+		case "--demo":
+			demo = true
 		default:
 			fmt.Fprintf(os.Stderr, "smithy tui: unexpected argument %s\n%s\n", a, Usage)
 			return 2
 		}
 	}
-	if _, err := tea.NewProgram(New(noAnim)).Run(); err != nil {
+	if _, err := tea.NewProgram(New(noAnim, demo)).Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "smithy tui:", err)
 		return 1
 	}

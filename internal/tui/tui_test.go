@@ -11,6 +11,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -29,32 +30,48 @@ func write(t *testing.T, path, s string) {
 	}
 }
 
+func utc(t *testing.T) {
+	old := time.Local
+	time.Local = time.UTC
+	t.Cleanup(func() { time.Local = old })
+}
+
 // fixture builds a smithy home with an auto state, a batch of three workers (one PR ready, one
-// stuck, one queued), a task list, a decision, two worktrees (one orphaned) and a worker log.
+// stuck, one queued), a task list, a decision, two worktrees (one orphaned), a worker log and events.
 func fixture(t *testing.T) {
 	t.Helper()
 	home := t.TempDir()
 	t.Setenv("SMITHY_HOME", home)
 	t.Setenv("WARDEN_HOME", "")
-	old := time.Local
-	time.Local = time.UTC
-	t.Cleanup(func() { time.Local = old })
+	utc(t)
 	write(t, filepath.Join(home, "auto", "state.json"), `{"version":1,
 "queue":[{"source":"github","key":"github","id":"42","title":"Add dark mode to the report","url":"https://github.com/o/r/issues/42","model":"mid","speed":"normal","queued_at":"2026-11-23T13:00:00Z","body":"The report is too bright.\nAdd a dark theme."},
 {"source":"linear","key":"linear","id":"TES-7","title":"Fix flaky login test","url":"https://linear.app/x/issue/TES-7","queued_at":"2026-11-23T14:10:00Z"}],
 "launched":{"2026-11-23":[{"source":"github","id":"40","batch":"b1","item":"01-api","at":"2026-11-23T09:10:00Z"},{"source":"github","id":"41","batch":"b1","item":"02-ui","at":"2026-11-23T13:20:00Z"}]},
-"last_poll":{"github":"2026-11-23T14:29:30Z"}}`)
+"last_poll":{"github":"2026-11-23T14:29:30Z"},"rate":{"github":4999}}`)
 	b := filepath.Join(home, "warden", "b1")
-	write(t, filepath.Join(b, "batch.json"), `{"items":[
-{"id":"01-api","title":"API","route":"strong","source":"github#40","branch":"feat/api","worktree":"/w/api"},
+	write(t, filepath.Join(b, "batch.json"), `{"repo":"/src/smithy","items":[
+{"id":"01-api","title":"API","model":"strong","speed":"fast","source":"github#40","branch":"feat/api","worktree":"/w/api"},
 {"id":"02-ui","title":"UI","route":"cheap","source":"github#41","branch":"feat/ui","worktree":"/w/ui"},
 {"id":"03-db","title":"DB","route":"mid"}]}`)
-	write(t, filepath.Join(b, "01-api.json"), `{"state":"pr_open","phase":"ship","pr":"https://github.com/o/r/pull/9","ci":"green","updated":"2026-11-23T14:20:00Z","last_beat":"2026-11-23T14:28:00Z"}`)
+	write(t, filepath.Join(b, "01-api.json"), `{"state":"ready","phase":"ship","pr":"https://github.com/o/r/pull/9","ci":"green","updated":"2026-11-23T14:20:00Z","last_beat":"2026-11-23T14:28:00Z"}`)
 	write(t, filepath.Join(b, "02-ui.json"), `{"state":"blocked","phase":"build","note":"tests need a DB","updated":"2026-11-23T14:00:00Z"}`)
 	write(t, filepath.Join(b, "01-api.log"), "step 1\nstep 2\nopened PR #9\n")
+	for _, e := range []events.Event{
+		{T: fixedNow.Add(-90 * time.Minute), Kind: "queued", Source: "github", ID: "40"},
+		{T: fixedNow.Add(-80 * time.Minute), Kind: "launched", Source: "github", ID: "40", Batch: "b1", Item: "01-api"},
+		{T: fixedNow.Add(-40 * time.Minute), Kind: "ci", Batch: "b1", Item: "01-api", Detail: "pending"},
+		{T: fixedNow.Add(-30 * time.Minute), Kind: "ci", Batch: "b1", Item: "01-api", Detail: "green", PR: "https://github.com/o/r/pull/9"},
+		{T: fixedNow.Add(-10 * time.Minute), Kind: "stage", Batch: "b1", Item: "01-api", Detail: "ready", PR: "https://github.com/o/r/pull/9"},
+		{T: fixedNow.Add(-5 * time.Minute), Kind: "skipped", Source: "github", ID: "43", Detail: "no auto label: Rename the CLI"},
+	} {
+		if err := events.Append(e); err != nil {
+			t.Fatal(err)
+		}
+	}
 	tdir := filepath.Join(home, "plans", "repo", "v1")
 	write(t, filepath.Join(tdir, "01-a.md"), "# 01 · A\nStatus: done\n")
-	write(t, filepath.Join(tdir, "02-b.md"), "# 02 · B\nStatus: doing\n")
+	write(t, filepath.Join(tdir, "02-b.md"), "# 02 · B\nStatus: doing\n\nDo the B thing.\n")
 	write(t, filepath.Join(tdir, "03-c.md"), "# 03 · C\nStatus: todo\n")
 	oldDirs, oldDec, oldWT, oldRepo := taskDirs, pendingDecisions, scanWorktrees, repoName
 	taskDirs = func() []string { return []string{tdir} }
@@ -62,20 +79,27 @@ func fixture(t *testing.T) {
 		return []string{"2026-11-22 · timeout · Use Postgres? → yes · fits the stack · ref: https://github.com/o/r/pull/9"}, nil
 	}
 	scanWorktrees = func([]Batch, time.Time) []Worktree {
-		return []Worktree{{Path: "/w/api", Branch: "feat/api", Item: "b1/01-api", Age: 25 * time.Minute},
+		return []Worktree{{Path: "/w/api", Branch: "feat/api", Item: "b1/01-api", Age: 25 * time.Minute, Ahead: 2},
 			{Path: "/w/old", Branch: "feat/old", Age: 49 * time.Hour, Dirty: true, Orphan: true, Status: []string{" M main.go"}}}
 	}
 	repoName = func() string { return "smithy" }
 	t.Cleanup(func() { taskDirs, pendingDecisions, scanWorktrees, repoName = oldDirs, oldDec, oldWT, oldRepo })
 }
 
-func model(w, h int) Model {
+func newTest(w, h int, load func(time.Time) Snapshot) Model {
 	m := newModel(options{profile: colorprofile.TrueColor, dark: true, unicode: true, seed: 7,
-		now: func() time.Time { return fixedNow }, load: Load})
+		now: func() time.Time { return fixedNow }, load: load})
 	m.width, m.height = w, h
 	m.opener = func(string) error { return nil }
 	m.pauser = func(bool) error { return nil }
 	return m
+}
+
+func model(w, h int) Model { return newTest(w, h, Load) }
+
+func demo(t *testing.T, w, h int) Model {
+	utc(t)
+	return newTest(w, h, Demo)
 }
 
 func TestLoad(t *testing.T) {
@@ -89,70 +113,98 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("queue/batches = %d/%+v", len(s.Queue), s.Batches)
 	}
 	it := s.Batches[0].Items[0]
-	if it.Stage != "verify" || it.Model != "strong" || it.Branch != "feat/api" || it.LastBeat == "" || !strings.HasSuffix(it.Log, "01-api.log") {
+	if it.Stage != "verify" || it.Model != "strong" || it.Speed != "fast" || it.Repo != "smithy" || it.LastBeat == "" || !strings.HasSuffix(it.Log, "01-api.log") {
 		t.Fatalf("item = %+v", it)
 	}
-	if tl := s.Tasks[0]; tl.Total != 3 || tl.Counts["done"] != 1 {
-		t.Fatalf("tasks = %+v", tl)
-	}
-	if len(s.Activity) < 5 || !s.Activity[0].At.After(s.Activity[len(s.Activity)-1].At) {
-		t.Fatalf("activity = %+v", s.Activity)
-	}
-	if len(s.Worktrees) != 2 || s.Repo != "smithy" || len(s.Decisions) != 1 || len(s.Errors) != 0 {
-		t.Fatalf("worktrees/repo/decisions/errors = %v %q %v %v", s.Worktrees, s.Repo, s.Decisions, s.Errors)
+	if len(s.Events) != 6 || s.Rates["github"] != 4999 || len(s.Worktrees) != 2 || s.Repo != "smithy" || len(s.Errors) != 0 {
+		t.Fatalf("events/rates/worktrees = %d %v %d %v", len(s.Events), s.Rates, len(s.Worktrees), s.Errors)
 	}
 	if Load(fixedNow.Add(time.Hour)).Watcher.Alive {
 		t.Fatal("watcher should be stale an hour later")
 	}
 }
 
-func TestPausedSetting(t *testing.T) {
+func TestStats(t *testing.T) {
 	fixture(t)
-	write(t, filepath.Join(os.Getenv("SMITHY_HOME"), "config.json"), `{"auto":{"paused":"true"}}`)
-	if err := setPaused(true); err != nil {
-		t.Fatal(err)
+	s := Load(fixedNow)
+	a, _ := throughput(s.Events, fixedNow)
+	if a[22] != 1 {
+		t.Fatalf("launched per hour = %v", a)
 	}
-	if !Load(fixedNow).Watcher.Paused {
-		t.Fatal("auto.paused not read")
+	runs := ciRuns(s.Events, 20)
+	if len(runs) != 1 || !runs[0].green || runs[0].took != 10*time.Minute {
+		t.Fatalf("ci runs = %+v", runs)
 	}
-	if err := setPaused(false); err != nil || Load(fixedNow).Watcher.Paused {
-		t.Fatalf("unpause: %v", err)
+	ready, _ := leadTimes(s.Events)
+	if len(ready) != 1 || ready[0] != 80*time.Minute {
+		t.Fatalf("lead = %v", ready)
+	}
+	if p := percentile([]time.Duration{1, 2, 3, 4, 100}, 0.5); p != 3 {
+		t.Fatalf("median = %v", p)
 	}
 }
 
-func TestLoadEmpty(t *testing.T) {
-	t.Setenv("SMITHY_HOME", t.TempDir())
-	t.Setenv("WARDEN_HOME", "")
-	oldDirs, oldDec, oldWT := taskDirs, pendingDecisions, scanWorktrees
-	taskDirs = func() []string { return nil }
-	pendingDecisions = func() ([]string, error) { return nil, nil }
-	scanWorktrees = func([]Batch, time.Time) []Worktree { return nil }
-	t.Cleanup(func() { taskDirs, pendingDecisions, scanWorktrees = oldDirs, oldDec, oldWT })
-	m := model(140, 45)
-	out := ansi.Strip(m.render())
-	for _, want := range []string{"not running", "start: tend auto", "smithy auto poll", "Nothing needs you", "smithy warden status"} {
-		if !strings.Contains(out, want) {
-			t.Errorf("empty view lacks %q:\n%s", want, out)
+func TestDemo(t *testing.T) {
+	utc(t)
+	a, b := Demo(fixedNow), Demo(fixedNow)
+	if fmt.Sprint(a.Events) != fmt.Sprint(b.Events) || len(a.Events) < 24*20 {
+		t.Fatalf("demo not deterministic or too thin: %d events", len(a.Events))
+	}
+	stages := map[string]int{}
+	n := 0
+	for _, bt := range a.Batches {
+		for _, it := range bt.Items {
+			stages[stageOf(it)]++
+			n++
 		}
+	}
+	for _, s := range []string{"queued", "building", "checking", "pr_open", "ready", "blocked", "merged"} {
+		if stages[s] == 0 {
+			t.Errorf("demo lacks stage %s: %v", s, stages)
+		}
+	}
+	m := demo(t, 160, 48)
+	if n != 14 || len(a.Tasks) != 4 || len(a.Watcher.Sources) != 2 || len(m.rows(vNeeds)) < 5 || !a.Demo {
+		t.Fatalf("demo world: %d agents, %d plans, %d needs", n, len(a.Tasks), len(m.rows(vNeeds)))
+	}
+}
+
+func TestDemoWritesNothing(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SMITHY_HOME", home)
+	t.Setenv("NO_COLOR", "")
+	defer func() { events.Off = false }()
+	m := New(true, true)
+	m.width, m.height = 120, 40
+	m.render()
+	if _, cmd := press(m, "p"); cmd != nil {
+		if msg := cmd(); msg.(pausedMsg).err == nil {
+			t.Fatal("demo pause should refuse")
+		}
+	}
+	if entries, _ := os.ReadDir(home); len(entries) != 0 {
+		t.Fatalf("demo wrote %v", entries)
 	}
 }
 
 func TestGolden(t *testing.T) {
-	fixture(t)
-	for _, size := range [][2]int{{140, 45}, {100, 30}, {70, 24}} {
-		m := model(size[0], size[1])
-		m.focus = pAgents
+	for _, g := range []struct {
+		w, h int
+		v    view
+	}{{160, 48, vOverview}, {160, 48, vAgents}, {100, 30, vOverview}, {100, 30, vAgents}, {70, 24, vNeeds}} {
+		m := demo(t, g.w, g.h)
+		m.view = g.v
 		got := ansi.Strip(m.View().Content)
 		lines := strings.Split(got, "\n")
-		if len(lines) != size[1] {
-			t.Errorf("%dx%d: %d lines", size[0], size[1], len(lines))
+		if len(lines) != g.h {
+			t.Errorf("%dx%d: %d lines", g.w, g.h, len(lines))
 		}
 		for i, l := range lines {
-			if w := ansi.StringWidth(l); w > size[0] {
-				t.Errorf("%dx%d: line %d is %d wide", size[0], size[1], i, w)
+			if w := ansi.StringWidth(l); w > g.w {
+				t.Errorf("%dx%d: line %d is %d wide", g.w, g.h, i, w)
 			}
 		}
-		file := filepath.Join("testdata", fmt.Sprintf("%dx%d.golden", size[0], size[1]))
+		file := filepath.Join("testdata", fmt.Sprintf("demo-%s-%dx%d.golden", strings.ToLower(strings.ReplaceAll(viewNames[g.v], " ", "-")), g.w, g.h))
 		if *update {
 			write(t, file, got)
 			continue
@@ -186,8 +238,6 @@ func press(m Model, k string) (Model, tea.Cmd) {
 		msg = tea.KeyPressMsg{Code: tea.KeyEnter}
 	case "esc":
 		msg = tea.KeyPressMsg{Code: tea.KeyEscape}
-	case "backspace":
-		msg = tea.KeyPressMsg{Code: tea.KeyBackspace}
 	case "ctrl+c":
 		msg = tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	default:
@@ -198,70 +248,77 @@ func press(m Model, k string) (Model, tea.Cmd) {
 }
 
 func TestKeys(t *testing.T) {
-	fixture(t)
-	m := model(140, 45)
-	if m, _ = press(m, "tab"); m.focus != pAgents {
-		t.Fatalf("tab -> %v", m.focus)
+	m := demo(t, 160, 48)
+	if m, _ = press(m, "tab"); m.view != vAgents {
+		t.Fatalf("tab -> %v", m.view)
 	}
-	if m, _ = press(m, "shift+tab"); m.focus != pIncoming {
-		t.Fatalf("shift+tab -> %v", m.focus)
+	if m, _ = press(m, "shift+tab"); m.view != vOverview {
+		t.Fatalf("shift+tab -> %v", m.view)
 	}
-	if m, _ = press(m, "left"); m.focus != pPlans {
-		t.Fatalf("left wraps -> %v", m.focus)
+	if m, _ = press(m, "shift+tab"); m.view != vPlans {
+		t.Fatalf("shift+tab wraps -> %v", m.view)
 	}
-	if m, _ = press(m, "5"); m.focus != pWorktrees {
-		t.Fatalf("5 -> %v", m.focus)
+	if m, _ = press(m, "1"); m.view != vOverview {
+		t.Fatal("1 did not jump")
 	}
-	m, _ = press(m, "1")
-	if m, _ = press(m, "j"); m.sel[pIncoming] != 1 {
-		t.Fatalf("j -> %d", m.sel[pIncoming])
+	if m, _ = press(m, "right"); m.view != vOverview || m.sel[vOverview] != 1 {
+		t.Fatalf("right on Overview moves the card: view %v card %d", m.view, m.sel[vOverview])
 	}
-	if m, _ = press(m, "down"); m.sel[pIncoming] != 1 {
-		t.Fatal("down past the end moved")
+	if m, _ = press(m, "down"); m.sel[vOverview] != 4 {
+		t.Fatalf("down on Overview -> card %d", m.sel[vOverview])
 	}
-	if m, _ = press(m, "k"); m.sel[pIncoming] != 0 {
-		t.Fatal("k did not move")
+	if m, _ = press(m, "enter"); m.view != vActivity {
+		t.Fatalf("enter on the Lead time card -> %v", m.view)
 	}
-	if m, _ = press(m, "enter"); !m.modal || !strings.Contains(ansi.Strip(m.render()), "Add a dark theme") {
-		t.Fatal("enter did not open the issue detail with its text")
+	m, _ = press(m, "2")
+	if m, _ = press(m, "j"); m.sel[vAgents] != 1 || m.view != vAgents {
+		t.Fatalf("j -> %d", m.sel[vAgents])
 	}
-	if m, _ = press(m, "tab"); m.focus != pIncoming {
-		t.Fatal("tab moved focus under the modal")
+	if m, _ = press(m, "right"); m.pane[vAgents] != 1 || m.view != vAgents {
+		t.Fatal("right did not focus the preview")
 	}
-	if m, _ = press(m, "esc"); m.modal {
-		t.Fatal("esc did not close the modal")
+	m, _ = press(m, "left")
+	if m, _ = press(m, "enter"); !m.modal || !strings.Contains(ansi.Strip(m.render()), "timeline") {
+		t.Fatal("enter did not open the worker detail")
 	}
-	var opened string
-	m.opener = func(u string) error { opened = u; return nil }
-	m, cmd := press(m, "o")
-	if cmd == nil {
-		t.Fatal("o returned no command")
+	if m, _ = press(m, "tab"); m.view != vAgents {
+		t.Fatal("tab switched views under the modal")
 	}
-	cmd()
-	if opened != "https://github.com/o/r/issues/42" {
-		t.Fatalf("opened %q", opened)
+	m, _ = press(m, "esc")
+	first := m.rows(vAgents)[0].cells[0].s
+	if m, _ = press(m, "s"); m.agentSort != 1 || m.rows(vAgents)[0].cells[0].s == first && false {
+		t.Fatal("s did not change the sort")
 	}
-	if m, cmd = press(m, "c"); cmd == nil || !strings.HasPrefix(m.status, "copied https://github.com/o/r/issues/42") {
-		t.Fatalf("c: %q", m.status)
+	if m, _ = press(m, "l"); !m.textOpen || !strings.Contains(ansi.Strip(m.render()), "[smelt]") {
+		t.Fatal("l did not open the log")
 	}
-	m.focus = pPlans
-	if m, cmd = press(m, "o"); cmd != nil || m.status != "no URL for this row" {
-		t.Fatalf("o on a row without URL: %q", m.status)
+	m, _ = press(m, "esc")
+	m, _ = press(m, "5")
+	if m, _ = press(m, "t"); activityTypes[m.actType] != "poll" {
+		t.Fatal("t did not switch the type")
 	}
+	for _, r := range m.rows(vActivity) {
+		if !strings.HasSuffix(r.cells[1].s, "poll") {
+			t.Fatalf("type filter let %q through", r.cells[1].s)
+		}
+	}
+	m, _ = press(m, "4")
+	m.sel[vNeeds] = 0
+	if m, cmd := press(m, "y"); cmd == nil || !strings.Contains(m.status, "smithy decisions confirm 1") {
+		t.Fatalf("y: %q", m.status)
+	}
+	m, _ = press(m, "7")
+	m, _ = press(m, "right")
+	if m, _ = press(m, "enter"); !m.textOpen || !strings.Contains(ansi.Strip(m.render()), "Done when") {
+		t.Fatal("enter on a task did not open its file")
+	}
+	m, _ = press(m, "esc")
 	if m, _ = press(m, "?"); !m.helpOpen || !strings.Contains(ansi.Strip(m.render()), "Every smithy worktree") {
 		t.Fatal("? did not open the help overlay")
 	}
 	m, _ = press(m, "esc")
-	if _, cmd = press(m, "r"); cmd == nil {
-		t.Fatal("r returned no command")
-	} else if _, ok := cmd().(snapMsg); !ok {
-		t.Fatal("r did not reload")
-	}
 	for _, k := range []string{"q", "ctrl+c"} {
 		_, cmd := press(m, k)
-		if cmd == nil {
-			t.Fatalf("%s returned no command", k)
-		}
 		if _, ok := cmd().(tea.QuitMsg); !ok {
 			t.Fatalf("%s did not quit", k)
 		}
@@ -269,95 +326,74 @@ func TestKeys(t *testing.T) {
 }
 
 func TestFilter(t *testing.T) {
-	fixture(t)
-	m := model(140, 45)
-	m, _ = press(m, "1")
+	m := demo(t, 160, 48)
+	m, _ = press(m, "3")
 	m, _ = press(m, "/")
-	if !m.filtering {
-		t.Fatal("/ did not start filtering")
-	}
-	for _, r := range "flaky" {
+	for _, r := range "cold" {
 		m, _ = press(m, string(r))
 	}
-	if es := m.visible(pIncoming); len(es) != 1 || !strings.Contains(es[0].text, "TES-7") {
-		t.Fatalf("filtered = %+v", es)
+	if rs := m.rows(vIncoming); len(rs) != 1 || !strings.Contains(rs[0].cells[1].s, "cold start") {
+		t.Fatalf("filtered = %d", len(rs))
 	}
-	if m, _ = press(m, "q"); m.focus != pIncoming || !m.filtering {
+	if m, _ = press(m, "q"); !m.filtering {
 		t.Fatal("q typed into the filter should not quit")
 	}
-	m, _ = press(m, "enter")
-	if m.filtering || len(m.visible(pIncoming)) != 0 {
-		t.Fatalf("after enter: filtering=%v visible=%d (filter %q)", m.filtering, len(m.visible(pIncoming)), m.filter[pIncoming])
-	}
 	m, _ = press(m, "esc")
-	if len(m.visible(pIncoming)) != 2 {
+	if len(m.rows(vIncoming)) != 6 {
 		t.Fatal("esc did not clear the filter")
 	}
 }
 
-func TestLogView(t *testing.T) {
+func TestLogFromFile(t *testing.T) {
 	fixture(t)
-	m := model(140, 45)
+	m := model(160, 48)
 	m, _ = press(m, "2")
-	if m, _ = press(m, "l"); !m.logOpen || !strings.Contains(ansi.Strip(m.render()), "opened PR #9") {
-		t.Fatal("l did not open the worker log")
+	for i, r := range m.rows(vAgents) {
+		if r.cells[1].s == "API" {
+			m.sel[vAgents] = i
+		}
 	}
-	if m, _ = press(m, "esc"); m.logOpen {
-		t.Fatal("esc did not close the log")
-	}
-	m, _ = press(m, "j")
-	if m, _ = press(m, "l"); m.logOpen || !strings.HasPrefix(m.status, "no log yet") {
-		t.Fatalf("missing log: %q", m.status)
+	if m, _ = press(m, "l"); !m.textOpen || !strings.Contains(ansi.Strip(m.render()), "opened PR #9") {
+		t.Fatal("l did not open the worker log file")
 	}
 }
 
 func TestPauseKey(t *testing.T) {
 	fixture(t)
-	m := model(140, 45)
+	m := model(160, 48)
 	var got []bool
 	m.pauser = func(on bool) error { got = append(got, on); return nil }
-	m, cmd := press(m, "p")
+	_, cmd := press(m, "p")
 	nm, cmd2 := m.Update(cmd())
 	if len(got) != 1 || !got[0] || cmd2 == nil || !strings.Contains(nm.(Model).status, "paused") {
 		t.Fatalf("p: %v %q", got, nm.(Model).status)
 	}
+	write(t, filepath.Join(os.Getenv("SMITHY_HOME"), "config.json"), `{}`)
+	if err := setPaused(true); err != nil || !Load(fixedNow).Watcher.Paused {
+		t.Fatalf("setPaused: %v", err)
+	}
 }
 
 func TestMouse(t *testing.T) {
-	fixture(t)
-	m := model(140, 45)
-	_, tabY, rects, _ := m.layout()
-	r := rects[pNeeds]
-	nm, _ := m.Update(tea.MouseClickMsg{X: r.x + 3, Y: r.y + 1})
-	m = nm.(Model)
-	if m.focus != pNeeds || m.sel[pNeeds] != 0 {
-		t.Fatalf("click focus=%v sel=%d", m.focus, m.sel[pNeeds])
+	m := demo(t, 160, 48)
+	_, tabY, _, _ := m.frame()
+	nm, _ := m.Update(tea.MouseClickMsg{X: 2 + ansi.StringWidth(m.tabLabel(vOverview)) + 2, Y: tabY})
+	if m = nm.(Model); m.view != vAgents {
+		t.Fatalf("tab click -> %v", m.view)
 	}
-	_, owner := m.panelBody(pNeeds, r.w-4, r.h-2)
-	y := -1
-	for i, o := range owner {
-		if o == 1 {
-			y = r.y + 1 + i
-			break
-		}
+	r := m.panes()["main"]
+	y := r.y + 2 + 3
+	nm, _ = m.Update(tea.MouseClickMsg{X: r.x + 5, Y: y})
+	if m = nm.(Model); m.sel[vAgents] != 3 || m.modal {
+		t.Fatalf("row click sel=%d", m.sel[vAgents])
 	}
-	nm, _ = m.Update(tea.MouseClickMsg{X: r.x + 3, Y: y})
-	m = nm.(Model)
-	if m.sel[pNeeds] != 1 || m.modal {
-		t.Fatalf("second row click sel=%d modal=%v", m.sel[pNeeds], m.modal)
-	}
-	nm, _ = m.Update(tea.MouseClickMsg{X: r.x + 3, Y: y})
+	nm, _ = m.Update(tea.MouseClickMsg{X: r.x + 5, Y: y})
 	if !nm.(Model).modal {
 		t.Fatal("double click did not open")
 	}
-	nm, _ = m.Update(tea.MouseClickMsg{X: 1 + ansi.StringWidth(m.tabLabel(pIncoming)) + 3, Y: tabY})
-	if nm.(Model).focus != pAgents {
-		t.Fatalf("tab click focus=%v", nm.(Model).focus)
-	}
-	a := rects[pAgents]
-	nm, _ = m.Update(tea.MouseWheelMsg{X: a.x + 2, Y: a.y + 2, Button: tea.MouseWheelDown})
-	if mm := nm.(Model); mm.focus != pAgents || mm.sel[pAgents] != 1 {
-		t.Fatalf("wheel focus=%v sel=%d", mm.focus, mm.sel[pAgents])
+	nm, _ = m.Update(tea.MouseWheelMsg{X: r.x + 5, Y: y, Button: tea.MouseWheelDown})
+	if nm.(Model).sel[vAgents] != 4 {
+		t.Fatal("wheel did not move")
 	}
 }
 
@@ -365,8 +401,8 @@ func TestToast(t *testing.T) {
 	fixture(t)
 	m := newModel(options{profile: colorprofile.TrueColor, dark: true, unicode: true, toast: true,
 		now: func() time.Time { return fixedNow }, load: Load})
-	m.width, m.height = 140, 45
-	if !strings.Contains(ansi.Strip(m.render()), "tab or 1-6 to move") {
+	m.width, m.height = 160, 48
+	if !strings.Contains(ansi.Strip(m.render()), "tab switches views") {
 		t.Fatal("first-run toast missing")
 	}
 	m.now = func() time.Time { return fixedNow.Add(5 * time.Second) }
@@ -384,6 +420,7 @@ func TestSanitize(t *testing.T) {
 {"source":"github","id":"2","title":"\u001b[2Jwipe\u009b31m\u0001","url":"javascript:alert(1)"}]}`)
 	write(t, filepath.Join(home, "warden", "b1", "02-ui.json"), `{"state":"working","note":"n\u001b[31mred\u001b]8;;http://e\u0007","branch":"x\u001b[2J"}`)
 	write(t, filepath.Join(home, "warden", "b1", "01-api.log"), "ok\n\u001b]52;c;aGk=\u0007boom\n")
+	write(t, filepath.Join(home, "events.jsonl"), `{"t":"2026-11-23T14:00:00Z","kind":"queued","id":"\u001b[2J9","detail":"x\u009b2J"}`+"\n")
 	pendingDecisions = func() ([]string, error) { return []string{"d \u001b[2J· x"}, errors.New("bad\u001b[2J") }
 	s := Load(fixedNow)
 	var all []string
@@ -398,8 +435,8 @@ func TestSanitize(t *testing.T) {
 			}
 		}
 	}
-	for _, e := range s.Activity {
-		all = append(all, e.Text)
+	for _, e := range s.Events {
+		all = append(all, e.ID, e.Detail)
 	}
 	all = append(all, tail(s.Batches[0].Items[0].Log, 15)...)
 	all = append(all, s.Decisions...)
@@ -424,18 +461,18 @@ func TestOpenRequiresWebURL(t *testing.T) {
 {"source":"github","id":"2","title":"b","url":"https:///nohost"},
 {"source":"github","id":"3","title":"c","url":"file:///etc/passwd"},
 {"source":"github","id":"4","title":"d","url":"http://ok.example/4"}]}`)
-	m := model(140, 45)
-	m.focus = pIncoming
+	m := model(160, 48)
+	m.view = vIncoming
 	var opened []string
 	m.opener = func(u string) error { opened = append(opened, u); return nil }
 	for i := 0; i < 3; i++ {
-		m.sel[pIncoming] = i
+		m.sel[vIncoming] = i
 		nm, cmd := press(m, "o")
 		if cmd != nil || nm.status != "not a web URL" {
 			t.Fatalf("row %d: cmd=%v status=%q", i, cmd != nil, nm.status)
 		}
 	}
-	m.sel[pIncoming] = 3
+	m.sel[vIncoming] = 3
 	_, cmd := press(m, "o")
 	cmd()
 	if len(opened) != 1 || opened[0] != "http://ok.example/4" {
@@ -445,7 +482,7 @@ func TestOpenRequiresWebURL(t *testing.T) {
 
 func TestOverlappingLoads(t *testing.T) {
 	fixture(t)
-	m := model(140, 45)
+	m := model(160, 48)
 	nm, cmd := m.Update(tickMsg(fixedNow))
 	m = nm.(Model)
 	if !m.loading || cmd == nil {
@@ -457,8 +494,7 @@ func TestOverlappingLoads(t *testing.T) {
 	if !nm.(Model).loading || calls != 0 {
 		t.Fatal("second tick loaded while one was in flight")
 	}
-	old := Snapshot{At: fixedNow.Add(-time.Minute)}
-	nm, _ = m.Update(snapMsg(old))
+	nm, _ = m.Update(snapMsg(Snapshot{At: fixedNow.Add(-time.Minute)}))
 	if m = nm.(Model); !m.snap.At.Equal(fixedNow) || m.loading {
 		t.Fatalf("older snapshot applied (at %v) or loading kept", m.snap.At)
 	}
@@ -468,62 +504,58 @@ func TestOverlappingLoads(t *testing.T) {
 	}
 }
 
-func TestModalFloats(t *testing.T) {
-	fixture(t)
-	m := model(140, 45)
-	m, _ = press(m, "2")
-	m, _ = press(m, "enter")
-	out := ansi.Strip(m.render())
-	for _, want := range []string{"b1/01-api", "last beat", "opened PR #9", "Incoming", "Worktrees"} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("modal lacks %q or does not float over the dashboard:\n%s", want, out)
-		}
-	}
-	if n := len(strings.Split(out, "\n")); n != 45 {
-		t.Fatalf("modal view has %d lines", n)
-	}
-}
-
 func TestResize(t *testing.T) {
-	fixture(t)
-	m := model(140, 45)
-	for _, sz := range [][2]int{{60, 20}, {100, 30}, {200, 60}} {
-		nm, _ := m.Update(tea.WindowSizeMsg{Width: sz[0], Height: sz[1]})
-		out := ansi.Strip(nm.(Model).render())
-		if n := len(strings.Split(out, "\n")); n != sz[1] {
-			t.Fatalf("%dx%d rendered %d lines", sz[0], sz[1], n)
+	m := demo(t, 160, 48)
+	for v := view(0); v < nViews; v++ {
+		m.view = v
+		for _, sz := range [][2]int{{60, 20}, {100, 30}, {220, 60}} {
+			nm, _ := m.Update(tea.WindowSizeMsg{Width: sz[0], Height: sz[1]})
+			out := ansi.Strip(nm.(Model).render())
+			if n := len(strings.Split(out, "\n")); n != sz[1] {
+				t.Fatalf("%s at %dx%d rendered %d lines", viewNames[v], sz[0], sz[1], n)
+			}
 		}
 	}
 }
 
-func TestAnvilReadsAsAnvil(t *testing.T) {
-	fixture(t)
+func TestAnvilShape(t *testing.T) {
 	for _, s := range []sprite{bigAnvil, smallAnvil} {
 		widths := make([]int, s.h())
 		for y, row := range s.mask {
 			widths[y] = strings.Count(row, "#")
 		}
-		face, waist, base := widths[s.faceY], widths[s.h()-1], widths[s.h()-1]
-		for _, w := range widths[s.faceY:] {
+		face, waist := 0, s.w()
+		for y := s.faceY; y < s.faceY+3; y++ {
+			face = max(face, widths[y])
+		}
+		for _, w := range widths[s.faceY+3:] {
 			waist = min(waist, w)
 		}
-		if !(face > base && base > waist && waist > 0) {
-			t.Fatalf("silhouette is not face > base > waist: %v", widths)
+		base := widths[s.h()-2]
+		if !(face > base && base > 2*waist && waist > 0) {
+			t.Fatalf("not face > base > 2×waist: %v", widths)
 		}
-		if s.mask[s.faceY][0:3] == "###" || s.mask[s.faceY][s.w()-1] == '#' {
-			t.Fatal("no margin around the horn or heel")
+		horn := s.mask[s.faceY+1]
+		if horn[0] != '#' || s.mask[s.faceY][0] == '#' || s.mask[s.faceY+2][0] == '#' {
+			t.Fatal("the horn is not a point on the left")
+		}
+		heel := strings.LastIndex(s.mask[s.faceY], "#")
+		if strings.LastIndex(s.mask[s.faceY+1], "#") != heel || strings.LastIndex(s.mask[s.faceY+2], "#") != heel {
+			t.Fatal("the heel is not square on the right")
+		}
+		if feet := strings.TrimSpace(s.mask[s.h()-1]); !strings.Contains(feet, " ") {
+			t.Fatal("the base has no feet")
 		}
 	}
-	m := model(140, 45)
+	m := demo(t, 160, 48)
 	if rows := m.anvil(bigAnvil); len(rows) != 7 || ansi.StringWidth(rows[3]) != 30 {
-		t.Fatalf("big anvil is %d rows, %d wide", len(rows), ansi.StringWidth(rows[3]))
+		t.Fatalf("big anvil is %d rows", len(rows))
 	}
 }
 
 func TestHeaderFrameDeterministic(t *testing.T) {
-	fixture(t)
 	frameAt := func(seed uint64, steps int) string {
-		m := model(140, 45)
+		m := demo(t, 160, 48)
 		m.motion = true
 		m.fx = newFX(seed)
 		m.strike(10)
@@ -533,31 +565,27 @@ func TestHeaderFrameDeterministic(t *testing.T) {
 		return strings.Join(m.anvil(bigAnvil), "\n") + strings.Join(m.wordmark(), "\n")
 	}
 	a := frameAt(42, 6)
-	if a != frameAt(42, 6) {
-		t.Fatal("same seed, different frames")
+	if a != frameAt(42, 6) || a == frameAt(43, 6) {
+		t.Fatal("frames are not a function of the seed")
 	}
-	if a == frameAt(43, 6) {
-		t.Fatal("different seeds drew the same sparks")
-	}
-	still := model(140, 45)
+	still := demo(t, 160, 48)
 	if a == strings.Join(still.anvil(bigAnvil), "\n")+strings.Join(still.wordmark(), "\n") {
 		t.Fatal("a mid-spark frame equals the still one")
 	}
-	for _, w := range []int{140, 110, 109, 80, 79} {
-		m := model(w, 40)
+	for _, w := range []int{160, 110, 109, 80, 79} {
+		m := demo(t, w, 40)
 		head := m.header(w)
-		if n := len(head); n > 7 {
-			t.Fatalf("width %d: header is %d rows", w, n)
+		if len(head) > 7 || !strings.Contains(ansi.Strip(strings.Join(head, "\n")), strings.TrimRight(wordB[0], " ")) {
+			t.Fatalf("width %d: header %d rows or name cut", w, len(head))
 		}
-		if !strings.Contains(ansi.Strip(strings.Join(head, "\n")), strings.TrimRight(wordB[0], " ")) {
-			t.Fatalf("width %d: name cut", w)
+		if !strings.Contains(ansi.Strip(strings.Join(head, "\n")), "DEMO") && w >= 80 {
+			t.Fatalf("width %d: no DEMO pill", w)
 		}
 	}
 }
 
 func TestMotionStopsWhenIdle(t *testing.T) {
-	fixture(t)
-	m := model(140, 45)
+	m := demo(t, 160, 48)
 	m.motion = true
 	nm, cmd := m.Update(strikeMsg{})
 	m = nm.(Model)
@@ -571,25 +599,27 @@ func TestMotionStopsWhenIdle(t *testing.T) {
 	if m.framing || m.fx.busy() {
 		t.Fatal("frames keep running after the sparks died")
 	}
-	still := model(140, 45)
+	still := demo(t, 160, 48)
 	if nm, cmd := still.Update(strikeMsg{}); cmd != nil || nm.(Model).framing {
 		t.Fatal("reduced motion scheduled frames")
 	}
 }
 
 func TestNoColor(t *testing.T) {
-	fixture(t)
+	utc(t)
 	m := newModel(options{profile: colorprofile.Ascii, dark: true, unicode: false,
-		now: func() time.Time { return fixedNow }, load: Load})
-	m.width, m.height = 140, 45
-	out := m.render()
-	if strings.Contains(out, "\x1b[38") || strings.Contains(out, "\x1b[48") {
-		i := strings.Index(out, "\x1b[38")
-		t.Fatalf("NO_COLOR output carries colors: %q", out[max(i-40, 0):min(i+40, len(out))])
-	}
-	for _, r := range ansi.Strip(out) {
-		if (r >= 0x2500 && r <= 0x28ff) || strings.ContainsRune("●◐○✓✗▸", r) {
-			t.Fatalf("ASCII mode drew %q", r)
+		now: func() time.Time { return fixedNow }, load: Demo})
+	m.width, m.height = 160, 48
+	for v := view(0); v < nViews; v++ {
+		m.view = v
+		out := m.render()
+		if strings.Contains(out, "\x1b[38") || strings.Contains(out, "\x1b[48") {
+			t.Fatalf("%s: NO_COLOR output carries colors", viewNames[v])
+		}
+		for _, r := range ansi.Strip(out) {
+			if (r >= 0x2500 && r <= 0x28ff) || strings.ContainsRune("●◐○✓✗▸■□", r) {
+				t.Fatalf("%s: ASCII mode drew %q", viewNames[v], r)
+			}
 		}
 	}
 }

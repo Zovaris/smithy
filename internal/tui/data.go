@@ -17,6 +17,7 @@ import (
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/decisions"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/tasks"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -31,7 +32,10 @@ type Snapshot struct {
 	Decisions []string
 	Worktrees []Worktree
 	Activity  []Event
+	Events    []events.Event // the last 7 days of ~/.smithy/events.jsonl, oldest first
+	Rates     map[string]int // API requests left per source, when the source reports it
 	Repo      string
+	Demo      bool
 	Errors    []string
 }
 
@@ -40,6 +44,7 @@ type Worktree struct {
 	Path, Branch, Item string
 	Age                time.Duration
 	Dirty, Orphan      bool
+	Ahead, Behind      int
 	Status             []string // git status --short, first lines
 }
 
@@ -77,6 +82,8 @@ type Batch struct {
 type Item struct {
 	cards.Row
 	Batch, Title, Model      string
+	Repo, Speed              string
+	LogTail                  []string // demo only: the log lines, when there is no log file
 	Source, Branch, Worktree string
 	LastBeat, Log            string
 	Card                     [][2]string // every card field, sorted by name
@@ -88,10 +95,12 @@ type TaskList struct {
 	Total  int
 	Counts map[string]int
 	Tasks  []tasks.Task
+	Text   map[string]string // demo only: task file text by file name
 }
 
 var (
 	taskDirs      = tasks.Dirs
+	readEvents    = events.Read
 	scanWorktrees = worktrees
 	repoName      = sync.OnceValue(func() string {
 		out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
@@ -143,12 +152,16 @@ func Load(now time.Time) Snapshot {
 		if err != nil {
 			continue
 		}
-		meta := itemMeta(name)
+		meta, repo := itemMeta(name)
 		b := Batch{Name: name}
 		dir := filepath.Join(cards.Home(), name)
 		for _, r := range rows {
 			m := meta[r.ID]
-			it := Item{Row: r, Batch: name, Title: m.Title, Model: or(m.Route), Source: m.Source, Branch: m.Branch,
+			model := m.Model
+			if model == "" {
+				model = m.Route
+			}
+			it := Item{Row: r, Batch: name, Title: m.Title, Model: or(model), Speed: or(m.Speed), Repo: or(repo), Source: m.Source, Branch: m.Branch,
 				Worktree: m.Worktree, Log: filepath.Join(dir, r.ID+".log")}
 			card := readCard(filepath.Join(dir, r.ID+".json"))
 			for k, v := range card {
@@ -180,6 +193,12 @@ func Load(now time.Time) Snapshot {
 
 	snap.Worktrees = scanWorktrees(snap.Batches, now)
 	snap.Activity = activity(st, snap.Batches)
+	snap.Rates = st.Rate
+	if es, err := readEvents(now.AddDate(0, 0, -7), 20000); err != nil {
+		snap.Errors = append(snap.Errors, "events: "+err.Error())
+	} else {
+		snap.Events = es
+	}
 	snap.Repo = repoName()
 
 	if d, err := pendingDecisions(); err != nil {
@@ -238,6 +257,8 @@ func sanitize(s Snapshot) Snapshot {
 				clean(it.CI), clean(it.Age), clean(it.Text), clean(it.Title), clean(it.Model)
 			it.Batch, it.Source, it.Branch, it.Worktree, it.LastBeat, it.Log =
 				clean(it.Batch), clean(it.Source), clean(it.Branch), clean(it.Worktree), clean(it.LastBeat), clean(it.Log)
+			it.Repo, it.Speed = clean(it.Repo), clean(it.Speed)
+			it.LogTail = cleanAll(it.LogTail)
 			for k := range it.Card {
 				it.Card[k] = [2]string{clean(it.Card[k][0]), clean(it.Card[k][1])}
 			}
@@ -260,11 +281,18 @@ func sanitize(s Snapshot) Snapshot {
 			t.File, t.NN, t.Title, t.Status, t.PR = clean(t.File), clean(t.NN), clean(t.Title), clean(t.Status), clean(t.PR)
 			t.Blockers = cleanAll(t.Blockers)
 		}
+		for k, v := range tl.Text {
+			tl.Text[k] = strings.Join(cleanAll(strings.Split(v, "\n")), "\n")
+		}
 	}
 	for i := range s.Worktrees {
 		w := &s.Worktrees[i]
 		w.Path, w.Branch, w.Item = clean(w.Path), clean(w.Branch), clean(w.Item)
 		w.Status = cleanAll(w.Status)
+	}
+	for i := range s.Events {
+		e := &s.Events[i]
+		e.Kind, e.Batch, e.Item, e.Source, e.ID, e.PR, e.Detail = clean(e.Kind), clean(e.Batch), clean(e.Item), clean(e.Source), clean(e.ID), clean(e.PR), clean(e.Detail)
 	}
 	for i := range s.Activity {
 		e := &s.Activity[i]
@@ -281,6 +309,8 @@ type meta struct {
 	ID       string `json:"id"`
 	Title    string `json:"title"`
 	Route    string `json:"route"`
+	Model    string `json:"model"`
+	Speed    string `json:"speed"`
 	Source   string `json:"source"`
 	Branch   string `json:"branch"`
 	Worktree string `json:"worktree"`
@@ -428,6 +458,9 @@ func worktrees(batches []Batch, now time.Time) []Worktree {
 		}
 		if fi, err := os.Stat(w.Path); err == nil {
 			w.Age = now.Sub(fi.ModTime())
+			if out, err := exec.Command("git", "-C", w.Path, "rev-list", "--left-right", "--count", "@{upstream}...HEAD").Output(); err == nil {
+				fmt.Sscan(string(out), &w.Behind, &w.Ahead)
+			}
 			if out, err := exec.Command("git", "-C", w.Path, "status", "--short").Output(); err == nil {
 				lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")
 				if lines[0] != "" {
@@ -469,13 +502,14 @@ func tail(file string, n int) []string {
 	return cleanAll(lines)
 }
 
-func itemMeta(batch string) map[string]meta {
+func itemMeta(batch string) (map[string]meta, string) {
 	out := map[string]meta{}
 	b, err := os.ReadFile(filepath.Join(cards.Home(), batch, "batch.json"))
 	if err != nil {
-		return out
+		return out, ""
 	}
 	var plan struct {
+		Repo  string `json:"repo"`
 		Items []meta `json:"items"`
 	}
 	if json.Unmarshal(b, &plan) == nil {
@@ -483,7 +517,11 @@ func itemMeta(batch string) map[string]meta {
 			out[m.ID] = m
 		}
 	}
-	return out
+	repo := ""
+	if plan.Repo != "" {
+		repo = filepath.Base(plan.Repo)
+	}
+	return out, repo
 }
 
 func or(s string) string {
