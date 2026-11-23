@@ -11,6 +11,9 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - `smithy batch init --risky <id,id>` marks risky items (security agent required).
 
 ### Fixed
+- `smithy tasks import` keeps text before the first section (stack, shared rules) as shared
+  context in every task file instead of refusing the list.
+- warden harness: a returning subagent worker is the wake; no batch wait needed.
 - `smithy verify`: checks that are all skipped or neutral are `none` (no proof), not green.
 - tend reads a foreign PR's agent instructions from the base, never from the PR head.
 - Skills that ship the launcher declare a `compatibility` line (git, gh or GH_TOKEN, attestation);
