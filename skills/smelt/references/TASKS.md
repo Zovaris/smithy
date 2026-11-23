@@ -111,7 +111,7 @@ minutes of agent work): for a small list or a long chain, one session building i
 faster and several times cheaper than parallel workers.
 - **Here, all of it:** smelt `build all`: built in order, one check wave on the whole branch at
   the end.
-- **Here, one at a time:** smelt `build next` (e.g. `/smelt build next`; repeat until `smithy tasks next` says all done).
+- **Here, one at a time:** smelt `build next` (repeat until `smithy tasks next` says all done).
 - **In parallel:** warden on the task dir (workers build at `fast`; warden checks the batch once
   at its speed; read the SKILL.md `smithy skills warden` prints) when it is installed (listed
   among your skills, or `<skill-dir>/../warden/SKILL.md` exists). Mixing is fine: build some here,

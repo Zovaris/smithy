@@ -80,7 +80,6 @@ const oneItem = `{"batch":"b1","repo":"REPO","max":1,"stack":true,"mode":"smelt 
 func TestBriefRenders(t *testing.T) {
 	e := newBrief(t, oneItem)
 	writeFile(t, filepath.Join(e.repo, "docs", "specs", "rulings.md"), "- a: keep the API\n- b: other\n")
-	writeFile(t, filepath.Join(e.dir, "decisions.md"), "- ab: not this one\n- a uses JSON\n")
 	t.Setenv("WARDEN_HARNESS", "codex")
 	o, er, c := brief(t, "b1", "a")
 	if c != 0 {
@@ -97,7 +96,7 @@ func TestBriefRenders(t *testing.T) {
 		"PR target: main. Merge mode: auto.\n",
 		"make A work",
 		filepath.Join(e.wt, "docs", "specs", "01-a.md") + " (in your worktree; read it first",
-		"## Rulings (settled; follow them)\n- a: keep the API\n- b: other\n- a uses JSON\n",
+		"## Rulings (settled; follow them)\n- a: keep the API\n- b: other\n",
 		"skills/smelt/SKILL.md and follow it",
 		"tasks set docs/specs/01-a.md status=done",
 		"`cd " + e.wt + " &&`",

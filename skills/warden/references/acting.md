@@ -12,18 +12,17 @@ do it on the user's yes.
 By `impact`, with the levels of smelt's `references/EXECUTE.md` (Rulings); you may raise it, never
 lower it; `impact_by=decide` means the decision model raised it:
 - **low**: decide on the merits.
-- **medium**: `smithy consult` with the worker's question and options verbatim, in neutral order (fails → decide yourself).
+- **medium**: `smithy consult` with the worker's question and options (neutral, per use-smithy **Decisions**, step 3; fails → decide yourself).
   `NEED-INFO` goes back to the worker; `ESCALATE` makes it high.
 - **high** (also: the same kind of finding recurring): the user's. One
   message with all of them; each gives the intent, the proposed change, the smallest alternative
-  that still meets the intent, and your recommendation. Then use-smithy's **Decisions**:
-  `smithy wait timer:<ask.timeout>` in the background (0: none); an answer first → kill the timer;
-  it fires → `smithy consult`, then `smithy decisions add "<q>" "<choice>" --why "<r>" --by timeout --ref <pr>`
-  (nobody to ask: `--by consult`, no timer). Hard floor: the item is held until the user answers.
+  that still meets the intent, and your recommendation. Then use-smithy's **Decisions** (timer,
+  consult, `smithy decisions add … --ref <batch>/<id>`); on its hard floor the item is held until
+  the user answers.
 
 Relay answers with **tell**, quoting the user's words when they decided, and close the question
-yourself: `smithy cards set <batch> <id> state=working decision_key=`. Log low and medium ones in
-`decisions.md`.
+yourself: `smithy cards set <batch> <id> state=working decision_key=`. Log the ones taken without
+the user with `smithy decisions add … --ref <batch>/<id>`.
 
 ## verify (`pr_open`, `ready`)
 
@@ -84,7 +83,7 @@ go under **Followups**.
 
 ## batch end (final message)
 
-When every item is final, read `<batch-dir>/decisions.md`, `smithy decisions pending` and every card's `followup:` note (cards
+When every item is final, read `smithy decisions list` (this batch's `--ref <batch>/…` entries), `smithy decisions pending` and every card's `followup:` note (cards
 set `followup:` in the note of a merged item), then end the final message with one section, one
 line each, grouped as **Decisions** and **Followups**, each with the PR it came from
 (`- <decision or followup> (PR <url>)`; no PR → the item id).
@@ -93,7 +92,7 @@ line each, grouped as **Decisions** and **Followups**, each with the PR it came 
   This is a proposal only: write nothing to STANDARDS.md or any repo doc without the user's yes;
   on yes, hand the accepted ones to smelt `retro` (or ledger).
 - One group empty → leave it out. Both empty → the single line `no decisions or followups`.
-- The user drops what they don't want; unpromoted entries stay in `decisions.md`.
+- The user drops what they don't want; unpromoted entries stay in `smithy decisions`.
 
 ## reported · dropped
 

@@ -26,8 +26,8 @@ over it. `smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's fo
 
 **Decisions** (the stop list). **Hard floor**, never auto-decided: merging or deploying to the production branch, deleting or irreversibly rewriting user data, credentials, secrets or logins, money. Wait for the user,
 or, with nobody to ask (hush, a launched session; warden workers ask warden), end `blocked: <why>`. The rest:
-1. Nobody to ask → step 3, `--by consult`. Else ask, then run `smithy wait timer:<m>` in the background,
-   m = `smithy config get ask.timeout` (0: no timer, wait); no wake on a background exit: step 3 at once.
+1. Nobody to ask → step 3, `--by consult`. Else ask, then run `smithy wait timer:<m>` in the background
+   (foreground where the harness can't wake on exit), m = `smithy config get ask.timeout` (0: no timer, wait).
 2. The user answers first → stop the timer (the harness's kill for that background task), use the
    answer. Only exit 0 printing `timer: <m>m elapsed` means it fired → step 3 with `--by timeout`.
 3. `smithy consult "<question>" "<options>"`: neutral options, safest first when security is
@@ -39,8 +39,8 @@ or `change <n> "<choice>"` (n as pending numbers them).
 
 **Model tiers.** cheap, mid, strong per harness, plus optional `judge` (only for `smithy
 consult`). `smithy route` picks the tier (`--agent <file>` for a smelt agent); `smithy config
-model <tier>` gives the model. Unset (exit 3 or `-`): ask once per harness for every unset tier in
-one message, save with `smithy config set-model <tier> <name>` (user config; smithy ships no
+model <tier>` gives the model. Unset (exit 3 or `-`): ask once per harness for every unset tier the run needs (judge is
+optional) in one message, save with `smithy config set-model <tier> <name>` (user config; smithy ships no
 names); meanwhile, and under hush or in a launched session, use the session's model and say so.
 Effort stays at `agent.effort` (cap medium): harder jobs get a stronger tier. Branch names: `smithy names branch <key|-> "<title>" [type]`.
 
