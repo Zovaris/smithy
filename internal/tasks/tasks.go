@@ -149,6 +149,7 @@ func Parse(file string) (Task, error) {
 	if end > 15 {
 		end = 15
 	}
+	got := map[string]bool{}
 	for _, l := range lines[min(1, len(lines)):end] {
 		if strings.HasPrefix(l, "## ") {
 			break
@@ -158,7 +159,12 @@ func Parse(file string) (Task, error) {
 			continue
 		}
 		v := strings.TrimSpace(m[2])
-		switch strings.ToLower(m[1]) {
+		k := strings.ToLower(m[1])
+		if got[k] {
+			continue
+		}
+		got[k] = true
+		switch k {
 		case "status":
 			t.Status = strings.ToLower(v)
 		case "pr":
@@ -336,10 +342,12 @@ func Add(dir, title, blockedBy, key, speed string) (string, error) {
 	return file, nil
 }
 
-var sectionRe = regexp.MustCompile(`^##\s+(\d+)\s*(?:·|-|\.)\s*(.+?)\s*$`)
+var sectionRe = regexp.MustCompile(`^##\s+(\d+)(?:\s*[·.\-]|\s+|$)\s*(.*?)\s*$`)
 
-// Import splits a task-list file whose sections are `## NN · Title` into task files in dir
-// (default: the file's folder) and returns their paths. It refuses to overwrite an NN that exists.
+// Import splits a task-list file whose sections are `## NN · Title` (or `## NN Title`) into task
+// files in dir (default: the file's folder) and returns their paths. A section's `Blocked by:` and
+// `Speed:` lines move into the task header. It refuses to overwrite an NN that exists, and writes
+// every file or none.
 func Import(file, dir string) ([]string, error) {
 	b, err := os.ReadFile(file)
 	if err != nil {
@@ -349,22 +357,55 @@ func Import(file, dir string) ([]string, error) {
 		dir = filepath.Dir(file)
 	}
 	type sec struct {
-		nn, title string
-		body      []string
+		nn, title, blocked, speed string
+		body                      []string
 	}
 	var secs []sec
-	fence := false
-	for _, l := range strings.Split(string(b), "\n") {
+	fence, titled := false, false
+	text := strings.ReplaceAll(strings.TrimPrefix(string(b), "\ufeff"), "\r\n", "\n")
+	for i, l := range strings.Split(text, "\n") {
 		if strings.HasPrefix(strings.TrimSpace(l), "```") {
 			fence = !fence
+			if len(secs) > 0 {
+				secs[len(secs)-1].body = append(secs[len(secs)-1].body, l)
+				continue
+			}
 		}
-		if m := sectionRe.FindStringSubmatch(l); m != nil && !fence {
+		if !fence && (strings.HasPrefix(l, "## ") || l == "##") {
+			m := sectionRe.FindStringSubmatch(l)
+			if m == nil {
+				return nil, fmt.Errorf("%s:%d: heading %q is not a numbered section (`## NN · Title`)", file, i+1, strings.TrimSpace(l))
+			}
+			if m[2] == "" {
+				return nil, fmt.Errorf("%s:%d: section %s has an empty title", file, i+1, m[1])
+			}
 			secs = append(secs, sec{nn: fmt.Sprintf("%02d", num(m[1])), title: m[2]})
 			continue
 		}
-		if len(secs) > 0 {
-			secs[len(secs)-1].body = append(secs[len(secs)-1].body, l)
+		if len(secs) == 0 {
+			if strings.TrimSpace(l) == "" {
+				continue
+			}
+			if !fence && !titled && strings.HasPrefix(l, "# ") {
+				titled = true
+				continue
+			}
+			return nil, fmt.Errorf("%s:%d: text before the first `## NN · Title` section", file, i+1)
 		}
+		cur := &secs[len(secs)-1]
+		if !fence {
+			if m := headerRe.FindStringSubmatch(l); m != nil {
+				switch k := strings.ToLower(m[1]); {
+				case k == "blocked by" && cur.blocked == "":
+					cur.blocked = strings.TrimSpace(m[2])
+					continue
+				case k == "speed" && cur.speed == "":
+					cur.speed = strings.TrimSpace(m[2])
+					continue
+				}
+			}
+		}
+		cur.body = append(cur.body, l)
 	}
 	if len(secs) == 0 {
 		return nil, fmt.Errorf("no `## NN · Title` sections in %s", file)
@@ -372,8 +413,11 @@ func Import(file, dir string) ([]string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
 	seen := map[string]bool{}
-	entries, _ := os.ReadDir(dir)
 	for _, s := range secs {
 		if seen[s.nn] {
 			return nil, fmt.Errorf("section %s appears twice in %s", s.nn, file)
@@ -385,23 +429,53 @@ func Import(file, dir string) ([]string, error) {
 			}
 		}
 	}
-	var paths []string
+	_, specErr := os.Stat(filepath.Join(dir, "spec.md"))
+	var paths, tmps []string
+	cleanup := func() {
+		for _, p := range tmps {
+			os.Remove(p)
+		}
+		for _, p := range paths {
+			os.Remove(p)
+		}
+	}
 	for _, s := range secs {
 		slug := names.Slug(s.title)
 		if slug == "" {
 			slug = "task"
 		}
 		p := filepath.Join(dir, s.nn+"-"+slug+".md")
-		body := strings.TrimSpace(strings.Join(s.body, "\n"))
-		txt := fmt.Sprintf("# %s · %s\nStatus: todo\nBlocked by: none\nSpeed: fast\nPR: -\n", s.nn, s.title)
-		if _, err := os.Stat(filepath.Join(dir, "spec.md")); err == nil {
+		blocked, speed := s.blocked, s.speed
+		if blocked == "" {
+			blocked = "none"
+		}
+		if speed == "" {
+			speed = "fast"
+		}
+		txt := fmt.Sprintf("# %s · %s\nStatus: todo\nBlocked by: %s\nSpeed: %s\nPR: -\n", s.nn, s.title, blocked, speed)
+		if specErr == nil {
 			txt += "Spec: ./spec.md\n"
 		}
-		txt += "\n" + body + "\n"
-		if err := os.WriteFile(p, []byte(txt), 0o644); err != nil {
-			return paths, err
+		txt += "\n" + strings.TrimSpace(strings.Join(s.body, "\n")) + "\n"
+		tmp := filepath.Join(dir, "."+filepath.Base(p)+".tmp")
+		tmps = append(tmps, tmp)
+		if err := os.WriteFile(tmp, []byte(txt), 0o644); err != nil {
+			cleanup()
+			return nil, err
 		}
 		paths = append(paths, p)
+	}
+	var done []string
+	for i, tmp := range tmps {
+		if err := os.Rename(tmp, paths[i]); err != nil {
+			for _, p := range done {
+				os.Remove(p)
+			}
+			paths = nil
+			cleanup()
+			return nil, err
+		}
+		done = append(done, paths[i])
 	}
 	remember(dir)
 	return paths, nil

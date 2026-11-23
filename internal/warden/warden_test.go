@@ -383,13 +383,24 @@ func TestDoctorClaudeSettings(t *testing.T) {
 		}
 	})
 	t.Run("smithy pr merge allow rule", func(t *testing.T) {
-		for _, rule := range []string{"Bash(smithy pr merge:*)", "Bash(smithy:*)", "Bash(*smithy*)"} {
+		for _, rule := range []string{"Bash(gh pr merge*)", "Bash(smithy pr merge:*)", "Bash(smithy:*)", "Bash(/opt/x/scripts/smithy pr merge:*)", "Bash(~/.claude/skills/use-smithy/scripts/smithy:*)"} {
 			d := newDoctor(t, "git", "gh")
 			t.Setenv("WARDEN_HARNESS", "claude-desktop")
 			writeFile(t, filepath.Join(d.home, ".claude", "settings.json"), `{"permissions":{"allow":["`+rule+`"]}}`)
 			o, _ := doctor(t)
 			if strings.Contains(o, "not in the allow list") || !strings.Contains(o, "  ok    gh pr merge allowed (") {
 				t.Errorf("%s:\n%s", rule, o)
+			}
+		}
+	})
+	t.Run("non-Bash or unrelated rules do not count", func(t *testing.T) {
+		for _, rule := range []string{"Read(~/smithy-notes/**)", "Bash(ls smithy:*)", "Edit(smithy:*)", "Bash(*smithy*)"} {
+			d := newDoctor(t, "git", "gh")
+			t.Setenv("WARDEN_HARNESS", "claude-desktop")
+			writeFile(t, filepath.Join(d.home, ".claude", "settings.json"), `{"permissions":{"allow":["`+rule+`"]}}`)
+			o, _ := doctor(t)
+			if !strings.Contains(o, "not in the allow list") {
+				t.Errorf("%s counted as a merge allow:\n%s", rule, o)
 			}
 		}
 	})

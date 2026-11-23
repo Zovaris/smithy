@@ -128,9 +128,16 @@ func batchInit(args []string) error {
 	if m := o["--merge"]; m != "" && m != "auto" && m != "manual" {
 		return fmt.Errorf("--merge is %q, want auto or manual", m)
 	}
+	if v, has := o["--risky"]; has && strings.TrimSpace(v) == "" {
+		return fmt.Errorf("--risky needs at least one item id")
+	}
 	ts := tasks.Load(td)
 	if len(ts) == 0 {
 		return fmt.Errorf("no task files in %s", td)
+	}
+	top := gitOut(repo, "rev-parse", "--show-toplevel")
+	if top == "" {
+		top = repo
 	}
 	base := o["--base"]
 	if base == "" {
@@ -166,9 +173,9 @@ func batchInit(args []string) error {
 			speed = "fast"
 		}
 		intent := t.File
-		if rel, err := filepath.Rel(realPath(repo), realPath(t.File)); err == nil && !strings.HasPrefix(rel, "..") {
+		if rel, err := filepath.Rel(realPath(top), realPath(t.File)); err == nil && !strings.HasPrefix(rel, "..") {
 			rel = filepath.ToSlash(rel)
-			if exec.Command("git", "-C", repo, "cat-file", "-e", "origin/"+base+":"+rel).Run() == nil {
+			if exec.Command("git", "-C", top, "cat-file", "-e", "origin/"+base+":"+rel).Run() == nil {
 				intent = rel
 			}
 		}

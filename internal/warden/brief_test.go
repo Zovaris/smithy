@@ -299,3 +299,19 @@ func TestSpecLineFirstToken(t *testing.T) {
 		}
 	}
 }
+
+func TestSpecLineWithSpace(t *testing.T) {
+	dir := t.TempDir()
+	f := filepath.Join(dir, "01-a.md")
+	writeFile(t, filepath.Join(dir, "my spec.md"), "x")
+	for in, want := range map[string]string{
+		"./my spec.md":                 "./my spec.md",
+		"./my spec.md (see section 3)": "./my spec.md",
+		"./missing spec.md":            "./missing",
+	} {
+		writeFile(t, f, "# 01\nSpec: "+in+"\n")
+		if got := specLine(f); got != want {
+			t.Errorf("Spec: %q -> %q, want %q", in, got, want)
+		}
+	}
+}

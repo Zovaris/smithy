@@ -122,3 +122,45 @@ func TestBatchInitRisky(t *testing.T) {
 		t.Errorf("risky flags: %+v", bt.Items)
 	}
 }
+
+func TestBatchInitIntentRepoSubdir(t *testing.T) {
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("WARDEN_HOME", filepath.Join(root, "warden"))
+	t.Setenv("HOME", root)
+	top := filepath.Join(root, "repo")
+	sub := filepath.Join(top, "pkg")
+	td := filepath.Join(sub, "notes")
+	os.MkdirAll(td, 0o755)
+	git(t, top, "init", "-q", "-b", "main")
+	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · A thing\nStatus: todo\nBlocked by: none\nPR: -\n")
+	git(t, top, "add", "-A")
+	git(t, top, "commit", "-q", "-m", "init")
+	git(t, top, "update-ref", "refs/remotes/origin/main", "HEAD")
+	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", sub}) })
+	if c != 0 {
+		t.Fatalf("%d %s", c, er)
+	}
+	var bt briefBatch
+	raw, _ := os.ReadFile(filepath.Join(strings.TrimSpace(o), "batch.json"))
+	json.Unmarshal(raw, &bt)
+	if want := "pkg/notes/01-a.md"; bt.Items[0].Intent != want {
+		t.Errorf("intent %q want %q", bt.Items[0].Intent, want)
+	}
+}
+
+func TestBatchInitRiskyEmpty(t *testing.T) {
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("WARDEN_HOME", filepath.Join(root, "warden"))
+	t.Setenv("HOME", root)
+	repo := filepath.Join(root, "repo")
+	td := filepath.Join(repo, "notes")
+	os.MkdirAll(td, 0o755)
+	git(t, repo, "init", "-q", "-b", "main")
+	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · Alpha\nStatus: todo\nBlocked by: none\nPR: -\n")
+	for _, a := range [][]string{{"--risky="}, {"--risky", ""}} {
+		args := append([]string{"init", td, "--repo", repo}, a...)
+		if _, er, c := capture(t, func() int { return Batch(args) }); c == 0 || !strings.Contains(er, "--risky") {
+			t.Errorf("%v: empty --risky must fail: %d %s", a, c, er)
+		}
+	}
+}

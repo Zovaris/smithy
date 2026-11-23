@@ -304,7 +304,7 @@ func Doctor(args []string) int {
 		for _, f := range claudeFiles() {
 			if s, ok := readSettings(f); ok {
 				for _, a := range s.Permissions.Allow {
-					if strings.HasPrefix(a, "Bash(gh pr merge") || strings.Contains(a, "smithy pr merge") || strings.Contains(a, "smithy:*") || strings.Contains(a, "*smithy*") {
+					if allowsMerge(a) {
 						allowed = f
 					}
 				}
@@ -364,4 +364,23 @@ func writable(dir string) bool {
 	name := f.Name()
 	f.Close()
 	return os.Remove(name) == nil
+}
+
+// allowsMerge says an allow rule lets the agent run `gh pr merge` or `smithy pr merge`: a Bash rule
+// for gh pr merge, or for smithy (bare or by launcher path) as a whole or its pr merge command.
+func allowsMerge(rule string) bool {
+	cmd, ok := strings.CutPrefix(rule, "Bash(")
+	if !ok {
+		return false
+	}
+	cmd = strings.TrimSuffix(cmd, ")")
+	if strings.HasPrefix(cmd, "gh pr merge") {
+		return true
+	}
+	for _, tail := range []string{"smithy pr merge:*", "smithy:*"} {
+		if cmd == tail || strings.HasSuffix(cmd, "/"+tail) {
+			return true
+		}
+	}
+	return false
 }
