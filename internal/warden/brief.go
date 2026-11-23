@@ -434,7 +434,7 @@ func Brief(args []string) int {
 	} else {
 		rulings = rulingLines(id, ruleFiles...)
 	}
-	max := 5
+	max := defaultMax()
 	if bt.Max != nil {
 		max = *bt.Max
 	}

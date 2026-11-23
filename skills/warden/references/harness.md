@@ -1,6 +1,6 @@
 # Harness adapters
 
-The only file in these skills that names vendor tools. The loop uses five operations;
+The only file in these skills that names vendor tools. The loop uses the operations below;
 `smithy harness` prints the adapter (`any`, `cli` or `desktop`). If you clearly have tools it
 didn't detect, use the matching row. State lives in the batch dir and git, so any harness can
 pick up a batch. Always render the brief (`smithy brief <batch> <id>`, writing `<batch-dir>/<id>.brief.md`)
@@ -16,8 +16,8 @@ before spawning: a respawn reuses it; a relaunch renders it again (`references/a
 | **end** worker | `kill <pid>` if alive |
 | auto-end on PR close | none: the final message says to run warden cleanup |
 | worker closing line | the card's `note` |
-| **channel line** (the brief's `<warden channel>`) | "Put it in the card's note." |
-| **subagent** (short read-only job, or a fallback worker) | the harness's own subagent tool; none: `smithy agent --readonly [--model <m>] <prompt-file>` |
+| **channel line** (the brief's `{{channel}}`) | "Put it in the card's note." |
+| **subagent** (short read-only job, or a fallback worker) | the harness's own subagent tool; none: `smithy agent --readonly [--model <m>] <prompt-file>` for a read-only job (no worker fallback: tell the user and stop) |
 
 `smithy agent` picks the installed CLI (`AGENT_CLI`, or `AGENT_CMD` for any other command, with no
 unattended flags added) and adds its unattended flags. Workers get `WARDEN_HARNESS` set.
@@ -27,8 +27,8 @@ Headless workers are one-shot and can't receive messages mid-run:
   from what exists.
 - Record `pid` and `log` in the item; `kill -0 <pid>` tells if it is alive. A dead pid with a
   non-final card is `stuck`.
-- No PR auto-fix: on each wake `smithy verify` the `pr_open` items; respawn a red one with
-  "fix CI on <pr>" in its inbox.
+- No PR auto-fix: on each wake `smithy verify` the `pr_open` items; a red one follows
+  `references/acting.md` (verify): tend when installed, else respawn with "fix CI on <pr>" in its inbox.
 
 ## Subagent workers (fallback)
 
@@ -37,7 +37,8 @@ run each worker as a background subagent of this session with the prompt `Read
 <batch-dir>/<id>.brief.md and follow it exactly.` Cards stay the channel; **tell** is a message to that subagent, **end** its stop.
 Workers die with this session: doctor prints `workers: subagent fallback; they end with this
 session`; put it in the plan line. A launched session (no user turn, `start_session` refused) uses this fallback too. Such a worker can't be woken from the
-background, so render its brief with `smithy brief <batch> <id> --subagent` (wait-turn in the foreground).
+background, so render its brief with `smithy brief <batch> <id> --subagent` (wait-turn in the foreground). A subagent
+returning is the wake: read its card then, no `smithy wait batch:` needed.
 Unless `stack`, launch only items whose prereqs have merged; launch a dependent when `smithy wait` reports its
 prereq merged, never parked in a wait loop that burns tokens. Session and headless workers keep
 launch-all.

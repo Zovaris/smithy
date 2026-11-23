@@ -27,8 +27,9 @@ the architecture with the user before a fourth attempt.
 **Redirect signals.** When the user says "is that really happening?", "you're guessing", "stop,
 look again" or similar, you skipped a phase: go back to reproduce or locate.
 
-Then the regression agent proves the fix: it runs your test on the base (must fail) and on the
-fix (must pass), and adds no file. Review follows.
+Then, at normal and full, the regression agent proves the fix: it runs your test on the base (must
+fail) and on the fix (must pass), and adds no file. At fast you run the repro receipts and
+`smithy receipt check-red` yourself. Review follows.
 
 ## Red flags
 

@@ -13,7 +13,7 @@ Scope: replies to the user in chat. Code, commit messages, PR bodies, docs, ADRs
 destructive-action warnings are written normally and in full (hush's one-line `blocked:` is
 the exception).
 
-Pending decisions open the reply (use-smithy **Decisions**); under hush, as a statement, no question.
+Pending decisions: use-smithy **Decisions** (first line of the reply; under hush, statements in `done:`).
 
 ## Shape
 

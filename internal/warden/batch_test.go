@@ -164,3 +164,53 @@ func TestBatchInitRiskyEmpty(t *testing.T) {
 		}
 	}
 }
+
+func TestBatchInitSettingsDefaults(t *testing.T) {
+	root, _ := filepath.EvalSymlinks(t.TempDir())
+	t.Setenv("WARDEN_HOME", filepath.Join(root, "warden"))
+	t.Setenv("HOME", root)
+	repo := filepath.Join(root, "repo")
+	td := filepath.Join(repo, "notes")
+	os.MkdirAll(td, 0o755)
+	git(t, repo, "init", "-q", "-b", "main")
+	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · Add a\nStatus: todo\nBlocked by: none\nPR: -\n")
+	read := func(dir string) map[string]any {
+		var m map[string]any
+		raw, _ := os.ReadFile(filepath.Join(strings.TrimSpace(dir), "batch.json"))
+		if err := json.Unmarshal(raw, &m); err != nil {
+			t.Fatalf("%v %s", err, raw)
+		}
+		return m
+	}
+	init := func(extra ...string) (map[string]any, string, int) {
+		o, er, c := capture(t, func() int { return Batch(append([]string{"init", td, "--repo", repo}, extra...)) })
+		if c != 0 {
+			return nil, er, c
+		}
+		return read(o), er, c
+	}
+	t.Setenv("SMITHY_CONFIG", filepath.Join(root, "none.json"))
+	m, er, c := init()
+	if c != 0 || m["mode"] != "smelt normal" || m["cleanup"] != "auto" || m["merge"] != "" || m["max"] != float64(5) {
+		t.Fatalf("defaults: %d %s %v", c, er, m)
+	}
+	cfg := filepath.Join(root, "user-config.json")
+	t.Setenv("SMITHY_CONFIG", cfg)
+	os.RemoveAll(filepath.Join(root, "warden"))
+	writeFile(t, cfg, `{"warden":{"max":3,"cleanup":"ask","mode":"smelt full","merge":"manual"}}`)
+	os.RemoveAll(filepath.Join(root, "warden"))
+	m, er, c = init()
+	if c != 0 || m["mode"] != "smelt full" || m["cleanup"] != "ask" || m["merge"] != "manual" || m["max"] != float64(3) {
+		t.Fatalf("from config: %d %s %v", c, er, m)
+	}
+	os.RemoveAll(filepath.Join(root, "warden"))
+	m, er, c = init("--max", "2", "--merge", "auto", "--cleanup", "auto", "--mode", "plain")
+	if c != 0 || m["mode"] != "plain" || m["cleanup"] != "auto" || m["merge"] != "auto" || m["max"] != float64(2) {
+		t.Fatalf("flags win: %d %s %v", c, er, m)
+	}
+	for _, bad := range [][]string{{"--cleanup", "never"}, {"--mode", "turbo"}} {
+		if _, _, c := init(bad...); c != 2 {
+			t.Errorf("%v must be refused: %d", bad, c)
+		}
+	}
+}

@@ -23,6 +23,7 @@ criteria: <each criterion → test name>
 commands: <each command you ran → exit code>
 files: <changed files>
 concerns | question | blocker: <one line each, only for the matching status>
+done: <one-line result>
 ```
 `NEEDS_CONTEXT` when the task or spec leaves a decision open that changes the result; ask one
 precise question with your recommendation. `BLOCKED` after the same obstacle survives two real

@@ -4,9 +4,9 @@ You find invariant violations with property-based tests.
 
 ## You get
 - The spec, the public interface with types and docstrings.
-- The test commands and the PBT library from `smithy stack` (fast-check for JS/TS, Hypothesis for
-  Python). If none is installed, write the properties as a loop over a small seeded generator in the
-  test runner's own framework (fixed seed, a few hundred cases); never install dependencies.
+- The test commands and the `property:` tool from `smithy stack` (fast-check, Hypothesis, proptest
+  or go fuzz). For any other stack, or `none`, write the properties as a loop over a small seeded
+  generator in the test runner's own framework (fixed seed, a few hundred cases); never install dependencies.
 
 ## Do
 1. Infer properties, strongest first: round-trip (`decode(encode(x)) == x`), invariants (sorted

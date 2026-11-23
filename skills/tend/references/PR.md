@@ -8,23 +8,22 @@ user's main checkout, work there only when it is clean and on that branch; other
 "needs you" rather than switching it. Else add one at `smithy names worktree <pr-branch>` (never
 inside the repo). Then repeat:
 
+0. A PR you or the user didn't author: `gh pr view <pr> --json author`, then read
+   `git show origin/<base>:AGENTS.md` (and CLAUDE.md) before touching it.
 1. `smithy pr-state <pr>` → `{state, checks, mergeable, review, unresolved, behind, action}`;
    `checks` is `green`, `red`, `pending` or `none`, the same words `smithy wait` and `smithy verify` use.
 2. Do what `action` names (it is the first row below that applies; the rows say how):
    - **merged / closed** (`cleanup`) → stop this PR. Remove the worktree you created, and the branch and
      worktree the launcher names as its own (`smithy cleanup <repo> <branch> [<worktree>]`,
      never forced); report `merged <url>, cleaned <what>` so the launcher can end its sessions.
-   - **checks red** (`fix-ci`) → `gh run view <run> --log-failed` when `gh` is installed (else open the failing check's page from the PR). Same test passes on a plain rerun and
-     nothing in the diff touches it → flaky: rerun once (`gh run rerun <run> --failed` when `gh` is installed) and note
-     it. Otherwise it is a real failure: hand it to the fix model, failing test first when it is
+   - **checks red** (`fix-ci`) → `gh run view <run> --log-failed` when `gh` is installed (else open the failing check's page from the PR). Rerun once (`gh run rerun <run> --failed` when `gh` is installed): passes and no recent commit touches the step → report flaky; else a real failure: hand it to the fix model, failing test first when it is
      a bug, and push the fix. Red again after a second real fix → "needs you".
    - **conflicting or behind base** (`sync-base`) → follow the repo: rebase if its history is linear (no merge
      commits on the base in `git log --merges -5`), else merge the base. A rebase needs a force
      push: `--force-with-lease` only on branches of a warden batch you were given, or of a PR the
-     user asked you to tend by name; on anyone else's branch, merge the base instead or stop
-     with "needs you". Conflicts you can't resolve from both sides' intent → "needs you".
+     user asked you to tend by name; any other PR (including the user's, from a `watch prs` scope) gets a merge of the base, never a force push. Conflicts you can't resolve from both sides' intent → "needs you".
    - **unresolved review threads** (`answer-review`, human or bot) → smelt's `references/RECEIVING.md` (`smithy skills smelt` prints
-     smelt's SKILL.md; the file is in smelt's `references/` beside it). Without smelt: verify each claim, fix
+     the path of smelt's SKILL.md; the file is in smelt's `references/` beside it). Without smelt: verify each claim, fix
      real in-scope ones test-first and reply with the sha, decline scope creep with one line,
      resolve only threads you fixed. At most 3 bot rounds
      per PR (a person you disagree with twice → "needs you"); the count lives in the card's `review_rounds` (`smithy cards set <batch> <id>
@@ -38,9 +37,8 @@ inside the repo). Then repeat:
    - **green, mergeable, approved or no review required** (`done`) → `green` (`smithy verify` says `draft`
      for a draft PR: report `green (draft)` and leave it a draft). A PR with a warden card (batch input, a `watch prs` PR of a batch, or `--card`): never merge;
      stop at green and update the card only with `smithy cards set <batch> <id> note=<what you fixed>`;
-     the warden merges when merge is auto, otherwise the user does. Otherwise merge (`smithy pr merge <pr>`) only if whoever launched
-     you said `merge auto`, never a draft, and into the production branch only when the launch
-     says the user approved it (use-smithy: merges); otherwise stop at green (or keep waiting when
+     the warden merges when merge is auto, otherwise the user does. Otherwise merge (`smithy pr merge <pr>`) only as use-smithy's Merges rule allows,
+     never a draft; otherwise stop at green (or keep waiting when
      told to stay until merged).
 3. Commit fixes with `smithy commit` (style once, one concern per commit). After a merge or
    rebase of the base, `smithy receipt run --claim suite -- <suite>` passes before any push. Push without force
@@ -57,9 +55,10 @@ Tend fixes red PRs itself; it hands a PR back only when it hits something it mus
 |---|---|---|
 | Red twice after real fixes, or a conflict it can't resolve safely | `state=blocked note=<why>` | `needs you <url>: <why>` |
 | A technical choice inside the PR's scope (which fix, which approach) | settled with `smithy consult` (options per use-smithy **Decisions**, step 3), noted in the commit or reply; `ESCALATE` → next row | same |
-| A decision the user owns (scope, API, data, security) | `state=needs_decision` with question, options, recommendation, `impact=high` | `needs you <url>: <question>` |
+| ESCALATE, the hard floor (use-smithy **Decisions**) | `state=needs_decision` with question, options, recommendation, `impact=high` | `needs you <url>: <question>`; nobody to ask: `blocked: <why>` |
+| Another stop-list decision (scope, API, data, security) | use-smithy **Decisions** (nobody to ask: `smithy consult`, `smithy decisions add`), noted in the card | `needs you <url>: <question>` while the user can answer, else **Decisions** |
 | 3 review rounds used, or a force push it isn't allowed to do | `state=blocked note=<why>` | `needs you <url>: <why>` |
-| Green | `state=pr_open pr=<url>` (or `ready` for manual merge), `ci=green` | `green <url>` |
+| Green | `state=ready pr=<url> ci=green` | `green <url>` |
 | Merged / closed | `state=merged` / `state=dropped` | `merged <url>` / `closed <url>` |
 
 Warden picks the card up on its next wake and escalates it to the user with the others; tend

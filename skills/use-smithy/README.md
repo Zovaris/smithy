@@ -19,7 +19,7 @@ one-line descriptions, and the user-invoked ones never come up unless you type t
 | the work done without conversation | **hush** |
 
 Shared rules: one task list, evidence before "done", atomic commits in the repo's style, waiting
-on CI with `smithy wait` instead of sleep loops, models picked per task (cheap, mid, strong),
+on CI with `smithy wait` instead of sleep loops, models picked per task (cheap, mid, strong, optional judge),
 and only the user's decisions go to the user.
 
 ## Setup

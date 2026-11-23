@@ -28,7 +28,9 @@ const receiptUsage = `usage:
   smithy receipt run [--claim "<claim>"] -- <command> [args...]
       runs the command in the repo root, streams its output and records a receipt:
       claim, command, exit code, output digest, commit, dirty tree, duration, platform.
-      Exits with the command's exit code.
+      Exits with the command's exit code; 127 when the command can't start (nothing recorded);
+      128+signal when it was killed by a signal, or when smithy itself was interrupted (then
+      nothing is recorded).
   smithy receipt list [--md] [--all] [--claim <c>]
       receipts for the current commit (--all: every commit); --md prints a table for a PR body.
       A receipt taken on another commit is marked stale (unless only task, spec or changelog

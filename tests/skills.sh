@@ -22,8 +22,8 @@ for d in skills/*/; do
   done
 done
 for f in skills/*/SKILL.md; do
-  s="$(basename "$(dirname "$f")")"; max=80; [ "$s" = smelt ] && max=100
-  n=$(($(wc -l <"$f"))); [ "$n" -le "$max" ] || bad "$s: SKILL.md has $n lines (max $max)"
+  s="$(basename "$(dirname "$f")")"; max=76; [ "$s" = smelt ] && max=96
+  n=$(awk 'f>=2{c++} /^---$/{f++} END{print c+0}' "$f"); [ "$n" -le "$max" ] || bad "$s: SKILL.md body has $n lines (max $max)"
 done
 for f in skills/*/references/*.md skills/*/agents/*.md; do
   [ -f "$f" ] || continue; n=$(($(wc -l <"$f"))); [ "$n" -le 120 ] || bad "$f has $n lines (max 120)"
