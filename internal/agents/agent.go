@@ -71,6 +71,7 @@ type Options struct {
 	Timeout    time.Duration
 	Profile    string
 	SmithyBins []string // absolute paths of the smithy binary and launcher, allowed under --profile auto
+	AddDirs    []string // directories outside the working dir the agent may use (--add-dir), set under --profile auto
 }
 
 // ProfileEnv carries --profile to every smithy agent an agent starts, so workers under an
@@ -295,6 +296,9 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if o.Profile == "auto" && !o.ReadOnly {
 			a = append(append(a, "--allowedTools"), AutoTools(o.SmithyBins)...)
 			a = append(append(a, "--disallowedTools"), AutoDenied(o.SmithyBins)...)
+			for _, d := range o.AddDirs {
+				a = append(a, "--add-dir", d)
+			}
 		}
 		opt("--model")
 		if o.Effort != "" {
@@ -467,6 +471,7 @@ func Run(o Options) int {
 	}
 	if o.Profile == "auto" {
 		o.SmithyBins = SmithyPaths()
+		o.AddDirs = AutoDirs(o.SmithyBins)
 	}
 	gitDir := ""
 	if Kind(cli) == "codex" && !o.ReadOnly {
@@ -717,6 +722,41 @@ func SmithyPaths() []string {
 			if fi, err := os.Stat(l); err == nil && !fi.IsDir() {
 				add(l)
 			}
+		}
+	}
+	return out
+}
+
+// AutoDirs lists what an unattended agent needs outside its working dir: smithy's home (plans,
+// batches, cards; secrets there stay behind the Read/Edit deny rules), each skills root, and the
+// parent of the repo, where sibling worktrees are created. Claude Code otherwise refuses any
+// Bash or file access outside the working dir in dontAsk mode.
+func AutoDirs(bins []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	add := func(d string) {
+		if d != "" && d != "/" && !seen[d] {
+			if fi, err := os.Stat(d); err == nil && fi.IsDir() {
+				seen[d] = true
+				out = append(out, d)
+			}
+		}
+	}
+	home := os.Getenv("SMITHY_HOME")
+	if home == "" {
+		if h, err := os.UserHomeDir(); err == nil {
+			home = filepath.Join(h, ".smithy")
+		}
+	}
+	add(home)
+	for _, b := range bins {
+		if filepath.Base(filepath.Dir(b)) == "scripts" {
+			add(filepath.Dir(filepath.Dir(filepath.Dir(b))))
+		}
+	}
+	if wd, err := os.Getwd(); err == nil {
+		if top, err := exec.Command("git", "-C", wd, "rev-parse", "--show-toplevel").Output(); err == nil {
+			add(filepath.Dir(strings.TrimSpace(string(top))))
 		}
 	}
 	return out

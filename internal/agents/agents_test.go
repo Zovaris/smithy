@@ -597,3 +597,17 @@ func TestSmithyPathsIncludesEverySkillLauncher(t *testing.T) {
 		}
 	}
 }
+
+func TestAutoDirsIncludesSmithyHomeAndSkillsRoot(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("SMITHY_HOME", home)
+	root := t.TempDir()
+	l := filepath.Join(root, "tend", "scripts", "smithy")
+	if err := os.MkdirAll(filepath.Dir(l), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Join(AutoDirs([]string{l}), "\n")
+	if !strings.Contains(got, home) || !strings.Contains(got, root) {
+		t.Fatalf("AutoDirs = %q", got)
+	}
+}
