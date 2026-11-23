@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -21,8 +20,8 @@ import (
 // System is the read-only health report of the System view.
 type System struct {
 	Doctor   []string
-	Settings [][3]string // key, value, where it comes from
-	Auth     []string    // "<service> ****abcd"
+	Settings []Setting
+	Auth     []string // "<service> ****abcd"
 	Binary   string
 	Skills   string
 	Home     string
@@ -43,21 +42,7 @@ func loadSystem() System {
 			s.Doctor = append(s.Doctor, "doctor: "+clean(err.Error()))
 		}
 	}
-	known := append([]config.Setting(nil), config.Known...)
-	rank := map[string]int{"auto": 0, "linear": 1, "warden": 2}
-	sort.SliceStable(known, func(i, j int) bool {
-		return rank[strings.SplitN(known[i].Key, ".", 2)[0]] < rank[strings.SplitN(known[j].Key, ".", 2)[0]]
-	})
-	for _, k := range known {
-		if !strings.HasPrefix(k.Key, "auto.") && !strings.HasPrefix(k.Key, "linear.") && !strings.HasPrefix(k.Key, "warden.") {
-			continue
-		}
-		v, src, err := config.Effective(k.Key)
-		if err != nil {
-			v, src = "-", "unset"
-		}
-		s.Settings = append(s.Settings, [3]string{k.Key, clean(v), src})
-	}
+	s.Settings = settingRows(currentHarness(), config.Effective)
 	if l, err := auth.List(); err == nil {
 		s.Auth = cleanAll(l)
 	} else {
@@ -75,19 +60,32 @@ func demoSystem() System {
 	return System{
 		Doctor: []string{"warden doctor", "ok   binary v0.15.0", "ok   git found", "ok   gh found and authenticated", "ok   claude found",
 			"ok   worktree root /home/dev/worktrees writable", "warn 2 orphaned worktrees (smithy warden cleanup)"},
-		Settings: [][3]string{{"auto.sources", "github,linear", "user"}, {"auto.mode", "labeled", "default"}, {"auto.label", "auto", "default"},
-			{"auto.max_per_day", "80", "user"}, {"auto.hours", "-", "unset"}, {"auto.every", "60", "default"}, {"auto.paused", "false", "default"},
-			{"linear.team", "TES", "user"}, {"linear.project", "-", "unset"}, {"warden.max", "5", "default"}, {"warden.merge", "manual", "user"},
-			{"warden.cleanup", "auto", "default"}, {"warden.mode", "smelt normal", "default"}},
-		Auth: []string{"github ****9f2c", "linear ****a41b"},
+		Settings: settingRows("claude", demoEffective),
+		Auth:     []string{"github ****9f2c", "linear ****a41b"},
 		Notify: []string{"token  ****x7Qa (/home/dev/.smithy/auth.json)", "chat 123456789", "kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached",
 			"state  on (smithy auto serve sends)", "last sent 2026-11-23 09:12"},
 		Binary: "0.15.0", Skills: "0.15.0", Home: "/home/dev/.smithy", Events: "/home/dev/.smithy/events.jsonl  (412.7 KB)",
 	}
 }
 
+var demoValues = map[string]string{"auto.sources": "github,linear", "auto.max_per_day": "80", "linear.team": "TES",
+	"warden.merge": "manual", "notify.telegram.chat": "123456789", "models.claude.cheap": "haiku", "models.claude.strong": "opus"}
+
+// demoEffective is Effective over a fixed user file, so demo mode reads nothing.
+func demoEffective(key string) (string, string, error) {
+	if v, ok := demoValues[key]; ok {
+		return v, "user", nil
+	}
+	for _, k := range config.Known {
+		if k.Key == key && k.Default != "" && k.Default != "ask" {
+			return k.Default, "default", nil
+		}
+	}
+	return "", "", config.ErrUnset
+}
+
 // systemLines renders the report as two columns of sections.
-func (m Model) systemLines(w int) (left, right []string) {
+func (m Model) systemLines(w, rw, rh int) (left, right []string) {
 	t := m.th
 	mut, val, head := t.fg(t.muted), t.fg(t.text), t.fg(t.accent).Bold(!t.plain)
 	if m.sys == nil {
@@ -155,18 +153,6 @@ func (m Model) systemLines(w int) (left, right []string) {
 	for _, e := range s.Err {
 		left = append(left, t.fg(t.err).Render(e))
 	}
-	group := ""
-	for _, kv := range s.Settings {
-		g := strings.SplitN(kv[0], ".", 2)[0]
-		if g != group {
-			if group != "" {
-				right = append(right, "")
-			}
-			group = g
-			right = append(right, head.Render(g+".*"))
-		}
-		right = append(right, val.Render(fmt.Sprintf("%-21s", kv[0]))+" "+val.Render(fmt.Sprintf("%-16s", short(kv[1], 16)))+" "+mut.Render(kv[2]))
-	}
-	right = append(right, "", mut.Italic(true).Render("Read-only here: change with smithy config set <key> <value>."))
+	right = m.settingLines(rw, rh)
 	return left, right
 }

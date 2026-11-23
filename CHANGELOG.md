@@ -5,6 +5,16 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: edit settings from `smithy tui` System view. Every known key plus the harness's models,
+  grouped, with value, source and meaning; enter opens a typed input (bool/enum choice, number,
+  list, text), a confirm step shows old → new and the scope (tab: user or repo), `u` unsets back to
+  the default. Writes go through `config.Apply`/`config.Remove`, the same path as
+  `smithy config set|unset`; secret-valued keys are locked (auth stays in `smithy auth`); demo mode
+  only says the command it would run.
+- Changed: `smithy config set` validates typed keys: booleans (`auto.paused`, `decide.enabled`),
+  whole numbers (`warden.max`, `auto.every`, …) and choices (`auto.mode`, `warden.merge`,
+  `warden.mode`, `tasks.location`, …); comma lists are trimmed.
+
 - Added: Telegram notifications, sent by `smithy auto serve` (never an agent) from events.jsonl
   and the cards: PR ready, item blocked, stuck or waiting on a decision, orchestrator failed,
   serve stopped, daily cap reached. Bot token in `smithy auth set telegram`, chat in

@@ -69,11 +69,11 @@ var meaning = [nViews]string{
 	"Every event, newest first: polls, queued, skipped, launches, stages, CI, reports, merges.",
 	"Every smithy worktree on disk: branch, item, age, dirty, ahead/behind, orphaned.",
 	"Task lists and their progress; enter reads the plan's spec or a task.",
-	"Read-only health: doctor, settings, auth, versions and paths.",
+	"Health (doctor, auth, versions, paths) and every setting: enter edits one, u unsets it.",
 }
 
 type keyMap struct {
-	Next, Prev, Up, Down, Left, Right, Jump, Enter, Close, Open, Log, Copy, Cmd, Sort, Type, Pause, Filter, Refresh, Help, Quit, Accept, Reject key.Binding
+	Next, Prev, Up, Down, Left, Right, Jump, Enter, Close, Open, Log, Copy, Cmd, Sort, Type, Pause, Filter, Refresh, Help, Quit, Accept, Reject, Edit, Unset key.Binding
 }
 
 var keys = keyMap{
@@ -87,6 +87,8 @@ var keys = keyMap{
 	Accept:  key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "accept")),
 	Reject:  key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reject")),
 	Enter:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "details")),
+	Edit:    key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "edit")),
+	Unset:   key.NewBinding(key.WithKeys("u"), key.WithHelp("u", "unset setting")),
 	Close:   key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "close")),
 	Open:    key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "open")),
 	Log:     key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "log")),
@@ -115,7 +117,7 @@ func viewKeys(v view) []key.Binding {
 	case vDone:
 		return []key.Binding{keys.Up, keys.Enter, keys.Open, keys.Copy, keys.Filter}
 	case vSystem:
-		return []key.Binding{keys.Refresh, keys.Log}
+		return []key.Binding{keys.Up, keys.Edit, keys.Unset, keys.Refresh, keys.Log}
 	case vActivity:
 		return []key.Binding{keys.Up, keys.Enter, keys.Open, keys.Type, keys.Filter}
 	case vWorktrees:
@@ -186,6 +188,8 @@ type Model struct {
 	loadSys   func() System
 	confirm   func(n int) error
 	reject    func(n int, why string) error
+	edit      *edit
+	setter    setterFunc
 	filtering bool
 	input     textinput.Model
 	filter    [nViews]string
@@ -230,7 +234,7 @@ func newModel(o options) Model {
 	m := Model{width: 120, height: 40, dark: o.dark, profile: o.profile, unicode: o.unicode, motion: o.motion,
 		now: o.now, load: o.load, opener: openURL, pauser: setPaused, fx: newFX(o.seed),
 		spring: harmonica.NewSpring(harmonica.FPS(fps), 4.0, 0.95), input: textinput.New(), reason: textinput.New(),
-		loadSys: loadSystem, confirm: decisions.Confirm, reject: decisions.Reject}
+		loadSys: loadSystem, setter: writeSetting, confirm: decisions.Confirm, reject: decisions.Reject}
 	m.reason.Prompt = "why reject? "
 	m.reason.Placeholder = "one line the agent will read"
 	m.input.Prompt = "/ "
@@ -271,7 +275,7 @@ func New(noAnim, demo bool) Model {
 		seed: uint64(time.Now().UnixNano()), now: time.Now, load: load})
 	if demo {
 		m.pauser = func(bool) error { return fmt.Errorf("demo: intake is not real") }
-		m.confirm, m.reject = nil, nil
+		m.confirm, m.reject, m.setter = nil, nil, nil
 		m.loadSys = demoSystem
 	}
 	return m
@@ -412,6 +416,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.say(msg.what)
 		m.modal, m.loading = false, true
 		return m, m.reload()
+	case savedMsg:
+		if msg.err != nil {
+			m.status = "config: " + msg.err.Error()
+			return m, nil
+		}
+		m.say(msg.what)
+		m.sys = nil
+		return m, m.show(vSystem)
 	case systemMsg:
 		s := System(msg)
 		m.sys, m.sysBusy = &s, false
@@ -474,8 +486,11 @@ func (m *Model) move(d int) {
 		return
 	}
 	n := len(m.rows(v))
-	if v == vOverview {
+	switch {
+	case v == vOverview:
 		n = 6
+	case v == vSystem && m.sys != nil:
+		n = len(m.sys.Settings)
 	}
 	m.sel[v] = max(min(m.sel[v]+d, n-1), 0)
 }
@@ -516,6 +531,9 @@ func (m Model) decide(n int, accept bool, why string) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.edit != nil {
+		return m.editKey(msg)
+	}
 	if m.prompting {
 		switch msg.String() {
 		case "ctrl+c":
@@ -640,6 +658,8 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	case key.Matches(msg, keys.Enter):
 		return m.enter()
+	case key.Matches(msg, keys.Unset) && v == vSystem:
+		return m.openEdit(true)
 	case key.Matches(msg, keys.Sort) && v == vAgents:
 		m.agentSort = (m.agentSort + 1) % len(agentSorts)
 		m.status = "sorted by " + agentSorts[m.agentSort]
@@ -672,7 +692,7 @@ func (m Model) enter() (tea.Model, tea.Cmd) {
 		return m, m.show([]view{vActivity, vAgents, vIncoming, vAgents, vDone, vNeeds}[m.sel[vOverview]])
 	}
 	if v == vSystem {
-		return m, nil
+		return m.openEdit(false)
 	}
 	if r, ok := m.selected(); ok && r.md != "" {
 		m.showMarkdown(r.mdTitle, r.md)
@@ -806,6 +826,9 @@ func (m *Model) sizeText() {
 
 func (m *Model) clamp() {
 	for v := view(1); v < nViews; v++ {
+		if v == vSystem {
+			continue
+		}
 		if n := len(m.rows(v)); m.sel[v] >= n {
 			m.sel[v] = max(n-1, 0)
 		}
