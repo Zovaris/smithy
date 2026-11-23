@@ -1,7 +1,7 @@
 ---
 name: tend
 description: "Use for open PRs that must get green and mergeable (red CI, rebases, review comments), a warden batch's PRs, or watching a GitHub repo for red runs, labeled issues, base moves and Dependabot alerts; smelt hands it red CI, conflicts or review comments; warden only PRs whose worker has ended."
-argument-hint: "<pr-url|number|branch> [...] | batch <warden batch> | watch [<scopes>|all] [--fix] [--label <l>] [--model <m>] [--fix-model <m>] [--card <batch> <id>] [--max-hours <h>] | auto"
+argument-hint: "<pr-url|number|branch> [...] | batch <warden batch> | watch [<scopes>|all] [--fix] [--label <l>] [--model <m>] [--fix-model <m>] [--card <batch> <id>] [--max-hours <h>] | auto [once <dir>]"
 compatibility: "Needs git and the smithy binary (installed once by the user with the repo's install.sh); gh (or GH_TOKEN) for GitHub steps."
 ---
 
@@ -47,8 +47,8 @@ At the first PR: read `references/PR.md` (the loop every PR goes through).
   `smithy config get tend.watch`, else `prs`): `prs` (the user's, a batch's; `--label` adds
   `prs:<label>`), `issues` (label default `agent`), `actions` (red runs on the default branch),
   `base` (default branch moved), `alerts` (Dependabot).
-- `auto`: build qualified Linear/GitHub issues unattended until stopped (`smithy auto`): read
-  `references/AUTO.md` first.
+- `auto`: build qualified Linear/GitHub issues unattended until stopped (`smithy auto`); `auto
+  once <dir>`: one task dir, then end (`smithy auto serve` starts it). Read `references/AUTO.md` first.
 - `stay until merged`: at green, `smithy wait pr:<pr-url>` until it merges or closes, then act
   as **merged / closed**; red, conflicts or new threads meanwhile go back through the loop.
 - `--card <batch> <id>`: mirror your state on that card (`smithy cards set <batch> <id> key=value…`).

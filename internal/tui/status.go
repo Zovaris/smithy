@@ -59,16 +59,27 @@ func (m Model) watcherLine() string {
 		src = append(src, s)
 	}
 	sources := or(strings.Join(src, ", "))
+	serve := ""
+	switch sv := wt.Serve; sv.State {
+	case "running":
+		serve = mut.Render(fmt.Sprintf(" %s serve pid %d %s", t.g.dot, sv.PID, sv.Agent))
+	case "stale":
+		serve = t.fg(t.warn).Render(" " + t.g.dot + " serve stale")
+	}
+	start := "tend auto"
+	if wt.Serve.State == "" || wt.Serve.State == "not running" {
+		start = "smithy auto serve"
+	}
 	switch {
 	case wt.Paused:
 		return t.fg(t.warn).Bold(true).Render("‖ paused") + mut.Render(" "+t.g.dot+" intake held "+t.g.dot+" p resumes")
 	case wt.Alive:
 		next := wt.LastPoll.Add(time.Duration(wt.Every) * time.Second).Sub(m.snap.At)
-		return t.fg(t.ok).Render(t.g.on+" watching ") + val.Render(sources) + mut.Render(fmt.Sprintf(" %s next poll %ds", t.g.dot, max(int(next.Seconds()), 0)))
+		return t.fg(t.ok).Render(t.g.on+" watching ") + val.Render(sources) + mut.Render(fmt.Sprintf(" %s next poll %ds", t.g.dot, max(int(next.Seconds()), 0))) + serve
 	case wt.Polled:
-		return t.fg(t.err).Bold(true).Render(t.g.on+" stale") + mut.Render(" "+t.g.dot+" last poll "+ago(m.snap.At.Sub(wt.LastPoll))+" "+t.g.dot+" start: ") + val.Render("tend auto")
+		return t.fg(t.err).Bold(true).Render(t.g.on+" stale") + mut.Render(" "+t.g.dot+" last poll "+ago(m.snap.At.Sub(wt.LastPoll))+" "+t.g.dot+" start: ") + val.Render(start) + serve
 	}
-	return t.fg(t.err).Render(t.g.off+" not running") + mut.Render(" "+t.g.dot+" "+sources+" "+t.g.dot+" start: ") + val.Render("tend auto")
+	return t.fg(t.err).Render(t.g.off+" not running") + mut.Render(" "+t.g.dot+" "+sources+" "+t.g.dot+" start: ") + val.Render(start) + serve
 }
 
 func (m Model) capBar(w int) string {

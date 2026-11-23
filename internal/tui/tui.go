@@ -115,7 +115,7 @@ func viewKeys(v view) []key.Binding {
 	case vDone:
 		return []key.Binding{keys.Up, keys.Enter, keys.Open, keys.Copy, keys.Filter}
 	case vSystem:
-		return []key.Binding{keys.Refresh}
+		return []key.Binding{keys.Refresh, keys.Log}
 	case vActivity:
 		return []key.Binding{keys.Up, keys.Enter, keys.Open, keys.Type, keys.Filter}
 	case vWorktrees:
@@ -766,6 +766,21 @@ func (m Model) copyField(command bool) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) openLog() (tea.Model, tea.Cmd) {
+	if m.view == vSystem {
+		p := m.snap.Watcher.Serve.SessionLog
+		if p == "" {
+			m.status = "no serve session log (smithy auto serve starts one per task dir)"
+			return m, nil
+		}
+		lines := tail(p, 2000)
+		if lines == nil {
+			m.status = "no log yet at " + p
+			return m, nil
+		}
+		m.showText("log "+home(p), lines)
+		m.text.GotoBottom()
+		return m, nil
+	}
 	r, ok := m.selected()
 	if !ok || (r.logPath == "" && r.logTail == nil) {
 		m.status = "no log for this row"

@@ -22,7 +22,7 @@ import (
 
 const agentUsage = `Harness-agnostic agent runner: runs one headless coding agent on a prompt file.
   smithy agent [--bg] [--cwd <dir>] [--log <file>] [--model <m>] [--effort low|medium] [--timeout <min>]
-               [--readonly] <prompt-file>
+               [--readonly] [--profile auto] <prompt-file>
 Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list below.
   AGENT_CMD   any shell command; gets the prompt on stdin and in $AGENT_PROMPT_FILE, the model
               in $AGENT_MODEL, and $AGENT_READONLY=1 for read-only runs
@@ -34,6 +34,10 @@ Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list be
   cursor      agent -p --force (Cursor CLI)
   pi          pi -p (--tools read when read-only)
   dsh         dsh headless --approval-policy never (DeepSeek Harness; model from its profile)
+--profile auto (smithy auto serve's orchestrator; never a full bypass): claude runs with
+  permission mode dontAsk and an allowed-tools list limited to Read, Edit, Write, Glob, Grep and Bash for
+  git, gh, go/npm test and smithy; codex keeps --sandbox workspace-write with approval_policy never;
+  the other CLIs keep their own headless mode above.
 Effort: --effort, else $AGENT_EFFORT, else the agent.effort setting (default medium). Anything
 above medium is capped at medium. Passed as --effort (claude) or -c model_reasoning_effort
 (codex), and as $AGENT_EFFORT to every CLI; the others keep their own default and say so.
@@ -65,6 +69,72 @@ type Options struct {
 	ReadOnly   bool
 	PromptFile string
 	Timeout    time.Duration
+	Profile    string
+	SmithyBins []string // absolute paths of the smithy binary and launcher, allowed under --profile auto
+}
+
+// ProfileEnv carries --profile to every smithy agent an agent starts, so workers under an
+// unattended orchestrator get the same allow-list.
+const ProfileEnv = "SMITHY_AGENT_PROFILE"
+
+// AutoTools are the only tools a claude session under --profile auto may use; everything else
+// is denied (permission mode dontAsk), so an unattended run never asks and never bypasses.
+// smithy itself is allowed only by the absolute paths in Options.SmithyBins.
+func AutoTools(smithy []string) []string {
+	t := []string{"Read", "Edit", "Write", "Glob", "Grep"}
+	for _, g := range []string{"status", "diff", "add", "commit", "checkout", "switch", "branch", "log", "merge", "rev-parse", "show"} {
+		t = append(t, "Bash(git "+g+" *)", "Bash(git "+g+")")
+	}
+	t = append(t, "Bash(git fetch)", "Bash(git fetch origin)", "Bash(git fetch origin *)", "Bash(git fetch --prune)", "Bash(git fetch --prune origin)",
+		"Bash(git push origin *)", "Bash(git push -u origin *)", "Bash(git worktree list)", "Bash(git worktree list *)")
+	for _, g := range []string{"pr create", "pr view", "pr checks", "pr list", "pr comment", "pr diff", "issue view", "issue comment", "run view", "run list"} {
+		t = append(t, "Bash(gh "+g+" *)")
+	}
+	t = append(t, "Bash(go test *)", "Bash(go vet *)", "Bash(npm test *)", "Bash(npm run test *)")
+	for _, b := range smithy {
+		if filepath.IsAbs(b) {
+			t = append(t, "Bash("+b+" *)")
+		}
+	}
+	return t
+}
+
+// AutoDenied always wins over AutoTools (Claude Code checks deny rules first): config and
+// credential commands, network fetchers, secrets on disk and files that run code later.
+func AutoDenied(smithy []string) []string {
+	d := []string{"Bash(git -c *)", "Bash(git config *)", "Bash(gh api *)", "Bash(gh auth *)", "Bash(gh gist *)", "Bash(gh alias *)",
+		"Bash(gh extension *)", "Bash(smithy auth *)", "Bash(smithy config *)", "Bash(curl *)", "Bash(wget *)",
+		// remote-exec and URL options of fetch/push, and file output of any git command
+		"Bash(git * --upload-pack*)", "Bash(git * --receive-pack*)", "Bash(git * --exec*)", "Bash(git * --repo*)", "Bash(git * --output*)",
+		"Bash(git push * http*)", "Bash(git push * git@*)", "Bash(git push * ssh*)", "Bash(git push * file*)", "Bash(git checkout * -- /*)",
+		// every shell redirect and tee: workers write files with Edit/Write, never through the shell
+		"Bash(*>*)", "Bash(* | tee *)", "Bash(*|tee *)"}
+	for _, b := range smithy {
+		if filepath.IsAbs(b) {
+			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config *)")
+		}
+	}
+	for _, f := range []string{"~/.smithy/auth.json", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
+		d = append(d, "Read("+f+")")
+	}
+	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
+		"~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile", "~/.zshenv", "~/.claude/**",
+		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json"} {
+		d = append(d, "Edit("+f+")", "Write("+f+")")
+	}
+	return d
+}
+
+// Kind is the CLI kind of an agent name or path: its base name, with agent meaning cursor.
+func Kind(cli string) string {
+	if cli == "" || cli == "custom" {
+		return cli
+	}
+	b := strings.TrimSuffix(filepath.Base(cli), ".exe")
+	if b == "agent" {
+		return "cursor"
+	}
+	return b
 }
 
 // DefaultTimeout is the agent.timeout setting when unset, in minutes.
@@ -97,6 +167,9 @@ func supervisor(o Options, log string) (*exec.Cmd, error) {
 	}
 	if o.ReadOnly {
 		a = append(a, "--readonly")
+	}
+	if o.Profile != "" {
+		a = append(a, "--profile", o.Profile)
 	}
 	cmd := exec.Command(exe, append(a, o.PromptFile)...)
 	cmd.Dir, cmd.Env = o.Cwd, Scrub(os.Environ())
@@ -198,6 +271,8 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		}
 	}
 	stdin := false
+	path := cli
+	cli = Kind(cli)
 	switch cli {
 	case "custom":
 		h := getenv("WARDEN_HARNESS")
@@ -210,16 +285,23 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if perm == "" {
 			perm = "auto"
 		}
+		if o.Profile == "auto" {
+			perm = "dontAsk"
+		}
 		if o.ReadOnly {
 			perm = "plan"
 		}
 		a = []string{"claude", "-p", "--permission-mode", perm}
+		if o.Profile == "auto" && !o.ReadOnly {
+			a = append(append(a, "--allowedTools"), AutoTools(o.SmithyBins)...)
+			a = append(append(a, "--disallowedTools"), AutoDenied(o.SmithyBins)...)
+		}
 		opt("--model")
 		if o.Effort != "" {
 			a = append(a, "--effort", o.Effort)
 		}
 		a = append(a, extra...)
-		return Spec{a, true, "claude-cli"}, nil
+		return Spec{withPath(a, path), true, "claude-cli"}, nil
 	case "codex":
 		a = []string{"codex", "exec"}
 		if o.ReadOnly {
@@ -228,6 +310,9 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 			a = append(a, "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true")
 			if gitDir != "" {
 				a = append(a, "--add-dir", gitDir)
+			}
+			if o.Profile == "auto" {
+				a = append(a, "-c", "approval_policy=never")
 			}
 		}
 		opt("-m")
@@ -274,13 +359,21 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 	default:
 		return Spec{}, ErrNoCLI
 	}
-	return Spec{a, stdin, cli}, nil
+	return Spec{withPath(a, path), stdin, cli}, nil
+}
+
+// withPath runs an absolute or relative CLI path in place of the bare name.
+func withPath(a []string, path string) []string {
+	if strings.ContainsRune(path, os.PathSeparator) || strings.ContainsRune(path, '/') {
+		a[0] = path
+	}
+	return a
 }
 
 // Env is the worker's environment: base without the parent harness's variables, with
 // WARDEN_HARNESS and the AGENT_* run variables set.
 func Env(base []string, s Spec, o Options) []string {
-	drop := map[string]bool{"WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
+	drop := map[string]bool{ProfileEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
 	for _, k := range ParentVars {
 		drop[k] = true
 	}
@@ -294,6 +387,9 @@ func Env(base []string, s Spec, o Options) []string {
 	ro := "0"
 	if o.ReadOnly {
 		ro = "1"
+	}
+	if o.Profile != "" {
+		env = append(env, ProfileEnv+"="+o.Profile)
 	}
 	return append(env, "AGENT_PROMPT_FILE="+o.PromptFile, "AGENT_MODEL="+o.Model, "AGENT_EFFORT="+o.Effort, "AGENT_READONLY="+ro, "WARDEN_HARNESS="+s.Harness)
 }
@@ -369,8 +465,11 @@ func Run(o Options) int {
 	if o.Cwd == "" {
 		o.Cwd, _ = os.Getwd()
 	}
+	if o.Profile == "auto" {
+		o.SmithyBins = SmithyPaths()
+	}
 	gitDir := ""
-	if cli == "codex" && !o.ReadOnly {
+	if Kind(cli) == "codex" && !o.ReadOnly {
 		gitDir, _ = ghx.Run("git", "-C", o.Cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	}
 	prompt := ""
@@ -382,7 +481,7 @@ func Run(o Options) int {
 		}
 		prompt = strings.TrimRight(string(b), "\n")
 	}
-	if cli != "custom" && !EffortFlags[cli] {
+	if cli != "custom" && !EffortFlags[Kind(cli)] {
 		fmt.Fprintf(os.Stderr, "smithy agent: %s has no effort flag; it runs at its own default (AGENT_EFFORT=%s is set)\n", cli, o.Effort)
 	}
 	s, err := Build(cli, o, prompt, SplitArgs(os.Getenv("AGENT_ARGS")), gitDir, os.Getenv)
@@ -525,6 +624,9 @@ func wait(cmd *exec.Cmd, timeout time.Duration, out *os.File) int {
 // AgentMain runs `smithy agent` and returns the exit code.
 func AgentMain(args []string) int {
 	o := Options{Model: os.Getenv("AGENT_MODEL"), Effort: os.Getenv("AGENT_EFFORT"), Timeout: ParseTimeout(config.Get("agent.timeout", DefaultTimeout))}
+	if os.Getenv(ProfileEnv) == "auto" {
+		o.Profile = "auto"
+	}
 	if o.Effort == "" {
 		o.Effort = config.Get("agent.effort", MaxEffort)
 	}
@@ -547,6 +649,12 @@ loop:
 			o.Effort = args[1]
 		case "--timeout":
 			o.Timeout = ParseTimeout(args[1])
+		case "--profile":
+			if args[1] != "auto" {
+				fmt.Fprintf(os.Stderr, "smithy agent: unknown profile %q (known: auto)\n", args[1])
+				return 2
+			}
+			o.Profile = args[1]
 		default:
 			break loop
 		}
@@ -572,4 +680,19 @@ loop:
 func isFile(p string) bool {
 	fi, err := os.Stat(p)
 	return err == nil && fi.Mode().IsRegular()
+}
+
+// SmithyPaths are the absolute paths of this smithy binary and the use-smithy launcher.
+func SmithyPaths() []string {
+	var out []string
+	if exe, err := os.Executable(); err == nil {
+		if r, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = r
+		}
+		out = append(out, exe)
+	}
+	if p, ok := FindSkill("use-smithy"); ok {
+		out = append(out, filepath.Join(filepath.Dir(p), "scripts", "smithy"))
+	}
+	return out
 }

@@ -5,6 +5,26 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: `smithy auto serve [--agent <cli>] [--once] [--max-hours <n>]`, the unattended loop
+  outside the LLM: polls every `auto.every`, and when `auto take` yields a task dir starts one
+  headless orchestrator (`smithy agent --bg --profile auto`) that runs `tend auto once <dir>`; one
+  at a time (`~/.smithy/auto/orchestrator.json`), logs in `~/.smithy/auto/sessions/`, heartbeat in
+  `~/.smithy/auto/serve.json`. In a terminal a compact live view (Esc, q or Ctrl+C asks before
+  stopping); otherwise one line per event. Stopping never stops the orchestrator or its workers.
+  `smithy auto status`, the TUI header and System view (`l` opens the session log) show serve.
+- Added: `smithy agent --profile auto`: Claude Code with permission mode `dontAsk` and an
+  allowed-tools list (Read, Edit, Write, Glob, Grep; Bash for git, gh, go/npm test, smithy);
+  Codex with `approval_policy=never` in its workspace-write sandbox. Never a full bypass.
+- Security: the auto profile reaches every worker (`SMITHY_AGENT_PROFILE`); its allow-list names
+  git and gh subcommands (push only to origin) and smithy by absolute path only, and a deny list
+  blocks `git -c`/`config`, fetch/push exec and URL options, shell redirects and tee, `gh api|auth|gist|alias|extension`, `smithy auth|config`, curl, wget,
+  secret files and hook/rc/settings edits. `auto.agent` takes an absolute path; doctor runs its
+  `--version` and states Codex's network limit. Serve's locks are O_EXCL with atomic rewrites,
+  pids carry their start time (a reused pid reads as dead), a failed launch puts the issues back
+  in the queue, SIGTERM no longer waits for a poll, and `--once` keeps the view for 3 s.
+- Added: settings `auto.agent` and `auto.session_hours` (default 3); `smithy doctor` warns when
+  `auto.agent` is missing or can't run headless. tend `auto once <dir>`; warden ends an `auto-*`
+  dir `blocked` when only the subagent fallback can launch workers.
 - Changed: `smithy cards board --changed-since` exits 4 (not 3) when nothing changed;
   `smithy auto` exits 1 (not 2) when a source fails to open for a reason other than access.
 - Added: `smithy <cmd> <sub> --help` prints only that subcommand's usage.

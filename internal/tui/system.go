@@ -94,6 +94,27 @@ func (m Model) systemLines(w int) (left, right []string) {
 		ver = t.fg(t.err).Render(t.g.fail + " mismatch: smithy doctor says how to fix it")
 	}
 	left = append(left, head.Render("Versions"), mut.Render("binary  ")+val.Render(s.Binary), mut.Render("skills  ")+val.Render(s.Skills)+"  "+ver, "",
+		head.Render("Serve")+mut.Render("  smithy auto serve"))
+	sv := m.snap.Watcher.Serve
+	switch sv.State {
+	case "running", "stale":
+		c := t.ok
+		if sv.State == "stale" {
+			c = t.warn
+		}
+		cycle := "-"
+		if !sv.LastCycle.IsZero() {
+			cycle = ago(m.snap.At.Sub(sv.LastCycle))
+		}
+		left = append(left, t.fg(c).Render(sv.State)+mut.Render(fmt.Sprintf("  pid %d %s agent ", sv.PID, t.g.dot))+val.Render(sv.Agent)+
+			mut.Render(" "+t.g.dot+" "+or(sv.Loop)+" "+t.g.dot+" last cycle ")+val.Render(cycle))
+	default:
+		left = append(left, mut.Render("not running (start: smithy auto serve)"))
+	}
+	if sv.SessionLog != "" {
+		left = append(left, mut.Render("session ")+val.Render(short(home(sv.SessionLog), max(w-12, 20)))+mut.Render("  l opens it"))
+	}
+	left = append(left, "",
 		head.Render("Paths"), mut.Render("home    ")+val.Render(home(s.Home)), mut.Render("events  ")+val.Render(home(s.Events)), "",
 		head.Render("Auth")+mut.Render("  keys are masked"))
 	if len(s.Auth) == 0 {

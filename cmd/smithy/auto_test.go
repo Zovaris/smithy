@@ -1,9 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
+	"syscall"
 	"testing"
+	"time"
 )
 
 func TestAutoStatusAndTakeEmpty(t *testing.T) {
@@ -29,5 +36,75 @@ func TestAutoStatusAndTakeEmpty(t *testing.T) {
 		if !strings.Contains(out, k) {
 			t.Errorf("config list lacks %s", k)
 		}
+	}
+}
+
+func TestAgentAutoProfileFlags(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script stand-in")
+	}
+	repo, env := sandbox(t)
+	bin := filepath.Join(filepath.Dir(repo), "bin")
+	rec := filepath.Join(filepath.Dir(repo), "claude.argv")
+	os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > "+rec+"\ncat > /dev/null\n"), 0o755)
+	prompt := filepath.Join(repo, "p.md")
+	os.WriteFile(prompt, []byte("hi"), 0o600)
+	env = append(env, "AGENT_CLI=claude", "AGENT_PERMISSION_MODE=bypassPermissions")
+	if _, errOut, code := run(t, repo, env, "agent", "--profile", "auto", prompt); code != 0 {
+		t.Fatalf("agent: %d %s", code, errOut)
+	}
+	b, _ := os.ReadFile(rec)
+	got := string(b)
+	if !strings.Contains(got, "--permission-mode\ndontAsk\n--allowedTools\n") || strings.Contains(got, "bypass") || !strings.Contains(got, "Bash(git commit *)") || strings.Contains(got, "Bash(git *)") {
+		t.Errorf("claude argv = %q", got)
+	}
+	// A worker the orchestrator starts with a plain `smithy agent` inherits the profile.
+	os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" \"env=$SMITHY_AGENT_PROFILE\" > "+rec+"\ncat > /dev/null\n"), 0o755)
+	if _, errOut, code := run(t, repo, append(env, "SMITHY_AGENT_PROFILE=auto"), "agent", prompt); code != 0 {
+		t.Fatalf("worker: %d %s", code, errOut)
+	}
+	b, _ = os.ReadFile(rec)
+	if got := string(b); !strings.Contains(got, "dontAsk\n--allowedTools\n") || !strings.Contains(got, "--disallowedTools\n") || !strings.Contains(got, "env=auto") {
+		t.Errorf("worker argv = %q", got)
+	}
+	if _, _, code := run(t, repo, env, "agent", "--profile", "yolo", prompt); code != 2 {
+		t.Errorf("unknown profile exit %d", code)
+	}
+}
+
+func TestAutoServeSIGTERM(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("no SIGTERM")
+	}
+	repo, env := sandbox(t)
+	home := strings.TrimPrefix(env[1], "SMITHY_HOME=")
+	c := exec.Command(bin, "auto", "serve", "--agent", "claude")
+	c.Dir, c.Env = repo, env
+	var o bytes.Buffer
+	c.Stdout, c.Stderr = &o, &o
+	if err := c.Start(); err != nil {
+		t.Fatal(err)
+	}
+	hb := filepath.Join(home, "auto", "serve.json")
+	for i := 0; i < 100; i++ {
+		if _, err := os.Stat(hb); err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if _, err := os.Stat(hb); err != nil {
+		c.Process.Kill()
+		t.Fatalf("no heartbeat: %v\n%s", err, o.String())
+	}
+	time.Sleep(200 * time.Millisecond)
+	c.Process.Signal(syscall.SIGTERM)
+	if err := c.Wait(); err != nil {
+		t.Errorf("exit: %v\n%s", err, o.String())
+	}
+	if _, err := os.Stat(hb); !os.IsNotExist(err) {
+		t.Error("heartbeat left after SIGTERM")
+	}
+	if !strings.Contains(o.String(), "serve started") || !strings.Contains(o.String(), "serve stopped") {
+		t.Errorf("output = %q", o.String())
 	}
 }
