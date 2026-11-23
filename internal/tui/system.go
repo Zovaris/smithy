@@ -14,6 +14,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/notify"
 	"github.com/Zovaris/smithy/internal/warden"
 )
 
@@ -25,7 +26,8 @@ type System struct {
 	Binary   string
 	Skills   string
 	Home     string
-	Events   string // events.jsonl path and size
+	Events   string   // events.jsonl path and size
+	Notify   []string // notify.Status lines (token masked)
 	Err      []string
 }
 
@@ -61,6 +63,7 @@ func loadSystem() System {
 	} else {
 		s.Err = append(s.Err, "auth: "+clean(err.Error()))
 	}
+	s.Notify = cleanAll(notify.Status())
 	s.Events = events.File() + "  (none yet)"
 	if fi, err := os.Stat(events.File()); err == nil {
 		s.Events = fmt.Sprintf("%s  (%.1f KB)", events.File(), float64(fi.Size())/1024)
@@ -76,7 +79,9 @@ func demoSystem() System {
 			{"auto.max_per_day", "80", "user"}, {"auto.hours", "-", "unset"}, {"auto.every", "60", "default"}, {"auto.paused", "false", "default"},
 			{"linear.team", "TES", "user"}, {"linear.project", "-", "unset"}, {"warden.max", "5", "default"}, {"warden.merge", "manual", "user"},
 			{"warden.cleanup", "auto", "default"}, {"warden.mode", "smelt normal", "default"}},
-		Auth:   []string{"github ****9f2c", "linear ****a41b"},
+		Auth: []string{"github ****9f2c", "linear ****a41b"},
+		Notify: []string{"token  ****x7Qa (/home/dev/.smithy/auth.json)", "chat 123456789", "kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached",
+			"state  on (smithy auto serve sends)", "last sent 2026-11-23 09:12"},
 		Binary: "0.15.0", Skills: "0.15.0", Home: "/home/dev/.smithy", Events: "/home/dev/.smithy/events.jsonl  (412.7 KB)",
 	}
 }
@@ -122,6 +127,17 @@ func (m Model) systemLines(w int) (left, right []string) {
 	}
 	for _, a := range s.Auth {
 		left = append(left, val.Render(a))
+	}
+	left = append(left, "", head.Render("Notify")+mut.Render("  Telegram, smithy notify test"))
+	for _, l := range s.Notify {
+		c := t.text
+		switch {
+		case strings.HasPrefix(l, "last error"):
+			c = t.err
+		case strings.HasPrefix(l, "state  off"):
+			c = t.muted
+		}
+		left = append(left, t.fg(c).Render(short(l, w)))
 	}
 	left = append(left, "", head.Render("Doctor"))
 	for _, d := range s.Doctor {
