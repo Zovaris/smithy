@@ -16,6 +16,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	tok "github.com/Zovaris/smithy/internal/usage"
 )
 
 // RaiseImpact, when set, may raise a new question's impact (never lower it); it reports whether it did.
@@ -222,6 +223,8 @@ type Row struct {
 	LastBeat *string `json:"last_beat"`
 	Updated  *string `json:"updated"`
 	Text     string  `json:"text"`
+	// Usage is what the item's worker run reported (<batch>/<id>.log.usage.json); nil when unknown.
+	Usage *tok.Usage `json:"usage,omitempty"`
 }
 
 func ageMin(card map[string]any) (float64, bool) { return since(card, "updated") }
@@ -359,6 +362,9 @@ func Rows(batch string) ([]Row, error) {
 				r.Age = fmt.Sprintf("%dm", int(a+0.5))
 			}
 		}
+		if u, ok := tok.Read(filepath.Join(dir, id+".log")); ok {
+			r.Usage = &u
+		}
 		r.Beat = "-"
 		if b := s(card, "last_beat"); b != "" {
 			r.LastBeat = &b
@@ -378,6 +384,18 @@ func or(v string) string {
 	return v
 }
 
+// Total sums the reported usage of rows; ok is false when none reported any.
+func Total(rows []Row) (tok.Usage, bool) {
+	var t tok.Usage
+	ok := false
+	for _, r := range rows {
+		if r.Usage != nil {
+			t, ok = t.Add(*r.Usage), true
+		}
+	}
+	return t, ok
+}
+
 // Board renders a batch as a table, or JSON.
 func Board(batch string, asJSON bool) (string, error) {
 	rows, err := Rows(batch)
@@ -385,7 +403,11 @@ func Board(batch string, asJSON bool) (string, error) {
 		return "", err
 	}
 	if asJSON {
-		b, _ := json.MarshalIndent(map[string]any{"batch": batch, "items": rows}, "", "  ")
+		out := map[string]any{"batch": batch, "items": rows}
+		if t, ok := Total(rows); ok {
+			out["usage"] = t
+		}
+		b, _ := json.MarshalIndent(out, "", "  ")
 		return string(b), nil
 	}
 	head := []string{"item", "stage", "state", "phase", "done", "pr", "ci", "age", "beat", "question / note"}

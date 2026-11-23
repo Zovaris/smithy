@@ -56,6 +56,7 @@ var Known = []Setting{
 	{"auto.model_prefix", "model:", "smithy auto", "label prefix for the worker tier (model:cheap, model:mid, model:strong)"},
 	{"auto.speed_prefix", "speed:", "smithy auto", "label prefix for the smelt speed (speed:fast, speed:normal, speed:full)"},
 	{"auto.max_per_day", "20", "smithy auto", "issues launched per local calendar day; the rest stay queued (an auto.hours window across midnight can launch up to 2x this overnight)"},
+	{"auto.max_cost_per_day", "", "smithy auto serve", "USD of reported agent cost per local day; at or over it serve launches nothing until tomorrow (empty = no cap; runs whose CLI reports no cost don't count)"},
 	{"auto.hours", "", "smithy auto", "launch window HH:MM-HH:MM in local time (22:00-07:00 wraps midnight); empty = always"},
 	{"auto.every", "60", "smithy auto", "seconds between polls of each source"},
 	{"auto.paused", "false", "smithy auto", "true holds smithy auto take: nothing launches until it is false again (p in smithy tui)"},

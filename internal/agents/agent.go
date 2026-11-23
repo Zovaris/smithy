@@ -16,8 +16,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/usage"
 )
 
 const agentUsage = `Harness-agnostic agent runner: runs one headless coding agent on a prompt file.
@@ -26,7 +29,9 @@ const agentUsage = `Harness-agnostic agent runner: runs one headless coding agen
 Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list below.
   AGENT_CMD   any shell command; gets the prompt on stdin and in $AGENT_PROMPT_FILE, the model
               in $AGENT_MODEL, and $AGENT_READONLY=1 for read-only runs
-  claude      claude -p --permission-mode ${AGENT_PERMISSION_MODE:-auto}   (plan when read-only)
+  claude      claude -p --permission-mode ${AGENT_PERMISSION_MODE:-auto}   (plan when read-only);
+              JSON output unless $AGENT_ARGS picks a format: the log keeps the plain answer
+              and the reported usage goes to <log>.usage.json and a usage event
   codex       codex exec --sandbox workspace-write, the repo's git dir writable and network on
               (so workers can commit, push and open PRs); read-only sandbox when read-only
   opencode    opencode run --standalone --auto (plan agent when read-only); -m provider/model
@@ -298,7 +303,11 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if o.ReadOnly {
 			perm = "plan"
 		}
-		a = []string{"claude", "-p", "--permission-mode", perm}
+		a = []string{"claude", "-p"}
+		if !hasArg(extra, "--output-format") {
+			a = append(a, "--output-format", "json")
+		}
+		a = append(a, "--permission-mode", perm)
 		if o.Profile == "auto" && !o.ReadOnly {
 			a = append(append(a, "--allowedTools"), AutoTools(o.SmithyBins)...)
 			a = append(append(a, "--disallowedTools"), AutoDenied(o.SmithyBins)...)
@@ -371,6 +380,41 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		return Spec{}, ErrNoCLI
 	}
 	return Spec{withPath(a, path), stdin, cli}, nil
+}
+
+func hasArg(a []string, flag string) bool {
+	for _, x := range a {
+		if x == flag || strings.HasPrefix(x, flag+"=") {
+			return true
+		}
+	}
+	return false
+}
+
+// jsonResult reports whether argv is a claude run smithy switched to --output-format json, whose
+// result line Finish turns back into text and a usage sidecar.
+func jsonResult(argv []string) bool {
+	for i := 0; i+1 < len(argv); i++ {
+		if argv[i] == "--output-format" && argv[i+1] == "json" {
+			return Kind(argv[0]) == "claude"
+		}
+	}
+	return false
+}
+
+// finish rewrites a claude json log to text and records its usage: the sidecar next to a named
+// log and a "usage" event (batch and item from a <warden home>/<batch>/<item>.log path).
+func finish(log string, named bool) {
+	u, ok := usage.Finish(log)
+	if !ok || !named {
+		os.Remove(usage.Sidecar(log))
+		return
+	}
+	e := events.Event{Kind: "usage", Detail: filepath.Base(log), Usage: &u}
+	if dir := filepath.Dir(log); filepath.Dir(dir) == cards.Home() {
+		e.Batch, e.Item = filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log")
+	}
+	_ = events.Append(e)
 }
 
 // withPath runs an absolute or relative CLI path in place of the bare name.
@@ -541,7 +585,7 @@ func Run(o Options) int {
 	cmd.Dir, cmd.Env = o.Cwd, Env(os.Environ(), s, o)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, out, out
 	if o.Bg {
-		if o.Timeout > 0 {
+		if o.Timeout > 0 || jsonResult(s.Argv) {
 			if cmd, err = supervisor(o, out.Name()); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return 1
@@ -570,6 +614,9 @@ func Run(o Options) int {
 	}
 	rc := wait(cmd, o.Timeout, out)
 	out.Close()
+	if jsonResult(s.Argv) {
+		finish(out.Name(), o.Log != "")
+	}
 	if b, err := os.ReadFile(out.Name()); err == nil {
 		os.Stdout.Write(b)
 	}

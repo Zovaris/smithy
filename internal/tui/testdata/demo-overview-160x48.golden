@@ -10,11 +10,11 @@
 │ launched ▇ 104   ready/merged ▇ 162               ││ █████████████████████████████████████████████████ ││ 69 / 80 launched today                             │
 │ 20┤· · · · · · · · · · · · · · · · · · · · · · ·  ││                                                   ││ ███████████████████████████████████████████░░░░░░░ │
 │   │                                               ││ ● 2 queued   ● 3 building   ● 2 checking          ││                                                    │
-│   │                                        ▂      ││ ● 2 pr_open   ● 2 ready   ● 2 blocked             ││ 7 days  ▄▃▃▄▃▃█  30 21 24 30 23 26 69              │
+│   │                                        ▂      ││ ● 2 pr_open   ● 2 ready   ● 2 blocked             ││ 7 days  ▄▄▃▃▄▃█  36 33 20 20 32 26 69              │
 │   │                                        █ █    ││                                                   ││ hours   any time                                   │
 │   │▄     █   ▁   ▁ ▁ █ ▁ ▁ ▁   ▄ ▁ ▁ ▁   ▁ █ █    ││ ● orchestrator  claude pid 5150 · 38m             ││                                                    │
-│   │█ ▇ ▇ █ ▄ █ ▇ █ █ █ █ █ █ ▂ █ █ █ █ ▇ █ █ █    ││ ⠋ TES-202 Rate-limit the exp…  building · 42s ago ││                                                    │
-│  0┼────────────────────────────────────────────── ││ ⠙ TES-203 Cache board queries  building · 53s ago ││                                                    │
+│   │█ ▇ ▇ █ ▄ █ ▇ █ █ █ █ █ █ ▂ █ █ █ █ ▇ █ █ █    ││ ⠋ TES-202 Rate-limit the exp…  building · 42s ago ││ spend   $82.58 today · cap $120.00                 │
+│  0┼────────────────────────────────────────────── ││ ⠙ TES-203 Cache board queries  building · 53s ago ││ 7 days  ▁▁▁▁▁█▇  $0 0 0 0 0 83 83                  │
 │   │█ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █ █  ││ ⠹ TES-204 Paginate the audit…  building · 1m ago  ││                                                    │
 │   │  ▅ █ █ █ ▅ ▂ █ █ ▅ █ █ █   █ ▅ █ █ █ ▂ █ █ ▅  ││                                                   ││                                                    │
 │   │    ▅ ▂ █     █ ▂   ▂ █ █   ▅   ▂ ▅ ▂   ▂ ▅    ││                                                   ││                                                    │

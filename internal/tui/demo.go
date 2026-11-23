@@ -10,6 +10,7 @@ import (
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/tasks"
+	"github.com/Zovaris/smithy/internal/usage"
 )
 
 // Demo is `smithy tui --demo`: a rich, deterministic fake world relative to now, built in memory
@@ -85,6 +86,13 @@ func Demo(now time.Time) Snapshot {
 		if r.IntN(9) == 0 {
 			reasons := []string{"no auto label", "project Mobile is filtered out", "state Backlog is filtered out", "cycle 41 is not current"}
 			add(events.Event{T: t, Kind: "skipped", Source: src, ID: fmt.Sprintf("TES-%d", 300+m%97), Detail: reasons[r.IntN(len(reasons))] + ": " + titles[r.IntN(len(titles))]})
+		}
+	}
+	for _, e := range evs {
+		if e.Kind == "launched" {
+			c := float64(20+r.IntN(260)) / 100
+			add(events.Event{T: e.T.Add(40 * time.Minute), Kind: "usage", Batch: e.Batch, Item: e.Item,
+				Usage: &usage.Usage{Input: 40 + int64(r.IntN(400)), Output: 2000 + int64(r.IntN(30000)), CacheRead: 300000 + int64(r.IntN(900000)), CostUSD: &c}})
 		}
 	}
 	sort.SliceStable(evs, func(i, j int) bool { return evs[i].T.Before(evs[j].T) })
@@ -248,6 +256,19 @@ func Demo(now time.Time) Snapshot {
 		Serve: auto.ServeStatus{State: "running", PID: 4242, Agent: "claude", LastCycle: now.Add(-25 * time.Second), Loop: "orchestrating",
 			SessionLog: "/home/dev/.smithy/auto/sessions/20261123-091500.log", SessionPID: 5150, SessionOn: true,
 			SessionAt: now.Add(-38 * time.Minute), SessionDir: "/home/dev/.smithy/plans/smithy/auto-2026-11-23-1"}}
+	for bi := range batches {
+		for ii := range batches[bi].Items {
+			it := &batches[bi].Items[ii]
+			if n++; it.Stage == "queued" || n%4 == 3 {
+				continue // queued, or a CLI that reports no usage: shown as "-"
+			}
+			c := float64(30+n*37%240) / 100
+			it.Usage = &usage.Usage{Input: int64(60 + n), Output: int64(4000 + n*900), CacheRead: int64(250000 + n*41000), CostUSD: &c}
+		}
+	}
+	w.Spend = events.Spend(evs, now, 7)
+	spendCap := 120.0
+	w.SpendCap = &spendCap
 	snap := Snapshot{At: now, Watcher: w, Queue: queue, Batches: batches, Tasks: lists, Worktrees: wts, Events: evs,
 		Rates: map[string]int{"linear": 1342}, Repo: "smithy", Demo: true,
 		Decisions: []string{

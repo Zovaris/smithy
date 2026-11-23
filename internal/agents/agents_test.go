@@ -25,8 +25,8 @@ func TestBuild(t *testing.T) {
 		stdin bool
 		h     string
 	}{
-		{"claude", Options{Model: "opus"}, []string{"--x"}, "", []string{"claude", "-p", "--permission-mode", "auto", "--model", "opus", "--x"}, true, "claude-cli"},
-		{"claude", Options{ReadOnly: true}, nil, "", []string{"claude", "-p", "--permission-mode", "plan"}, true, "claude-cli"},
+		{"claude", Options{Model: "opus"}, []string{"--x"}, "", []string{"claude", "-p", "--output-format", "json", "--permission-mode", "auto", "--model", "opus", "--x"}, true, "claude-cli"},
+		{"claude", Options{ReadOnly: true}, nil, "", []string{"claude", "-p", "--output-format", "json", "--permission-mode", "plan"}, true, "claude-cli"},
 		{"codex", Options{}, nil, "/r/.git", []string{"codex", "exec", "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true", "--add-dir", "/r/.git", "-"}, true, "codex"},
 		{"codex", Options{ReadOnly: true, Model: "m"}, nil, "", []string{"codex", "exec", "--sandbox", "read-only", "-m", "m", "-"}, true, "codex"},
 		{"opencode", Options{}, nil, "", []string{"opencode", "run", "--standalone", "--archived", "--auto", "P"}, false, "opencode"},
@@ -34,7 +34,7 @@ func TestBuild(t *testing.T) {
 		{"gemini", Options{ReadOnly: true}, nil, "", []string{"gemini", "--approval-mode", "plan", "-p", "P"}, false, "gemini"},
 		{"cursor", Options{Model: "m"}, nil, "", []string{"agent", "-p", "--force", "--model", "m", "P"}, false, "cursor"},
 		{"pi", Options{ReadOnly: true}, nil, "", []string{"pi", "-p", "--tools", "read", "P"}, false, "pi"},
-		{"claude", Options{Effort: "medium"}, nil, "", []string{"claude", "-p", "--permission-mode", "auto", "--effort", "medium"}, true, "claude-cli"},
+		{"claude", Options{Effort: "medium"}, nil, "", []string{"claude", "-p", "--output-format", "json", "--permission-mode", "auto", "--effort", "medium"}, true, "claude-cli"},
 		{"codex", Options{ReadOnly: true, Effort: "low"}, nil, "", []string{"codex", "exec", "--sandbox", "read-only", "-c", "model_reasoning_effort=low", "-"}, true, "codex"},
 		{"gemini", Options{Effort: "medium"}, nil, "", []string{"gemini", "--approval-mode", "yolo", "-p", "P"}, false, "gemini"},
 		{"dsh", Options{ReadOnly: true, Model: "ignored"}, nil, "", []string{"dsh", "headless", "--approval-policy", "never", "--permission-mode", "read-only", "-"}, true, "dsh"},
@@ -48,7 +48,7 @@ func TestBuild(t *testing.T) {
 	auto := Options{Profile: "auto", SmithyBins: []string{"/opt/smithy/bin/smithy", "rel/smithy"}}
 	s, _ := Build("/Apps/Claude Code/2.1/claude", auto, "", nil, "", env(map[string]string{"AGENT_PERMISSION_MODE": "bypassPermissions"}))
 	argv := strings.Join(s.Argv, "\n")
-	if s.Argv[0] != "/Apps/Claude Code/2.1/claude" || s.Harness != "claude-cli" || !strings.HasPrefix(argv, "/Apps/Claude Code/2.1/claude\n-p\n--permission-mode\ndontAsk\n--allowedTools\n") {
+	if s.Argv[0] != "/Apps/Claude Code/2.1/claude" || s.Harness != "claude-cli" || !strings.HasPrefix(argv, "/Apps/Claude Code/2.1/claude\n-p\n--output-format\njson\n--permission-mode\ndontAsk\n--allowedTools\n") {
 		t.Errorf("claude auto profile = %q", s.Argv)
 	}
 	for _, want := range []string{"\nBash(git commit *)\n", "\nBash(git push origin *)\n", "\nBash(gh pr create *)\n", "\nBash(/opt/smithy/bin/smithy *)\n",
@@ -77,7 +77,7 @@ func TestBuild(t *testing.T) {
 		t.Errorf("codex auto profile = %q", s.Argv)
 	}
 	s, _ = Build("claude", Options{}, "", nil, "", env(map[string]string{"AGENT_PERMISSION_MODE": "acceptEdits"}))
-	if s.Argv[3] != "acceptEdits" {
+	if s.Argv[5] != "acceptEdits" {
 		t.Errorf("AGENT_PERMISSION_MODE ignored: %q", s.Argv)
 	}
 	s, _ = Build("custom", Options{}, "", nil, "", env(map[string]string{"AGENT_CMD": "cat", "WARDEN_HARNESS": "pi"}))
@@ -610,4 +610,55 @@ func TestAutoDirsIncludesSmithyHomeAndSkillsRoot(t *testing.T) {
 	if !strings.Contains(got, home) || !strings.Contains(got, root) {
 		t.Fatalf("AutoDirs = %q", got)
 	}
+}
+
+func TestBuildKeepsAnOutputFormatFromAgentArgs(t *testing.T) {
+	s, _ := Build("claude", Options{}, "", []string{"--output-format", "stream-json"}, "", env(nil))
+	if strings.Count(strings.Join(s.Argv, " "), "--output-format") != 1 {
+		t.Errorf("argv = %q", s.Argv)
+	}
+}
+
+func fakeClaude(t *testing.T) (prompt, log string) {
+	t.Helper()
+	d := t.TempDir()
+	bin := filepath.Join(d, "claude")
+	os.WriteFile(bin, []byte("#!/bin/sh\necho 'a warning' >&2\necho '{\"type\":\"result\",\"result\":\"all done\",\"total_cost_usd\":0.25,\"usage\":{\"input_tokens\":3,\"output_tokens\":7,\"cache_read_input_tokens\":11,\"cache_creation_input_tokens\":13}}'\n"), 0o755)
+	t.Setenv("AGENT_CLI", bin)
+	t.Setenv("SMITHY_HOME", d)
+	prompt = filepath.Join(d, "p.md")
+	os.WriteFile(prompt, []byte("x"), 0o644)
+	return prompt, filepath.Join(d, "w.log")
+}
+
+func TestAgentClaudeKeepsATextLogAndWritesUsage(t *testing.T) {
+	p, log := fakeClaude(t)
+	if rc := AgentMain([]string{"--timeout", "0", "--log", log, p}); rc != 0 {
+		t.Fatalf("rc = %d", rc)
+	}
+	b, _ := os.ReadFile(log)
+	if string(b) != "a warning\nall done\n" {
+		t.Fatalf("log = %q", b)
+	}
+	u, err := os.ReadFile(log + ".usage.json")
+	if err != nil || !strings.Contains(string(u), `"cost_usd":0.25`) || !strings.Contains(string(u), `"cache_write_tokens":13`) {
+		t.Fatalf("sidecar = %s (%v)", u, err)
+	}
+}
+
+func TestAgentClaudeBackgroundWritesUsage(t *testing.T) {
+	p, log := fakeClaude(t)
+	t.Setenv("SMITHY_TEST_AGENT_MAIN", "1")
+	if rc := AgentMain([]string{"--bg", "--timeout", "0", "--log", log, p}); rc != 0 {
+		t.Fatalf("bg rc = %d", rc)
+	}
+	for start := time.Now(); time.Since(start) < 15*time.Second; time.Sleep(100 * time.Millisecond) {
+		if _, err := os.Stat(log + ".usage.json"); err == nil {
+			if b, _ := os.ReadFile(log); strings.Contains(string(b), "all done") && !strings.Contains(string(b), "{") {
+				return
+			}
+		}
+	}
+	b, _ := os.ReadFile(log)
+	t.Fatalf("no usage from a background run; log = %q", b)
 }

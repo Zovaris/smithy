@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/usage"
 )
 
 // fakeSmithy is a stand-in for `smithy agent --bg`: it records its argv and the prompt, then
@@ -130,6 +132,50 @@ func TestServePausedLaunchesNothing(t *testing.T) {
 	sv.Cycle()
 	if _, err := os.Stat(filepath.Join(fake, "argv")); err == nil {
 		t.Error("launched while paused")
+	}
+}
+
+func TestServeSpendCapLaunchesNothing(t *testing.T) {
+	_, fake := serveSetup(t)
+	config.Set(config.UserFile(), "auto.max_cost_per_day", "1.5")
+	c := 1.6
+	events.Append(events.Event{Kind: "usage", Usage: &usage.Usage{CostUSD: &c}})
+	var logs []string
+	sv := newTestServer(t, &logs)
+	sv.Cycle()
+	sv.Cycle()
+	if _, err := os.Stat(filepath.Join(fake, "argv")); err == nil {
+		t.Error("launched over the spend cap")
+	}
+	if !strings.Contains(strings.Join(logs, "\n"), "daily spend cap $1.50 reached ($1.60 today)") {
+		t.Errorf("logs = %q", logs)
+	}
+	es, _ := events.Read(time.Time{}, 0)
+	n := 0
+	for _, e := range es {
+		if e.Kind == "cap_reached" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("cap_reached events = %d, want 1", n)
+	}
+
+	config.Set(config.UserFile(), "auto.max_cost_per_day", "5")
+	sv.Cycle()
+	if _, err := os.Stat(filepath.Join(fake, "argv")); err != nil {
+		t.Error("not launched under a raised cap")
+	}
+}
+
+func TestSpendCapSetting(t *testing.T) {
+	home(t)
+	if s, err := LoadSettings(); err != nil || s.MaxCostPerDay != nil {
+		t.Fatalf("unset cap = %v, %v", s.MaxCostPerDay, err)
+	}
+	config.Set(config.UserFile(), "auto.max_cost_per_day", "-1")
+	if _, err := LoadSettings(); err == nil {
+		t.Fatal("negative cap accepted")
 	}
 }
 

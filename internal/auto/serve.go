@@ -19,7 +19,9 @@ import (
 
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/usage"
 )
 
 // ServeUsage is the text for `smithy auto serve --help`.
@@ -175,10 +177,11 @@ func Prompt(dir string, hours float64) string {
 
 // Server is one smithy auto serve run. Log gets one line per event.
 type Server struct {
-	Opt  ServeOptions
-	Log  func(string)
-	hb   Heartbeat
-	mkdr func(string) (string, error)
+	Opt    ServeOptions
+	Log    func(string)
+	hb     Heartbeat
+	mkdr   func(string) (string, error)
+	capDay string // local day a cap_reached event was last recorded
 }
 
 // NewServer checks no other serve is running and writes the first heartbeat.
@@ -398,6 +401,9 @@ func (sv *Server) Cycle() time.Duration {
 			}
 			sv.hb.SessionPID, sv.hb.SessionDir = 0, ""
 		}
+		if sv.overCap(s) {
+			break
+		}
 		if err := acquire(LockFile(), func(b []byte) bool {
 			var l Session
 			return json.Unmarshal(b, &l) == nil && AliveAs(l.PID, l.Start)
@@ -432,6 +438,30 @@ func (sv *Server) Cycle() time.Duration {
 	}
 	_ = sv.beat()
 	return time.Duration(s.Every) * time.Second
+}
+
+// overCap reports whether today's reported spend is at or over auto.max_cost_per_day; it logs
+// each time and records one cap_reached event per day.
+func (sv *Server) overCap(s Settings) bool {
+	if s.MaxCostPerDay == nil {
+		return false
+	}
+	t := now()
+	es, err := events.Read(time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location()), 0)
+	if err != nil {
+		sv.logf("serve: spend: %v", err)
+	}
+	spent := events.Spend(es, t, 1)[0]
+	if spent < *s.MaxCostPerDay {
+		return false
+	}
+	msg := fmt.Sprintf("daily spend cap %s reached (%s today)", usage.Cost(s.MaxCostPerDay), usage.Cost(&spent))
+	sv.logf("serve: %s; nothing launches until tomorrow", msg)
+	if d := t.Format("2006-01-02"); sv.capDay != d {
+		sv.capDay = d
+		_ = events.Append(events.Event{Kind: "cap_reached", Detail: msg})
+	}
+	return true
 }
 
 type logWriter struct{ sv *Server }

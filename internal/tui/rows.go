@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/usage"
 )
 
 type cell struct {
@@ -52,13 +53,13 @@ func (m Model) cols(v view) []col {
 	case vAgents:
 		return []col{{"issue", 10, false, 0}, {"title", 0, true, 0}, {"repo", 10, false, 4}, {"branch", 16, false, 5},
 			{"model", 6, false, 3}, {"speed", 6, false, 6}, {"stage", 8, false, 0}, {"CI", 9, false, 1}, {"PR", 6, false, 2},
-			{"beat", 8, false, 2}, {"age", 5, false, 7}}
+			{"beat", 8, false, 2}, {"age", 5, false, 7}, {"cost", 7, false, 5}}
 	case vIncoming:
 		return []col{{"issue", 9, false, 0}, {"title", 0, true, 0}, {"source", 7, false, 2}, {"model", 6, false, 1}, {"speed", 6, false, 3}, {"queued", 8, false, 1}}
 	case vNeeds:
 		return []col{{"", 2, false, 0}, {"what", 0, true, 0}, {"where", 22, false, 1}, {"keys", 22, false, 2}}
 	case vDone:
-		return []col{{"issue", 10, false, 0}, {"title", 0, true, 0}, {"PR", 7, false, 1}, {"result", 8, false, 0}, {"took", 8, false, 1}, {"when", 9, false, 2}}
+		return []col{{"issue", 10, false, 0}, {"title", 0, true, 0}, {"PR", 7, false, 1}, {"result", 8, false, 0}, {"took", 8, false, 1}, {"cost", 7, false, 3}, {"when", 9, false, 2}}
 	case vActivity:
 		return []col{{"when", 8, false, 0}, {"kind", 9, false, 0}, {"what", 0, true, 0}, {"where", 22, false, 1}}
 	case vWorktrees:
@@ -281,7 +282,7 @@ func (m Model) itemDetail(it Item) [][2]string {
 	d := [][2]string{{"batch", it.Batch}, {"item", it.ID}, {"title", or(it.Title)}, {"issue", or(it.Source)}, {"repo", or(it.Repo)},
 		{"branch", or(it.Branch)}, {"worktree", or(it.Worktree)}, {"stage", stageOf(it)}, {"state", it.State},
 		{"phase", it.Phase}, {"model", it.Model}, {"speed", or(it.Speed)}, {"ci", it.CI}, {"pr", it.PR},
-		{"last beat", m.beat(it)}, {"note", or(it.Text)}}
+		{"last beat", m.beat(it)}, {"note", or(it.Text)}, {"usage", usageOf(it.Usage)}}
 	if !m.snap.Demo {
 		d = append(d, [2]string{"card", cardPath(it.Batch, it.ID)})
 	}
@@ -356,7 +357,7 @@ func (m Model) agentRows() []row {
 		out = append(out, row{
 			cells: []cell{{s: issue, c: t.text, bold: true}, {s: or(it.Title), c: t.text}, {s: or(it.Repo), c: t.muted}, {s: or(branch), c: t.muted},
 				{s: it.Model, c: t.muted}, {s: or(it.Speed), c: t.muted}, {s: st, c: m.stageColor(st), bold: true}, m.ciCell(it.CI),
-				{s: pr, c: t.accent}, {s: beat, c: bc}, {s: it.Age, c: t.muted}},
+				{s: pr, c: t.accent}, {s: beat, c: bc}, {s: it.Age, c: t.muted}, {s: costOf(it.Usage), c: t.muted}},
 			chip: st, chipC: m.stageColor(st),
 			search: it.Batch + " " + it.Branch, url: it.PR, copy: firstNonDash(it.PR, it.Worktree, it.Branch), title: it.Batch + "/" + it.ID,
 			detail: m.itemDetail(it), logPath: logPath, logTail: it.LogTail, timeline: m.timeline(it),
@@ -388,7 +389,7 @@ func (m Model) orchestratorRow() (row, bool) {
 	return row{
 		cells: []cell{{s: "serve", c: t.text, bold: true}, {s: fmt.Sprintf("orchestrator · %s · pid %d · %s", or(sv.Agent), sv.SessionPID, dir), c: t.text},
 			{s: "-", c: t.muted}, {s: "-", c: t.muted}, {s: "-", c: t.muted}, {s: "-", c: t.muted},
-			{s: "orchestr", c: t.accent, bold: true}, {s: "-", c: t.muted}, {s: "-", c: t.muted}, {s: "-", c: t.muted}, {s: elapsed, c: t.muted}},
+			{s: "orchestr", c: t.accent, bold: true}, {s: "-", c: t.muted}, {s: "-", c: t.muted}, {s: "-", c: t.muted}, {s: elapsed, c: t.muted}, {s: "-", c: t.muted}},
 		chip: "orchestrator", chipC: t.accent, search: "orchestrator serve " + sv.SessionDir, copy: sv.SessionLog,
 		title: "orchestrator pid " + fmt.Sprint(sv.SessionPID),
 		detail: [][2]string{{"kind", "orchestrator"}, {"agent", or(sv.Agent)}, {"pid", fmt.Sprint(sv.SessionPID)}, {"elapsed", elapsed},
@@ -680,7 +681,9 @@ func (m Model) doneRows() []row {
 	type job struct {
 		issue, title, pr, result, batch, item string
 		start, end                            time.Time
+		use                                   *usage.Usage
 	}
+	used := map[string]*usage.Usage{}
 	titles := map[string]string{}
 	issues := map[string]string{}
 	starts := map[string]time.Time{}
@@ -688,6 +691,13 @@ func (m Model) doneRows() []row {
 	var order []string
 	for _, e := range m.snap.Events {
 		k := e.Batch + "/" + e.Item
+		if e.Kind == "usage" && e.Usage != nil && e.Item != "" {
+			sum := *e.Usage
+			if u := used[k]; u != nil {
+				sum = u.Add(sum)
+			}
+			used[k] = &sum
+		}
 		switch {
 		case e.Kind == "queued":
 			titles[e.Source+":"+e.ID] = e.Detail
@@ -729,10 +739,13 @@ func (m Model) doneRows() []row {
 	var js []*job
 	for _, k := range order {
 		j := jobs[k]
-		j.issue, j.title, j.start = issues[k], titles[k], starts[k]
+		j.issue, j.title, j.start, j.use = issues[k], titles[k], starts[k], used[k]
 		for _, it := range m.items() {
 			if it.Batch == j.batch && it.ID == j.item && j.title == "" {
 				j.title = it.Title
+			}
+			if it.Batch == j.batch && it.ID == j.item && j.use == nil {
+				j.use = it.Usage
 			}
 		}
 		js = append(js, j)
@@ -751,12 +764,27 @@ func (m Model) doneRows() []row {
 		}
 		pr := shortPR(or(j.pr))
 		out = append(out, row{cells: []cell{{s: issue, c: t.text, bold: true}, {s: or(j.title), c: t.text}, {s: pr, c: t.accent},
-			{s: j.result, c: c, bold: true}, {s: took, c: t.muted}, {s: ago(m.snap.At.Sub(j.end)), c: t.muted}},
+			{s: j.result, c: c, bold: true}, {s: took, c: t.muted}, {s: costOf(j.use), c: t.muted}, {s: ago(m.snap.At.Sub(j.end)), c: t.muted}},
 			url: j.pr, copy: firstNonDash(j.pr, j.batch+"/"+j.item), title: issue + " · " + or(j.title), chip: j.result, chipC: c,
 			detail: [][2]string{{"issue", issue}, {"title", or(j.title)}, {"batch", j.batch}, {"item", j.item}, {"pr", or(j.pr)},
-				{"result", j.result}, {"started", stampOr(j.start)}, {"finished", stampOr(j.end)}, {"took", took}}})
+				{"result", j.result}, {"started", stampOr(j.start)}, {"finished", stampOr(j.end)}, {"took", took}, {"usage", usageOf(j.use)}}})
 	}
 	return out
+}
+
+// costOf is a run's reported cost, "-" when unknown (never estimated).
+func costOf(u *usage.Usage) string {
+	if u == nil {
+		return "-"
+	}
+	return usage.Cost(u.CostUSD)
+}
+
+func usageOf(u *usage.Usage) string {
+	if u == nil {
+		return "-"
+	}
+	return u.String()
 }
 
 func stampOr(t time.Time) string {
