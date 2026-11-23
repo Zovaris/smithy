@@ -12,6 +12,8 @@ API, worker or job, end to end. You did not write it. Assume it misbehaves under
 - Test credentials and data only from the project's seed or fixture files.
 
 ## Do
+- Raw HTTP paths (`..`, `%2e%2e`, `%2f`): send them with a raw client (`node:http` with `path`,
+  `curl --path-as-is`, Python `http.client`); fetch and most URL parsers rewrite them first.
 1. Build and start it. It won't build or start → that is the finding; stop and report it.
 2. Derive cases from the contract for each class below. A class with nothing to apply is listed
    as not applicable, never silently dropped.

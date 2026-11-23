@@ -31,8 +31,8 @@ or, with nobody to ask (hush, a launched session; warden workers ask warden), en
 2. The user answers first → stop the timer (the harness's kill for that background task), use the
    answer. Only exit 0 printing `timer: <m>m elapsed` means it fired → step 3 with `--by timeout`.
 3. `smithy consult "<q>" "<options>"`: neutral, safest first for security, never "as written" for
-   an insecure request. Fails → safest; ESCALATE (hard floor) → warden or the user, nobody → `blocked` (security:
-   the secure one; else the most reversible, least new surface; name which). Go on.
+   an insecure request. ESCALATE (hard floor) → warden or the user; nobody → end `blocked`. Fails,
+   or nobody for the rest → safest (security: the secure one; else most reversible; name it). Go on.
 4. `smithy decisions add "<q>" "<choice>" --why "<reason>" --by timeout|consult|self [--ref <pr|file>]` (consult that failed: `consult`).
 Each reply starts (simple too) with `smithy decisions pending` → show any ("decided without you:
 … — keep or change?"), then `smithy decisions confirm <n>|--all` or `change <n> "<choice>"`.
@@ -52,7 +52,7 @@ Run `smithy skills --list` once per session; skip only when the brief gives the 
 |---|---|
 | a typo, copy, config value, one-line fix, rename in one file | **none**: change it, run the check that covers it (test, lint or build), commit |
 | to build, change or fix code | **smelt**: say "Using smelt `<route>` `<speed>`", read its SKILL.md; no plan → `plan`, a plan or task → `build`, a bug → `debug` |
-| several tasks at once | **warden**: costs sessions; propose with the task list, run on a yes |
+| several tasks at once | **warden**: costs sessions; propose with the task list, run on a yes (one `tasks.md` of `## NN` sections: `smithy tasks import` first) |
 | a fact, a comparison, "why does X", "can we Y" | **scout** (read-only, cited); "research, then build": scout, then smelt `plan` with its report |
 | a decision recorded, docs, comment policy, a map, past decisions | **ledger** (search before re-deciding) |
 | open PRs kept green, PRs or labeled issues watched | **tend** (accepted issues become task files for warden) |

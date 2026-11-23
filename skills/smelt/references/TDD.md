@@ -3,7 +3,8 @@
 ## Loop
 For each behaviour in the acceptance criteria, in tracer-bullet order:
 1. **Red.** One test at an agreed seam (one table of cases for one rule counts as one test); run that file with the runner's timeout (`go test -timeout 60s`, `node --test --test-timeout=60000`, `pytest-timeout`); a
-   hang or crash is not red: fix the test until it fails on an assertion (a single-file command skips pretest
+   hang or crash is not red: fix the test until it fails on an assertion (HTTP tests: close
+   keep-alive connections, e.g. `server.closeAllConnections()`) (a single-file command skips pretest
    hooks: build first when tests spawn the built CLI). It fails on an assertion naming the
    missing behaviour (an import, syntax or setup error is not red: stub the export returning an empty value first).
    A test of behaviour that already exists passes at once: see it fail once with a one-line

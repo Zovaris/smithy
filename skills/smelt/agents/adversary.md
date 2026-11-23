@@ -15,6 +15,8 @@ If your brief includes a diff, skip its bodies in round one and read only the si
 the bodies come in round two.
 
 ## Do
+- Raw HTTP paths (`..`, `%2e%2e`, `%2f`): send them with a raw client (`node:http` with `path`,
+  `curl --path-as-is`, Python `http.client`); fetch and most URL parsers rewrite them first.
 1. List the spec's claims and, for each, the ways it could break: boundaries (0, 1, max, max+1,
    empty, null/undefined/None), types at the edge (NaN, negative zero, huge ints, unicode, emoji,
    whitespace, very long strings), ordering and duplicates, time (timezones, DST, leap days),
