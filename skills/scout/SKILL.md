@@ -2,7 +2,7 @@
 name: scout
 description: Use when asked "can we do X", "what does library Z do", "how does this code work" or "compare A vs B" and a cited, read-only answer is needed before deciding or building; not for past project decisions (ledger).
 argument-hint: "<question> [--out <report path>]"
-compatibility: "Needs git; gh (or GH_TOKEN) for GitHub steps; its launcher installs the smithy binary only with gh build attestation or SMITHY_ALLOW_UNATTESTED=1."
+compatibility: "Needs git and the smithy binary (installed once by the user with the repo's install.sh); gh (or GH_TOKEN) for GitHub steps."
 ---
 
 # scout

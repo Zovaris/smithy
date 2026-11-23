@@ -35,9 +35,10 @@ keeps pull requests green until they merge.
 
 ```bash
 npx skills add Zovaris/smithy -g
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh
 ```
 
-Pick every skill (at least `use-smithy`) and the agents to install to. Then, in your agent:
+The second line installs the `smithy` binary the skills run ([details](#install)). Pick every skill (at least `use-smithy`) and the agents to install to. Then, in your agent:
 
 1. **"run use-smithy setup"** — models, settings, and an optional pointer in your `AGENTS.md`.
 2. **Describe a task** (or start `/smelt <task>`) — planned and built test-first, ending in a PR.
@@ -106,13 +107,14 @@ asks for a yes before it starts sessions.
 ![How a skill runs the smithy binary](docs/binary.svg)
 
 Everything mechanical (settings, branch names, task lists, status cards, commits and PRs in your
-repo's style, waiting on CI) is one small Go binary, `smithy`. You never install it:
+repo's style, waiting on CI) is one small Go binary, `smithy`, that you install once:
 
-- Each skill ships a launcher that downloads the binary for your platform from the matching
-  release on first run and caches it in `~/.smithy/bin/`.
-- It verifies the checksum and the GitHub build attestation, so it needs `gh`. Without `gh` (or
-  with one too old for attestations) it installs nothing unless you set
-  `SMITHY_ALLOW_UNATTESTED=1`, which accepts the checksum alone. A mismatch always refuses.
+- [`install.sh`](install.sh) downloads it for your platform from the GitHub release into
+  `~/.smithy/bin/<version>/`, verifying the checksum and the GitHub build attestation (so it
+  needs `gh`). Without `gh` it installs nothing unless you set `SMITHY_ALLOW_UNATTESTED=1`, which
+  accepts the checksum alone. A mismatch always refuses.
+- Each skill ships a small launcher that runs that binary and never downloads anything. If the
+  skills' version isn't installed, it says so and points here.
 
 Agents wait on GitHub without spending tokens:
 
@@ -135,12 +137,14 @@ never edit them by hand: use-smithy setup asks everything up front, or each skil
 time it needs a value. `smithy config list` shows every setting and where it came from; all of
 them, with defaults, are in [docs/settings.md](docs/settings.md).
 
-## Install options
+## Install
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh             # binary, latest
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.14.1    # binary, pinned
 npx skills add Zovaris/smithy -g -y --skill '*' -a claude-code -a codex   # no prompts
 npx skills add Zovaris/smithy@v0.14.0 -g                                   # pin a release
-npx skills update -g                                                      # update
+npx skills update -g                                                      # update (then rerun install.sh)
 ```
 
 Drop `-g` to install into the current project only. Requires the

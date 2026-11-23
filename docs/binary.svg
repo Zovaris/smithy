@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="250" viewBox="0 0 960 250" role="img" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title>How a skill runs the smithy binary</title>
-  <desc>A skill calls its scripts/smithy launcher; the launcher runs the cached binary, downloading and verifying it once from the GitHub release; the binary drives git and the GitHub CLI and keeps state in ~/.smithy.</desc>
+  <desc>A skill calls its scripts/smithy launcher; the launcher runs the installed binary, which install.sh downloaded and verified once from the GitHub release; the binary drives git and the GitHub CLI and keeps state in ~/.smithy.</desc>
   <style>
     .bg { fill: #ffffff; }
     .t { font-size: 15px; font-weight: 600; fill: #1f2328; }
@@ -52,7 +52,7 @@
   <text class="s" x="750" y="112">no node, jq or python</text>
 
   <rect class="neutral" x="254" y="172" width="200" height="56" rx="12"/>
-  <text class="t" x="270" y="196">GitHub release</text>
+  <text class="t" x="270" y="196">install.sh · GitHub release</text>
   <text class="s" x="270" y="215">checksums · attestation</text>
 
   <rect class="neutral" x="494" y="172" width="200" height="56" rx="12"/>
@@ -63,6 +63,6 @@
   <path class="line" d="M454 86H492" marker-end="url(#b)"/>
   <path class="line" d="M694 86H732" marker-end="url(#b)"/>
   <path class="dash" d="M354 170V134" marker-end="url(#b)"/>
-  <text class="s" x="362" y="158">first run only</text>
+  <text class="s" x="362" y="158">you run it once</text>
   <path class="line" d="M594 134V170" marker-end="url(#b)"/>
 </svg>

@@ -1,15 +1,12 @@
 #!/bin/sh
 # smithy launcher: runs the smithy binary for this skills version, so skills need no Node, bash
-# features or other runtime. Order:
+# features or other runtime. It never downloads anything. Order:
 #   1. $SMITHY_BIN, when set (your own build);
 #   2. a source checkout of the skills repo with Go installed: builds it once into
 #      ~/.smithy/bin/dev/<checkout id> (one per checkout or worktree) and rebuilds when a .go
 #      file changes (development);
-#   3. ~/.smithy/bin/<VERSION>/smithy, downloaded once (gzipped, ~1.5 MB) from the GitHub
-#      release v<VERSION>, checked against the release's checksums.txt and its build attestation
-#      (with gh; without gh, or with a gh too old for `gh attestation`, it downloads with curl and
-#      installs nothing unless SMITHY_ALLOW_UNATTESTED=1). ~/.smithy/bin/smithy always points at the last one used: put ~/.smithy/bin
-#      on PATH to run `smithy status` yourself.
+#   3. ~/.smithy/bin/<VERSION>/smithy, put there by the repo's install.sh (README: Install);
+#   4. ~/.smithy/bin/smithy (another version), with a one-line notice to install <VERSION>.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd -P)
 export SMITHY_SKILL_DIR="$here"
@@ -34,51 +31,14 @@ for root in "$here/../../.." "$here/.."; do
 done
 
 bin="$home/bin/$version/smithy"
+[ -x "$bin" ] || [ ! -x "$bin.exe" ] || bin="$bin.exe"  # Git Bash on Windows
 if [ ! -x "$bin" ]; then
-  case "$(uname -s)" in Darwin) os=darwin ;; Linux) os=linux ;; *) echo "smithy: unsupported OS $(uname -s)" >&2; exit 3 ;; esac
-  case "$(uname -m)" in arm64|aarch64) arch=arm64 ;; x86_64|amd64) arch=amd64 ;; *) echo "smithy: unsupported CPU $(uname -m)" >&2; exit 3 ;; esac
-  asset="smithy-$os-$arch.gz"; tmp=$(mktemp -d "${TMPDIR:-/tmp}/smithy.XXXXXX"); trap 'rm -rf "$tmp"' EXIT
-  echo "smithy: downloading v$version ($asset), once" >&2
-  limit=${SMITHY_DOWNLOAD_TIMEOUT:-120}
-  # watch runs a command with a watchdog: after $limit seconds it is killed and watch returns 124.
-  watch() {
-    "$@" & pid=$!
-    ( sleep "$limit"; : > "$tmp/timedout"; kill "$pid" ) >/dev/null 2>&1 & dog=$!
-    rc=0; wait "$pid" || rc=$?
-    kill "$dog" 2>/dev/null || true; wait "$dog" 2>/dev/null || true
-    [ -f "$tmp/timedout" ] && { rm -f "$tmp/timedout"; return 124; }
-    return $rc
-  }
-  fail() { why=$(tr '\n' ' ' < "$tmp/err" | sed 's/  */ /g; s/ $//'); echo "smithy: can't download v$version ($asset): ${why:-unknown error}" >&2; exit 3; }
-  if command -v gh >/dev/null 2>&1; then
-    rc=0; watch gh release download "v$version" -R "$repo" -p "$asset" -p checksums.txt -D "$tmp" >/dev/null 2>"$tmp/err" || rc=$?
-    case $rc in 0) ;; 124) echo "timed out after ${limit}s" > "$tmp/err"; fail ;; *) fail ;; esac
-  else
-    url="https://github.com/$repo/releases/download/v$version"
-    for f in "$asset" checksums.txt; do
-      curl -fsSL --proto "=https" --proto-redir "=https" --connect-timeout 10 --max-time 120 -o "$tmp/$f" "$url/$f" 2>"$tmp/err" || fail
-    done
+  if [ -x "$home/bin/smithy" ]; then
+    echo "smithy: v$version is not installed; using $home/bin/smithy. Install v$version: https://github.com/$repo#install" >&2
+    exec "$home/bin/smithy" "$@"
   fi
-  [ -s "$tmp/$asset" ] && [ -s "$tmp/checksums.txt" ] || { echo "release is missing $asset or checksums.txt" > "$tmp/err"; fail; }
-  want=$(awk -v a="$asset" '$2 == a || $2 == "*"a {print $1}' "$tmp/checksums.txt")
-  got=$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$tmp/$asset" || shasum -a 256 "$tmp/$asset") | awk '{print $1}')
-  [ -n "$want" ] && [ "$want" = "$got" ] || { echo "smithy: checksum mismatch for $asset, not installed" >&2; exit 3; }
-  if command -v gh >/dev/null 2>&1 && gh attestation verify --help >/dev/null 2>&1; then
-    rc=0; watch gh attestation verify "$tmp/$asset" -R "$repo" >/dev/null 2>&1 || rc=$?
-    case $rc in
-      0) ;;
-      124) echo "smithy: can't verify the build attestation of $asset: timed out after ${limit}s; not installed" >&2; exit 3 ;;
-      *) echo "smithy: $asset has no valid build attestation for $repo (or gh is offline or signed out: gh auth status), not installed" >&2; exit 3 ;;
-    esac
-  elif [ "${SMITHY_ALLOW_UNATTESTED:-}" = 1 ]; then
-    echo "smithy: build attestation not checked; installing on checksum only (SMITHY_ALLOW_UNATTESTED=1)" >&2
-  else
-    echo "smithy: can't verify the build attestation of $asset: install or update gh (https://cli.github.com) and sign in, or set SMITHY_ALLOW_UNATTESTED=1 to accept a checksum-only install; not installed" >&2
-    exit 3
-  fi
-  gunzip -f "$tmp/$asset"; chmod +x "$tmp/${asset%.gz}"
-  mkdir -p "$home/bin/$version"; mv "$tmp/${asset%.gz}" "$bin"
-  rm -rf "$tmp"; trap - EXIT  # exec skips the EXIT trap
+  echo "smithy: the smithy binary v$version is not installed. Ask the user to install it (https://github.com/$repo#install), then retry." >&2
+  exit 3
 fi
 link "$bin"
 exec "$bin" "$@"

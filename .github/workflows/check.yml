@@ -45,7 +45,12 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Installs the latest released binary and fails clearly on a missing release
+      - name: install.sh installs the latest release under Git Bash
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: SMITHY_HOME="$RUNNER_TEMP/home" sh install.sh
+      - name: The launcher runs the installed binary and never downloads
         shell: cmd
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,8 +60,7 @@ jobs:
           echo %tag:~1%> "%RUNNER_TEMP%\l\VERSION"
           set "SMITHY_HOME=%RUNNER_TEMP%\home"
           call "%RUNNER_TEMP%\l\smithy.cmd" version || exit /b 1
-          echo 0.0.0> "%RUNNER_TEMP%\l\VERSION"
-          set "SMITHY_HOME=%RUNNER_TEMP%\home2"
+          set "SMITHY_HOME=%RUNNER_TEMP%\empty"
           call "%RUNNER_TEMP%\l\smithy.cmd" version 2> "%RUNNER_TEMP%\err.txt"
           if not errorlevel 3 ( type "%RUNNER_TEMP%\err.txt" & exit /b 1 )
-          findstr /c:"can't download v0.0.0" "%RUNNER_TEMP%\err.txt" || exit /b 1
+          findstr /c:"is not installed" "%RUNNER_TEMP%\err.txt" || exit /b 1
