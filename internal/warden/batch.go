@@ -134,6 +134,27 @@ func defaultBase(repo string) string {
 	return "main"
 }
 
+// knownDefault is the repo's default branch from origin/HEAD, then gh, then ls-remote; "" when
+// none answers (callers then treat the base as production: fail safe).
+func knownDefault(repo string) string {
+	if b := gitOut(repo, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"); b != "" {
+		return strings.TrimPrefix(b, "origin/")
+	}
+	cmd := exec.Command("gh", "repo", "view", "--json", "defaultBranchRef", "-q", ".defaultBranchRef.name")
+	cmd.Dir = repo
+	if out, err := cmd.Output(); err == nil && strings.TrimSpace(string(out)) != "" {
+		return strings.TrimSpace(string(out))
+	}
+	for _, l := range strings.Split(gitOut(repo, "ls-remote", "--symref", "origin", "HEAD"), "\n") {
+		if ref, ok := strings.CutPrefix(l, "ref: refs/heads/"); ok {
+			if b, _, ok := strings.Cut(ref, "\t"); ok {
+				return b
+			}
+		}
+	}
+	return ""
+}
+
 func batchInit(args []string) error {
 	o, pos, err := batchOpts(args, "--repo", "--base", "--merge", "--max", "--risky", "--cleanup", "--mode")
 	if err != nil {
@@ -274,7 +295,7 @@ func batchInit(args []string) error {
 		"merge": merge, "cleanup": cleanup, "tasks_dir": td, "items": items}
 	if isAuto {
 		bt["production"] = false
-		if base == defaultBase(repo) && gitOut(repo, "symbolic-ref", "--short", "refs/remotes/origin/HEAD") != "" {
+		if d := knownDefault(repo); d == "" || d == base {
 			bt["production"] = base
 		}
 	}
@@ -344,7 +365,37 @@ func writeBatch(dir string, bt map[string]any) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(dir, "batch.json"), append(b, '\n'), 0o644)
+	tmp, err := os.CreateTemp(dir, "batch.*.tmp")
+	if err != nil {
+		return err
+	}
+	if _, err := tmp.Write(append(b, '\n')); err != nil {
+		tmp.Close()
+		os.Remove(tmp.Name())
+		return err
+	}
+	tmp.Close()
+	os.Chmod(tmp.Name(), 0o644)
+	return os.Rename(tmp.Name(), filepath.Join(dir, "batch.json"))
+}
+
+// editBatch loads, changes and atomically saves <batch>/batch.json under its lock.
+func editBatch(dir string, f func(bt map[string]any) error) error {
+	file := filepath.Join(dir, "batch.json")
+	return config.WithLock(file, func() error {
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("no batch.json in %s", dir)
+		}
+		var bt map[string]any
+		if err := json.Unmarshal(raw, &bt); err != nil {
+			return fmt.Errorf("batch.json unreadable: %v", err)
+		}
+		if err := f(bt); err != nil {
+			return err
+		}
+		return writeBatch(dir, bt)
+	})
 }
 
 func batchAdd(args []string) error {
@@ -424,15 +475,35 @@ func batchSet(args []string) error {
 		return fmt.Errorf("bad batch name %q", args[0])
 	}
 	dir := filepath.Join(cards.Home(), args[0])
-	raw, err := os.ReadFile(filepath.Join(dir, "batch.json"))
-	if err != nil {
-		return fmt.Errorf("no batch.json in %s", dir)
+	if err := editBatch(dir, func(bt map[string]any) error { return setFields(bt, args[1:]) }); err != nil {
+		return err
 	}
-	var bt map[string]any
-	if err := json.Unmarshal(raw, &bt); err != nil {
-		return fmt.Errorf("batch.json unreadable: %v", err)
+	fmt.Println("batch", args[0], "set")
+	return nil
+}
+
+// branchExists reports whether name is a local or origin branch of repo.
+func branchExists(repo, name string) bool {
+	for _, ref := range []string{"refs/heads/" + name, "refs/remotes/origin/" + name} {
+		if exec.Command("git", "-C", repo, "rev-parse", "-q", "--verify", ref).Run() == nil {
+			return true
+		}
 	}
-	for _, p := range args[1:] {
+	return false
+}
+
+func setFields(bt map[string]any, pairs []string) error {
+	repo, _ := bt["repo"].(string)
+	bases := map[string]bool{}
+	list, _ := bt["items"].([]any)
+	for _, x := range list {
+		if m, _ := x.(map[string]any); m != nil {
+			if b, _ := m["base"].(string); b != "" {
+				bases[b] = true
+			}
+		}
+	}
+	for _, p := range pairs {
 		k, v, ok := strings.Cut(p, "=")
 		if !ok {
 			return fmt.Errorf("not key=value: %s", p)
@@ -454,15 +525,21 @@ func batchSet(args []string) error {
 			}
 			bt[k] = v
 		case "production":
-			if v == "" || v == "false" {
+			switch {
+			case v == "false":
 				bt[k] = false
-			} else {
+			case v != "" && branchExists(repo, v):
 				bt[k] = v
+			default:
+				return fmt.Errorf("production is %q, want false or an existing branch", v)
 			}
 		case "base_sha":
 			b, sha, ok := strings.Cut(v, ":")
 			if !ok || b == "" || sha == "" {
 				return fmt.Errorf("base_sha is %q, want <base>:<sha>", v)
+			}
+			if !bases[b] {
+				return fmt.Errorf("base_sha: no item in the batch has base %q", b)
 			}
 			m, _ := bt[k].(map[string]any)
 			if m == nil {
@@ -474,10 +551,6 @@ func batchSet(args []string) error {
 			return fmt.Errorf("unknown field %q (merge, production, cleanup, mode, base_sha)", k)
 		}
 	}
-	if err := writeBatch(dir, bt); err != nil {
-		return err
-	}
-	fmt.Println("batch", args[0], "set")
 	return nil
 }
 

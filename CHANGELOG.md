@@ -28,7 +28,11 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   `smithy auto report` takes `linear:TES-1`, `linear:<uuid>` or a bare id it launched.
 - Fixed: `smithy batch init` on an `auto-*` task dir takes merge from `auto.merge`, each item's
   `model` from its `Model:` header and `speed: route` from the mode, and records `production`
-  (the base when it is the default branch, else `false`).
+  (the base when it is the default branch or the default can't be found from origin/HEAD, gh or
+  ls-remote, else `false`). `""` production blocks a merge like a production base.
+  `batch.json` writes are atomic; `batch set` locks it and checks `production` is `false` or an
+  existing branch and `base_sha`'s base is in the batch. Card writes and beats take the card lock.
+  A bare id in `smithy auto report` that two sources launched exits 2 naming both refs.
 - Added: `smithy batch set <batch> key=value…` sets `merge`, `production`, `cleanup`, `mode` and
   `base_sha` with validation; warden's docs use it instead of hand edits.
 - Added: worker heartbeat: `smithy cards beat <batch> <id>` (and every `cards set`) stamps

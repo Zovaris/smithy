@@ -29,8 +29,8 @@ before (`blocked`, `failed`, `pr_open`, `ready` stay open); how: `references/har
 ## verify (`pr_open`, `ready`)
 
 Before merging a risky item, `smithy cards gate <batch> <id>` (exit 1 without `security=ran`): never merge it; unset → **tell** its worker to run the security agent; `not-run:<reason>` → list it for the user with the reason. Else `smithy verify <repo> <branch> <pr-url>` prints one verdict:
-- `green`: merge auto, and either not the production branch or the user approved a production
-  merge for this batch → `smithy pr merge <pr>` (workers never merge: the merge permission is
+- `green`: merge auto, and `production` is `false` or a branch other than the PR's base (`""`
+  counts as production), or the user approved a production merge for this batch → `smithy pr merge <pr>` (workers never merge: the merge permission is
   the user's, given to you, and a permission check would refuse it from a worker). Use the repo's
   usual merge method; a rebase merge refused because the branch has merge commits → a merge
   commit, never a force-push. Not mergeable (the base moved) → **tell** the worker to merge the base and push.

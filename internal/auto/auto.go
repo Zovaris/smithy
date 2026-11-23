@@ -509,7 +509,18 @@ func Report(srcs []Source, ref, state, pr string) error {
 	}
 	name, id, ok := strings.Cut(ref, ":")
 	if !ok {
-		name, id = launchedSource(ref), ref
+		id = ref
+		switch from := launchedSources(ref); len(from) {
+		case 0:
+		case 1:
+			name = from[0]
+		default:
+			refs := make([]string, len(from))
+			for i, f := range from {
+				refs[i] = f + ":" + ref
+			}
+			return fmt.Errorf("%w: %s matches %s; say which", ErrAmbiguous, ref, strings.Join(refs, " and "))
+		}
 		if name == "" && len(srcs) == 1 {
 			name = srcs[0].Name()
 		}
@@ -525,20 +536,25 @@ func Report(srcs []Source, ref, state, pr string) error {
 	return fmt.Errorf("source %q is not configured (auto.sources)", name)
 }
 
-// launchedSource is the source of the launched issue whose display id or key is id, or "".
-func launchedSource(id string) string {
+// ErrAmbiguous marks a bare id that launched issues from more than one source share (exit 2).
+var ErrAmbiguous = errors.New("ambiguous issue id")
+
+// launchedSources lists, sorted, the sources of launched issues whose display id or key is id.
+func launchedSources(id string) []string {
 	st, err := Load()
 	if err != nil {
-		return ""
+		return nil
 	}
+	var out []string
 	for _, ls := range st.Launched {
 		for _, l := range ls {
-			if l.ID == id || l.Key == id {
-				return l.Source
+			if (l.ID == id || l.Key == id) && !contains(out, l.Source) {
+				out = append(out, l.Source)
 			}
 		}
 	}
-	return ""
+	sort.Strings(out)
+	return out
 }
 
 // Status is `smithy auto status --json`.

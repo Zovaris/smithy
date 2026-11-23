@@ -54,12 +54,17 @@ func Beat(batch, id string) error {
 		return fmt.Errorf("batch and id must match [A-Za-z0-9._-]+")
 	}
 	file := filepath.Join(Home(), batch, id+".json")
-	cur := read(file)
-	if cur == nil {
+	if read(file) == nil {
 		return fmt.Errorf("no card %s in batch %s (%s)", id, batch, file)
 	}
-	cur["last_beat"] = stampNow()
-	return write(file, cur)
+	return config.WithLock(file, func() error {
+		cur := read(file)
+		if cur == nil {
+			return fmt.Errorf("no card %s in batch %s (%s)", id, batch, file)
+		}
+		cur["last_beat"] = stampNow()
+		return write(file, cur)
+	})
 }
 
 func write(file string, cur map[string]any) error {
@@ -118,6 +123,16 @@ func Set(batch, id string, pairs []string) (map[string]any, error) {
 		return nil, err
 	}
 	file := filepath.Join(dir, id+".json")
+	var out map[string]any
+	err := config.WithLock(file, func() error {
+		var err error
+		out, err = set(file, id, pairs)
+		return err
+	})
+	return out, err
+}
+
+func set(file, id string, pairs []string) (map[string]any, error) {
 	cur := read(file)
 	if cur == nil {
 		cur = map[string]any{"id": id}

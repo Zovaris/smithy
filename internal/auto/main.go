@@ -109,6 +109,9 @@ func Main(args []string) int {
 			if errors.Is(err, ghx.ErrNoGitHub) || errors.Is(err, ErrNoAccess) {
 				return 3
 			}
+			if errors.Is(err, ErrAmbiguous) {
+				return 2
+			}
 			return 1
 		}
 		fmt.Println("auto reported", pos[0], pos[1])

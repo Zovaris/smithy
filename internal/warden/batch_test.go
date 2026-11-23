@@ -236,6 +236,8 @@ func TestBatchInitAutoTaskDir(t *testing.T) {
 	cfg := filepath.Join(root, "config.json")
 	t.Setenv("SMITHY_CONFIG", cfg)
 	writeFile(t, cfg, `{"auto":{"merge":"auto"}}`)
+	git(t, repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+	git(t, repo, "update-ref", "refs/remotes/origin/release/x", "HEAD")
 	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo, "--base", "release/x"}) })
 	if c != 0 {
 		t.Fatalf("%d %s", c, er)
@@ -272,6 +274,21 @@ func TestBatchInitAutoOnProductionBase(t *testing.T) {
 	}
 }
 
+func TestBatchInitAutoUnknownDefaultIsProduction(t *testing.T) {
+	root, repo, td := autoRepo(t)
+	cfg := filepath.Join(root, "config.json")
+	t.Setenv("SMITHY_CONFIG", cfg)
+	writeFile(t, cfg, `{"auto":{"merge":"auto"}}`)
+	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo}) })
+	if c != 0 {
+		t.Fatalf("%d %s", c, er)
+	}
+	raw, _ := os.ReadFile(filepath.Join(strings.TrimSpace(o), "batch.json"))
+	if !strings.Contains(string(raw), `"production": "main"`) {
+		t.Errorf("unknown default branch must fail safe to production=base: %s", raw)
+	}
+}
+
 func TestBatchSet(t *testing.T) {
 	root, repo, td := autoRepo(t)
 	t.Setenv("SMITHY_CONFIG", filepath.Join(root, "none.json"))
@@ -299,7 +316,7 @@ func TestBatchSet(t *testing.T) {
 	if !strings.Contains(string(raw), `"production": false`) {
 		t.Errorf("production=false: %s", raw)
 	}
-	for _, bad := range [][]string{{"merge=yes"}, {"cleanup=never"}, {"mode=turbo"}, {"base_sha=main"}, {"items=[]"}, {"merge"}, {}} {
+	for _, bad := range [][]string{{"merge=yes"}, {"cleanup=never"}, {"mode=turbo"}, {"base_sha=main"}, {"base_sha=other:abc"}, {"production=no-such-branch"}, {"items=[]"}, {"merge"}, {}} {
 		if _, _, c := capture(t, func() int { return Batch(append([]string{"set", name}, bad...)) }); c != 2 {
 			t.Errorf("set %v must be refused: %d", bad, c)
 		}

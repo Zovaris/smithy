@@ -3,6 +3,7 @@ package auto
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -375,6 +376,14 @@ func TestReportBareIDFindsSourceFromState(t *testing.T) {
 	}
 	if err := Report([]Source{lin, gh}, "OPS-3", "started", ""); err == nil {
 		t.Error("unknown bare id with two sources accepted")
+	}
+	update(func(st *State) error {
+		st.Launched["2026-01-02"] = []Launch{{Source: "github", Key: "TES-1", ID: "TES-1"}}
+		return nil
+	})
+	err = Report([]Source{lin, gh}, "TES-1", "started", "")
+	if !errors.Is(err, ErrAmbiguous) || !strings.Contains(err.Error(), "linear:TES-1") || !strings.Contains(err.Error(), "github:TES-1") {
+		t.Errorf("ambiguous bare id: %v", err)
 	}
 }
 

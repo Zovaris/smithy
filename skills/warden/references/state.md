@@ -23,8 +23,8 @@ An `auto-*` task dir (tend auto) comes pre-answered: merge from `auto.merge`, ea
   batch check runs at the highest speed among the items.
 - `stack`: boolean, default false (wait for the prereq to merge); see SKILL.md Defaults.
 - `production`: the production branch name, from the user's answer to the plan-line question or
-  an obvious repo convention; `""` while unasked, `false` when no base in the batch is
-  production.
+  an obvious repo convention; `false` when no base in the batch is production. `""` (unasked)
+  blocks a merge exactly like a production base; only an explicit `false` allows it.
 - `route`: `debug` for a bug report (`references/intake.md`), else absent; `risky`: true when the
   item is risky (smelt's SKILL.md), so its brief requires the security agent.
 - `launches`: starts so far, first included; at most 3 (see `acting.md`).
