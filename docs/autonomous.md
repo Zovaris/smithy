@@ -19,7 +19,8 @@ smithy auto serve                              # Esc/q stops the loop; running a
 
 Issues opt in with the `auto` label. `model:` and `speed:` labels pick the tier and smelt speed.
 A daily cap and an optional hours window bound the spend. `smithy tui` shows the queue, running
-agents and the cost of each issue, and edits settings in place. Every setting is listed in
+agents and the cost of each issue, a History tab of past days' work with PR, cost and outcome, and
+edits settings in place. Every setting is listed in
 [settings.md](settings.md).
 
 ## Daemon (harness build)

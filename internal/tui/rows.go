@@ -60,6 +60,8 @@ func (m Model) cols(v view) []col {
 		return []col{{"", 2, false, 0}, {"what", 0, true, 0}, {"where", 22, false, 1}, {"keys", 22, false, 2}}
 	case vDone:
 		return []col{{"issue", 10, false, 0}, {"title", 0, true, 0}, {"PR", 7, false, 1}, {"result", 8, false, 0}, {"took", 8, false, 1}, {"cost", 7, false, 3}, {"when", 9, false, 2}}
+	case vHistory:
+		return []col{{"issue", 10, false, 0}, {"title", 0, true, 0}, {"PR", 7, false, 1}, {"outcome", 8, false, 0}, {"cost", 9, false, 2}, {"at", 5, false, 3}}
 	case vActivity:
 		return []col{{"when", 8, false, 0}, {"kind", 9, false, 0}, {"what", 0, true, 0}, {"where", 22, false, 1}}
 	case vWorktrees:
@@ -82,6 +84,8 @@ func (m Model) rows(v view) []row {
 		rs = m.needRows()
 	case vDone:
 		rs = m.doneRows()
+	case vHistory:
+		rs = m.historyRows()
 	case vActivity:
 		rs = m.activityRows()
 	case vWorktrees:
@@ -678,21 +682,22 @@ func (m Model) planRows() []row {
 	return out
 }
 
-// doneRows is finished work, newest first: from the event log, plus finished cards it lacks.
-func (m Model) doneRows() []row {
-	t := m.th
-	type job struct {
-		issue, title, pr, result, batch, item string
-		start, end                            time.Time
-		use                                   *usage.Usage
-	}
+// job is one finished run: what started it, how it ended, its PR and its reported usage.
+type job struct {
+	issue, title, pr, result, batch, item string
+	start, end                            time.Time
+	use                                   *usage.Usage
+}
+
+// doneJobs is the finished runs in es, newest first; with cards, finished cards es lacks too.
+func (m Model) doneJobs(es []events.Event, cards bool) []*job {
 	used := map[string]*usage.Usage{}
 	titles := map[string]string{}
 	issues := map[string]string{}
 	starts := map[string]time.Time{}
 	jobs := map[string]*job{}
 	var order []string
-	for _, e := range m.snap.Events {
+	for _, e := range es {
 		k := e.Batch + "/" + e.Item
 		if e.Kind == "usage" && e.Usage != nil && e.Item != "" {
 			sum := *e.Usage
@@ -729,15 +734,17 @@ func (m Model) doneRows() []row {
 			}
 		}
 	}
-	for _, it := range m.items() {
-		k := it.Batch + "/" + it.ID
-		res := map[string]string{"merged": "merged", "reported": "merged", "dropped": "closed"}[it.Stage]
-		if _, ok := jobs[k]; ok || res == "" || it.Updated == nil {
-			continue
+	if cards {
+		for _, it := range m.items() {
+			k := it.Batch + "/" + it.ID
+			res := map[string]string{"merged": "merged", "reported": "merged", "dropped": "closed"}[it.Stage]
+			if _, ok := jobs[k]; ok || res == "" || it.Updated == nil {
+				continue
+			}
+			end, _ := time.Parse(time.RFC3339, *it.Updated)
+			jobs[k] = &job{batch: it.Batch, item: it.ID, result: res, end: end, pr: it.PR}
+			order = append(order, k)
 		}
-		end, _ := time.Parse(time.RFC3339, *it.Updated)
-		jobs[k] = &job{batch: it.Batch, item: it.ID, result: res, end: end, pr: it.PR}
-		order = append(order, k)
 	}
 	var js []*job
 	for _, k := range order {
@@ -754,25 +761,85 @@ func (m Model) doneRows() []row {
 		js = append(js, j)
 	}
 	sort.SliceStable(js, func(a, b int) bool { return js[a].end.After(js[b].end) })
+	return js
+}
+
+// doneRows is finished work, newest first: from the event log, plus finished cards it lacks.
+func (m Model) doneRows() []row {
 	var out []row
-	for _, j := range js {
-		took := "-"
-		if !j.start.IsZero() && j.end.After(j.start) {
-			took = dur(j.end.Sub(j.start))
-		}
-		c := map[string]color.Color{"merged": t.ok, "ready": t.accent, "closed": t.muted, "blocked": t.err}[j.result]
-		issue := or(j.issue)
-		if issue == "-" {
-			issue = j.item
-		}
-		pr := shortPR(or(j.pr))
-		out = append(out, row{cells: []cell{{s: issue, c: t.text, bold: true}, {s: or(j.title), c: t.text}, {s: pr, c: t.accent},
-			{s: j.result, c: c, bold: true}, {s: took, c: t.muted}, {s: costOf(j.use), c: t.muted}, {s: ago(m.snap.At.Sub(j.end)), c: t.muted}},
-			url: j.pr, copy: firstNonDash(j.pr, j.batch+"/"+j.item), title: issue + " · " + or(j.title), chip: j.result, chipC: c,
-			detail: [][2]string{{"issue", issue}, {"title", or(j.title)}, {"batch", j.batch}, {"item", j.item}, {"pr", or(j.pr)},
-				{"result", j.result}, {"started", stampOr(j.start)}, {"finished", stampOr(j.end)}, {"took", took}, {"usage", usageOf(j.use)}}})
+	for _, j := range m.doneJobs(m.snap.Events, true) {
+		r := m.jobRow(j)
+		r.cells = append(r.cells, cell{s: ago(m.snap.At.Sub(j.end)), c: m.th.muted})
+		out = append(out, r)
 	}
 	return out
+}
+
+// historyRows is past days' finished work from the event log, newest day first, each day under
+// a row with its count and known cost. Today's work stays in Done.
+func (m Model) historyRows() []row {
+	t := m.th
+	now := m.snap.At.Local()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	var out []row
+	var day string
+	head := -1
+	var n int
+	var spent float64
+	var known bool
+	flush := func() {
+		if head < 0 {
+			return
+		}
+		sum := fmt.Sprintf("%d finished", n)
+		if known {
+			sum += " · " + usage.Cost(&spent)
+		}
+		out[head].cells[1].s = sum
+		out[head].detail = [][2]string{{"day", day}, {"finished", fmt.Sprint(n)}, {"cost", or(map[bool]string{true: usage.Cost(&spent)}[known])}}
+	}
+	for _, j := range m.doneJobs(m.snap.History, false) {
+		if !j.end.Before(today) {
+			continue
+		}
+		if d := j.end.Local().Format("2006-01-02 Mon"); d != day {
+			flush()
+			day, n, spent, known = d, 0, 0, false
+			head = len(out)
+			out = append(out, row{cells: []cell{{s: d[:10], c: t.text, bold: true}, {s: "", c: t.muted}, {}, {}, {}, {s: d[11:], c: t.muted}},
+				title: "History · " + d, explain: []string{"One day of finished work: the rows below it, newest first."}})
+		}
+		n++
+		if j.use != nil && j.use.CostUSD != nil {
+			spent += *j.use.CostUSD
+			known = true
+		}
+		r := m.jobRow(j)
+		r.cells = append(r.cells[:4], r.cells[5], cell{s: j.end.Local().Format("15:04"), c: t.muted})
+		out = append(out, r)
+	}
+	flush()
+	return out
+}
+
+// jobRow is a finished run's cells (issue, title, PR, result, took, cost) and its modal.
+func (m Model) jobRow(j *job) row {
+	t := m.th
+	took := "-"
+	if !j.start.IsZero() && j.end.After(j.start) {
+		took = dur(j.end.Sub(j.start))
+	}
+	c := map[string]color.Color{"merged": t.ok, "ready": t.accent, "closed": t.muted, "blocked": t.err}[j.result]
+	issue := or(j.issue)
+	if issue == "-" {
+		issue = j.item
+	}
+	pr := shortPR(or(j.pr))
+	return row{cells: []cell{{s: issue, c: t.text, bold: true}, {s: or(j.title), c: t.text}, {s: pr, c: t.accent},
+		{s: j.result, c: c, bold: true}, {s: took, c: t.muted}, {s: costOf(j.use), c: t.muted}},
+		url: j.pr, copy: firstNonDash(j.pr, j.batch+"/"+j.item), title: issue + " · " + or(j.title), chip: j.result, chipC: c,
+		detail: [][2]string{{"issue", issue}, {"title", or(j.title)}, {"batch", j.batch}, {"item", j.item}, {"pr", or(j.pr)},
+			{"result", j.result}, {"started", stampOr(j.start)}, {"finished", stampOr(j.end)}, {"took", took}, {"usage", usageOf(j.use)}}}
 }
 
 // costOf is a run's reported cost, "-" when unknown (never estimated).

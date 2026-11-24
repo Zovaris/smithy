@@ -269,7 +269,7 @@ func Demo(now time.Time) Snapshot {
 	w.Spend = events.Spend(evs, now, 7)
 	spendCap := 120.0
 	w.SpendCap = &spendCap
-	snap := Snapshot{At: now, Watcher: w, Queue: queue, Batches: batches, Tasks: lists, Worktrees: wts, Events: evs,
+	snap := Snapshot{At: now, Watcher: w, Queue: queue, Batches: batches, Tasks: lists, Worktrees: wts, Events: evs, History: evs,
 		Rates: map[string]int{"linear": 1342}, Repo: "smithy", Demo: true,
 		Decisions: []string{
 			"2026-11-23 · timeout · Retry the export with backoff? → yes, 3 tries · keeps the API polite · ref: https://github.com/acme/atlas/pull/2004",
