@@ -699,6 +699,7 @@ func Run(o Options) int {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
+		launchCard(log, o.Cwd, cmd.Process.Pid)
 		done := make(chan error, 1)
 		go func() { done <- cmd.Wait() }()
 		select {
@@ -706,6 +707,7 @@ func Run(o Options) int {
 			var ee *exec.ExitError
 			if err != nil && !(errors.As(err, &ee) && (ee.ExitCode() == 124 || ee.ExitCode() == ExitLimited)) {
 				fmt.Fprintf(os.Stderr, "smithy agent: %s exited right after starting (%v): %s\n", s.Argv[0], err, lastLine(log))
+				setCard(log, o.Cwd, "state=failed", "note=worker exited: "+lastLine(log))
 				return 1
 			}
 		case <-time.After(startCheck):
