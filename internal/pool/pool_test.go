@@ -62,8 +62,8 @@ func TestAcquirePicksLeastRecentlyUsedAndSkipsLimited(t *testing.T) {
 
 func TestAddRejectsUnknownHarnessAndDuplicates(t *testing.T) {
 	h := home(t)
-	if _, err := Add("a", "gemini", ""); err == nil {
-		t.Fatal("gemini accepted")
+	if _, err := Add("a", "aider", ""); err == nil {
+		t.Fatal("aider accepted")
 	}
 	a, err := Add("a", "claude", "")
 	if err != nil || a.Dir != filepath.Join(h, "accounts", "a") {
@@ -217,5 +217,36 @@ func TestMainListAndLogin(t *testing.T) {
 	}
 	if rc := Main([]string{"bogus"}, &out, &errb); rc != 2 {
 		t.Fatalf("bogus rc %d", rc)
+	}
+}
+
+func TestEveryHarnessLogsInWithItsOwnDir(t *testing.T) {
+	h := home(t)
+	bin := t.TempDir()
+	cases := map[string][2]string{
+		"opencode": {"opencode", "XDG_DATA_HOME"},
+		"gemini":   {"gemini", "GEMINI_CLI_HOME"},
+		"cursor":   {"agent", "CURSOR_CONFIG_DIR"},
+		"pi":       {"pi", "PI_CODING_AGENT_DIR"},
+		"dsh":      {"dsh", "DSH_HOME"},
+	}
+	for _, c := range cases {
+		os.WriteFile(filepath.Join(bin, c[0]), []byte("#!/bin/sh\necho \"dir $"+c[1]+"\"\n"), 0o755)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	for harness, c := range cases {
+		var out, errb bytes.Buffer
+		name := "acct-" + harness
+		if rc := Main([]string{"add", name, harness}, &out, &errb); rc != 0 {
+			t.Fatalf("%s add rc %d: %s", harness, rc, errb.String())
+		}
+		out.Reset()
+		want := "dir " + filepath.Join(h, "accounts", name)
+		if rc := Main([]string{"login", name}, &out, &errb); rc != 0 || !strings.Contains(out.String(), want) {
+			t.Fatalf("%s login (%s) rc %d out %q err %q", harness, c[1], rc, out.String(), errb.String())
+		}
+	}
+	if _, err := Add("x", "nope", ""); err == nil {
+		t.Fatal("unknown harness accepted")
 	}
 }

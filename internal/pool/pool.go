@@ -1,7 +1,7 @@
 // Package pool keeps the user's own agent accounts (~/.smithy/pool.json) and when each one is
 // rate limited (~/.smithy/pool-state.json), so smithy agent can run on the least recently used
 // account that is not limited and fail over once when a run hits a usage limit. Each account is
-// an official CLI pointed at its own config dir (CLAUDE_CONFIG_DIR, CODEX_HOME); smithy never
+// an official CLI pointed at its own config dir (see Harnesses); smithy never
 // reads, copies or logs the tokens inside it.
 package pool
 
@@ -23,21 +23,31 @@ import (
 // Usage is the text for `smithy pool --help`.
 const Usage = `usage: smithy pool add <name> <harness> [<dir>] | list | remove <name> | login <name> | clear <name>
 A pool of your own accounts for smithy agent (off until one is added). Each account is an official
-CLI with its own config dir: claude via CLAUDE_CONFIG_DIR, codex via CODEX_HOME. No proxies or relays,
+CLI with its own config dir: claude CLAUDE_CONFIG_DIR, codex CODEX_HOME, opencode XDG_DATA_HOME,
+gemini GEMINI_CLI_HOME, cursor CURSOR_CONFIG_DIR, pi PI_CODING_AGENT_DIR, dsh DSH_HOME. No proxies or relays,
 and only accounts you own: the providers' terms apply to each one.
-  add     <name> <harness> [<dir>]  harness claude or codex; dir defaults to ~/.smithy/accounts/<name>
+  add     <name> <harness> [<dir>]  harness claude, codex, opencode, gemini, cursor, pi or dsh; dir defaults to ~/.smithy/accounts/<name>
   login   <name>                    runs the CLI interactively with that account's dir so you sign in
   list                              accounts, status (ok or limited until), last used
   remove  <name>                    drops the account (its dir and login stay on disk)
   clear   <name>                    forgets a recorded limit
 smithy agent picks the least recently used account that is not limited, for the CLI it runs
 (AGENT_CLI=pool: any harness). A run that hits a usage limit marks the account limited until its
-reset (5h when the CLI does not say). A read-only run, or one that left the worktree untouched,
+reset (5h when the CLI does not say); limits are detected for claude and codex, the others only
+rotate. A read-only run, or one that left the worktree untouched,
 reruns once on the next account; any other exits 75 and blocks its warden card so warden
 relaunches it in the same worktree. With every account limited it exits 75 at once. Files: ~/.smithy/pool.json, ~/.smithy/pool-state.json.`
 
 // Harnesses are the CLIs a pool account can use, with the env var that points at its config dir.
-var Harnesses = map[string]string{"claude": "CLAUDE_CONFIG_DIR", "codex": "CODEX_HOME"}
+var Harnesses = map[string]string{
+	"claude":   "CLAUDE_CONFIG_DIR",
+	"codex":    "CODEX_HOME",
+	"opencode": "XDG_DATA_HOME",
+	"gemini":   "GEMINI_CLI_HOME",
+	"cursor":   "CURSOR_CONFIG_DIR",
+	"pi":       "PI_CODING_AGENT_DIR",
+	"dsh":      "DSH_HOME",
+}
 
 // DefaultLimit is how long an account stays limited when the CLI gives no reset time.
 const DefaultLimit = 5 * time.Hour
@@ -123,7 +133,7 @@ func Add(name, harness, dir string) (Account, error) {
 		return Account{}, fmt.Errorf("name must start with a letter, digit or _ and use only [A-Za-z0-9._-]")
 	}
 	if Harnesses[harness] == "" {
-		return Account{}, fmt.Errorf("harness %q has no per-account dir smithy knows (claude, codex)", harness)
+		return Account{}, fmt.Errorf("harness %q has no per-account dir smithy knows (claude, codex, opencode, gemini, cursor, pi, dsh)", harness)
 	}
 	for _, seg := range strings.FieldsFunc(dir, func(r rune) bool { return r == '/' || r == '\\' }) {
 		if seg == ".." {
