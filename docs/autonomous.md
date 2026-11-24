@@ -75,13 +75,18 @@ Container mode notes:
 The pool is off until you add an account. Each account is your own, on its harness's official CLI,
 signed in once in its own config dir.
 
-| Harness | Config dir per account |
-|---|---|
-| Claude Code | `CLAUDE_CONFIG_DIR` |
-| Codex | `CODEX_HOME` |
+| Harness | Config dir per account | Limit detected |
+|---|---|---|
+| Claude Code | `CLAUDE_CONFIG_DIR` | yes |
+| Codex | `CODEX_HOME` | yes |
+| OpenCode | `XDG_DATA_HOME` | no |
+| Gemini CLI | `GEMINI_CLI_HOME` | no |
+| Cursor CLI | `CURSOR_CONFIG_DIR` | no |
+| Pi | `PI_CODING_AGENT_DIR` | no |
+| DeepSeek Harness | `DSH_HOME` | no |
 
-Other harnesses run with their normal login. They join the pool once smithy knows how to give
-each account its own dir.
+Every harness rotates across its accounts. Where the limit is not detected yet, a limited run fails
+like any other error, and the next run picks the next account.
 
 `smithy agent` picks the least recently used account that is not rate limited. When a run hits a
 usage limit, that account is marked until its reset:

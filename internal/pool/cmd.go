@@ -53,8 +53,15 @@ func Rows(now time.Time) ([]Row, error) {
 
 // loginArgs is the interactive command that signs an account in.
 func loginArgs(harness string) []string {
-	if harness == "codex" {
+	switch harness {
+	case "codex":
 		return []string{"codex", "login"}
+	case "opencode":
+		return []string{"opencode", "auth", "login"}
+	case "cursor":
+		return []string{"agent", "login"}
+	case "gemini", "pi", "dsh":
+		return []string{harness}
 	}
 	return []string{"claude", "/login"}
 }
