@@ -36,6 +36,12 @@ Every skill can be run by an agent. Only warden is kept out of implicit invocati
 `allow_implicit_invocation: false` from `skills/warden/agents/openai.yaml`. Warden still asks for
 your yes before it starts sessions.
 
+## Daemon
+
+The harness build of smithy (`smithy-harness-<os>-<arch>`) adds `smithy daemon`: the
+autonomous loop plus a local API any client can follow (SSE events, first-answer-wins
+decisions). It is the same for every agent CLI; see [autonomous.md](autonomous.md#daemon-harness-build).
+
 ## How the skills behave
 
 - **One task list.** smelt and warden share it: `NN-<slug>.md` files with status, blockers and PR,

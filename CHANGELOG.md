@@ -10,6 +10,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - `smithy tui` restyled to Steel (TK-28): steel background tiers instead of boxes (a border only on the focused block), dim/base/strong text tiers, one ember for what runs or has focus, `?` for what waits on you, a half-block gradient header with ember sparks, a Bayer shimmer on running items and a dithered progress edge. Motion runs at 15 fps only while something moves; the new `tui.reduce_motion` setting keeps every frame still.
 - Added: a History tab in `smithy tui` (key `0`): past days' finished work from the last 30 days of `~/.smithy/events.jsonl`, grouped by day with each day's count and known cost; each row shows the issue, PR, outcome, cost and finish time.
 
+- Added: `smithy daemon` (harness build): the auto serve loop plus a loopback-only API (`GET /v1/state`, `GET /v1/events` as resumable SSE, `POST /v1/decisions` where the first answer wins) with every event in the SQLite store. Requests need `~/.smithy/daemon.token` or a `Tailscale-User-Login` in the new `daemon.allow`; `daemon.port` picks the port. In the harness build `smithy auto serve` starts the daemon or attaches to it; `smithy doctor` checks it.
+
 ## v0.17.0 — 2026-11-24
 
 - Container refuses `auto.sandbox_network host` and, on the default image, harnesses it does not carry (only Claude Code and OpenCode); pool hints and help list every harness; docs match the proxy allow-list and restart rule.
