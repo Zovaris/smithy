@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/pool"
 )
 
 func probe(goos string, have ...string) Probe {
@@ -340,5 +341,41 @@ func TestRunSandboxFailsClosed(t *testing.T) {
 	}
 	if _, err := os.Stat(log + ".ran"); err == nil {
 		t.Error("worker ran with unreadable sandbox settings")
+	}
+}
+
+func TestSandboxCheckAgentPool(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	ok := probe("darwin", "/usr/bin/sandbox-exec")
+	if err := SandboxCheckAgent("native", "pool", ok); err == nil {
+		t.Error("an empty pool has nothing to sandbox")
+	}
+	write := func(body string) {
+		if err := os.WriteFile(pool.File(), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(`{"accounts":[{"name":"a","harness":"claude","dir":"/acct/a"},{"name":"b","harness":"codex","dir":"/acct/b"}]}`)
+	if err := SandboxCheckAgent("native", "pool", ok); err != nil {
+		t.Errorf("claude+codex pool: %v", err)
+	}
+	if err := SandboxCheckAgent("native", "pool", withVersion(ok, "2.0.0", nil)); err == nil || !strings.Contains(err.Error(), "older") {
+		t.Errorf("claude accounts get the version floor: %v", err)
+	}
+	if err := SandboxCheckAgent("container", "pool", probe("linux", "docker")); err == nil || !strings.Contains(err.Error(), "pool") {
+		t.Errorf("pool + container must refuse: %v", err)
+	}
+	if err := SandboxCheckAgent("off", "pool", ok); err != nil {
+		t.Errorf("off: %v", err)
+	}
+	if dirs, err := PoolDirs(); err != nil || !slices.Contains(dirs, "/acct/a") {
+		t.Errorf("PoolDirs = %v, %v", dirs, err)
+	}
+	write("{broken")
+	if _, err := PoolDirs(); err == nil {
+		t.Error("unreadable pool.json must be an error")
+	}
+	if err := SandboxCheckAgent("native", "pool", ok); err == nil {
+		t.Error("unreadable pool.json must refuse")
 	}
 }

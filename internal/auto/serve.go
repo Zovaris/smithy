@@ -570,7 +570,7 @@ var sandboxReady = defaultSandboxReady
 func defaultSandboxReady(agent string) error {
 	mode, err := agents.SandboxMode()
 	if err == nil {
-		err = agents.SandboxCheck(mode, agent, agents.HostProbe())
+		err = agents.SandboxCheckAgent(mode, agent, agents.HostProbe())
 	}
 	if err != nil {
 		return fmt.Errorf("auto.sandbox: %v; nothing launches until it is fixed (smithy doctor)", err)

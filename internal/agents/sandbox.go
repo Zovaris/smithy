@@ -300,8 +300,12 @@ func nativeSettings(o *Options, gitDir string) (settings, gocache string, err er
 		}
 		sock = os.Getenv("SSH_AUTH_SOCK")
 	}
+	secret, err := PoolDirs()
+	if err != nil {
+		return "", "", err
+	}
 	p := SandboxPaths{Cwd: realPath(cwd), Home: home, SmithyHome: sm, Warden: cards.Home(), GoCache: gocache, ReadOnly: ro,
-		SigningKey: key, AgentSocket: sock, Secret: PoolDirs()}
+		SigningKey: key, AgentSocket: sock, Secret: secret}
 	if gitDir != "" {
 		p.GitDir = realPath(gitDir)
 	}
@@ -310,9 +314,12 @@ func nativeSettings(o *Options, gitDir string) (settings, gocache string, err er
 
 // PoolDirs are the smithy pool account dirs (each a harness login) and their default root: a
 // sandboxed worker's shell never reads or writes them, and containers never mount them.
-func PoolDirs() []string {
+func PoolDirs() ([]string, error) {
 	out := []string{filepath.Join(ghx.Home(), "accounts")}
-	as, _ := pool.Load()
+	as, err := pool.Load()
+	if err != nil {
+		return nil, fmt.Errorf("reading the pool: %v", err)
+	}
 	for _, a := range as {
 		if a.Dir != "" && !slices.Contains(out, a.Dir) {
 			out = append(out, a.Dir)
@@ -321,7 +328,37 @@ func PoolDirs() []string {
 	for i, d := range out {
 		out[i] = realPath(d)
 	}
-	return out
+	return out, nil
+}
+
+// SandboxCheckAgent is SandboxCheck for an agent setting that may be "pool": then every harness
+// in the pool is checked (claude accounts get the version floor), and container mode refuses,
+// since a container mounts no account dir and passes no pooled login.
+func SandboxCheckAgent(mode, cli string, p Probe) error {
+	if mode == "off" || cli != "pool" {
+		return SandboxCheck(mode, cli, p)
+	}
+	if mode == "container" {
+		return fmt.Errorf("pool and container don't combine yet: the account dir isn't mounted and the pooled login env isn't passed in")
+	}
+	as, err := pool.Load()
+	if err != nil {
+		return fmt.Errorf("reading the pool: %v", err)
+	}
+	var seen []string
+	for _, a := range as {
+		if slices.Contains(seen, a.Harness) {
+			continue
+		}
+		seen = append(seen, a.Harness)
+		if err := SandboxCheck(mode, a.Harness, p); err != nil {
+			return fmt.Errorf("pool account %s: %v", a.Name, err)
+		}
+	}
+	if len(seen) == 0 {
+		return fmt.Errorf("the pool has no accounts (smithy pool add)")
+	}
+	return nil
 }
 
 // Container is one `docker|podman run` for a worker.
@@ -429,7 +466,10 @@ func container(cwd, gitDir string) (Container, error) {
 	if runtime.GOOS == "linux" {
 		c.User = strconv.Itoa(os.Getuid()) + ":" + strconv.Itoa(os.Getgid())
 	}
-	secret := PoolDirs()
+	secret, err := PoolDirs()
+	if err != nil {
+		return Container{}, err
+	}
 	for _, d := range []string{cwd, gitDir, filepath.Join(ghx.Home(), "plans"), cards.Home()} {
 		if fi, err := os.Stat(d); d != "" && err == nil && fi.IsDir() && !slices.Contains(c.Mounts, d) && !overlaps(realPath(d), secret) {
 			c.Mounts = append(c.Mounts, d)

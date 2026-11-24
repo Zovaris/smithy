@@ -59,3 +59,19 @@ func TestSandboxDoctor(t *testing.T) {
 		}
 	}
 }
+
+func TestSandboxDoctorPoolContainer(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	t.Setenv("SMITHY_CONFIG", filepath.Join(t.TempDir(), "c.json"))
+	for k, v := range map[string]string{"auto.sandbox": "container", "auto.agent": "pool"} {
+		if err := config.Set(config.UserFile(), k, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p := agents.Probe{GOOS: "linux", Look: func(b string) (string, error) { return b, nil }}
+	r := &report{}
+	o, _, _ := capture(t, func() int { sandboxDoctor(r, p); return 0 })
+	if !r.failed || !strings.Contains(o, "pool and container don't combine yet") {
+		t.Errorf("want a FAIL line for pool + container:\n%s", o)
+	}
+}

@@ -475,7 +475,7 @@ func sandboxDoctor(r *report, p agents.Probe) {
 	if cli == "" {
 		cli = agents.ResolveCLI(os.Getenv, func(b string) bool { _, err := p.Look(b); return err == nil })
 	}
-	switch err := agents.SandboxCheck(mode, cli, p); {
+	switch err := agents.SandboxCheckAgent(mode, cli, p); {
 	case mode == "off":
 		r.ok("sandbox: off (unattended workers rely on the allow-list; smithy config set auto.sandbox native|container)")
 	case err != nil:
