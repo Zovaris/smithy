@@ -57,7 +57,7 @@ it.
 | Mode | Isolation | Works with |
 |---|---|---|
 | `off` (default) | the guard above only | every harness |
-| `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off, so push and `gh` fail |
+| `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off, so push and `gh` fail; Gemini CLI is refused (its sandbox can't limit hosts) |
 | `container` | docker or podman, read-only root, dropped capabilities | Claude Code, Codex, OpenCode |
 
 Container mode notes:
