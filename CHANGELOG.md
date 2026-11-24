@@ -5,6 +5,11 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Fixed: under `auto.sandbox native`, git reaches GitHub over HTTPS with `gh auth git-credential`
+  (SSH remotes and `~/.ssh` stay blocked inside the sandbox), so sandboxed workers can push.
+- Fixed: `smithy agent` resolves the tiers `cheap`, `mid`, `strong` and `judge` to your models for
+  that CLI's harness (`models.<harness>.<tier>`); an unset tier uses the CLI's default with a warning.
+- Changed: the container sandbox image (`sandbox/Dockerfile`) is on Go 1.27.4, pinned by digest.
 - Fixed: a warden worker that died at start (for example on an invalid `--model`) no longer hangs
   `smithy wait batch:<batch>`. `smithy agent --bg` with a `<batch-dir>/<id>.log` writes the card
   at launch (`working`, `last_beat` now, the worker's `pid`), and the batch wait turns a card whose
