@@ -168,6 +168,28 @@ worktree and smithy's plans) or `container` (docker/podman, not live-tested yet)
 orchestrator itself is not sandboxed and may run repo tests; workers sign commits through your ssh-agent
 (use a dedicated signing key) and still get your `GH_TOKEN` (use a fine-grained, repo-scoped token).
 
+### Account pool
+
+Off until you add an account. Each one is your own account on an official CLI, signed in once in
+its own config dir; smithy agent picks the least recently used one that is not rate limited and,
+when a run hits a usage limit, marks it until its reset. A read-only or untouched run reruns once
+on the next account; a run with partial work stops (exit 75) and warden resumes it in the same
+worktree.
+
+```
+smithy pool add work claude          # dir ~/.smithy/accounts/work (CLAUDE_CONFIG_DIR)
+smithy pool add home claude
+smithy pool add cx codex             # CODEX_HOME
+smithy pool login work               # opens the CLI with that dir: sign in, then exit
+smithy pool list                     # status, resets at, runs and cost today (also smithy tui, System)
+smithy config set auto.agent pool    # optional: serve's orchestrator may use any harness in the pool
+```
+
+When every account is limited, `smithy agent` exits 75 and serve launches nothing until the
+earliest reset (Telegram kind `limited`). Use only accounts you own, through the official CLIs,
+with no proxy or relay in between: each provider's terms apply to each account. Unattended claude
+workers are denied reading every account dir.
+
 ## Install
 
 ```bash

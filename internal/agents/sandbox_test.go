@@ -147,6 +147,39 @@ func TestNativeSettingsSigning(t *testing.T) {
 	}
 }
 
+func TestNativeSettingsPoolDirs(t *testing.T) {
+	raw := NativeSettings(SandboxPaths{Cwd: "/w", Home: "/h", SmithyHome: "/h/.smithy", Secret: []string{"/h/.smithy/accounts", "/acct/b"}}, nil, "linux", true)
+	var s struct {
+		Sandbox struct {
+			Filesystem struct{ DenyRead, DenyWrite []string }
+		}
+	}
+	if err := json.Unmarshal([]byte(raw), &s); err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range []string{"/h/.smithy/accounts", "/acct/b"} {
+		if !slices.Contains(s.Sandbox.Filesystem.DenyRead, d) || !slices.Contains(s.Sandbox.Filesystem.DenyWrite, d) {
+			t.Errorf("pool dir %s must be read- and write-denied: %s", d, raw)
+		}
+	}
+}
+
+func TestOverlaps(t *testing.T) {
+	dirs := []string{"/h/.smithy/accounts", "/acct/b"}
+	for d, want := range map[string]bool{"/acct/b": true, "/acct/b/x": true, "/acct": true, "/acct/bb": false, "/w": false} {
+		if overlaps(d, dirs) != want {
+			t.Errorf("overlaps(%s) = %v", d, !want)
+		}
+	}
+}
+
+func TestContainerEnvNoPoolLogin(t *testing.T) {
+	_, names := ContainerEnv([]string{"CLAUDE_CONFIG_DIR=/acct/a", "CODEX_HOME=/acct/b", "AGENT_MODEL=m"})
+	if slices.Contains(names, "CLAUDE_CONFIG_DIR") || slices.Contains(names, "CODEX_HOME") {
+		t.Errorf("pool account dirs never pass into a container: %v", names)
+	}
+}
+
 func TestNativeDirs(t *testing.T) {
 	add, ro := NativeDirs([]string{"/h/.smithy", "/skills", "/w"}, "/h/.smithy", "/h/.smithy/plans", "/h/.smithy/warden", "/w")
 	if !slices.Equal(add, []string{"/h/.smithy/plans", "/h/.smithy/warden", "/skills"}) || !slices.Equal(ro, []string{"/skills"}) {

@@ -17,6 +17,7 @@ import (
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/pool"
 )
 
 // SandboxRoleEnv marks the orchestrator serve starts: it stays on the allow-list only, since a
@@ -181,6 +182,7 @@ type SandboxPaths struct {
 	// SigningKey is git's SSH signing public key (user.signingkey, a .pub) and AgentSocket the
 	// ssh-agent socket: signed commits work through the agent while the private keys stay unreadable.
 	SigningKey, AgentSocket string
+	Secret                  []string // more dirs never read or written from the shell (smithy pool account dirs)
 }
 
 // NativeDirs narrows the --add-dir list of a native-sandboxed worker, since Claude Code also opens
@@ -231,9 +233,9 @@ func NativeSettings(p SandboxPaths, domains []string, goos string, weakerNet boo
 	fs := map[string][]string{
 		"allowWrite": keep(p.Cwd, p.GitDir, join(sm, "plans"), p.Warden, p.GoCache),
 		"denyWrite": keep(append([]string{join(sm, "auth.json"), join(sm, "config.json"), join(p.GitDir, "hooks"), join(p.GitDir, "config"),
-			join(p.Cwd, ".claude"), join(p.Cwd, ".smithy/config.json")}, p.ReadOnly...)...),
-		"denyRead": keep(join(sm, "auth.json"), join(home, ".ssh"), join(home, ".aws"), join(home, ".netrc"), join(home, ".git-credentials"),
-			join(home, ".gnupg")),
+			join(p.Cwd, ".claude"), join(p.Cwd, ".smithy/config.json")}, append(p.ReadOnly, p.Secret...)...)...),
+		"denyRead": keep(append([]string{join(sm, "auth.json"), join(home, ".ssh"), join(home, ".aws"), join(home, ".netrc"), join(home, ".git-credentials"),
+			join(home, ".gnupg")}, p.Secret...)...),
 	}
 	if p.SigningKey != "" && strings.HasSuffix(p.SigningKey, ".pub") && filepath.IsAbs(p.SigningKey) {
 		fs["allowRead"] = []string{p.SigningKey}
@@ -299,11 +301,27 @@ func nativeSettings(o *Options, gitDir string) (settings, gocache string, err er
 		sock = os.Getenv("SSH_AUTH_SOCK")
 	}
 	p := SandboxPaths{Cwd: realPath(cwd), Home: home, SmithyHome: sm, Warden: cards.Home(), GoCache: gocache, ReadOnly: ro,
-		SigningKey: key, AgentSocket: sock}
+		SigningKey: key, AgentSocket: sock, Secret: PoolDirs()}
 	if gitDir != "" {
 		p.GitDir = realPath(gitDir)
 	}
 	return NativeSettings(p, SandboxDomains(extra), runtime.GOOS, weak != "false"), gocache, nil
+}
+
+// PoolDirs are the smithy pool account dirs (each a harness login) and their default root: a
+// sandboxed worker's shell never reads or writes them, and containers never mount them.
+func PoolDirs() []string {
+	out := []string{filepath.Join(ghx.Home(), "accounts")}
+	as, _ := pool.Load()
+	for _, a := range as {
+		if a.Dir != "" && !slices.Contains(out, a.Dir) {
+			out = append(out, a.Dir)
+		}
+	}
+	for i, d := range out {
+		out[i] = realPath(d)
+	}
+	return out
 }
 
 // Container is one `docker|podman run` for a worker.
@@ -381,6 +399,16 @@ func ContainerEnv(base []string) (env, names []string) {
 	return env, names
 }
 
+// overlaps reports whether d is, holds or sits inside one of dirs.
+func overlaps(d string, dirs []string) bool {
+	for _, x := range dirs {
+		if d == x || strings.HasPrefix(d, x+string(filepath.Separator)) || strings.HasPrefix(x, d+string(filepath.Separator)) {
+			return true
+		}
+	}
+	return false
+}
+
 // container builds the Container for a worker in cwd on this machine; the git dir's hooks and
 // config are mounted read-only over it.
 func container(cwd, gitDir string) (Container, error) {
@@ -401,8 +429,9 @@ func container(cwd, gitDir string) (Container, error) {
 	if runtime.GOOS == "linux" {
 		c.User = strconv.Itoa(os.Getuid()) + ":" + strconv.Itoa(os.Getgid())
 	}
+	secret := PoolDirs()
 	for _, d := range []string{cwd, gitDir, filepath.Join(ghx.Home(), "plans"), cards.Home()} {
-		if fi, err := os.Stat(d); d != "" && err == nil && fi.IsDir() && !slices.Contains(c.Mounts, d) {
+		if fi, err := os.Stat(d); d != "" && err == nil && fi.IsDir() && !slices.Contains(c.Mounts, d) && !overlaps(realPath(d), secret) {
 			c.Mounts = append(c.Mounts, d)
 		}
 	}

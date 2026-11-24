@@ -26,6 +26,8 @@ type Event struct {
 	ID     string    `json:"id,omitempty"`
 	PR     string    `json:"pr,omitempty"`
 	Detail string    `json:"detail,omitempty"`
+	// Account is the pool account a run used (smithy pool), on kinds "usage" and "limited".
+	Account string `json:"account,omitempty"`
 	// Usage is set on kind "usage": what one finished agent run reported (tokens, cost when known).
 	Usage *usage.Usage `json:"usage,omitempty"`
 }
@@ -77,7 +79,7 @@ func Append(e Event) error {
 	}
 	e.T = e.T.UTC().Truncate(time.Second)
 	e.Kind, e.Batch, e.Item, e.Source, e.ID = flat(e.Kind, 32), flat(e.Batch, 80), flat(e.Item, 80), flat(e.Source, 32), flat(e.ID, 80)
-	e.PR, e.Detail = flat(e.PR, 200), flat(e.Detail, 160)
+	e.PR, e.Detail, e.Account = flat(e.PR, 200), flat(e.Detail, 160), flat(e.Account, 80)
 	b, err := json.Marshal(e)
 	if err != nil {
 		return err

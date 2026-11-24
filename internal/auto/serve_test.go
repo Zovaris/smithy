@@ -14,6 +14,7 @@ import (
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/pool"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -168,6 +169,39 @@ func TestServeSpendCapLaunchesNothing(t *testing.T) {
 	sv.Cycle()
 	if _, err := os.Stat(filepath.Join(fake, "argv")); err != nil {
 		t.Error("not launched under a raised cap")
+	}
+}
+
+func TestServeHoldsWhileEveryPoolAccountIsLimited(t *testing.T) {
+	_, fake := serveSetup(t)
+	if _, err := pool.Add("a", "claude", ""); err != nil {
+		t.Fatal(err)
+	}
+	pool.MarkLimited("a", time.Now().Add(time.Hour))
+	var logs []string
+	sv := newTestServer(t, &logs)
+	sv.Cycle()
+	sv.Cycle()
+	if _, err := os.Stat(filepath.Join(fake, "argv")); err == nil {
+		t.Error("launched with every pool account limited")
+	}
+	if !strings.Contains(strings.Join(logs, "\n"), "every pool account is limited; earliest reset") {
+		t.Errorf("logs = %q", logs)
+	}
+	es, _ := events.Read(time.Time{}, 0)
+	n := 0
+	for _, e := range es {
+		if e.Kind == "limited" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("limited events = %d, want 1", n)
+	}
+	pool.Clear("a")
+	sv.Cycle()
+	if _, err := os.Stat(filepath.Join(fake, "argv")); err != nil {
+		t.Error("not launched once an account was free")
 	}
 }
 
