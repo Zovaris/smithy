@@ -41,7 +41,8 @@ type entry struct {
 	Prefix  string   `json:"prefix,omitempty"`
 }
 
-var service = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
+// service is a name, optionally :<pool account> (claude:work, a pooled account's own token).
+var service = regexp.MustCompile(`^[a-z][a-z0-9_-]*(:[A-Za-z0-9_][A-Za-z0-9._-]*)?$`)
 
 // File is the auth file path.
 func File() string { return filepath.Join(ghx.Home(), "auth.json") }
@@ -101,7 +102,7 @@ func save(m map[string]entry) error {
 
 func check(svc string) error {
 	if !service.MatchString(svc) {
-		return fmt.Errorf("bad service name %q (lowercase letters, digits, - and _)", svc)
+		return fmt.Errorf("bad service name %q (lowercase letters, digits, - and _, optionally :<pool account>)", svc)
 	}
 	return nil
 }

@@ -649,7 +649,14 @@ func Run(o Options) int {
 		env = append(env, NativeGitEnv(env)...)
 	}
 	if o.Sandbox == "container" {
-		box, err := container(o.Cwd, gitDir)
+		var acct pool.Account
+		if o.Account != "" {
+			if acct, err = pool.Find(o.Account); err != nil {
+				fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
+				return 1
+			}
+		}
+		box, err := container(o.Cwd, gitDir, acct)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
 			return 1
@@ -658,7 +665,11 @@ func Run(o Options) int {
 		if set, _ := DockerHost(box.Engine, hp); set != "" {
 			env = append(env, "DOCKER_HOST="+set)
 		}
-		env = ContainerSecrets(env, ContainerCreds(Kind(cli), o.Model), hp.Secret)
+		creds := ContainerCreds(Kind(cli), o.Model)
+		if acct.Dir != "" {
+			creds = PoolContainerCreds(acct)
+		}
+		env = ContainerSecrets(env, creds, hp.Secret)
 		if o.Proxy {
 			if err := startProxy(&box, env, hp); err != nil {
 				fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox_network proxy: %v; worker not started (fails closed)\n", err)
@@ -666,7 +677,9 @@ func Run(o Options) int {
 			}
 			env = ProxyEnv(env)
 		}
-		env, box.Env = ContainerEnv(env)
+		var names []string
+		env, names = ContainerEnv(env)
+		box.Env = append(box.Env, names...)
 		s.Argv[0] = filepath.Base(s.Argv[0]) // a host path means nothing inside the image
 		s.Argv = box.Argv(s.Argv)
 	}

@@ -291,6 +291,35 @@ func ContainerSecrets(env []string, creds [][2]string, secret func(svc string) s
 // containerCheck says why a container worker can't start: no engine, no network, or for claude no
 // credential in the env or smithy auth.
 func containerCheck(cli string, p Probe) error {
+	if err := containerBase(p); err != nil {
+		return err
+	}
+	creds := ContainerCreds(Kind(cli), "")
+	if len(creds) == 0 {
+		return nil
+	}
+	for _, s := range creds {
+		if (p.Getenv != nil && p.Getenv(s[1]) != "") || (p.Secret != nil && p.Secret(s[0]) != "") {
+			return nil
+		}
+	}
+	if Kind(cli) == "claude" {
+		return fmt.Errorf("%s", ContainerNoCredential)
+	}
+	return fmt.Errorf("no %s credential for the container: smithy auth set %s", cli, creds[0][0])
+}
+
+// PoolContainerCreds are ContainerCreds for a pooled run: a claude account's own token
+// (smithy auth set claude:<account>); other harnesses log in from the mounted account dir.
+func PoolContainerCreds(a pool.Account) [][2]string {
+	if a.Harness == "claude" {
+		return [][2]string{{"claude:" + a.Name, "CLAUDE_CODE_OAUTH_TOKEN"}}
+	}
+	return nil
+}
+
+// containerBase says why no container can start: no engine or no network.
+func containerBase(p Probe) error {
 	if ContainerEngine(p) == "" {
 		return fmt.Errorf("no docker or podman on PATH (nor ~/.kiri/bin/docker or ~/.orbstack/bin/docker)")
 	}
@@ -306,19 +335,7 @@ func containerCheck(cli string, p Probe) error {
 			return err
 		}
 	}
-	creds := ContainerCreds(Kind(cli), "")
-	if len(creds) == 0 {
-		return nil
-	}
-	for _, s := range creds {
-		if (p.Getenv != nil && p.Getenv(s[1]) != "") || (p.Secret != nil && p.Secret(s[0]) != "") {
-			return nil
-		}
-	}
-	if Kind(cli) == "claude" {
-		return fmt.Errorf("%s", ContainerNoCredential)
-	}
-	return fmt.Errorf("no %s credential for the container: smithy auth set %s", cli, creds[0][0])
+	return nil
 }
 
 // SandboxDomains is DefaultSandboxDomains plus the comma list extra, without duplicates.
@@ -470,7 +487,7 @@ func nativeSettings(o *Options, gitDir string) (settings, gocache string, err er
 }
 
 // PoolDirs are the smithy pool account dirs (each a harness login) and their default root: a
-// sandboxed worker's shell never reads or writes them, and containers never mount them.
+// sandboxed worker's shell never reads or writes them, and a container mounts only its run's own.
 func PoolDirs() ([]string, error) {
 	out := []string{filepath.Join(ghx.Home(), "accounts")}
 	as, err := pool.Load()
@@ -489,18 +506,29 @@ func PoolDirs() ([]string, error) {
 }
 
 // SandboxCheckAgent is SandboxCheck for an agent setting that may be "pool": then every harness
-// in the pool is checked (claude accounts get the version floor), and container mode refuses,
-// since a container mounts no account dir and passes no pooled login.
+// in the pool is checked (claude accounts get the version floor); in container mode each claude
+// account needs its own token (claude:<account>), since the Keychain login never reaches a container.
 func SandboxCheckAgent(mode, cli string, p Probe) error {
 	if mode == "off" || cli != "pool" {
 		return SandboxCheck(mode, cli, p)
 	}
-	if mode == "container" {
-		return fmt.Errorf("pool and container don't combine yet: the account dir isn't mounted and the pooled login env isn't passed in")
-	}
 	as, err := pool.Load()
 	if err != nil {
 		return fmt.Errorf("reading the pool: %v", err)
+	}
+	if mode == "container" {
+		if len(as) == 0 {
+			return fmt.Errorf("the pool has no accounts (smithy pool add)")
+		}
+		if err := containerBase(p); err != nil {
+			return err
+		}
+		for _, a := range as {
+			if creds := PoolContainerCreds(a); len(creds) > 0 && (p.Secret == nil || p.Secret(creds[0][0]) == "") {
+				return fmt.Errorf("pool account %s: no claude credential for the container: run claude setup-token, then smithy auth set %s", a.Name, creds[0][0])
+			}
+		}
+		return nil
 	}
 	var seen []string
 	for _, a := range as {
@@ -604,8 +632,9 @@ func overlaps(d string, dirs []string) bool {
 }
 
 // container builds the Container for a worker in cwd on this machine; the git dir's hooks and
-// config are mounted read-only over it.
-func container(cwd, gitDir string) (Container, error) {
+// config are mounted read-only over it. A pooled run (acct.Dir set) also mounts its own account
+// dir and passes its config-dir variable; no other account's dir is mounted.
+func container(cwd, gitDir string, acct pool.Account) (Container, error) {
 	var c Container
 	var err error
 	get := func(key, def string) string {
@@ -631,6 +660,21 @@ func container(cwd, gitDir string) (Container, error) {
 		if fi, err := os.Stat(d); d != "" && err == nil && fi.IsDir() && !slices.Contains(c.Mounts, d) && !overlaps(realPath(d), secret) {
 			c.Mounts = append(c.Mounts, d)
 		}
+	}
+	if acct.Dir != "" && pool.Harnesses[acct.Harness] != "" {
+		if fi, err := os.Stat(acct.Dir); err != nil || !fi.IsDir() {
+			return Container{}, fmt.Errorf("pool account %s: dir %s: not found (smithy pool login %s)", acct.Name, acct.Dir, acct.Name)
+		}
+		own := realPath(acct.Dir)
+		holds := own == realPath(ghx.Home()) || strings.HasPrefix(realPath(ghx.Home()), own+string(filepath.Separator))
+		for _, d := range secret {
+			holds = holds || strings.HasPrefix(d, own+string(filepath.Separator))
+		}
+		if holds {
+			return Container{}, fmt.Errorf("pool account %s: dir %s holds another account's dir or %s; give it a dir of its own", acct.Name, acct.Dir, ghx.Home())
+		}
+		c.Mounts = append(c.Mounts, acct.Dir)
+		c.Env = append(c.Env, pool.Harnesses[acct.Harness])
 	}
 	if gitDir != "" {
 		for _, n := range []string{"hooks", "config"} {

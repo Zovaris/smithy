@@ -127,5 +127,8 @@ provider's terms apply to each account.
 
 - **Hiding the account dirs:** `native` hides them from workers. With the sandbox `off`, only
   Claude Code workers get a deny rule for them.
-- **Container:** the pool doesn't combine with `container` yet, so `smithy doctor` fails and serve
-  launches nothing.
+- **Container:** a pooled container worker mounts only its own account's dir and gets its
+  config-dir variable (`CODEX_HOME`, `XDG_DATA_HOME`, ...). A claude account's Keychain login never
+  reaches a container, so each needs its own token: run `claude setup-token` signed in as that
+  account, then `smithy auth set claude:<account>`. `smithy doctor` fails until every claude account
+  in the pool has one.
