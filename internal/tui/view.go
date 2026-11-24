@@ -300,6 +300,8 @@ func (m Model) empty(v view) []string {
 		return []string{"", mut.Render("No events yet. smithy auto and smithy cards set write ~/.smithy/events.jsonl.")}
 	case vWorktrees:
 		return []string{"", mut.Render("No worktrees: running workers' worktrees appear here.")}
+	case vHistory:
+		return []string{"", mut.Render("Nothing finished before today in the last 30 days."), mut.Render("It reads ~/.smithy/events.jsonl.")}
 	case vDone:
 		return []string{"", mut.Render("Nothing finished yet: merged, ready, closed and blocked work lands here."), mut.Render("It reads ~/.smithy/events.jsonl and the cards.")}
 	}
@@ -493,7 +495,7 @@ func (m Model) tabLabel(v view) string {
 	if m.compactTabs() && v != m.view {
 		return fmt.Sprintf(" %d%s ", v+1, badge)
 	}
-	return fmt.Sprintf(" %d %s%s ", v+1, viewNames[v], badge)
+	return fmt.Sprintf(" %d %s%s ", (v+1)%10, viewNames[v], badge)
 }
 
 func (m Model) compactTabs() bool {
@@ -676,7 +678,7 @@ func (m Model) helpBox(w, h int) string {
 	}
 	lines = append(lines, k.Render(fmt.Sprintf("%-9s", "mouse"))+l.Render("click a tab or a row, double-click opens, wheel moves"), "")
 	for v := view(0); v < nViews; v++ {
-		lines = append(lines, t.fg(t.text).Bold(!t.plain).Render(fmt.Sprintf("%d %-11s", v+1, viewNames[v]))+l.Render(meaning[v]))
+		lines = append(lines, t.fg(t.text).Bold(!t.plain).Render(fmt.Sprintf("%d %-11s", (v+1)%10, viewNames[v]))+l.Render(meaning[v]))
 	}
 	if len(lines) > h-4 {
 		lines = lines[:max(h-4, 1)]

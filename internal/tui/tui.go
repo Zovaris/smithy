@@ -28,7 +28,7 @@ import (
 const Usage = `usage: smithy tui [--no-anim] [--demo]
 A live dashboard of the autonomous forge. Views: Overview, Agents, Incoming, Needs you,
 Done, Activity, Worktrees, Plans, System. It refreshes every 2 s from local files only (no network).
-Keys: tab/shift+tab or 1-9 switch views; up/down (j/k) move inside a view; left/right switch
+Keys: tab/shift+tab or 1-9, 0 switch views; up/down (j/k) move inside a view; left/right switch
 panes or cards; enter details or read; esc close; o open; l log; c copy; y copy the action command;
 a accept / x reject a decision (Needs you);
 s sort (Agents); t event type (Activity); p pause/resume intake (auto.paused); / filter;
@@ -54,10 +54,11 @@ const (
 	vWorktrees
 	vPlans
 	vSystem
+	vHistory
 	nViews
 )
 
-var viewNames = [nViews]string{"Overview", "Agents", "Incoming", "Needs you", "Done", "Activity", "Worktrees", "Plans", "System"}
+var viewNames = [nViews]string{"Overview", "Agents", "Incoming", "Needs you", "Done", "Activity", "Worktrees", "Plans", "System", "History"}
 
 // meaning is what each view holds, for empty states and the help overlay.
 var meaning = [nViews]string{
@@ -70,6 +71,7 @@ var meaning = [nViews]string{
 	"Every smithy worktree on disk: branch, item, age, dirty, ahead/behind, orphaned.",
 	"Task lists and their progress; enter reads the plan's spec or a task.",
 	"Health (doctor, auth, versions, paths) and every setting: enter edits one, u unsets it.",
+	"Past days' finished work from the last 30 days of events: issue, PR, cost and outcome, by day.",
 }
 
 type keyMap struct {
@@ -83,7 +85,7 @@ var keys = keyMap{
 	Down:    key.NewBinding(key.WithKeys("down", "j"), key.WithHelp("↓/j", "down")),
 	Left:    key.NewBinding(key.WithKeys("left"), key.WithHelp("←→", "pane")),
 	Right:   key.NewBinding(key.WithKeys("right"), key.WithHelp("→", "pane")),
-	Jump:    key.NewBinding(key.WithKeys("1", "2", "3", "4", "5", "6", "7", "8", "9"), key.WithHelp("1-9", "view")),
+	Jump:    key.NewBinding(key.WithKeys("1", "2", "3", "4", "5", "6", "7", "8", "9", "0"), key.WithHelp("0-9", "view")),
 	Accept:  key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "accept")),
 	Reject:  key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "reject")),
 	Enter:   key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "details")),
@@ -114,7 +116,7 @@ func viewKeys(v view) []key.Binding {
 		return []key.Binding{keys.Up, keys.Left, keys.Enter, keys.Open, keys.Copy, keys.Pause, keys.Filter}
 	case vNeeds:
 		return []key.Binding{keys.Up, keys.Enter, keys.Accept, keys.Reject, keys.Open, keys.Cmd}
-	case vDone:
+	case vDone, vHistory:
 		return []key.Binding{keys.Up, keys.Enter, keys.Open, keys.Copy, keys.Filter}
 	case vSystem:
 		return []key.Binding{keys.Up, keys.Edit, keys.Unset, keys.Refresh, keys.Log}
@@ -655,7 +657,7 @@ func (m Model) key(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.reason.Focus()
 	case m.modal:
 	case key.Matches(msg, keys.Jump):
-		return m, m.show(view(msg.String()[0] - '1'))
+		return m, m.show(view((msg.String()[0] - '0' + 9) % 10))
 	case key.Matches(msg, keys.Next):
 		return m, m.show((v + 1) % nViews)
 	case key.Matches(msg, keys.Prev):

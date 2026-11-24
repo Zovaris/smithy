@@ -194,7 +194,7 @@ func TestGolden(t *testing.T) {
 	for _, g := range []struct {
 		w, h int
 		v    view
-	}{{160, 48, vOverview}, {160, 48, vAgents}, {100, 30, vOverview}, {100, 30, vAgents}, {70, 24, vNeeds}, {160, 48, vDone}, {160, 48, vSystem}} {
+	}{{160, 48, vOverview}, {160, 48, vAgents}, {100, 30, vOverview}, {100, 30, vAgents}, {70, 24, vNeeds}, {160, 48, vDone}, {160, 48, vSystem}, {160, 48, vHistory}} {
 		m := demo(t, g.w, g.h)
 		m.view = g.v
 		s := demoSystem()
@@ -260,7 +260,7 @@ func TestKeys(t *testing.T) {
 	if m, _ = press(m, "shift+tab"); m.view != vOverview {
 		t.Fatalf("shift+tab -> %v", m.view)
 	}
-	if m, _ = press(m, "shift+tab"); m.view != vSystem {
+	if m, _ = press(m, "shift+tab"); m.view != vHistory {
 		t.Fatalf("shift+tab wraps -> %v", m.view)
 	}
 	if m, _ = press(m, "1"); m.view != vOverview {

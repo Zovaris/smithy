@@ -4,7 +4,7 @@
  ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   DEMO  autonomous forge · dev · smithy                                           
  ● watching github, linear (TES) · next poll 35s · serve pid 4242 claude   ███████████▓▒  69 / 80 l…
  5 working · 0 waiting · 2 stuck   3 ready for you · 1 CI running                                   
-  1   2 Agents   3   4 ? 8   5   6   7   8   9                                                      
+  1   2 Agents   3   4 ? 8   5   6   7   8   9   10                                                 
 ╭─ Agents · 15 · sort stage ───────────────────────────────────────────────────────────────────────╮
 │   issue       title                     model   stage     CI         PR      beat      cost      │
 │ ▸ serve       orchestrator · claude ·…  -       orchestr  -          -       -         -         │
