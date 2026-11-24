@@ -5,6 +5,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.16.1 — 2026-11-23
+
 - Fixed: `auto.sandbox container` workers get their credentials, scoped to the harness (claude:
   `CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`; codex: `OPENAI_API_KEY`; opencode: none unless
   its model names that provider). When the env lacks them they come from `smithy auth`, passed by
