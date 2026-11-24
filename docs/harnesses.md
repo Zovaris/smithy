@@ -1,18 +1,21 @@
 # Harnesses
 
-Nothing depends on one vendor. Only three things change per harness:
+Nothing depends on one vendor. Per harness, three things change in daily use:
 
 - how you start a skill;
 - how warden starts workers;
 - whether a session waiting on a background command resumes on its own. If it doesn't, it waits
   in the foreground.
 
+Unattended runs also differ in their guard, sandbox support and limit detection; see
+[autonomous mode](autonomous.md).
+
 | Harness | Skills folder (global) | Start a skill | Warden workers | Resumes after background wait |
 |---|---|---|---|---|
 | Claude Code desktop | `~/.claude/skills` | `/smelt` | app sessions (`start_session`) | yes |
 | Claude Code CLI | `~/.claude/skills` | `/smelt` | `claude --bg` | yes |
-| Codex CLI | `~/.agents/skills` | `$smelt` | `smithy agent` → `codex exec` | no: foreground watcher |
-| OpenCode | `~/.config/opencode/skills`, `~/.agents/skills` | `@smelt` | `smithy agent` → `opencode run --standalone` | yes |
+| Codex CLI | `~/.agents/skills`, `~/.codex/skills` | `$smelt` | `smithy agent` → `codex exec` | no: foreground watcher |
+| OpenCode | `~/.config/opencode/skills`, `~/.agents/skills` | `@smelt` | `smithy agent` → `opencode run --standalone --auto` | yes |
 | Pi | `~/.pi/agent/skills`, `~/.agents/skills` | `/skill:smelt` | `smithy agent` → `pi -p` | no: foreground watcher |
 | DeepSeek Harness | `~/.dsh/skills`, `~/.agents/skills` | `/smelt` | `smithy agent` → `dsh headless` | yes |
 | Gemini CLI | `~/.gemini/skills`, `~/.agents/skills` | ask: "use smelt" | `smithy agent` → `gemini -p` | with `backgroundCompletionBehavior: inject` |

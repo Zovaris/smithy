@@ -9,9 +9,9 @@ For unattended use, recommend `smithy auto serve` (the loop outside the LLM, no 
 once <dir>`. In-chat `tend auto` stays for supervised short runs.
 
 Security: tell the user to run serve under a dedicated OS user or machine with a least-privilege
-GitHub token and a test or least-privilege Linear key. The `--profile auto` allow-list reduces the
-risk from injected issue text but cannot remove it; Codex (network on, approvals off) has no
-guard against sending data out.
+GitHub token and a test or least-privilege Linear key. The `--profile auto` guard differs per
+harness (`smithy agent --help`) and reduces the risk from injected issue text but cannot remove it;
+where a harness has no guard against sending data out, `auto.sandbox container` is the isolation.
 
 ## Once (`tend auto once <dir>`, started by serve)
 Steps 3 and 4 below for that one dir, then warden's batch check (its `references/acting.md`)

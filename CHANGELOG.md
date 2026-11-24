@@ -5,9 +5,12 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.16.3 — 2026-11-23
+
 - Account pool: OpenCode, Gemini CLI, Cursor CLI, Pi and DeepSeek Harness accounts, each with its own config dir (`smithy pool add <name> <harness>`). Usage limits are detected for Claude Code and Codex; the others rotate.
 - README: autonomous mode diagram (`docs/auto.svg`) and the TUI's cost and settings views.
 - README rewritten to be scannable: highlights, short tables, one-line examples. Details live in `docs/install.md`, `docs/harnesses.md` and `docs/autonomous.md`.
+- Docs: per-harness guard under `--profile auto` (smithy allow-list is Claude Code only), native sandbox codex runs with network off, pool does not combine with container yet.
 
 ## v0.16.2 — 2026-11-23
 
