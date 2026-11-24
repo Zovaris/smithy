@@ -84,10 +84,10 @@ signed in once in its own config dir.
 |---|---|---|
 | Claude Code | `CLAUDE_CONFIG_DIR` | yes |
 | Codex | `CODEX_HOME` | yes |
-| OpenCode | `XDG_DATA_HOME` | no |
-| Gemini CLI | `GEMINI_CLI_HOME` | no |
+| OpenCode | `XDG_DATA_HOME` | yes |
+| Gemini CLI | `GEMINI_CLI_HOME` | yes |
 | Cursor CLI | `CURSOR_CONFIG_DIR` | no |
-| Pi | `PI_CODING_AGENT_DIR` | no |
+| Pi | `PI_CODING_AGENT_DIR` | yes |
 | DeepSeek Harness | `DSH_HOME` | no |
 
 Every harness rotates across its accounts. Where the limit is not detected yet, a limited run fails
