@@ -5,6 +5,10 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.16.2 — 2026-11-23
+
+- Fixed: the `auto.sandbox_network` description in `smithy config list` and the TUI says the setting is required (empty or `none` refuses to start container workers; `bridge` is open egress).
+
 ## v0.16.1 — 2026-11-23
 
 - Fixed: `auto.sandbox container` workers get their credentials, scoped to the harness (claude:
