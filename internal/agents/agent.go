@@ -82,10 +82,13 @@ type Options struct {
 	Profile    string
 	SmithyBins []string // absolute paths of the smithy binary and launcher, allowed under --profile auto
 	AddDirs    []string // directories outside the working dir the agent may use (--add-dir), set under --profile auto
-	PoolEnv    []string // the pool account's config-dir variable (smithy pool), added to the worker's env
-	Account    string   // the pool account this run uses
-	poolSkip   []string // accounts already tried (limited) in this run
-	poolStart  string   // the worktree's HEAD before the first attempt ("" when not a git repo)
+	// Sandbox is auto.sandbox for this run (off, native, container); SandboxSettings the claude
+	// --settings JSON under native.
+	Sandbox, SandboxSettings string
+	PoolEnv                  []string // the pool account's config-dir variable (smithy pool), added to the worker's env
+	Account                  string   // the pool account this run uses
+	poolSkip                 []string // accounts already tried (limited) in this run
+	poolStart                string   // the worktree's HEAD before the first attempt ("" when not a git repo)
 }
 
 // ProfileEnv carries --profile to every smithy agent an agent starts, so workers under an
@@ -327,6 +330,9 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 				a = append(a, "--add-dir", d)
 			}
 		}
+		if o.Sandbox == "native" {
+			a = append(a, "--settings", o.SandboxSettings)
+		}
 		opt("--model")
 		if o.Effort != "" {
 			a = append(a, "--effort", o.Effort)
@@ -338,7 +344,7 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if o.ReadOnly {
 			a = append(a, "--sandbox", "read-only")
 		} else {
-			a = append(a, "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true")
+			a = append(a, "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access="+strconv.FormatBool(o.Sandbox != "native"))
 			if gitDir != "" {
 				a = append(a, "--add-dir", gitDir)
 			}
@@ -452,7 +458,7 @@ func withPath(a []string, path string) []string {
 // Env is the worker's environment: base without the parent harness's variables, with
 // WARDEN_HARNESS and the AGENT_* run variables set.
 func Env(base []string, s Spec, o Options) []string {
-	drop := map[string]bool{ProfileEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
+	drop := map[string]bool{ProfileEnv: true, SandboxRoleEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
 	if len(o.PoolEnv) > 0 {
 		for _, k := range PoolDropEnv {
 			drop[k] = true
@@ -577,8 +583,28 @@ func Run(o Options) int {
 			cli = acct.Harness
 		}
 	}
-	if Kind(cli) == "codex" && !o.ReadOnly {
+	// after the pool picked the harness, so the check is the CLI that actually runs
+	if o.Profile == "auto" && os.Getenv(SandboxRoleEnv) != "orchestrator" {
+		mode, err := SandboxMode()
+		if err == nil {
+			err = SandboxCheck(mode, cli, HostProbe())
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
+			return 1
+		}
+		o.Sandbox = mode
+	}
+	if (Kind(cli) == "codex" && !o.ReadOnly) || o.Sandbox == "native" || o.Sandbox == "container" {
 		gitDir, _ = ghx.Run("git", "-C", o.Cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	}
+	gocache := ""
+	if o.Sandbox == "native" && Kind(cli) == "claude" {
+		var err error
+		if o.SandboxSettings, gocache, err = nativeSettings(&o, gitDir); err != nil {
+			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
+			return 1
+		}
 	}
 	prompt := ""
 	if cli != "custom" {
@@ -596,6 +622,21 @@ func Run(o Options) int {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
+	}
+	asJSON := jsonResult(s.Argv)
+	env := Env(os.Environ(), s, o)
+	if gocache != "" {
+		env = append(env, "GOCACHE="+gocache)
+	}
+	if o.Sandbox == "container" {
+		box, err := container(o.Cwd, gitDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
+			return 1
+		}
+		env, box.Env = ContainerEnv(env)
+		s.Argv[0] = filepath.Base(s.Argv[0]) // a host path means nothing inside the image
+		s.Argv = box.Argv(s.Argv)
 	}
 	if fi, err := os.Stat(o.Cwd); err != nil || !fi.IsDir() {
 		fmt.Fprintf(os.Stderr, "smithy agent: cd: %s: No such file or directory\n", o.Cwd)
@@ -638,10 +679,10 @@ func Run(o Options) int {
 		return 1
 	}
 	cmd := exec.Command(s.Argv[0], s.Argv[1:]...)
-	cmd.Dir, cmd.Env = o.Cwd, Env(os.Environ(), s, o)
+	cmd.Dir, cmd.Env = o.Cwd, env
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, out, out
 	if o.Bg {
-		if o.Timeout > 0 || jsonResult(s.Argv) || ph != "" {
+		if o.Timeout > 0 || asJSON || ph != "" {
 			if cmd, err = supervisor(o, out.Name()); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return 1
@@ -670,8 +711,8 @@ func Run(o Options) int {
 	}
 	rc := wait(cmd, o.Timeout, out)
 	out.Close()
-	hit := acct.Name != "" && limited(acct, out.Name(), Kind(s.Argv[0]), rc)
-	if jsonResult(s.Argv) {
+	hit := acct.Name != "" && limited(acct, out.Name(), Kind(cli), rc)
+	if asJSON {
 		finish(out.Name(), o.Log != "", o.Account)
 	}
 	if hit {

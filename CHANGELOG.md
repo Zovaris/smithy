@@ -5,6 +5,21 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: `auto.sandbox` (off | native | container) isolates unattended workers on top of the
+  `--profile auto` allow-list and fails closed: a worker whose sandbox can't start is not started,
+  and serve launches nothing (log, `orchestrator_failed` to the TUI and Telegram). native runs
+  Claude Code with `--settings` for its sandbox: strict host allow-list (GitHub, Anthropic, Linear
+  plus `auto.sandbox_domains`), shell writes only to the worktree, its git dir, `~/.smithy/plans`,
+  `~/.smithy/warden` and the Go cache, secrets unreadable, no unsandboxed retry; `--add-dir` is
+  narrowed to match. Live-tested on macOS. codex runs with network off. container wraps the worker
+  in `docker|podman run --rm` with the worktree and plans mounted and a scrubbed env (image:
+  `auto.sandbox_image`, `sandbox/Dockerfile`); unit-tested only, live test pending. `smithy doctor`
+  checks each mode (sandbox-exec, bwrap + socat, docker/podman) and the TUI System view shows it.
+  `auto.sandbox*` are read from the user settings only; an unreadable file fails closed; native
+  needs claude 2.1.331 or newer. Containers run with `--network none` by default, a read-only root,
+  tmpfs /tmp, pid and memory limits (`auto.sandbox_memory`) and read-only git hooks and config.
+  `auto.sandbox_weaker_net` turns off macOS's weaker network isolation (gh then fails inside).
+
 - Added: account pool (`smithy pool add|login|list|remove|clear`), off until an account is added.
   Your own claude (CLAUDE_CONFIG_DIR) and codex (CODEX_HOME) accounts in `~/.smithy/pool.json`;
   `smithy agent` runs on the least recently used one that is not limited (`AGENT_CLI=pool` or

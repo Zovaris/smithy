@@ -17,9 +17,10 @@ var enums = map[string][]string{
 	"warden.mode":    {"smelt fast", "smelt normal", "smelt full", "plain"},
 	"agent.effort":   {"low", "medium"},
 	"auto.mode":      {"labeled", "all"},
+	"auto.sandbox":   {"off", "native", "container"},
 }
 
-var bools = map[string]bool{"auto.paused": true, "decide.enabled": true}
+var bools = map[string]bool{"auto.paused": true, "auto.sandbox_weaker_net": true, "decide.enabled": true}
 
 var numbers = map[string]bool{"warden.max": true, "warden.stuck_minutes": true, "ask.timeout": true, "agent.timeout": true,
 	"watch.every": true, "watch.max": true, "decide.timeout": true, "auto.max_per_day": true, "auto.every": true, "auto.session_hours": true,
@@ -32,7 +33,7 @@ var decimals = map[string]bool{"auto.max_cost_per_day": true, "watch.every": tru
 // atLeastOne are whole numbers the code rejects below 1.
 var atLeastOne = map[string]bool{"warden.max": true, "auto.every": true}
 
-var lists = map[string]bool{"route.domain": true, "watch.events": true, "tend.watch": true, "auto.sources": true, "notify.kinds": true,
+var lists = map[string]bool{"route.domain": true, "watch.events": true, "tend.watch": true, "auto.sources": true, "auto.sandbox_domains": true, "notify.kinds": true,
 	"linear.team": true, "linear.project": true, "linear.states": true}
 
 // KindOf is the input a key takes: bool, enum (with its options), number, list (comma) or text.

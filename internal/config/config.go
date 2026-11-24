@@ -62,6 +62,12 @@ var Known = []Setting{
 	{"auto.paused", "false", "smithy auto", "true holds smithy auto take: nothing launches until it is false again (p in smithy tui)"},
 	{"auto.agent", "", "smithy auto serve", "agent CLI for serve's orchestrator (claude, codex, opencode…, or pool: any smithy pool account); empty = the one smithy agent detects"},
 	{"auto.session_hours", "3", "smithy auto serve", "hours one orchestrator session may run before smithy agent ends it (its workers keep going)"},
+	{"auto.sandbox", "off", "smithy agent", "isolation for unattended workers (--profile auto) on top of the allow-list: off, native (claude/codex OS sandbox) or container (docker/podman); fails closed: a worker whose sandbox can't start is not started; auto.sandbox* are read from the user settings only, never a repo's"},
+	{"auto.sandbox_domains", "", "smithy agent", "comma list of extra hosts a native-sandboxed worker may reach (github.com, api.github.com, api.anthropic.com, api.linear.app always)"},
+	{"auto.sandbox_image", "smithy-sandbox:latest", "smithy agent", "container image for auto.sandbox container (build it from sandbox/Dockerfile)"},
+	{"auto.sandbox_network", "", "smithy agent", "docker/podman --network for auto.sandbox container; empty = none (no network: push and gh fail inside); set bridge or a proxied network knowingly"},
+	{"auto.sandbox_memory", "4g", "smithy agent", "docker/podman --memory for auto.sandbox container"},
+	{"auto.sandbox_weaker_net", "true", "smithy agent", "macOS native sandbox: enableWeakerNetworkIsolation so gh and other Go CLIs can verify TLS (opens the system TLS trust service to the worker); false turns it off and gh then fails inside workers"},
 	{"auto.merge", "manual", "tend auto", "merge mode for auto batches (production stays the user's, always)"},
 	{"notify.telegram.chat", "", "smithy auto serve", "Telegram chat id serve notifies (bot token: smithy auth set telegram); empty = no notifications"},
 	{"notify.kinds", "pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited", "smithy auto serve", "comma list of notification kinds sent to Telegram"},
@@ -289,6 +295,19 @@ func Effective(key string) (string, string, error) {
 		return d, "default", nil
 	}
 	return "", "", ErrUnset
+}
+
+// UserGet reads key from the user's settings file only, never the repo's (a cloned repo must not
+// loosen a security setting); fallback when unset. A file that can't be read is an error.
+func UserGet(key, fallback string) (string, error) {
+	v, ok, err := readKeyErr(UserFile(), key)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return fallback, nil
+	}
+	return v, nil
 }
 
 // Get returns a key's effective value, or fallback when it is unset.

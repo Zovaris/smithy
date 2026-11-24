@@ -521,6 +521,9 @@ func (sv *Server) launch(dir string) error {
 	if err != nil {
 		return err
 	}
+	if err := sandboxReady(sv.hb.Agent); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(SessionsDir(), 0o700); err != nil {
 		return err
 	}
@@ -534,7 +537,7 @@ func (sv *Server) launch(dir string) error {
 	cmd := exec.Command(exe, "agent", "--bg", "--profile", "auto", "--timeout", strconv.FormatFloat(hours*60, 'f', -1, 64),
 		"--cwd", sv.Opt.Cwd, "--log", log, prompt)
 	cmd.Dir = sv.Opt.Cwd
-	env := agents.Scrub(os.Environ())
+	env := append(agents.Scrub(os.Environ()), agents.SandboxRoleEnv+"=orchestrator")
 	if sv.hb.Agent != "custom" {
 		env = append(env, "AGENT_CLI="+sv.hb.Agent)
 	}
@@ -558,6 +561,21 @@ func (sv *Server) launch(dir string) error {
 	sv.hb.SessionPID, sv.hb.SessionLog, sv.hb.SessionAt, sv.hb.SessionDir, sv.hb.SessionPS = pid, f[1], now(), dir, procStart(pid)
 	b, _ := json.Marshal(Session{PID: pid, Log: f[1], Dir: dir, At: sv.hb.SessionAt, Start: sv.hb.SessionPS})
 	return writeAtomic(LockFile(), append(b, '\n'))
+}
+
+// sandboxReady fails closed before an orchestrator starts when auto.sandbox can't sandbox the
+// workers it would launch with agent.
+var sandboxReady = defaultSandboxReady
+
+func defaultSandboxReady(agent string) error {
+	mode, err := agents.SandboxMode()
+	if err == nil {
+		err = agents.SandboxCheckAgent(mode, agent, agents.HostProbe())
+	}
+	if err != nil {
+		return fmt.Errorf("auto.sandbox: %v; nothing launches until it is fixed (smithy doctor)", err)
+	}
+	return nil
 }
 
 // View draws the live serve view until done closes or the user stops serve; logs carries each
