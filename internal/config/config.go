@@ -80,6 +80,7 @@ var Known = []Setting{
 	{"linear.cycle", "", "smithy auto", "Linear cycle filter: current or a cycle number"},
 	{"linear.initiative", "", "smithy auto", "Linear initiative name filter (via the issue's project)"},
 	{"linear.states", "unstarted,backlog", "smithy auto", "Linear workflow state types that count as new work"},
+	{"tui.reduce_motion", "false", "smithy tui", "true draws every frame still: no sparks, shimmer or sliding bars (like --no-anim or SMITHY_REDUCE_MOTION)"},
 }
 
 // ErrUnset means the key has no value and no default: ask the user once, then save it.
