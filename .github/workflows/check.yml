@@ -15,6 +15,7 @@ jobs:
         run: |
           test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
           go vet ./...
+          go vet -tags harness ./...
       - name: Go tests (race detector, coverage)
         run: |
           go test -race -covermode=atomic -coverprofile=cover.out ./...
@@ -26,6 +27,7 @@ jobs:
             echo '|---|---|'
             go test -cover ./... 2>/dev/null | awk '{pkg=$1=="ok"?$2:$1; sub("github.com/Zovaris/smithy/","",pkg); for(i=1;i<=NF;i++) if($i ~ /%$/) print "| " pkg " | " $i " |"}'
           } >> "$GITHUB_STEP_SUMMARY"
+          go test -race -tags harness ./...
           awk -v t="${total%\%}" -v min="$COVERAGE_MIN" 'BEGIN { if (t+0 < min+0) { print "coverage " t "% is below " min "%"; exit 1 } }'
         env:
           COVERAGE_MIN: "60"
@@ -37,6 +39,7 @@ jobs:
         run: |
           for t in darwin/arm64 darwin/amd64 linux/arm64 linux/amd64 windows/amd64; do
             GOOS=${t%/*} GOARCH=${t#*/} go build -trimpath -ldflags "-s -w" -o /dev/null ./cmd/smithy
+            GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build -tags harness -trimpath -ldflags "-s -w" -o /dev/null ./cmd/smithy
           done
       - name: Launcher syntax
         run: |
