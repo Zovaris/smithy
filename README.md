@@ -145,9 +145,9 @@ smithy scan                          # secrets in what the change adds
 - [Settings](docs/settings.md)
 - [Autonomous mode](docs/autonomous.md)
 - [Harnesses](docs/harnesses.md)
-- [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
+- [Roadmap](ROADMAP.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
-GitHub is the only forge today; GitLab and Bitbucket come later.
+GitHub is the only forge today; GitLab is planned for v0.18.
 
 ## Credits
 
