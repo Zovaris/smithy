@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -98,5 +99,16 @@ func TestBuildProxyAllowsCurlToProxyOnly(t *testing.T) {
 	s, _ = Build("claude", o, "p", nil, "", func(string) string { return "" })
 	if j := strings.Join(s.Argv, "\n"); !strings.Contains(j, "Bash(curl *)") || strings.Contains(j, "smithy-proxy") {
 		t.Error("no proxy: curl must stay denied")
+	}
+}
+
+func TestProxySidecarRestartsWhenAuthChanges(t *testing.T) {
+	home := t.TempDir()
+	os.WriteFile(filepath.Join(home, "auth.json"), []byte(`{"a":{"key":"x"}}`), 0o600)
+	s := ProxySidecar{Engine: "docker", Image: "img", Bin: "/b", Home: home}
+	h1 := s.Hash()
+	os.WriteFile(filepath.Join(home, "auth.json"), []byte(`{"a":{"key":"x","hosts":["api.linear.app"]}}`), 0o600)
+	if s.Hash() == h1 {
+		t.Fatal("a new binding in auth.json keeps the old sidecar (stale single-file mount)")
 	}
 }

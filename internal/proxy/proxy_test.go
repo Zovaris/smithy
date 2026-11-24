@@ -267,3 +267,14 @@ func TestScrubBase64(t *testing.T) {
 		t.Errorf("%s", b)
 	}
 }
+
+func TestDefaultDomainsReachOpenCodeModels(t *testing.T) {
+	for _, h := range []string{"opencode.ai", "models.opencode.ai", "api.opencode.ai"} {
+		if !Allowed(DefaultDomains, h) {
+			t.Errorf("%s refused: opencode workers fetch their models there", h)
+		}
+	}
+	if Allowed(DefaultDomains, "evilopencode.ai") {
+		t.Error("suffix match without a dot")
+	}
+}
