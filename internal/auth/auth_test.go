@@ -51,6 +51,18 @@ func TestSetGetPermsAndList(t *testing.T) {
 	}
 }
 
+func TestStoredIgnoresEnv(t *testing.T) {
+	home(t)
+	t.Setenv("CLAUDE_API_KEY", "fromenv")
+	if k := Stored("claude"); k != "" {
+		t.Errorf("Stored read the env: %q", k)
+	}
+	Set("claude", "fromfile")
+	if k := Stored("claude"); k != "fromfile" {
+		t.Errorf("Stored = %q", k)
+	}
+}
+
 func TestEnvWins(t *testing.T) {
 	home(t)
 	Set("linear", "fromfile")

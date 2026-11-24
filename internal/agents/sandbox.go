@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
@@ -41,16 +42,31 @@ type Probe struct {
 	GOOS    string
 	Look    func(string) (string, error)
 	Version func(cli string) (string, error) // `<cli> --version` output
+	// Home is the user's home dir, Exists reports a file or socket, Getenv reads the env, Secret is a
+	// service's key from smithy auth and Context the docker context's endpoint; nil means none.
+	Home    string
+	Exists  func(string) bool
+	Getenv  func(string) string
+	Secret  func(svc string) string
+	Context func(docker string) string
 }
 
 // HostProbe looks at this machine.
 func HostProbe() Probe {
+	home, _ := os.UserHomeDir()
 	return Probe{GOOS: runtime.GOOS, Look: exec.LookPath, Version: func(cli string) (string, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		out, err := exec.CommandContext(ctx, cli, "--version").Output()
 		return string(out), err
-	}}
+	}, Home: home, Exists: func(f string) bool { _, err := os.Stat(f); return err == nil }, Getenv: os.Getenv,
+		Secret: auth.Stored,
+		Context: func(docker string) string {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			out, _ := exec.CommandContext(ctx, docker, "context", "inspect", "--format", "{{.Endpoints.docker.Host}}").Output()
+			return strings.TrimSpace(string(out))
+		}}
 }
 
 // SandboxSetting reads an auto.sandbox* key from the user's settings only (never a repo's), so a
@@ -103,10 +119,7 @@ func SandboxCheck(mode, cli string, p Probe) error {
 	case "off":
 		return nil
 	case "container":
-		if ContainerEngine(p.Look) == "" {
-			return fmt.Errorf("no docker or podman on PATH")
-		}
-		return nil
+		return containerCheck(cli, p)
 	case "native":
 	default:
 		return fmt.Errorf("unknown sandbox mode %q", mode)
@@ -154,14 +167,151 @@ func firstLine(s string) string {
 	return l
 }
 
-// ContainerEngine is docker, else podman, else "".
-func ContainerEngine(look func(string) (string, error)) string {
-	for _, e := range []string{"docker", "podman"} {
-		if _, err := look(e); err == nil {
-			return e
+// ContainerEngine is the docker binary (on PATH, else Kiri's or OrbStack's), else podman, else "".
+func ContainerEngine(p Probe) string {
+	if _, err := p.Look("docker"); err == nil {
+		return "docker"
+	}
+	for _, b := range []string{".kiri/bin/docker", ".orbstack/bin/docker"} {
+		if f := filepath.Join(p.Home, b); p.Home != "" && p.Exists != nil && p.Exists(f) {
+			return f
 		}
 	}
+	if _, err := p.Look("podman"); err == nil {
+		return "podman"
+	}
 	return ""
+}
+
+// dockerSockets are the engine sockets tried, in order, when DOCKER_HOST is unset and the docker
+// context's socket is gone: Kiri, OrbStack, Colima, Docker Desktop, the system socket.
+var dockerSockets = []string{"~/.kiri/run/docker.sock", "~/.orbstack/run/docker.sock", "~/.colima/default/docker.sock",
+	"~/.docker/run/docker.sock", "/var/run/docker.sock"}
+
+// DockerHost is the DOCKER_HOST a docker engine runs with ("" leaves it: podman, DOCKER_HOST
+// already set, or the context's socket exists) and the endpoint it ends up using, for doctor.
+func DockerHost(engine string, p Probe) (set, endpoint string) {
+	if engine == "" || filepath.Base(engine) == "podman" {
+		return "", ""
+	}
+	if p.Getenv != nil {
+		if h := p.Getenv("DOCKER_HOST"); h != "" {
+			return "", h
+		}
+	}
+	exists := func(f string) bool { return p.Exists != nil && p.Exists(f) }
+	if p.Context != nil {
+		if ep := p.Context(engine); ep != "" {
+			if f, ok := strings.CutPrefix(ep, "unix://"); !ok || exists(f) {
+				return "", ep
+			}
+		}
+	}
+	for _, f := range dockerSockets {
+		if rest, ok := strings.CutPrefix(f, "~/"); ok {
+			if p.Home == "" {
+				continue
+			}
+			f = filepath.Join(p.Home, rest)
+		}
+		if exists(f) {
+			return "unix://" + f, "unix://" + f
+		}
+	}
+	return "", ""
+}
+
+// ContainerNoNetwork is why a container with no network is refused: claude can't reach its API
+// and git can't push.
+const ContainerNoNetwork = "container needs a network: smithy config set auto.sandbox_network bridge (open egress) or a proxied network"
+
+// ContainerNoCredential is why a claude container with no credential is refused: a Keychain login
+// never reaches the container.
+const ContainerNoCredential = "no claude credential for the container: run claude setup-token, then smithy auth set claude"
+
+// credNames are every model credential env name a container could carry.
+var credNames = []string{"CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"}
+
+// ContainerCreds are the {smithy auth service, env name} pairs a harness kind's container worker
+// may carry, the only credentials it gets: claude its token or Anthropic key, codex its OpenAI key,
+// opencode none (its free models need no login) unless model names the anthropic or openai provider.
+func ContainerCreds(kind, model string) [][2]string {
+	claude := [][2]string{{"claude", "CLAUDE_CODE_OAUTH_TOKEN"}, {"anthropic", "ANTHROPIC_API_KEY"}}
+	openai := [][2]string{{"openai", "OPENAI_API_KEY"}}
+	switch kind {
+	case "claude":
+		return claude
+	case "codex":
+		return openai
+	case "opencode":
+		switch {
+		case strings.HasPrefix(model, "anthropic/"):
+			return claude[1:]
+		case strings.HasPrefix(model, "openai/"):
+			return openai
+		}
+	}
+	return nil
+}
+
+// ContainerSecrets drops from env the credential names creds doesn't list, then adds NAME=value
+// from smithy auth for the listed ones env lacks. Values stay in the engine's env; the container
+// gets them by name (-e NAME), never on argv.
+func ContainerSecrets(env []string, creds [][2]string, secret func(svc string) string) []string {
+	allowed := map[string]bool{}
+	for _, c := range creds {
+		allowed[c[1]] = true
+	}
+	have := map[string]bool{}
+	var out []string
+	for _, kv := range env {
+		k, v, _ := strings.Cut(kv, "=")
+		if slices.Contains(credNames, k) && !allowed[k] {
+			continue
+		}
+		if v != "" {
+			have[k] = true
+		}
+		out = append(out, kv)
+	}
+	for _, c := range creds {
+		if have[c[1]] || secret == nil {
+			continue
+		}
+		if k := secret(c[0]); k != "" {
+			out = append(out, c[1]+"="+k)
+			have[c[1]] = true
+		}
+	}
+	return out
+}
+
+// containerCheck says why a container worker can't start: no engine, no network, or for claude no
+// credential in the env or smithy auth.
+func containerCheck(cli string, p Probe) error {
+	if ContainerEngine(p) == "" {
+		return fmt.Errorf("no docker or podman on PATH (nor ~/.kiri/bin/docker or ~/.orbstack/bin/docker)")
+	}
+	n, err := SandboxSetting("auto.sandbox_network", "")
+	if err != nil {
+		return err
+	}
+	if n == "" || n == "none" {
+		return fmt.Errorf("%s", ContainerNoNetwork)
+	}
+	creds := ContainerCreds(Kind(cli), "")
+	if len(creds) == 0 {
+		return nil
+	}
+	for _, s := range creds {
+		if (p.Getenv != nil && p.Getenv(s[1]) != "") || (p.Secret != nil && p.Secret(s[0]) != "") {
+			return nil
+		}
+	}
+	if Kind(cli) == "claude" {
+		return fmt.Errorf("%s", ContainerNoCredential)
+	}
+	return fmt.Errorf("no %s credential for the container: smithy auth set %s", cli, creds[0][0])
 }
 
 // SandboxDomains is DefaultSandboxDomains plus the comma list extra, without duplicates.
@@ -381,7 +531,7 @@ func (c Container) Argv(argv []string) []string {
 	}
 	a := []string{c.Engine, "run", "--rm", "-i", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
 		"--read-only", "--tmpfs", "/tmp", "--pids-limit", "512", "--memory", memory, "--network", network}
-	if c.Engine == "podman" {
+	if filepath.Base(c.Engine) == "podman" {
 		a = append(a, "--userns=keep-id")
 	} else if c.User != "" {
 		a = append(a, "--user", c.User)
@@ -458,7 +608,7 @@ func container(cwd, gitDir string) (Container, error) {
 		}
 		return v
 	}
-	c = Container{Engine: ContainerEngine(exec.LookPath), Image: get("auto.sandbox_image", DefaultSandboxImage),
+	c = Container{Engine: ContainerEngine(HostProbe()), Image: get("auto.sandbox_image", DefaultSandboxImage),
 		Network: get("auto.sandbox_network", ""), Memory: get("auto.sandbox_memory", "4g"), Cwd: cwd}
 	if err != nil {
 		return Container{}, err

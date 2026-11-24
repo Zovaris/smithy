@@ -5,6 +5,23 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Fixed: `auto.sandbox container` workers get their credentials, scoped to the harness (claude:
+  `CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`; codex: `OPENAI_API_KEY`; opencode: none unless
+  its model names that provider). When the env lacks them they come from `smithy auth`, passed by
+  name, never on argv; container env is visible to `docker inspect` and the engine socket. A
+  worker with no credential its harness needs is refused and doctor fails with the fix (`claude
+  setup-token`, then `smithy auth set claude`). On macOS the container runs as root inside the
+  engine VM; on Linux as your uid.
+- Fixed: container mode needs `auto.sandbox_network`; unset or `none` now refuses to start (claude
+  couldn't reach its API, git couldn't push) and doctor fails. `bridge` is open egress with no
+  domain allow-list; an egress allow-list proxy is planned for v0.17.
+- Fixed: with `DOCKER_HOST` unset and a dead docker context, the engine socket is found (Kiri,
+  OrbStack, Colima, Docker Desktop, `/var/run/docker.sock`), and docker is found at
+  `~/.kiri/bin/docker` or `~/.orbstack/bin/docker` off PATH. Doctor prints the engine and socket.
+- Added: the sandbox image ships OpenCode 2.4.0 (release tarball, digest-checked) next to
+  claude-code. OpenCode has no smithy allow-list, so the container is its isolation; live-tested
+  with `opencode/big-pickle` under Kiri.
+
 ## v0.16.0 — 2026-11-23
 
 - Added: `notify.style` (`plain`, default, or `emoji`) for Telegram messages.

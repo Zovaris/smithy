@@ -13,6 +13,11 @@ import (
 
 func sandboxReport(t *testing.T, mode, goos string, have ...string) (string, bool) {
 	t.Helper()
+	return sandboxReportWith(t, mode, goos, "bridge", "tok", have...)
+}
+
+func sandboxReportWith(t *testing.T, mode, goos, network, token string, have ...string) (string, bool) {
+	t.Helper()
 	version := "2.1.331 (Claude Code)"
 	if goos == "old" {
 		goos, version = "darwin", "2.0.1 (Claude Code)"
@@ -26,7 +31,17 @@ func sandboxReport(t *testing.T, mode, goos string, have ...string) (string, boo
 	if err := config.Set(config.UserFile(), "auto.agent", "claude"); err != nil {
 		t.Fatal(err)
 	}
-	p := agents.Probe{GOOS: goos, Look: func(b string) (string, error) {
+	if network != "" {
+		if err := config.Set(config.UserFile(), "auto.sandbox_network", network); err != nil {
+			t.Fatal(err)
+		}
+	}
+	p := agents.Probe{Getenv: func(k string) string {
+		if k == "CLAUDE_CODE_OAUTH_TOKEN" {
+			return token
+		}
+		return ""
+	}, GOOS: goos, Look: func(b string) (string, error) {
 		if slices.Contains(have, b) {
 			return b, nil
 		}
@@ -48,7 +63,8 @@ func TestSandboxDoctor(t *testing.T) {
 		{"native", "darwin", []string{"/usr/bin/sandbox-exec"}, "ok    sandbox: native (claude, hosts github.com,", false},
 		{"native", "darwin", nil, "FAIL  sandbox native: sandbox-exec missing", true},
 		{"native", "linux", []string{"bwrap"}, "socat missing", true},
-		{"container", "linux", []string{"podman"}, "not live-tested yet", false},
+		{"container", "linux", []string{"podman"}, "ok    sandbox: container (podman, socket engine default, image smithy-sandbox:latest, network bridge)", false},
+		{"container", "linux", []string{"docker"}, "open egress with no domain allow-list", false},
 		{"container", "linux", nil, "no docker or podman", true},
 		{"native", "old", []string{"/usr/bin/sandbox-exec"}, "older than 2.1.331", true},
 	}
@@ -73,5 +89,21 @@ func TestSandboxDoctorPoolContainer(t *testing.T) {
 	o, _, _ := capture(t, func() int { sandboxDoctor(r, p); return 0 })
 	if !r.failed || !strings.Contains(o, "pool and container don't combine yet") {
 		t.Errorf("want a FAIL line for pool + container:\n%s", o)
+	}
+}
+
+func TestSandboxDoctorContainerRefusals(t *testing.T) {
+	o, failed := sandboxReportWith(t, "container", "linux", "none", "tok", "docker")
+	if !failed || !strings.Contains(o, agents.ContainerNoNetwork) {
+		t.Errorf("network none must FAIL:\n%s", o)
+	}
+	o, failed = sandboxReportWith(t, "container", "linux", "", "tok", "docker")
+	if !failed || !strings.Contains(o, agents.ContainerNoNetwork) {
+		t.Errorf("network unset must FAIL:\n%s", o)
+	}
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	o, failed = sandboxReportWith(t, "container", "linux", "bridge", "", "docker")
+	if !failed || !strings.Contains(o, "claude setup-token, then smithy auth set claude") {
+		t.Errorf("no credential must FAIL:\n%s", o)
 	}
 }
