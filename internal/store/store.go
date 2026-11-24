@@ -40,6 +40,34 @@ var migrations = []string{
 		session TEXT NOT NULL DEFAULT '',
 		data    TEXT NOT NULL DEFAULT 'null'
 	)`,
+	`CREATE TABLE tasks (
+		id               INTEGER PRIMARY KEY AUTOINCREMENT,
+		title            TEXT NOT NULL,
+		body             TEXT NOT NULL DEFAULT '',
+		state            TEXT NOT NULL DEFAULT 'todo' CHECK (state IN ('todo','in_progress','blocked','review','done','canceled')),
+		priority         INTEGER NOT NULL DEFAULT 0,
+		labels           TEXT NOT NULL DEFAULT '[]',
+		blocked_by       TEXT NOT NULL DEFAULT '[]',
+		pr_urls          TEXT NOT NULL DEFAULT '[]',
+		branch           TEXT NOT NULL DEFAULT '',
+		claimed_by       TEXT NOT NULL DEFAULT '',
+		claim_expires_at TEXT NOT NULL DEFAULT '',
+		created_at       TEXT NOT NULL,
+		updated_at       TEXT NOT NULL,
+		linear_id        TEXT UNIQUE,
+		linear_updated_at TEXT NOT NULL DEFAULT ''
+	)`,
+	`CREATE TABLE task_map (
+		task_id      INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+		source       TEXT NOT NULL,
+		ext_id       TEXT NOT NULL,
+		ext_key      TEXT NOT NULL DEFAULT '',
+		pushed_state TEXT NOT NULL DEFAULT '',
+		pushed_prs   TEXT NOT NULL DEFAULT '[]',
+		PRIMARY KEY (source, ext_id),
+		UNIQUE (task_id, source)
+	)`,
+	`CREATE TABLE sync_cursors (source TEXT PRIMARY KEY, cursor TEXT NOT NULL)`,
 }
 
 // DefaultPath is <smithy home>/smithy.db.
@@ -62,6 +90,9 @@ func Open(path string) (*Store, error) {
 	}
 	return s, nil
 }
+
+// DB is the underlying database, for packages that own tables here (board).
+func (s *Store) DB() *sql.DB { return s.db }
 
 // Close closes the database.
 func (s *Store) Close() error { return s.db.Close() }
