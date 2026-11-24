@@ -7,6 +7,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 - `auto.sandbox native` now refuses Gemini CLI workers with the reason: its seatbelt profiles either open every host or need a proxy smithy doesn't ship, and on Linux it only offers docker/podman. Use `auto.sandbox container`.
 - Account pool: usage limits are now detected for OpenCode, Gemini CLI and Pi too (each from its own error text, last lines of a failed run), so a limited account is marked until its reset instead of only rotating.
+- Added: `auto.sandbox_network proxy` for container workers: an internal network whose only exit is the `smithy-proxy` sidecar (`smithy proxy serve`), which tunnels only to GitHub, the model APIs, package registries and `auto.sandbox_domains`, and logs what it refuses.
+- Added: secrets for container workers that never see them: `smithy auth bind <name> <host> [METHODS]` lets the proxy send a stored key to that host (`http://smithy-proxy:8877/s/<name>/<path>`), dropping the worker's own auth headers and scrubbing the key from responses; writes are refused unless bound, or held for `smithy proxy approve <id>` with `smithy auth ask <name> on`.
 - Fixed: stopping `smithy auto serve` mid-cycle could leave a stale heartbeat (`~/.smithy/auto/serve.json`) written by the abandoned cycle.
 
 ## v0.16.3 — 2026-11-23
