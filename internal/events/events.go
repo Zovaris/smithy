@@ -74,8 +74,21 @@ func flat(s string, n int) string {
 // home the proxy sidecar can write. Read merges it in.
 func ProxyFile() string { return filepath.Join(ghx.Home(), "proxy", "events.jsonl") }
 
+// Tap, when set, receives every event Append writes in this process (smithy daemon mirrors them
+// into its store).
+var Tap func(Event)
+
 // Append writes one event; errors are returned but callers may ignore them (the log is advisory).
-func Append(e Event) error { return appendTo(File(), e) }
+func Append(e Event) error {
+	if Tap != nil && !Off {
+		t := e
+		if t.T.IsZero() {
+			t.T = time.Now()
+		}
+		Tap(t)
+	}
+	return appendTo(File(), e)
+}
 
 // AppendProxy writes one event to ProxyFile.
 func AppendProxy(e Event) error { return appendTo(ProxyFile(), e) }
