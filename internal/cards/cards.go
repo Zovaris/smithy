@@ -393,7 +393,7 @@ func Rows(batch string) ([]Row, error) {
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		n := e.Name()
-		if strings.HasSuffix(n, ".json") && n != "batch.json" {
+		if IsCardFile(n) {
 			id := strings.TrimSuffix(n, ".json")
 			if _, ok := items[id]; !ok {
 				items[id] = map[string]any{}
@@ -685,4 +685,10 @@ func hasKey(pairs []string, k string) bool {
 		}
 	}
 	return false
+}
+
+// IsCardFile reports whether a batch dir entry is an item's card: a .json file other than
+// batch.json and other than a usage sidecar (<id>.log.usage.json).
+func IsCardFile(name string) bool {
+	return strings.HasSuffix(name, ".json") && name != "batch.json" && !strings.HasSuffix(name, ".usage.json")
 }
