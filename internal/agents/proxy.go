@@ -86,9 +86,12 @@ type ProxySidecar struct {
 	Allow                          []string
 }
 
-// Hash identifies the sidecar's config, so a changed allow list or binary restarts it.
+// Hash identifies the sidecar's config, so a changed allow list, binary or auth.json restarts it:
+// auth.json is rewritten by rename, which a single-file mount never sees.
 func (s ProxySidecar) Hash() string {
-	h := sha256.Sum256([]byte(strings.Join([]string{EgressNetwork, "narrow-mounts", s.Image, s.Bin, s.Home, s.User, strings.Join(s.Allow, ",")}, "\x00")))
+	auth, _ := os.ReadFile(filepath.Join(s.Home, "auth.json"))
+	sum := sha256.Sum256(auth)
+	h := sha256.Sum256([]byte(strings.Join([]string{EgressNetwork, "narrow-mounts", s.Image, s.Bin, s.Home, s.User, strings.Join(s.Allow, ","), hex.EncodeToString(sum[:])}, "\x00")))
 	return hex.EncodeToString(h[:8])
 }
 

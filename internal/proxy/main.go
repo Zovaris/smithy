@@ -60,7 +60,7 @@ func EventsApprover(timeout, poll time.Duration) func(context.Context, Ask) bool
 // DefaultDomains are the hosts a proxied worker always reaches: GitHub, the harnesses' model APIs
 // and the package registries; auto.sandbox_domains adds more.
 var DefaultDomains = []string{"github.com", "api.github.com", "codeload.github.com", "uploads.github.com", "objects.githubusercontent.com", "raw.githubusercontent.com",
-	"api.anthropic.com", "api.openai.com", "chatgpt.com", "opencode.ai", "models.dev",
+	"api.anthropic.com", "api.openai.com", "chatgpt.com", "opencode.ai", "*.opencode.ai", "models.dev",
 	"registry.npmjs.org", "proxy.golang.org", "sum.golang.org", "pypi.org", "files.pythonhosted.org"}
 
 // Main runs `smithy proxy`.
