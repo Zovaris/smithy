@@ -5,6 +5,14 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Fixed: tests no longer write to your real `~/.smithy` (test `stage` events reached Telegram as
+  real alerts). Under `go test` the smithy home is a temp dir unless a test sets one, and
+  `tests/run.sh` exports a temp `SMITHY_HOME`.
+- Changed: Telegram notifications are rich HTML: an emoji header per kind, the item key and title,
+  repo, stage, model · speed, known cost and duration, the reason in a quote, the pending question
+  and how to answer it for decisions, and Open PR / Open issue buttons (http(s) only); every value
+  is escaped and link previews are off. `smithy notify test --all` sends a sample of every kind.
+
 - Fixed: under `auto.sandbox native`, git reaches GitHub over HTTPS with `gh auth git-credential`
   (SSH remotes and `~/.ssh` stay blocked inside the sandbox), so sandboxed workers can push.
 - Fixed: `smithy agent` resolves the tiers `cheap`, `mid`, `strong` and `judge` to your models for

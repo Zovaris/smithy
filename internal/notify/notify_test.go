@@ -109,7 +109,7 @@ func TestFirstFlushStartsAtNowThenMapsEvents(t *testing.T) {
 		t.Fatalf("want 2 msgs (ready once, blocked), got %d: %v", len(f.msgs), f.msgs)
 	}
 	m := f.msgs[0].Get("text")
-	if !strings.Contains(m, "PR ready") || !strings.Contains(m, "T-1") || !strings.Contains(m, "pull/1") {
+	if !strings.Contains(m, "PR ready") || !strings.Contains(m, "T-1") || !strings.Contains(f.msgs[0].Get("reply_markup"), "pull/1") {
 		t.Fatalf("msg %q", m)
 	}
 	n.Flush(time.Now().Add(2 * time.Second))
@@ -277,10 +277,73 @@ func TestStatusMasksToken(t *testing.T) {
 }
 
 func TestMessageTrimsTitle(t *testing.T) {
-	m := message(item{kind: "pr_ready", key: "T-1", title: strings.Repeat("x", 200), pr: "https://x/pull/1", reason: "ready"})
+	m, _ := render(item{kind: "pr_ready", key: "T-1", title: strings.Repeat("x", 200), pr: "https://x/pull/1", reason: strings.Repeat("y", 500)})
 	for _, l := range strings.Split(m, "\n") {
-		if len([]rune(l)) > 120 {
+		if len([]rune(l)) > 240 {
 			t.Fatalf("long line %q", l)
 		}
+	}
+	if n := strings.Count(m, "\n"); n > 11 {
+		t.Fatalf("%d lines", n+1)
+	}
+}
+
+func TestMessageEscapesUntrustedText(t *testing.T) {
+	m, _ := render(item{kind: "blocked", key: "<b>1</b>", title: `</i><a href="x">hi & bye`, reason: "<script>"})
+	for _, bad := range []string{"<script>", "<a href", "</i><a", "<b>1</b>"} {
+		if strings.Contains(m, bad) {
+			t.Fatalf("unescaped %q in %q", bad, m)
+		}
+	}
+	if !strings.Contains(m, "&lt;script&gt;") || !strings.Contains(m, "hi &amp; bye") || !strings.HasPrefix(m, "⛔ <b>") {
+		t.Fatalf("msg %q", m)
+	}
+}
+
+func TestButtonsOnlyHTTPURLs(t *testing.T) {
+	_, kb := render(item{kind: "pr_ready", key: "1", pr: "https://github.com/o/r/pull/1", issue: "javascript:alert(1)"})
+	if len(kb) != 1 || kb[0].Text != "Open PR" || kb[0].URL != "https://github.com/o/r/pull/1" {
+		t.Fatalf("buttons %+v", kb)
+	}
+	_, kb = render(item{kind: "pr_ready", key: "1", pr: "ftp://x/1", issue: "https://github.com/o/r/issues/1"})
+	if len(kb) != 1 || kb[0].Text != "Open issue" {
+		t.Fatalf("buttons %+v", kb)
+	}
+}
+
+func TestSendUsesHTMLNoPreviewAndKeyboard(t *testing.T) {
+	f, _ := setup(t)
+	n := New(nil)
+	n.Flush(time.Now())
+	appendEv(t, events.Event{Kind: "stage", Batch: "b", Item: "T-1", PR: "https://github.com/o/r/pull/1", Detail: "ready"})
+	n.Flush(time.Now().Add(time.Second))
+	if len(f.msgs) != 1 {
+		t.Fatalf("msgs %v", f.msgs)
+	}
+	v := f.msgs[0]
+	if v.Get("parse_mode") != "HTML" || !strings.Contains(v.Get("link_preview_options"), `"is_disabled":true`) ||
+		!strings.Contains(v.Get("reply_markup"), `"url":"https://github.com/o/r/pull/1"`) {
+		t.Fatalf("form %v", v)
+	}
+	if !strings.Contains(v.Get("text"), "o/r") {
+		t.Fatalf("repo missing: %q", v.Get("text"))
+	}
+}
+
+func TestDecisionShowsQuestionAndHowToAnswer(t *testing.T) {
+	setup(t)
+	m, _ := render(item{kind: "decision", key: "7", question: "Use <Postgres> or SQLite?"})
+	if !strings.Contains(m, "Use &lt;Postgres&gt; or SQLite?") || !strings.Contains(m, "smithy decisions") || !strings.Contains(m, "Needs you") {
+		t.Fatalf("msg %q", m)
+	}
+}
+
+func TestTestAllSendsEveryKind(t *testing.T) {
+	f, _ := setup(t)
+	if err := TestAll(); err != nil {
+		t.Fatal(err)
+	}
+	if len(f.msgs) != len(Kinds)+1 || len(f.msgs) > 10 {
+		t.Fatalf("sent %d", len(f.msgs))
 	}
 }
