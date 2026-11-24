@@ -12,7 +12,14 @@ import (
 var (
 	claudeLimitRe = regexp.MustCompile(`(?i)(hit your [a-z0-9 -]*limit|usage limit reached)`)
 	codexLimit    = "hit your usage limit"
-	resetRe       = regexp.MustCompile(`(?i)(?:resets|try again at)\s+` +
+	// The texts each CLI prints for an account limit; pool_test.go cites the source of each.
+	opencodeLimitRe = regexp.MustCompile(`(?i)^error: .*(usage limit reached|reached the usage limit|subscription limit reached)`)
+	geminiLimitRe   = regexp.MustCompile(`(?i)^an unexpected critical error occurred: .*(exhausted your capacity|quota will reset after)`)
+	piLimitRe       = regexp.MustCompile(`(?i)usage limit|GoUsageLimitError|FreeUsageLimitError|insufficient_quota|quota exceeded|subscription_sharing_[a-z_]*usage_limit_exceeded`)
+	ansiRe          = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	isoResetRe      = regexp.MustCompile(`(?i)resets at (\d{4}-\d\d-\d\dT[0-9:.]+Z)`)
+	afterResetRe    = regexp.MustCompile(`(?i)reset after ((?:\d+[hms])+)`)
+	resetRe         = regexp.MustCompile(`(?i)(?:resets|try again at)\s+` +
 		`(?:(mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s+)?` +
 		`(?:(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(?:\d{4},?\s+)?(?:at\s+)?)?` +
 		`(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s*\(([^)]+)\))?`)
@@ -22,10 +29,10 @@ var (
 var Warn = func(s string) { fmt.Fprintln(os.Stderr, "smithy pool:", s) }
 
 // Detect reads a finished run's log for a usage-limit result of kind's CLI. claude: only a
-// result JSON object with is_error and limit text; codex: only the sentence "hit your usage
-// limit" in the last lines of a failed run (rc != 0). Any other CLI or text never counts, so a
-// test log that mentions rate_limit does not mark an account. until is the reset the CLI gave,
-// else now + DefaultLimit.
+// result JSON object with is_error and limit text; codex, opencode, gemini and pi: only that
+// CLI's own limit error in the last lines of a failed run (rc != 0). Any other CLI or text never
+// counts, so a test log that mentions rate_limit does not mark an account. until is the reset
+// the CLI gave, else now + DefaultLimit.
 func Detect(log, kind string, rc int, now time.Time) (until time.Time, ok bool) {
 	b, err := os.ReadFile(log)
 	if err != nil {
@@ -47,6 +54,28 @@ func Detect(log, kind string, rc int, now time.Time) (until time.Time, ok bool) 
 			if strings.Contains(strings.ToLower(lines[i]), codexLimit) {
 				return Reset(lines[i], now), true
 			}
+		}
+	case "opencode", "gemini", "pi":
+		if rc == 0 {
+			return
+		}
+		re := map[string]*regexp.Regexp{"opencode": opencodeLimitRe, "gemini": geminiLimitRe, "pi": piLimitRe}[kind]
+		for i := len(lines) - 1; i >= 0 && i >= len(lines)-5; i-- {
+			l := strings.TrimSpace(ansiRe.ReplaceAllString(lines[i], ""))
+			if !re.MatchString(l) {
+				continue
+			}
+			if m := isoResetRe.FindStringSubmatch(l); m != nil {
+				if t, err := time.Parse(time.RFC3339, m[1]); err == nil && t.After(now) {
+					return t, true
+				}
+			}
+			if m := afterResetRe.FindStringSubmatch(l); m != nil {
+				if d, err := time.ParseDuration(m[1]); err == nil && d > 0 {
+					return now.Add(d), true
+				}
+			}
+			return Reset(l, now), true
 		}
 	}
 	return
