@@ -16,5 +16,8 @@ func init() {
 		tui.Version = version
 		return daemon.Main(args, tui.RunServeView)
 	})
+	register("attach", "watch a daemon live: events, decisions, reconnect and resume", tui.AttachUsage, "--", func(args []string) int {
+		return tui.Attach(args)
+	})
 	serveMain = daemon.ServeOrAttach
 }
