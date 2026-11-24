@@ -29,7 +29,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `tend.watch` / `tend.label` | `prs` / `agent` | What `/tend watch` follows (comma list of `prs`, `issues`, `actions`, `base`, `alerts`, or `all`); the issue label it may queue. |
 | `stack.<key>` | unset | A command `smithy stack` can't detect (`stack.test`, `stack.single`, `stack.lint`, `stack.dev`…), set with `--repo`. Read from the default branch's committed config or the main checkout's local file, never a branch's own edit. |
 | `decide.url` / `decide.model` | unset (off) | Optional decision model for `smithy decide`, on once both are set. A URL ending in `/scores` uses Respan's behavior format; anything else System One (Jev, Kev local, Clef, span-02). `decide.key_env` names the env var with the key (never the key), `decide.timeout` is in ms (3000). Three failed calls in a row set `decide.enabled` false; set it `true` to turn it back on. |
-| `auto.sources` | `github` | Comma list of issue sources `smithy auto` polls: `github`, `linear`. |
+| `auto.sources` | `github` | Comma list of issue sources `smithy auto` polls: `github`, `linear`, `board` (the built-in tracker, harness build). |
 | `auto.mode` | `labeled` | `labeled`: only issues with the `auto.label` label; `all`: every issue that passes the source's filters. |
 | `auto.label` | `auto` | Label that opts an issue in (`auto.mode labeled`). |
 | `auto.model_prefix` / `auto.speed_prefix` | `model:` / `speed:` | Label prefixes for the worker tier (`model:cheap`…) and the smelt speed (`speed:fast`…). |
@@ -53,6 +53,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `notify.telegram.chat` | unset (off) | Telegram chat id (numeric, or `@channel`) that `smithy auto serve` notifies; the bot token goes in `smithy auth set telegram` (or `TELEGRAM_API_KEY`). `smithy notify test` sends a test message (`--all`: a sample of every kind), `smithy notify status` shows the setup. Messages are short HTML (every value escaped, link previews off): the kind, item key and title, repo, stage, model · speed, known cost, duration, the reason or pending question, and Open PR / Open issue buttons; never an issue body or a key; each (item, kind) once, at most 20 a minute (the overflow in one summary). |
 | `notify.style` | `plain` | Telegram message look: `plain` (status tag, one monospace detail line) or `emoji` (an icon per line). |
 | `notify.kinds` | `pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited` | Comma list of the notification kinds sent; drop one to turn it off. |
+| `board.linear_sync` | `false` | `true`: `smithy board sync` and the `board` source pull title, body, priority and labels from Linear (`linear.*` filters, `updatedAt` cursor) and push states and PR links back. |
 | `linear.team` | unset (required) | Linear team keys smithy may work in (e.g. `ENG,OPS`); empty, the Linear source refuses to poll. |
 | `linear.key_env` | `LINEAR_API_KEY` | Name of the env var holding the Linear personal API key (never the key); wins over `smithy auth set linear` (`~/.smithy/auth.json`). |
 | `linear.project` / `linear.milestone` / `linear.initiative` | unset | Name filters (project: a comma list; initiative via the issue's project). |

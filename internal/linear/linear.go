@@ -231,6 +231,26 @@ func (s *Source) allowed(team string) bool {
 // a retry after a failed move or attachment does not post it twice. Issues outside linear.team
 // are refused.
 func (s *Source) Report(id, state, pr string) error {
+	uid, team, err := s.issue(id)
+	if err != nil {
+		return err
+	}
+	if state == "started" || state == "completed" {
+		if err := s.move(uid, team, state); err != nil {
+			return err
+		}
+	}
+	if pr != "" {
+		if err := s.attach(uid, pr); err != nil {
+			return err
+		}
+	}
+	return s.do(`mutation($input: CommentCreateInput!) { commentCreate(input: $input) { success } }`,
+		map[string]any{"input": map[string]any{"issueId": uid, "body": auto.Comment(state, pr)}}, nil)
+}
+
+// issue resolves id (identifier or UUID) to its UUID and team key, refusing teams outside linear.team.
+func (s *Source) issue(id string) (uid, team string, err error) {
 	var is struct {
 		Issue struct {
 			ID   string
@@ -238,50 +258,155 @@ func (s *Source) Report(id, state, pr string) error {
 		}
 	}
 	if err := s.do(`query($id: String!) { issue(id: $id) { id team { key } } }`, map[string]any{"id": id}, &is); err != nil {
-		return err
+		return "", "", err
 	}
 	if is.Issue.ID == "" {
-		return fmt.Errorf("linear: issue %s not found", id)
+		return "", "", fmt.Errorf("linear: issue %s not found", id)
 	}
 	if !s.allowed(is.Issue.Team.Key) {
-		return fmt.Errorf("linear: issue %s is in team %s, not in linear.team", id, is.Issue.Team.Key)
+		return "", "", fmt.Errorf("linear: issue %s is in team %s, not in linear.team", id, is.Issue.Team.Key)
 	}
-	uid := is.Issue.ID
-	if state == "started" || state == "completed" {
-		var ws struct {
-			WorkflowStates struct {
+	return is.Issue.ID, is.Issue.Team.Key, nil
+}
+
+// move sets issue uid to team's workflow state of type stateType with the lowest position.
+func (s *Source) move(uid, team, stateType string) error {
+	var ws struct {
+		WorkflowStates struct {
+			Nodes []struct {
+				ID, Name, Type string
+				Position       float64
+			}
+		}
+	}
+	if err := s.do(`query($team: String!) { workflowStates(filter: { team: { key: { eq: $team } } }) { nodes { id name type position } } }`,
+		map[string]any{"team": team}, &ws); err != nil {
+		return err
+	}
+	sid, best := "", 0.0
+	for _, w := range ws.WorkflowStates.Nodes {
+		if w.Type == stateType && (sid == "" || w.Position < best) {
+			sid, best = w.ID, w.Position
+		}
+	}
+	if sid == "" {
+		return fmt.Errorf("linear: team %s has no %s workflow state", team, stateType)
+	}
+	return s.do(`mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`,
+		map[string]any{"id": uid, "input": map[string]any{"stateId": sid}}, nil)
+}
+
+// SetState moves issue id to its team's first workflow state of stateType (one of stateTypes).
+func (s *Source) SetState(id, stateType string) error {
+	uid, team, err := s.issue(id)
+	if err != nil {
+		return err
+	}
+	return s.move(uid, team, stateType)
+}
+
+// AttachPR links url to issue id (UUID or identifier) as a "Pull request" attachment; Linear
+// dedupes the same url on one issue. Issues outside linear.team are refused.
+func (s *Source) AttachPR(id, url string) error {
+	uid, _, err := s.issue(id)
+	if err != nil {
+		return err
+	}
+	return s.attach(uid, url)
+}
+
+func (s *Source) attach(id, url string) error {
+	return s.do(`mutation($issueId: String!, $url: String!, $title: String) { attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success } }`,
+		map[string]any{"issueId": id, "url": url, "title": "Pull request"}, nil)
+}
+
+// Change is one issue as the board sync reads it: the fields Linear owns plus its state type
+// and updatedAt (the sync cursor).
+type Change struct {
+	ID, Identifier, Title, Body, StateType, UpdatedAt, URL string
+	Priority                                               int
+	Labels                                                 []string
+}
+
+const changesQuery = `query($first: Int!, $after: String, $filter: IssueFilter) {
+  issues(first: $first, after: $after, filter: $filter, orderBy: updatedAt) {
+    nodes { id identifier title description url priority state { type } labels { nodes { name } }
+      team { key } updatedAt }
+    pageInfo { hasNextPage endCursor }
+  }
+}`
+
+// Changes lists issues in the linear.* filters for the board sync. With an empty cursor (the
+// first sync) only issues in linear.states are read; after that every issue updated at or after
+// cursor (Linear's own updatedAt, so no clock skew), whatever its state, so edits to linked
+// tasks are seen. The new cursor is the latest updatedAt read; it stays at cursor when the page
+// cap cut the read short, since pages need not come oldest first.
+func (s *Source) Changes(cursor string) ([]Change, string, error) {
+	f := s.Filter(time.Time{})
+	delete(f, "updatedAt")
+	if cursor != "" {
+		delete(f, "state")
+		f["updatedAt"] = map[string]any{"gte": cursor}
+	}
+	var out []Change
+	next, after := cursor, ""
+	for page := 1; ; page++ {
+		vars := map[string]any{"first": 50, "filter": f}
+		if after != "" {
+			vars["after"] = after
+		}
+		var data struct {
+			Issues struct {
 				Nodes []struct {
-					ID, Name, Type string
-					Position       float64
+					ID, Identifier, Title, Description, URL, UpdatedAt string
+					Priority                                           float64
+					State                                              struct{ Type string }
+					Labels                                             struct{ Nodes []struct{ Name string } }
+					Team                                               struct{ Key string }
+				}
+				PageInfo struct {
+					HasNextPage bool
+					EndCursor   string
 				}
 			}
 		}
-		if err := s.do(`query($team: String!) { workflowStates(filter: { team: { key: { eq: $team } } }) { nodes { id name type position } } }`,
-			map[string]any{"team": is.Issue.Team.Key}, &ws); err != nil {
-			return err
+		if err := s.do(changesQuery, vars, &data); err != nil {
+			return nil, cursor, err
 		}
-		sid, best := "", 0.0
-		for _, w := range ws.WorkflowStates.Nodes {
-			if w.Type == state && (sid == "" || w.Position < best) {
-				sid, best = w.ID, w.Position
+		for _, n := range data.Issues.Nodes {
+			if !s.allowed(n.Team.Key) {
+				continue
 			}
+			c := Change{ID: n.ID, Identifier: n.Identifier, Title: n.Title, Body: n.Description, URL: n.URL,
+				StateType: n.State.Type, UpdatedAt: n.UpdatedAt, Priority: int(n.Priority)}
+			for _, l := range n.Labels.Nodes {
+				c.Labels = append(c.Labels, l.Name)
+			}
+			if c.UpdatedAt > next {
+				next = c.UpdatedAt
+			}
+			out = append(out, c)
 		}
-		if sid == "" {
-			return fmt.Errorf("linear: team %s has no %s workflow state", is.Issue.Team.Key, state)
+		end := data.Issues.PageInfo.EndCursor
+		if !data.Issues.PageInfo.HasNextPage || end == "" || end == after {
+			return out, next, nil
 		}
-		if err := s.do(`mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`,
-			map[string]any{"id": uid, "input": map[string]any{"stateId": sid}}, nil); err != nil {
-			return err
+		if page >= maxPages {
+			fmt.Fprintf(Warn, "linear: stopped after %d pages; the rest are read on the next sync\n", maxPages)
+			return out, cursor, nil
+		}
+		after = end
+	}
+}
+
+// NewWork reports whether a Linear state type counts as new work (linear.states).
+func (s *Source) NewWork(stateType string) bool {
+	for _, x := range s.Filters.States {
+		if x == stateType {
+			return true
 		}
 	}
-	if pr != "" {
-		if err := s.do(`mutation($issueId: String!, $url: String!, $title: String) { attachmentLinkURL(issueId: $issueId, url: $url, title: $title) { success } }`,
-			map[string]any{"issueId": uid, "url": pr, "title": "Pull request"}, nil); err != nil {
-			return err
-		}
-	}
-	return s.do(`mutation($input: CommentCreateInput!) { commentCreate(input: $input) { success } }`,
-		map[string]any{"input": map[string]any{"issueId": uid, "body": auto.Comment(state, pr)}}, nil)
+	return false
 }
 
 // do posts one GraphQL request and decodes data into out (nil: ignored). Errors never carry

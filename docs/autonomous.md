@@ -44,6 +44,25 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   `daemon.allow` only on a machine where every local user is trusted (the dedicated OS user above).
 - `smithy doctor` reports whether it runs, a stale `daemon.json`, and a token readable by others.
 
+## Built-in tracker (harness build)
+
+`smithy board` keeps tasks in `~/.smithy/smithy.db`; `auto.sources board` makes the watcher
+read it like any source (the `auto` label and filters apply). A task is new work while it is
+`todo`, unclaimed and every task in `blocked_by` is done or canceled.
+
+```
+smithy board add "Fix login" --labels auto --priority 2
+smithy board list --state todo
+smithy board claim B-1 --by me --ttl 30m
+smithy board set B-1 --state review --pr https://github.com/o/r/pull/7
+```
+
+With `board.linear_sync true`, `smithy board sync` (and every board poll) syncs with Linear by
+field ownership: Linear owns title, body, priority and labels; the board owns state, claims, PRs
+and branch. Issues in `linear.states` under the `linear.*` filters are imported as `todo`; later
+edits are read with an `updatedAt` cursor (no webhooks), and state changes and new PR links are
+pushed back. A board task linked to Linear refuses local edits to the fields Linear owns.
+
 ## Notifications
 
 ```
