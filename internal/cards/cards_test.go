@@ -677,3 +677,11 @@ func TestGate(t *testing.T) {
 		t.Errorf("ran: %v", err)
 	}
 }
+
+func TestIsCardFile(t *testing.T) {
+	for n, want := range map[string]bool{"01-a.json": true, "batch.json": false, "01-a.log.usage.json": false, "01-a.log": false} {
+		if IsCardFile(n) != want {
+			t.Fatalf("IsCardFile(%q) = %v", n, !want)
+		}
+	}
+}

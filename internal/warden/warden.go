@@ -156,7 +156,7 @@ func WaitTurn(args []string) int {
 			entries, _ := os.ReadDir(dir)
 			for _, e := range entries {
 				n := e.Name()
-				if strings.HasSuffix(n, ".json") && n != "batch.json" && cardState(dir, strings.TrimSuffix(n, ".json")) == "working" {
+				if cards.IsCardFile(n) && cardState(dir, strings.TrimSuffix(n, ".json")) == "working" {
 					working++
 				}
 			}

@@ -366,7 +366,7 @@ func batchBranches() map[string]bool {
 	for _, b := range cards.Batches() {
 		entries, _ := os.ReadDir(filepath.Join(cards.Home(), b))
 		for _, e := range entries {
-			if !strings.HasSuffix(e.Name(), ".json") || e.Name() == "batch.json" {
+			if !cards.IsCardFile(e.Name()) {
 				continue
 			}
 			var c struct{ Branch string }

@@ -825,7 +825,7 @@ func batchStarted(dir string) bool {
 		}
 		cs, _ := os.ReadDir(bd)
 		for _, c := range cs {
-			if c.Name() == "batch.json" || filepath.Ext(c.Name()) != ".json" {
+			if !strings.HasSuffix(c.Name(), ".json") || c.Name() == "batch.json" || strings.HasSuffix(c.Name(), ".usage.json") {
 				continue
 			}
 			var card struct {
