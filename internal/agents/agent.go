@@ -558,8 +558,13 @@ func Run(o Options) int {
 	if (Kind(cli) == "codex" && !o.ReadOnly) || o.Sandbox == "native" || o.Sandbox == "container" {
 		gitDir, _ = ghx.Run("git", "-C", o.Cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	}
+	gocache := ""
 	if o.Sandbox == "native" && Kind(cli) == "claude" {
-		o.SandboxSettings = nativeSettings(&o, gitDir)
+		var err error
+		if o.SandboxSettings, gocache, err = nativeSettings(&o, gitDir); err != nil {
+			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
+			return 1
+		}
 	}
 	prompt := ""
 	if cli != "custom" {
@@ -580,8 +585,15 @@ func Run(o Options) int {
 	}
 	asJSON := jsonResult(s.Argv)
 	env := Env(os.Environ(), s, o)
+	if gocache != "" {
+		env = append(env, "GOCACHE="+gocache)
+	}
 	if o.Sandbox == "container" {
-		box := container(o.Cwd, gitDir)
+		box, err := container(o.Cwd, gitDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
+			return 1
+		}
 		env, box.Env = ContainerEnv(env)
 		s.Argv[0] = filepath.Base(s.Argv[0]) // a host path means nothing inside the image
 		s.Argv = box.Argv(s.Argv)

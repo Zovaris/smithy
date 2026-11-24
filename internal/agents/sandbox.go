@@ -1,15 +1,18 @@
 package agents
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
@@ -18,7 +21,8 @@ import (
 
 // SandboxRoleEnv marks the orchestrator serve starts: it stays on the allow-list only, since a
 // sandboxed orchestrator could not start sandboxed workers (sandboxes don't nest). Env drops it, so
-// every worker the orchestrator starts gets auto.sandbox.
+// every worker the orchestrator starts gets auto.sandbox. A worker that sets it itself is still
+// inside its own sandbox, which its children inherit.
 const SandboxRoleEnv = "SMITHY_SANDBOX_ROLE"
 
 // DefaultSandboxDomains are the hosts a native-sandboxed worker may reach; auto.sandbox_domains adds more.
@@ -27,18 +31,43 @@ var DefaultSandboxDomains = []string{"github.com", "api.github.com", "api.anthro
 // DefaultSandboxImage is the container image when auto.sandbox_image is unset (build it from sandbox/Dockerfile).
 const DefaultSandboxImage = "smithy-sandbox:latest"
 
+// MinClaudeSandbox is the oldest Claude Code smithy's native sandbox settings were verified on
+// (failIfUnavailable, network.strictAllowlist, enableWeakerNetworkIsolation); older ones are refused.
+const MinClaudeSandbox = "2.1.331"
+
 // Probe is how SandboxCheck looks at the host; tests replace it.
 type Probe struct {
-	GOOS string
-	Look func(string) (string, error)
+	GOOS    string
+	Look    func(string) (string, error)
+	Version func(cli string) (string, error) // `<cli> --version` output
 }
 
 // HostProbe looks at this machine.
-func HostProbe() Probe { return Probe{GOOS: runtime.GOOS, Look: exec.LookPath} }
+func HostProbe() Probe {
+	return Probe{GOOS: runtime.GOOS, Look: exec.LookPath, Version: func(cli string) (string, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, cli, "--version").Output()
+		return string(out), err
+	}}
+}
 
-// SandboxMode is auto.sandbox: off, native or container.
+// SandboxSetting reads an auto.sandbox* key from the user's settings only (never a repo's), so a
+// cloned repo can't turn the sandbox off or widen it. A read error is returned: callers fail closed.
+func SandboxSetting(key, fallback string) (string, error) {
+	v, err := config.UserGet(key, fallback)
+	if err != nil {
+		return "", fmt.Errorf("reading %s from %s: %v", key, config.UserFile(), err)
+	}
+	return v, nil
+}
+
+// SandboxMode is auto.sandbox from the user's settings: off, native or container.
 func SandboxMode() (string, error) {
-	m := config.Get("auto.sandbox", "off")
+	m, err := SandboxSetting("auto.sandbox", "off")
+	if err != nil {
+		return "", err
+	}
 	switch m {
 	case "", "off":
 		return "off", nil
@@ -46,6 +75,24 @@ func SandboxMode() (string, error) {
 		return m, nil
 	}
 	return "", fmt.Errorf("auto.sandbox %q is not off, native or container", m)
+}
+
+var semver = regexp.MustCompile(`(\d+)\.(\d+)\.(\d+)`)
+
+// versionAtLeast reports whether the first x.y.z in out is at least min.
+func versionAtLeast(out, min string) bool {
+	got, want := semver.FindStringSubmatch(out), semver.FindStringSubmatch(min)
+	if got == nil || want == nil {
+		return false
+	}
+	for i := 1; i <= 3; i++ {
+		g, _ := strconv.Atoi(got[i])
+		w, _ := strconv.Atoi(want[i])
+		if g != w {
+			return g > w
+		}
+	}
+	return true
 }
 
 // SandboxCheck says why mode can't start a cli worker here (nil when it can). Callers fail closed:
@@ -87,7 +134,23 @@ func SandboxCheck(mode, cli string, p Probe) error {
 	default:
 		return fmt.Errorf("claude's sandbox needs macOS or Linux, not %s", p.GOOS)
 	}
+	if p.Version == nil {
+		return fmt.Errorf("can't check the claude version")
+	}
+	out, err := p.Version(cli)
+	if err != nil {
+		return fmt.Errorf("%s --version failed: %v", cli, err)
+	}
+	if !versionAtLeast(out, MinClaudeSandbox) {
+		return fmt.Errorf("claude %s is older than %s, the oldest the sandbox settings were verified on (update claude)",
+			strings.TrimSpace(firstLine(out)), MinClaudeSandbox)
+	}
 	return nil
+}
+
+func firstLine(s string) string {
+	l, _, _ := strings.Cut(s, "\n")
+	return l
 }
 
 // ContainerEngine is docker, else podman, else "".
@@ -141,11 +204,11 @@ func NativeDirs(dirs []string, smithyHome, plans, warden, repoParent string) (ad
 }
 
 // NativeSettings is the claude --settings JSON for a native-sandboxed worker: Bash and its children
-// write only to the worktree, its git dir, smithy's plans and warden dirs and the Go build cache,
+// write only to the worktree, its git dir, smithy's plans and warden dirs and its Go build cache,
 // reach only domains, never read the secrets smithy knows of, and can't fall back to running
-// unsandboxed. strictAllowlist blocks unlisted hosts even when a permission mode would allow them;
-// on macOS enableWeakerNetworkIsolation lets gh and other Go CLIs verify TLS.
-func NativeSettings(p SandboxPaths, domains []string, goos string) string {
+// unsandboxed. strictAllowlist blocks unlisted hosts even when a permission mode would allow them.
+// weakerNet (macOS only) turns on enableWeakerNetworkIsolation so gh and other Go CLIs can verify TLS.
+func NativeSettings(p SandboxPaths, domains []string, goos string, weakerNet bool) string {
 	keep := func(ps ...string) []string {
 		var out []string
 		for _, x := range ps {
@@ -187,16 +250,29 @@ func NativeSettings(p SandboxPaths, domains []string, goos string) string {
 		"network":                  net,
 		"filesystem":               fs,
 	}
-	if goos == "darwin" {
+	if goos == "darwin" && weakerNet {
 		sb["enableWeakerNetworkIsolation"] = true
 	}
 	b, _ := json.Marshal(map[string]any{"sandbox": sb})
 	return string(b)
 }
 
-// nativeSettings fills SandboxPaths from this machine for a worker in cwd and narrows its
-// --add-dir list (NativeDirs).
-func nativeSettings(o *Options, gitDir string) string {
+// GoCacheDir is a worker's own Go build cache: under the warden dir (writable to it), one per worktree.
+func GoCacheDir(warden, cwd string) string {
+	return filepath.Join(warden, "gocache", filepath.Base(cwd))
+}
+
+// nativeSettings fills SandboxPaths from this machine for a worker in cwd, narrows its --add-dir
+// list (NativeDirs) and returns the settings JSON and the worker's GOCACHE.
+func nativeSettings(o *Options, gitDir string) (settings, gocache string, err error) {
+	extra, err := SandboxSetting("auto.sandbox_domains", "")
+	if err != nil {
+		return "", "", err
+	}
+	weak, err := SandboxSetting("auto.sandbox_weaker_net", "true")
+	if err != nil {
+		return "", "", err
+	}
 	cwd := o.Cwd
 	parent := ""
 	if top, err := ghx.Run("git", "-C", cwd, "rev-parse", "--show-toplevel"); err == nil {
@@ -206,11 +282,9 @@ func nativeSettings(o *Options, gitDir string) string {
 	var ro []string
 	o.AddDirs, ro = NativeDirs(o.AddDirs, sm, filepath.Join(sm, "plans"), cards.Home(), parent)
 	home, _ := os.UserHomeDir()
-	gocache := ""
-	if _, err := exec.LookPath("go"); err == nil {
-		if out, err := exec.Command("go", "env", "GOCACHE").Output(); err == nil {
-			gocache = strings.TrimSpace(string(out))
-		}
+	gocache = GoCacheDir(realPath(cards.Home()), cwd)
+	if err := os.MkdirAll(gocache, 0o700); err != nil {
+		return "", "", err
 	}
 	for i, d := range ro {
 		ro[i] = realPath(d)
@@ -229,28 +303,40 @@ func nativeSettings(o *Options, gitDir string) string {
 	if gitDir != "" {
 		p.GitDir = realPath(gitDir)
 	}
-	return NativeSettings(p, SandboxDomains(config.Get("auto.sandbox_domains", "")), runtime.GOOS)
+	return NativeSettings(p, SandboxDomains(extra), runtime.GOOS, weak != "false"), gocache, nil
 }
 
 // Container is one `docker|podman run` for a worker.
 type Container struct {
-	Engine, Image, Network, Cwd, User string
-	Mounts                            []string // host paths, mounted at the same path
-	Env                               []string // names only: values come from the engine's env, never argv
+	Engine, Image, Network, Cwd, User, Memory string
+	Mounts                                    []string // host paths, mounted read-write at the same path
+	ReadOnly                                  []string // host paths inside Mounts, mounted again read-only over them
+	Env                                       []string // names only: values come from the engine's env, never argv
 }
 
-// Argv wraps argv in `<engine> run --rm -i` with no capabilities, the mounts, -w Cwd and the env names.
+// Argv wraps argv in `<engine> run --rm -i` with no capabilities, a read-only root and tmpfs /tmp,
+// pid and memory limits, the mounts, -w Cwd and the env names. Network is "none" unless set.
 func (c Container) Argv(argv []string) []string {
-	a := []string{c.Engine, "run", "--rm", "-i", "--cap-drop", "ALL", "--security-opt", "no-new-privileges"}
-	if c.Network != "" {
-		a = append(a, "--network", c.Network)
+	network, memory := c.Network, c.Memory
+	if network == "" {
+		network = "none"
 	}
-	if c.User != "" {
+	if memory == "" {
+		memory = "4g"
+	}
+	a := []string{c.Engine, "run", "--rm", "-i", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+		"--read-only", "--tmpfs", "/tmp", "--pids-limit", "512", "--memory", memory, "--network", network}
+	if c.Engine == "podman" {
+		a = append(a, "--userns=keep-id")
+	} else if c.User != "" {
 		a = append(a, "--user", c.User)
 	}
 	a = append(a, "-w", c.Cwd)
 	for _, m := range c.Mounts {
 		a = append(a, "-v", m+":"+m)
+	}
+	for _, m := range c.ReadOnly {
+		a = append(a, "-v", m+":"+m+":ro")
 	}
 	a = append(a, "-e", "HOME=/tmp")
 	for _, n := range c.Env {
@@ -295,10 +381,23 @@ func ContainerEnv(base []string) (env, names []string) {
 	return env, names
 }
 
-// container builds the Container for a worker in cwd on this machine.
-func container(cwd, gitDir string) Container {
-	c := Container{Engine: ContainerEngine(exec.LookPath), Image: config.Get("auto.sandbox_image", DefaultSandboxImage),
-		Network: config.Get("auto.sandbox_network", ""), Cwd: cwd}
+// container builds the Container for a worker in cwd on this machine; the git dir's hooks and
+// config are mounted read-only over it.
+func container(cwd, gitDir string) (Container, error) {
+	var c Container
+	var err error
+	get := func(key, def string) string {
+		v, e := SandboxSetting(key, def)
+		if e != nil && err == nil {
+			err = e
+		}
+		return v
+	}
+	c = Container{Engine: ContainerEngine(exec.LookPath), Image: get("auto.sandbox_image", DefaultSandboxImage),
+		Network: get("auto.sandbox_network", ""), Memory: get("auto.sandbox_memory", "4g"), Cwd: cwd}
+	if err != nil {
+		return Container{}, err
+	}
 	if runtime.GOOS == "linux" {
 		c.User = strconv.Itoa(os.Getuid()) + ":" + strconv.Itoa(os.Getgid())
 	}
@@ -307,5 +406,12 @@ func container(cwd, gitDir string) Container {
 			c.Mounts = append(c.Mounts, d)
 		}
 	}
-	return c
+	if gitDir != "" {
+		for _, n := range []string{"hooks", "config"} {
+			if _, err := os.Stat(filepath.Join(gitDir, n)); err == nil {
+				c.ReadOnly = append(c.ReadOnly, filepath.Join(gitDir, n))
+			}
+		}
+	}
+	return c, nil
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -18,7 +19,12 @@ func probe(goos string, have ...string) Probe {
 			return "/usr/bin/" + b, nil
 		}
 		return "", errors.New("not found")
-	}}
+	}, Version: func(string) (string, error) { return "2.1.331 (Claude Code)\n", nil }}
+}
+
+func withVersion(p Probe, v string, err error) Probe {
+	p.Version = func(string) (string, error) { return v, err }
+	return p
 }
 
 func TestSandboxCheck(t *testing.T) {
@@ -40,6 +46,11 @@ func TestSandboxCheck(t *testing.T) {
 		{"container", "claude", probe("linux", "podman"), true},
 		{"container", "claude", probe("linux"), false},
 		{"bogus", "claude", probe("linux"), false},
+		{"native", "claude", withVersion(probe("darwin", "/usr/bin/sandbox-exec"), "2.1.330 (Claude Code)", nil), false},
+		{"native", "claude", withVersion(probe("darwin", "/usr/bin/sandbox-exec"), "2.2.0 (Claude Code)", nil), true},
+		{"native", "claude", withVersion(probe("darwin", "/usr/bin/sandbox-exec"), "garbage", nil), false},
+		{"native", "claude", withVersion(probe("darwin", "/usr/bin/sandbox-exec"), "", errors.New("boom")), false},
+		{"native", "claude", Probe{GOOS: "darwin", Look: probe("darwin", "/usr/bin/sandbox-exec").Look}, false},
 	}
 	for _, c := range cases {
 		if err := SandboxCheck(c.mode, c.cli, c.p); (err == nil) != c.ok {
@@ -71,7 +82,7 @@ func TestSandboxDomains(t *testing.T) {
 func TestNativeSettings(t *testing.T) {
 	p := SandboxPaths{Cwd: "/w/repo-feat", GitDir: "/w/repo/.git", Home: "/h", SmithyHome: "/h/.smithy", Warden: "/h/.smithy/warden",
 		GoCache: "/h/Library/Caches/go-build", ReadOnly: []string{"/skills"}}
-	raw := NativeSettings(p, []string{"github.com"}, "darwin")
+	raw := NativeSettings(p, []string{"github.com"}, "darwin", true)
 	var s struct {
 		Sandbox struct {
 			Enabled, FailIfUnavailable, AllowUnsandboxedCommands, AutoAllowBashIfSandboxed, EnableWeakerNetworkIsolation *bool
@@ -113,22 +124,25 @@ func TestNativeSettings(t *testing.T) {
 			t.Errorf("denyWrite misses %s: %v", d, b.Filesystem.DenyWrite)
 		}
 	}
-	if strings.Contains(NativeSettings(p, nil, "linux"), "enableWeakerNetworkIsolation") {
+	if strings.Contains(NativeSettings(p, nil, "linux", true), "enableWeakerNetworkIsolation") {
 		t.Error("enableWeakerNetworkIsolation is macOS only")
 	}
-	if strings.Contains(NativeSettings(SandboxPaths{Cwd: "/w", Home: "/h", SmithyHome: "/h/.smithy"}, nil, "linux"), `""`) {
+	if strings.Contains(NativeSettings(p, nil, "darwin", false), "enableWeakerNetworkIsolation") {
+		t.Error("auto.sandbox_weaker_net false must leave enableWeakerNetworkIsolation out")
+	}
+	if strings.Contains(NativeSettings(SandboxPaths{Cwd: "/w", Home: "/h", SmithyHome: "/h/.smithy"}, nil, "linux", true), `""`) {
 		t.Error("empty paths must be left out")
 	}
 }
 
 func TestNativeSettingsSigning(t *testing.T) {
 	p := SandboxPaths{Cwd: "/w", Home: "/h", SmithyHome: "/h/.smithy", SigningKey: "/h/.ssh/k.pub", AgentSocket: "/tmp/agent.sock"}
-	raw := NativeSettings(p, nil, "darwin")
+	raw := NativeSettings(p, nil, "darwin", true)
 	if !strings.Contains(raw, `"allowRead":["/h/.ssh/k.pub"]`) || !strings.Contains(raw, `"allowUnixSockets":["/tmp/agent.sock"]`) {
 		t.Errorf("signing key or agent socket missing: %s", raw)
 	}
 	p.SigningKey = "/h/.ssh/k"
-	if strings.Contains(NativeSettings(p, nil, "linux"), "allowRead") || strings.Contains(NativeSettings(p, nil, "linux"), "allowUnixSockets") {
+	if strings.Contains(NativeSettings(p, nil, "linux", true), "allowRead") || strings.Contains(NativeSettings(p, nil, "linux", true), "allowUnixSockets") {
 		t.Error("a private key path is never opened; unix sockets are a macOS key")
 	}
 }
@@ -167,24 +181,27 @@ func TestBuildNativeSandbox(t *testing.T) {
 }
 
 func TestContainerArgv(t *testing.T) {
-	c := Container{Engine: "podman", Image: "smithy-sandbox", Network: "", Cwd: "/w/repo-feat",
-		Mounts: []string{"/w/repo-feat", "/w/repo/.git", "/h/.smithy/plans"}, Env: []string{"AGENT_MODEL", "GH_TOKEN"}, User: "501:20"}
+	c := Container{Engine: "docker", Image: "smithy-sandbox", Cwd: "/w/repo-feat", User: "501:20",
+		Mounts: []string{"/w/repo-feat", "/w/repo/.git", "/h/.smithy/plans"}, ReadOnly: []string{"/w/repo/.git/hooks", "/w/repo/.git/config"},
+		Env: []string{"AGENT_MODEL", "GH_TOKEN"}}
 	got := c.Argv([]string{"claude", "-p", "--output-format", "json"})
-	want := []string{"podman", "run", "--rm", "-i", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--user", "501:20",
+	want := []string{"docker", "run", "--rm", "-i", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+		"--read-only", "--tmpfs", "/tmp", "--pids-limit", "512", "--memory", "4g", "--network", "none", "--user", "501:20",
 		"-w", "/w/repo-feat", "-v", "/w/repo-feat:/w/repo-feat", "-v", "/w/repo/.git:/w/repo/.git", "-v", "/h/.smithy/plans:/h/.smithy/plans",
+		"-v", "/w/repo/.git/hooks:/w/repo/.git/hooks:ro", "-v", "/w/repo/.git/config:/w/repo/.git/config:ro",
 		"-e", "HOME=/tmp", "-e", "AGENT_MODEL", "-e", "GH_TOKEN", "smithy-sandbox", "claude", "-p", "--output-format", "json"}
 	if !slices.Equal(got, want) {
 		t.Errorf("argv =\n%v\nwant\n%v", got, want)
 	}
-	c.Network, c.User = "none", ""
+	c.Engine, c.Network, c.Memory = "podman", "bridge", "8g"
 	got = c.Argv([]string{"claude"})
-	if i := slices.Index(got, "--network"); i < 0 || got[i+1] != "none" || slices.Contains(got, "--user") {
-		t.Errorf("network/user: %v", got)
-	}
-	for _, a := range got {
-		if strings.Contains(a, "=") && strings.HasPrefix(a, "GH_TOKEN") {
-			t.Errorf("a value leaked into argv: %s", a)
+	for _, pair := range [][2]string{{"--network", "bridge"}, {"--memory", "8g"}} {
+		if i := slices.Index(got, pair[0]); i < 0 || got[i+1] != pair[1] {
+			t.Errorf("%s: %v", pair[0], got)
 		}
+	}
+	if !slices.Contains(got, "--userns=keep-id") || slices.Contains(got, "--user") {
+		t.Errorf("podman keeps the host uid with --userns=keep-id: %v", got)
 	}
 }
 
@@ -209,6 +226,41 @@ func TestContainerEnv(t *testing.T) {
 	if slices.Contains(names, "GH_TOKEN") || slices.Contains(names, "GITHUB_TOKEN") {
 		t.Errorf("host GitHub tokens never pass without SMITHY_SANDBOX_GH_TOKEN: %v", names)
 	}
+}
+
+// auto.sandbox* come from the user's settings only: a repo's .smithy/config.json can't turn the
+// sandbox off, and an unreadable user file fails closed.
+func TestSandboxModeUserOnly(t *testing.T) {
+	user := filepath.Join(t.TempDir(), "c.json")
+	t.Setenv("SMITHY_CONFIG", user)
+	repo := t.TempDir()
+	t.Chdir(repo)
+	if _, err := ghxRun("git", "init", "-q"); err != nil {
+		t.Skip("git not available")
+	}
+	if err := config.Set(user, "auto.sandbox", "native"); err != nil {
+		t.Fatal(err)
+	}
+	if err := config.Set(filepath.Join(repo, ".smithy", "config.json"), "auto.sandbox", "off"); err != nil {
+		t.Fatal(err)
+	}
+	if m, err := SandboxMode(); err != nil || m != "native" {
+		t.Errorf("mode = %q, %v; want native (repo file ignored)", m, err)
+	}
+	if v, _ := SandboxSetting("auto.sandbox_domains", ""); v != "" {
+		t.Errorf("domains = %q", v)
+	}
+	if err := os.WriteFile(user, []byte("not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if m, err := SandboxMode(); err == nil {
+		t.Errorf("unreadable user settings must be an error, got mode %q", m)
+	}
+}
+
+func ghxRun(name string, args ...string) (string, error) {
+	out, err := exec.Command(name, args...).CombinedOutput()
+	return string(out), err
 }
 
 func TestEnvDropsSandboxRole(t *testing.T) {
@@ -245,5 +297,15 @@ func TestRunSandboxFailsClosed(t *testing.T) {
 	}
 	if rc := AgentMain([]string{"--profile", "auto", "--log", log, p}); rc != 0 {
 		t.Errorf("off rc = %d, want 0", rc)
+	}
+	if err := os.WriteFile(config.UserFile(), []byte("{broken"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	os.Remove(log + ".ran")
+	if rc := AgentMain([]string{"--profile", "auto", "--log", log, p}); rc != 1 {
+		t.Errorf("unreadable settings rc = %d, want 1 (fails closed)", rc)
+	}
+	if _, err := os.Stat(log + ".ran"); err == nil {
+		t.Error("worker ran with unreadable sandbox settings")
 	}
 }

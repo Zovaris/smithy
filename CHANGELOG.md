@@ -15,6 +15,10 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   in `docker|podman run --rm` with the worktree and plans mounted and a scrubbed env (image:
   `auto.sandbox_image`, `sandbox/Dockerfile`); unit-tested only, live test pending. `smithy doctor`
   checks each mode (sandbox-exec, bwrap + socat, docker/podman) and the TUI System view shows it.
+  `auto.sandbox*` are read from the user settings only; an unreadable file fails closed; native
+  needs claude 2.1.331 or newer. Containers run with `--network none` by default, a read-only root,
+  tmpfs /tmp, pid and memory limits (`auto.sandbox_memory`) and read-only git hooks and config.
+  `auto.sandbox_weaker_net` turns off macOS's weaker network isolation (gh then fails inside).
 
 - Added: edit settings from `smithy tui` System view. Every known key plus the harness's models,
   grouped, with value, source and meaning; enter opens a typed input (bool/enum choice, number,

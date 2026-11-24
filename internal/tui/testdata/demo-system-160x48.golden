@@ -6,7 +6,7 @@
          ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
   1 Overview   2 Agents   3 Incoming   4 Needs you 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System                                                   
-╭─ Health · read-only ─────────────────────────────────────────────────────────╮╭─ Settings · 56 · enter edits ────────────────────────────────────────────────╮
+╭─ Health · read-only ─────────────────────────────────────────────────────────╮╭─ Settings · 58 · enter edits ────────────────────────────────────────────────╮
 │ Versions                                                                     ││ auto.*                                                                       │
 │ binary  0.15.0                                                               ││ ▸ auto.sources           github,linear  user    comma list of issue sources… │
 │ skills  0.15.0  ✓ match                                                      ││   auto.mode              labeled        default labeled: only issues with t… │
@@ -24,24 +24,24 @@
 │ linear ****a41b                                                              ││   auto.sandbox_domains   -              unset   comma list of extra hosts a… │
 │                                                                              ││   auto.sandbox_image     smithy-sandbo… default container image for auto.sa… │
 │ Notify  Telegram, smithy notify test                                         ││   auto.sandbox_network   -              unset   docker/podman --network for… │
-│ token  ****x7Qa (/home/dev/.smithy/auth.json)                                ││   auto.merge             manual         default merge mode for auto batches… │
-│ chat 123456789                                                               ││                                                                              │
-│ kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_r… ││ linear.*                                                                     │
-│ state  on (smithy auto serve sends)                                          ││   linear.key_env         LINEAR_API_KEY default name of the env var holding… │
-│ last sent 2026-11-23 09:12                                                   ││   linear.team            TES            user    required: Linear team keys … │
-│                                                                              ││   linear.project         -              unset   Linear project name filter;… │
-│ Doctor                                                                       ││   linear.milestone       -              unset   Linear project milestone na… │
-│ warden doctor                                                                ││   linear.cycle           -              unset   Linear cycle filter: curren… │
-│ ok   binary v0.15.0                                                          ││   linear.initiative      -              unset   Linear initiative name filt… │
-│ ok   git found                                                               ││   linear.states          unstarted,bac… default Linear workflow state types… │
-│ ok   gh found and authenticated                                              ││                                                                              │
-│ ok   claude found                                                            ││ warden.*                                                                     │
-│ ok   worktree root /home/dev/worktrees writable                              ││   warden.merge           manual         user    auto: warden merges green P… │
-│ ok   sandbox: native (claude, hosts github.com,api.github.com,api.anthropic… ││   warden.cleanup         auto           default auto: end finished workers … │
-│ warn 2 orphaned worktrees (smithy warden cleanup)                            ││   warden.max             5              default parallel workers (a token-c… │
+│ token  ****x7Qa (/home/dev/.smithy/auth.json)                                ││   auto.sandbox_memory    4g             default docker/podman --memory for … │
+│ chat 123456789                                                               ││   auto.sandbox_weaker_n… true           default macOS native sandbox: enabl… │
+│ kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_r… ││   auto.merge             manual         default merge mode for auto batches… │
+│ state  on (smithy auto serve sends)                                          ││                                                                              │
+│ last sent 2026-11-23 09:12                                                   ││ linear.*                                                                     │
+│                                                                              ││   linear.key_env         LINEAR_API_KEY default name of the env var holding… │
+│ Doctor                                                                       ││   linear.team            TES            user    required: Linear team keys … │
+│ warden doctor                                                                ││   linear.project         -              unset   Linear project name filter;… │
+│ ok   binary v0.15.0                                                          ││   linear.milestone       -              unset   Linear project milestone na… │
+│ ok   git found                                                               ││   linear.cycle           -              unset   Linear cycle filter: curren… │
+│ ok   gh found and authenticated                                              ││   linear.initiative      -              unset   Linear initiative name filt… │
+│ ok   claude found                                                            ││   linear.states          unstarted,bac… default Linear workflow state types… │
+│ ok   worktree root /home/dev/worktrees writable                              ││                                                                              │
+│ ok   sandbox: native (claude, hosts github.com,api.github.com,api.anthropic… ││ warden.*                                                                     │
+│ warn 2 orphaned worktrees (smithy warden cleanup)                            ││   warden.merge           manual         user    auto: warden merges green P… │
+│                                                                              ││   warden.cleanup         auto           default auto: end finished workers … │
+│                                                                              ││   warden.max             5              default parallel workers (a token-c… │
 │                                                                              ││   warden.mode            smelt normal   default batch check speed: smelt fa… │
-│                                                                              ││   warden.stuck_minutes   15             default minutes without a worker he… │
-│                                                                              ││   warden.worker_model    route          default route: pick cheap/mid/stron… │
 │                                                                              ││                                                                              │
 │                                                                              ││ enter edits · u unsets · auth stays in smithy auth                           │
 ╰──────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────╯

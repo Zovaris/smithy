@@ -164,7 +164,9 @@ workspace-write sandbox with network on (push needs it) and approvals off, so no
 sending data out: least-privilege tokens matter most there. For more isolation set
 `smithy config set auto.sandbox native` (Claude Code's OS sandbox: host allow-list, writes only to the
 worktree and smithy's plans) or `container` (docker/podman, not live-tested yet); it fails closed, and
-`smithy doctor` checks it ([settings](docs/settings.md)).
+`smithy doctor` checks it ([settings](docs/settings.md)). Its settings are read from your user config only. The
+orchestrator itself is not sandboxed and may run repo tests; workers sign commits through your ssh-agent
+(use a dedicated signing key) and still get your `GH_TOKEN` (use a fine-grained, repo-scoped token).
 
 ## Install
 

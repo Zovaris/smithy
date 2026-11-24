@@ -475,12 +475,18 @@ func sandboxDoctor(r *report, p agents.Probe) {
 	case err != nil:
 		r.bad("sandbox "+mode+": "+err.Error()+"; unattended workers will not start", "fix it, or smithy config set auto.sandbox off")
 	case mode == "container":
-		r.ok("sandbox: container (" + agents.ContainerEngine(p.Look) + ", image " + config.Get("auto.sandbox_image", agents.DefaultSandboxImage) + ")")
+		r.ok("sandbox: container (" + agents.ContainerEngine(p.Look) + ", image " + userSetting("auto.sandbox_image", agents.DefaultSandboxImage) + ")")
 		r.warn("sandbox container: not live-tested yet; smithy has only unit-tested the docker/podman command", "run one worker by hand and check its log before relying on it")
 	case agents.Kind(cli) == "codex":
 		r.ok("sandbox: native (codex workspace-write, network off)")
 		r.warn("sandbox native with codex: workers have no network, so git push and gh fail inside them", "push and open PRs through smithy outside the worker, or use auto.sandbox container")
 	default:
-		r.ok("sandbox: native (claude, hosts " + strings.Join(agents.SandboxDomains(config.Get("auto.sandbox_domains", "")), ",") + ")")
+		r.ok("sandbox: native (claude, hosts " + strings.Join(agents.SandboxDomains(userSetting("auto.sandbox_domains", "")), ",") + ")")
 	}
+}
+
+// userSetting is an auto.sandbox* key from the user settings only (agents.SandboxSetting).
+func userSetting(key, def string) string {
+	v, _ := agents.SandboxSetting(key, def)
+	return v
 }
