@@ -5,6 +5,17 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: `auto.sandbox` (off | native | container) isolates unattended workers on top of the
+  `--profile auto` allow-list and fails closed: a worker whose sandbox can't start is not started,
+  and serve launches nothing (log, `orchestrator_failed` to the TUI and Telegram). native runs
+  Claude Code with `--settings` for its sandbox: strict host allow-list (GitHub, Anthropic, Linear
+  plus `auto.sandbox_domains`), shell writes only to the worktree, its git dir, `~/.smithy/plans`,
+  `~/.smithy/warden` and the Go cache, secrets unreadable, no unsandboxed retry; `--add-dir` is
+  narrowed to match. Live-tested on macOS. codex runs with network off. container wraps the worker
+  in `docker|podman run --rm` with the worktree and plans mounted and a scrubbed env (image:
+  `auto.sandbox_image`, `sandbox/Dockerfile`); unit-tested only, live test pending. `smithy doctor`
+  checks each mode (sandbox-exec, bwrap + socat, docker/podman) and the TUI System view shows it.
+
 - Added: edit settings from `smithy tui` System view. Every known key plus the harness's models,
   grouped, with value, source and meaning; enter opens a typed input (bool/enum choice, number,
   list, text), a confirm step shows old → new and the scope (tab: user or repo), `u` unsets back to

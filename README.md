@@ -161,7 +161,10 @@ token and a test or least-privilege Linear key. Issue text can carry injected in
 `smithy agent --profile auto` allow-list (explicit git/gh subcommands, denied config, credential and
 network commands, denied secret files) reduces that risk but cannot remove it. Codex runs in its
 workspace-write sandbox with network on (push needs it) and approvals off, so nothing stops it
-sending data out: least-privilege tokens matter most there.
+sending data out: least-privilege tokens matter most there. For more isolation set
+`smithy config set auto.sandbox native` (Claude Code's OS sandbox: host allow-list, writes only to the
+worktree and smithy's plans) or `container` (docker/podman, not live-tested yet); it fails closed, and
+`smithy doctor` checks it ([settings](docs/settings.md)).
 
 ## Install
 
