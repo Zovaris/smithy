@@ -805,14 +805,7 @@ func bodyLines(s string) []string {
 // batchStarted reports whether a warden batch over dir has a card past queued: its workers
 // started even if nobody moved the task files off todo.
 func batchStarted(dir string) bool {
-	home := os.Getenv("SMITHY_HOME")
-	if home == "" {
-		h, err := os.UserHomeDir()
-		if err != nil {
-			return false
-		}
-		home = filepath.Join(h, ".smithy")
-	}
+	home := ghx.Home()
 	want, _ := filepath.EvalSymlinks(dir)
 	batches, _ := os.ReadDir(filepath.Join(home, "warden"))
 	for _, b := range batches {

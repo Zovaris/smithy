@@ -30,12 +30,12 @@ import (
 )
 
 // Usage is the text for `smithy notify --help`.
-const Usage = `usage: smithy notify test | status
+const Usage = `usage: smithy notify test [--all] | status
 Telegram notifications, sent by smithy auto serve from events.jsonl. Setup:
   smithy auth set telegram            (the bot token from @BotFather, on stdin)
   smithy config set notify.telegram.chat <chat id>
   smithy config set notify.kinds pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited
-test sends one test message; status shows the token (masked), chat, kinds, last send and last error.`
+test sends one test message (--all: one sample of every kind); status shows the token (masked), chat, kinds, last send and last error.`
 
 // Kinds are every notification kind, in the default notify.kinds order.
 var Kinds = []string{"pr_ready", "blocked", "stuck", "decision", "orchestrator_failed", "serve_down", "cap_reached", "limited"}
@@ -73,6 +73,7 @@ type state struct {
 // retry is an alert whose send failed; it is tried again each flush for RetryFor.
 type retry struct {
 	Kind, Key, Title, PR, Reason, Dedupe string
+	Batch, Stage                         string `json:",omitempty"`
 	First                                time.Time
 }
 
@@ -140,9 +141,19 @@ func trim(s string, n int) string {
 	return s
 }
 
-// send posts one message. Errors never contain the token.
-func send(tok, chat, msg string) error {
-	form := url.Values{"chat_id": {chat}, "text": {msg}, "disable_web_page_preview": {"true"}}
+// button is one inline-keyboard URL button.
+type button struct {
+	Text string `json:"text"`
+	URL  string `json:"url"`
+}
+
+// send posts one HTML message (link previews off) with optional URL buttons. Errors never contain the token.
+func send(tok, chat, msg string, kb []button) error {
+	form := url.Values{"chat_id": {chat}, "text": {msg}, "parse_mode": {"HTML"}, "link_preview_options": {`{"is_disabled":true}`}}
+	if len(kb) > 0 {
+		b, _ := json.Marshal(map[string][][]button{"inline_keyboard": {kb}})
+		form.Set("reply_markup", string(b))
+	}
 	resp, err := client.PostForm(APIBase+"/bot"+tok+"/sendMessage", form)
 	if err != nil {
 		var ue *url.Error
@@ -169,7 +180,35 @@ func Test() error {
 	if err != nil {
 		return err
 	}
-	return send(tok, chat, "smithy · test\nnotifications reach this chat")
+	m, kb := render(item{kind: "test", reason: "notifications reach this chat"})
+	return send(tok, chat, m, kb)
+}
+
+// TestAll sends the test message and one sample of every kind, so the design can be checked.
+func TestAll() error {
+	tok, chat, err := creds()
+	if err != nil {
+		return err
+	}
+	cost, pr, issue := 1.84, "https://github.com/Zovaris/smithy/pulls", "https://github.com/Zovaris/smithy/issues"
+	samples := []item{
+		{kind: "test", reason: "notifications reach this chat"},
+		{kind: "pr_ready", key: "#44", title: "Add <dark mode> & tidy the header", repo: "acme/web", stage: "ready", model: "strong", speed: "normal", cost: &cost, dur: 42 * time.Minute, pr: pr, issue: issue},
+		{kind: "blocked", key: "#45", title: "Migrate billing to v2", repo: "acme/api", stage: "failed", model: "mid", speed: "fast", dur: 18 * time.Minute, reason: "go test ./billing: 3 failures", issue: issue},
+		{kind: "stuck", key: "#46", title: "Speed up search", repo: "acme/api", stage: "working", reason: "no heartbeat since 25m", issue: issue},
+		{kind: "decision", key: "#47", title: "Pick a queue", repo: "acme/api", stage: "needs_decision", question: "Use Postgres SKIP LOCKED or Redis streams for the job queue?", issue: issue},
+		{kind: "orchestrator_failed", reason: "warden exited 1: no task files in dir"},
+		{kind: "serve_down", reason: "serve stopped"},
+		{kind: "cap_reached", reason: "3 of 3 issues launched today"},
+		{kind: "limited", reason: "earliest reset 15:00"},
+	}
+	for _, it := range samples {
+		m, kb := render(it)
+		if err := send(tok, chat, m, kb); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // enabled is the set of kinds notify.kinds turns on.
@@ -182,22 +221,156 @@ func enabled() map[string]bool {
 }
 
 type item struct {
-	kind, key, title, pr, reason, dedupe string
-	first                                time.Time
+	kind, batch, key, title, pr, reason, dedupe string
+	issue, repo, stage, model, speed, question  string
+	cost                                        *float64
+	dur                                         time.Duration
+	first                                       time.Time
 }
 
-func message(it item) string {
-	lines := []string{"smithy · " + label[it.kind]}
-	if h := strings.TrimSpace(trim(text.Clean(it.key), 40) + "  " + trim(text.Clean(it.title), 80)); h != "" {
-		lines = append(lines, h)
+var header = map[string]string{"pr_ready": "✅ <b>PR ready</b>", "blocked": "⛔ <b>Blocked</b>", "stuck": "⏳ <b>Stuck</b>",
+	"decision": "🤔 <b>Decision needed</b>", "orchestrator_failed": "💥 <b>Orchestrator failed</b>", "serve_down": "🛑 <b>Serve stopped</b>",
+	"cap_reached": "💸 <b>Daily cap reached</b>", "limited": "🔒 <b>Every pool account limited</b>", "test": "🧪 <b>smithy test</b>"}
+
+// esc escapes text for Telegram HTML (only &, < and > need it, per the Bot API docs).
+var esc = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace
+
+// clean is one escaped line of untrusted text, at most n runes before escaping.
+func clean(s string, n int) string { return esc(trim(text.Clean(s), n)) }
+
+// webURL keeps s only when it is an absolute http(s) URL.
+func webURL(s string) string {
+	u, err := url.Parse(strings.TrimSpace(s))
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return ""
 	}
-	if it.pr != "" {
-		lines = append(lines, trim(text.Clean(it.pr), 120))
+	return u.String()
+}
+
+var repoRe = regexp.MustCompile(`^https?://[^/]+/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/(pull|issues)/`)
+
+func dur(d time.Duration) string {
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	return fmt.Sprintf("%dh%02dm", int(d.Hours()), int(d.Minutes())%60)
+}
+
+// render is a short HTML message (at most 9 lines) and its URL buttons; every value is escaped.
+func render(it item) (string, []button) {
+	if style() == "plain" {
+		return renderPlain(it)
+	}
+	h := header[it.kind]
+	if it.kind == "blocked" && it.stage == "failed" {
+		h = "⛔ <b>Failed</b>"
+	}
+	lines := []string{h}
+	if it.key != "" || it.title != "" {
+		l := "<b>" + clean(it.key, 40) + "</b>"
+		if it.title != "" {
+			l += " <i>" + clean(it.title, 80) + "</i>"
+		}
+		lines = append(lines, strings.TrimPrefix(l, "<b></b> "))
+	}
+	repo := it.repo
+	for _, u := range []string{it.pr, it.issue} {
+		if m := repoRe.FindStringSubmatch(u); repo == "" && m != nil {
+			repo = m[1]
+		}
+	}
+	var where []string
+	if repo != "" {
+		where = append(where, "📁 <code>"+clean(repo, 60)+"</code>")
+	}
+	if it.stage != "" {
+		where = append(where, "stage <b>"+clean(it.stage, 20)+"</b>")
+	}
+	if len(where) > 0 {
+		lines = append(lines, strings.Join(where, " · "))
+	}
+	var run []string
+	if it.model != "" || it.speed != "" {
+		run = append(run, "🧠 "+strings.Trim(clean(it.model, 20)+" · "+clean(it.speed, 20), " ·"))
+	}
+	if it.cost != nil {
+		run = append(run, fmt.Sprintf("💲 $%.2f", *it.cost))
+	}
+	if it.dur > 0 {
+		run = append(run, "⏱ "+dur(it.dur))
+	}
+	if len(run) > 0 {
+		lines = append(lines, strings.Join(run, "  "))
+	}
+	if it.question != "" {
+		lines = append(lines, "<blockquote>"+clean(it.question, 300)+"</blockquote>",
+			"Answer in <code>smithy tui</code> › Needs you, or <code>smithy decisions pending</code>")
 	}
 	if it.reason != "" {
-		lines = append(lines, trim(text.Clean(it.reason), 100))
+		lines = append(lines, "<blockquote>"+clean(it.reason, 200)+"</blockquote>")
 	}
-	return strings.Join(lines, "\n")
+	_, kb := renderButtons(it)
+	return strings.Join(lines, "\n"), kb
+}
+
+func renderButtons(it item) (string, []button) {
+	var kb []button
+	if u := webURL(it.pr); u != "" {
+		kb = append(kb, button{"Open PR", u})
+	}
+	if u := webURL(it.issue); u != "" {
+		kb = append(kb, button{"Open issue", u})
+	}
+	return "", kb
+}
+
+// enrich fills an item's issue, title, duration, model, speed, question and cost from the auto
+// state, its card and the usage events; every source is optional.
+func enrich(it *item, evs []events.Event, now time.Time) {
+	if it.batch == "" || it.key == "" || filepath.Base(it.batch) != it.batch || filepath.Base(it.key) != it.key {
+		return
+	}
+	var st struct {
+		Launched map[string][]struct {
+			Key, Title, URL, Batch, Item string
+			At                           time.Time
+		} `json:"launched"`
+	}
+	if b, err := os.ReadFile(filepath.Join(ghx.Home(), "auto", "state.json")); err == nil && json.Unmarshal(b, &st) == nil {
+		for _, day := range st.Launched {
+			for _, l := range day {
+				if l.Batch == it.batch && l.Item == it.key {
+					it.issue = l.URL
+					if it.title == "" {
+						it.title = l.Title
+					}
+					if !l.At.IsZero() {
+						it.dur = now.Sub(l.At)
+					}
+				}
+			}
+		}
+	}
+	var card map[string]any
+	if b, err := os.ReadFile(filepath.Join(cards.Home(), it.batch, it.key+".json")); err == nil && json.Unmarshal(b, &card) == nil {
+		str := func(k string) string { s, _ := card[k].(string); return s }
+		it.model, it.speed = str("model"), str("speed")
+		if it.kind == "decision" {
+			it.question = str("question")
+		}
+		if it.reason == "" {
+			it.reason = str("reason")
+		}
+	}
+	for _, e := range evs {
+		if e.Kind == "usage" && e.Batch == it.batch && e.Item == it.key && e.Usage != nil && e.Usage.CostUSD != nil {
+			c := *e.Usage.CostUSD
+			if it.cost != nil {
+				c += *it.cost
+			}
+			it.cost = &c
+		}
+	}
 }
 
 // classify maps one event to a notification, or ok false.
@@ -206,7 +379,10 @@ func classify(e events.Event) (item, bool) {
 	if key == "" {
 		key = e.ID
 	}
-	it := item{key: key, pr: e.PR, reason: e.Detail}
+	it := item{batch: e.Batch, key: key, pr: e.PR, reason: e.Detail}
+	if e.Kind == "stage" {
+		it.stage, it.reason = e.Detail, ""
+	}
 	switch {
 	case e.Kind == "stage" && e.Detail == "ready":
 		it.kind = "pr_ready"
@@ -253,7 +429,7 @@ func stuck() []item {
 			if r.LastBeat != nil {
 				beat = *r.LastBeat
 			}
-			out = append(out, item{kind: "stuck", key: r.ID, pr: r.PR, reason: "no heartbeat since " + r.Beat,
+			out = append(out, item{kind: "stuck", batch: batch, key: r.ID, pr: r.PR, stage: r.State, reason: "no heartbeat since " + r.Beat,
 				dedupe: "stuck|" + batch + "|" + r.ID + "|" + beat})
 		}
 	}
@@ -315,7 +491,7 @@ func (n *Notifier) Flush(now time.Time) {
 			st.Sent[r.Dedupe] = now
 			continue
 		}
-		pending = append(pending, item{kind: r.Kind, key: r.Key, title: r.Title, pr: r.PR, reason: r.Reason, dedupe: r.Dedupe, first: r.First})
+		pending = append(pending, item{kind: r.Kind, batch: r.Batch, key: r.Key, title: r.Title, pr: r.PR, stage: r.Stage, reason: r.Reason, dedupe: r.Dedupe, first: r.First})
 	}
 	st.Retry = nil
 	cursor := st.Cursor
@@ -358,7 +534,7 @@ func (n *Notifier) Flush(now time.Time) {
 			if it.first.IsZero() {
 				it.first = now
 			}
-			st.Retry = append(st.Retry, retry{Kind: it.kind, Key: it.key, Title: it.title, PR: it.pr, Reason: it.reason, Dedupe: it.dedupe, First: it.first})
+			st.Retry = append(st.Retry, retry{Kind: it.kind, Batch: it.batch, Key: it.key, Title: it.title, PR: it.pr, Stage: it.stage, Reason: it.reason, Dedupe: it.dedupe, First: it.first})
 		}
 	}
 	if len(todo) > 0 && (budget < 1 || (len(todo) > budget && budget < 2)) {
@@ -367,8 +543,8 @@ func (n *Notifier) Flush(now time.Time) {
 		_ = st.save()
 		return
 	}
-	one := func(msg string) bool {
-		if err := send(tok, chat, msg); err != nil {
+	one := func(msg string, kb []button) bool {
+		if err := send(tok, chat, msg, kb); err != nil {
 			if err.Error() != st.LastErr && n.log != nil {
 				n.log("notify: " + err.Error())
 			}
@@ -384,7 +560,8 @@ func (n *Notifier) Flush(now time.Time) {
 		individual = todo[:budget-1]
 	}
 	for i, it := range individual {
-		if !one(message(it)) {
+		enrich(&it, evs, now)
+		if !one(render(it)) {
 			keep(todo[i:])
 			todo = todo[:i]
 			individual = todo
@@ -398,10 +575,14 @@ func (n *Notifier) Flush(now time.Time) {
 		}
 		var parts []string
 		for k, c := range count {
-			parts = append(parts, fmt.Sprintf("%d %s", c, k))
+			parts = append(parts, fmt.Sprintf("• %d %s", c, esc(k)))
 		}
 		sort.Strings(parts)
-		if !one(fmt.Sprintf("smithy · %d more\n%s\nsmithy tui shows them", len(rest), strings.Join(parts, ", "))) {
+		if len(parts) > 8 {
+			parts = parts[:8]
+		}
+		msg := fmt.Sprintf("📬 <b>%d more alerts</b> (rate limit)\n%s\n<i>smithy tui shows them</i>", len(rest), strings.Join(parts, "\n"))
+		if !one(msg, nil) {
 			keep(rest)
 			todo = individual
 		}
@@ -471,6 +652,13 @@ func Main(args []string, stdout, stderr io.Writer) int {
 		}
 		fmt.Fprintln(stdout, "sent a test message")
 		return 0
+	case len(args) == 2 && args[0] == "test" && args[1] == "--all":
+		if err := TestAll(); err != nil {
+			fmt.Fprintln(stderr, "smithy notify:", err)
+			return 1
+		}
+		fmt.Fprintf(stdout, "sent %d sample messages\n", len(Kinds)+1)
+		return 0
 	case len(args) == 1 && args[0] == "status":
 		for _, l := range Status() {
 			fmt.Fprintln(stdout, l)
@@ -482,4 +670,61 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintln(stderr, Usage)
 	return 2
+}
+
+// style is notify.style: emoji (icons per line) or plain (typographic, no emoji).
+func style() string {
+	if config.Get("notify.style", "plain") == "emoji" {
+		return "emoji"
+	}
+	return "plain"
+}
+
+var plainTag = map[string]string{"pr_ready": "READY", "blocked": "BLOCKED", "stuck": "STUCK", "decision": "DECIDE",
+	"orchestrator_failed": "FAILED", "serve_down": "STOPPED", "cap_reached": "CAP", "limited": "LIMITED", "test": "TEST"}
+
+var plainTitle = map[string]string{"pr_ready": "PR ready for review", "blocked": "Blocked", "stuck": "No heartbeat",
+	"decision": "Decision needed", "orchestrator_failed": "Orchestrator failed", "serve_down": "Serve stopped",
+	"cap_reached": "Daily cap reached", "limited": "All pool accounts limited", "test": "smithy"}
+
+// renderPlain: a code-font status tag, a bold title line, one monospace meta line, the reason quoted.
+func renderPlain(it item) (string, []button) {
+	tag, title := plainTag[it.kind], plainTitle[it.kind]
+	if it.kind == "blocked" && it.stage == "failed" {
+		tag, title = "FAILED", "Failed"
+	}
+	lines := []string{"<code>" + tag + "</code>  <b>" + title + "</b>"}
+	if it.key != "" || it.title != "" {
+		lines = append(lines, strings.TrimSpace("<b>"+clean(it.key, 40)+"</b> "+clean(it.title, 80)))
+	}
+	repo := it.repo
+	for _, u := range []string{it.pr, it.issue} {
+		if m := repoRe.FindStringSubmatch(u); repo == "" && m != nil {
+			repo = m[1]
+		}
+	}
+	var meta []string
+	for _, v := range []string{clean(repo, 60), clean(it.stage, 20), strings.Trim(clean(it.model, 20)+"/"+clean(it.speed, 20), "/")} {
+		if v != "" {
+			meta = append(meta, v)
+		}
+	}
+	if it.cost != nil {
+		meta = append(meta, fmt.Sprintf("$%.2f", *it.cost))
+	}
+	if it.dur > 0 {
+		meta = append(meta, dur(it.dur))
+	}
+	if len(meta) > 0 {
+		lines = append(lines, "<code>"+strings.Join(meta, " · ")+"</code>")
+	}
+	if it.question != "" {
+		lines = append(lines, "<blockquote>"+clean(it.question, 300)+"</blockquote>",
+			"<i>Answer in</i> <code>smithy tui</code> <i>› Needs you, or</i> <code>smithy decisions pending</code>")
+	}
+	if it.reason != "" {
+		lines = append(lines, "<blockquote>"+clean(it.reason, 200)+"</blockquote>")
+	}
+	_, kb := renderButtons(it)
+	return strings.Join(lines, "\n"), kb
 }

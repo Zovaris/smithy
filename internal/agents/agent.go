@@ -912,13 +912,7 @@ func AutoDirs(bins []string) []string {
 			}
 		}
 	}
-	home := os.Getenv("SMITHY_HOME")
-	if home == "" {
-		if h, err := os.UserHomeDir(); err == nil {
-			home = filepath.Join(h, ".smithy")
-		}
-	}
-	add(home)
+	add(ghx.Home())
 	for _, b := range bins {
 		if filepath.Base(filepath.Dir(b)) == "scripts" {
 			add(filepath.Dir(filepath.Dir(filepath.Dir(b))))

@@ -3,9 +3,11 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 rc=0
+# Tests never touch the user's real ~/.smithy (events, cards, notify state).
+home="$(mktemp -d)"; export SMITHY_HOME="$home" WARDEN_HOME="$home/warden"; trap 'rm -rf "$home"' EXIT
 # One build of the smithy binary for every test (the launcher would build or download it per call).
 if [ -z "${SMITHY_BIN:-}" ]; then
-  out="$(mktemp -d)"; trap 'rm -rf "$out"' EXIT
+  out="$(mktemp -d)"; trap 'rm -rf "$out" "$home"' EXIT
   go build -trimpath -o "$out/smithy" ./cmd/smithy || exit 1
   export SMITHY_BIN="$out/smithy"
 fi
