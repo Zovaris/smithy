@@ -6,6 +6,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 ## Unreleased
 
 - README: autonomous mode diagram (`docs/auto.svg`) and the TUI's cost and settings views.
+- README rewritten to be scannable: highlights, short tables, one-line examples. Details live in `docs/install.md`, `docs/harnesses.md` and `docs/autonomous.md`.
 
 ## v0.16.2 — 2026-11-23
 
