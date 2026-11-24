@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -85,6 +86,7 @@ type Options struct {
 	// Sandbox is auto.sandbox for this run (off, native, container); SandboxSettings the claude
 	// --settings JSON under native.
 	Sandbox, SandboxSettings string
+	Proxy                    bool     // container worker behind the egress proxy (auto.sandbox_network proxy)
 	PoolEnv                  []string // the pool account's config-dir variable (smithy pool), added to the worker's env
 	Account                  string   // the pool account this run uses
 	poolSkip                 []string // accounts already tried (limited) in this run
@@ -324,9 +326,16 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		}
 		a = append(a, "--permission-mode", perm)
 		if o.Profile == "auto" && !o.ReadOnly {
-			a = append(append(a, "--allowedTools"), AutoTools(o.SmithyBins)...)
-			a = append(append(a, "--disallowedTools"), AutoDenied(o.SmithyBins)...)
-			a = append(a, "--append-system-prompt", AutoNote)
+			tools, denied, note := AutoTools(o.SmithyBins), AutoDenied(o.SmithyBins), AutoNote
+			if o.Proxy {
+				// egress is the proxy's allow-list, so curl may reach the proxy's secret endpoint
+				tools = append(tools, "Bash(curl "+ProxyURL+"/s/*)")
+				denied = slices.DeleteFunc(denied, func(d string) bool { return d == "Bash(curl *)" })
+				note += " " + ProxyNote
+			}
+			a = append(append(a, "--allowedTools"), tools...)
+			a = append(append(a, "--disallowedTools"), denied...)
+			a = append(a, "--append-system-prompt", note)
 			for _, d := range o.AddDirs {
 				a = append(a, "--add-dir", d)
 			}
@@ -616,6 +625,13 @@ func Run(o Options) int {
 		}
 		prompt = strings.TrimRight(string(b), "\n")
 	}
+	if o.Sandbox == "container" {
+		n, _ := SandboxSetting("auto.sandbox_network", "")
+		o.Proxy = n == "proxy"
+	}
+	if o.Proxy && cli != "custom" && Kind(cli) != "claude" {
+		prompt += "\n\n" + ProxyNote
+	}
 	if cli != "custom" && !EffortFlags[Kind(cli)] {
 		fmt.Fprintf(os.Stderr, "smithy agent: %s has no effort flag; it runs at its own default (AGENT_EFFORT=%s is set)\n", cli, o.Effort)
 	}
@@ -643,6 +659,13 @@ func Run(o Options) int {
 			env = append(env, "DOCKER_HOST="+set)
 		}
 		env = ContainerSecrets(env, ContainerCreds(Kind(cli), o.Model), hp.Secret)
+		if o.Proxy {
+			if err := startProxy(&box, env, hp); err != nil {
+				fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox_network proxy: %v; worker not started (fails closed)\n", err)
+				return 1
+			}
+			env = ProxyEnv(env)
+		}
 		env, box.Env = ContainerEnv(env)
 		s.Argv[0] = filepath.Base(s.Argv[0]) // a host path means nothing inside the image
 		s.Argv = box.Argv(s.Argv)

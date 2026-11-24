@@ -22,11 +22,23 @@ import (
 
 // Usage is the text for `smithy auth --help`.
 const Usage = `usage: smithy auth set <service> < keyfile | list | remove <service>
+       smithy auth bind <service> <host> [METHODS] [--header <name>] [--prefix <scheme>] | ask <service> on|off
 Source API keys in ~/.smithy/auth.json (mode 0600). set reads the key from stdin only, never
-from arguments; in a terminal it prompts with echo off. The env var named by <service>.key_env (e.g. LINEAR_API_KEY) wins when set.`
+from arguments; in a terminal it prompts with echo off. The env var named by <service>.key_env (e.g. LINEAR_API_KEY) wins when set.
+bind lets the egress proxy (auto.sandbox_network proxy) send the key to host for METHODS (comma
+list, default GET,HEAD) in --header (default Authorization) as "<prefix> <key>"; bind again to add
+a host. A container worker calls http://smithy-proxy:8877/s/<service>/<path> and never sees the key.
+ask on holds the other write methods until you run smithy proxy approve <id> (denied after a timeout).`
 
 type entry struct {
 	Key string `json:"key"`
+	// Hosts, Methods, Ask, Header and Prefix bind the key to the egress proxy (smithy auth bind):
+	// the proxy sends it only to Hosts, for Methods, in Header as "<Prefix> <key>".
+	Hosts   []string `json:"hosts,omitempty"`
+	Methods []string `json:"methods,omitempty"`
+	Ask     bool     `json:"ask,omitempty"`
+	Header  string   `json:"header,omitempty"`
+	Prefix  string   `json:"prefix,omitempty"`
 }
 
 var service = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
@@ -150,7 +162,9 @@ func Set(svc, key string) error {
 		if err != nil {
 			return err
 		}
-		m[svc] = entry{Key: key}
+		e := m[svc]
+		e.Key = key
+		m[svc] = e
 		return save(m)
 	})
 }
@@ -191,7 +205,14 @@ func List() ([]string, error) {
 	}
 	var out []string
 	for s, e := range m {
-		out = append(out, s+" "+Mask(e.Key))
+		line := s + " " + Mask(e.Key)
+		if len(e.Hosts) > 0 {
+			line += " -> " + strings.Join(e.Hosts, ",") + " " + strings.Join(methodsOf(e), ",")
+			if e.Ask {
+				line += " ask"
+			}
+		}
+		out = append(out, line)
 	}
 	sort.Strings(out)
 	return out, nil
@@ -232,6 +253,35 @@ func Main(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return 0
 	case len(args) > 2 && args[0] == "set":
 		return fail(2, fmt.Errorf("the key is read from stdin only, never from arguments"))
+	case len(args) >= 3 && args[0] == "bind":
+		var methods []string
+		header, prefix := "", ""
+		rest := args[3:]
+		for len(rest) > 0 {
+			switch {
+			case rest[0] == "--header" && len(rest) > 1:
+				header, rest = rest[1], rest[2:]
+			case rest[0] == "--prefix" && len(rest) > 1:
+				prefix, rest = rest[1], rest[2:]
+			case methods == nil && !strings.HasPrefix(rest[0], "-"):
+				methods, rest = strings.Split(rest[0], ","), rest[1:]
+			default:
+				fmt.Fprintln(stderr, Usage)
+				return 2
+			}
+		}
+		if err := Bind(args[1], args[2], methods, header, prefix); err != nil {
+			return fail(1, err)
+		}
+		s, _ := Secret(args[1])
+		fmt.Fprintf(stdout, "bound %s -> %s %s\n", args[1], strings.Join(s.Hosts, ","), strings.Join(s.Methods, ","))
+		return 0
+	case len(args) == 3 && args[0] == "ask" && (args[2] == "on" || args[2] == "off"):
+		if err := SetAsk(args[1], args[2] == "on"); err != nil {
+			return fail(1, err)
+		}
+		fmt.Fprintf(stdout, "ask %s %s\n", args[1], args[2])
+		return 0
 	case len(args) == 1 && args[0] == "list":
 		l, err := List()
 		if err != nil {

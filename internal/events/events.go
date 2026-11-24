@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -69,8 +70,17 @@ func flat(s string, n int) string {
 	return s
 }
 
+// ProxyFile is the egress proxy's own log (asks, approvals, refusals): the only part of the smithy
+// home the proxy sidecar can write. Read merges it in.
+func ProxyFile() string { return filepath.Join(ghx.Home(), "proxy", "events.jsonl") }
+
 // Append writes one event; errors are returned but callers may ignore them (the log is advisory).
-func Append(e Event) error {
+func Append(e Event) error { return appendTo(File(), e) }
+
+// AppendProxy writes one event to ProxyFile.
+func AppendProxy(e Event) error { return appendTo(ProxyFile(), e) }
+
+func appendTo(f string, e Event) error {
 	if Off {
 		return nil
 	}
@@ -86,7 +96,6 @@ func Append(e Event) error {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	f := File()
 	if err := os.MkdirAll(filepath.Dir(f), 0o700); err != nil {
 		return err
 	}
@@ -110,7 +119,7 @@ func Append(e Event) error {
 // Read returns the events at or after since, oldest first, at most max (the newest kept).
 func Read(since time.Time, max int) ([]Event, error) {
 	var out []Event
-	for _, f := range []string{File() + ".1", File()} {
+	for _, f := range []string{File() + ".1", File(), ProxyFile() + ".1", ProxyFile()} {
 		fh, err := os.Open(f)
 		if os.IsNotExist(err) {
 			continue
@@ -129,6 +138,7 @@ func Read(since time.Time, max int) ([]Event, error) {
 		}
 		fh.Close()
 	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].T.Before(out[j].T) })
 	if max > 0 && len(out) > max {
 		out = out[len(out)-max:]
 	}

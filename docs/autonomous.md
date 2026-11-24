@@ -62,8 +62,21 @@ it.
 
 Container mode notes:
 
-- **Network:** it needs `auto.sandbox_network`. `bridge` is open egress with no domain allow-list;
-  an egress proxy is planned for v0.17.
+- **Network:** it needs `auto.sandbox_network`. `proxy` puts workers on an internal network whose
+  only exit is the `smithy-proxy` sidecar: GitHub, the model APIs, package registries and
+  `auto.sandbox_domains`, nothing else. `bridge` is open egress with no domain allow-list.
+- **Secrets (proxy only):** the worker never gets the key. Bind it to its host, then the worker
+  calls the proxy, which adds the key and scrubs it from the response:
+
+  ```sh
+  smithy auth set linear < key.txt
+  smithy auth bind linear api.linear.app GET,POST
+  # inside the worker: curl http://smithy-proxy:8877/s/linear/graphql
+  ```
+
+  Writes are refused unless bound; `smithy auth ask <name> on` holds them until
+  `smithy proxy approve <id>` instead. The sidecar needs a linux smithy binary
+  (`auto.sandbox_proxy_binary`, see [settings](settings.md)).
 - **Credentials:** each worker gets only its own harness's credential from `smithy auth`:
 
   | Harness | Credential |
