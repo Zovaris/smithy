@@ -5,6 +5,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: `notify.style` (`plain`, default, or `emoji`) for Telegram messages.
 - Fixed: tests no longer write to your real `~/.smithy` (test `stage` events reached Telegram as
   real alerts). Under `go test` the smithy home is a temp dir unless a test sets one, and
   `tests/run.sh` exports a temp `SMITHY_HOME`.

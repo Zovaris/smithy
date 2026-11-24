@@ -69,7 +69,7 @@ func TestSendPostsToBotPath(t *testing.T) {
 	if err := Test(); err != nil {
 		t.Fatal(err)
 	}
-	if len(f.msgs) != 1 || f.msgs[0].Get("chat_id") != "42" || !strings.Contains(f.msgs[0].Get("text"), "test") {
+	if len(f.msgs) != 1 || f.msgs[0].Get("chat_id") != "42" || !strings.Contains(f.msgs[0].Get("text"), "TEST") {
 		t.Fatalf("msgs %v", f.msgs)
 	}
 	if f.path[0] != "/bot"+token+"/sendMessage" {
@@ -295,7 +295,7 @@ func TestMessageEscapesUntrustedText(t *testing.T) {
 			t.Fatalf("unescaped %q in %q", bad, m)
 		}
 	}
-	if !strings.Contains(m, "&lt;script&gt;") || !strings.Contains(m, "hi &amp; bye") || !strings.HasPrefix(m, "⛔ <b>") {
+	if !strings.Contains(m, "&lt;script&gt;") || !strings.Contains(m, "hi &amp; bye") || !strings.HasPrefix(m, "<code>BLOCKED</code>") {
 		t.Fatalf("msg %q", m)
 	}
 }
@@ -345,5 +345,18 @@ func TestTestAllSendsEveryKind(t *testing.T) {
 	}
 	if len(f.msgs) != len(Kinds)+1 || len(f.msgs) > 10 {
 		t.Fatalf("sent %d", len(f.msgs))
+	}
+}
+
+func TestRenderPlainDefault(t *testing.T) {
+	c := 1.84
+	msg, kb := render(item{kind: "pr_ready", key: "#44", title: "Add <dark mode>", repo: "acme/web", stage: "ready", model: "strong", speed: "normal", cost: &c, pr: "https://github.com/acme/web/pull/44"})
+	for _, want := range []string{"<code>READY</code>", "Add &lt;dark mode&gt;", "<code>acme/web · ready · strong/normal · $1.84</code>"} {
+		if !strings.Contains(msg, want) {
+			t.Fatalf("missing %q in %s", want, msg)
+		}
+	}
+	if strings.ContainsAny(msg, "✅📁🧠") || len(kb) != 1 {
+		t.Fatalf("plain style: %s %v", msg, kb)
 	}
 }

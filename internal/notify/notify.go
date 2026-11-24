@@ -258,6 +258,9 @@ func dur(d time.Duration) string {
 
 // render is a short HTML message (at most 9 lines) and its URL buttons; every value is escaped.
 func render(it item) (string, []button) {
+	if style() == "plain" {
+		return renderPlain(it)
+	}
 	h := header[it.kind]
 	if it.kind == "blocked" && it.stage == "failed" {
 		h = "⛔ <b>Failed</b>"
@@ -306,6 +309,11 @@ func render(it item) (string, []button) {
 	if it.reason != "" {
 		lines = append(lines, "<blockquote>"+clean(it.reason, 200)+"</blockquote>")
 	}
+	_, kb := renderButtons(it)
+	return strings.Join(lines, "\n"), kb
+}
+
+func renderButtons(it item) (string, []button) {
 	var kb []button
 	if u := webURL(it.pr); u != "" {
 		kb = append(kb, button{"Open PR", u})
@@ -313,7 +321,7 @@ func render(it item) (string, []button) {
 	if u := webURL(it.issue); u != "" {
 		kb = append(kb, button{"Open issue", u})
 	}
-	return strings.Join(lines, "\n"), kb
+	return "", kb
 }
 
 // enrich fills an item's issue, title, duration, model, speed, question and cost from the auto
@@ -662,4 +670,61 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintln(stderr, Usage)
 	return 2
+}
+
+// style is notify.style: emoji (icons per line) or plain (typographic, no emoji).
+func style() string {
+	if config.Get("notify.style", "plain") == "emoji" {
+		return "emoji"
+	}
+	return "plain"
+}
+
+var plainTag = map[string]string{"pr_ready": "READY", "blocked": "BLOCKED", "stuck": "STUCK", "decision": "DECIDE",
+	"orchestrator_failed": "FAILED", "serve_down": "STOPPED", "cap_reached": "CAP", "limited": "LIMITED", "test": "TEST"}
+
+var plainTitle = map[string]string{"pr_ready": "PR ready for review", "blocked": "Blocked", "stuck": "No heartbeat",
+	"decision": "Decision needed", "orchestrator_failed": "Orchestrator failed", "serve_down": "Serve stopped",
+	"cap_reached": "Daily cap reached", "limited": "All pool accounts limited", "test": "smithy"}
+
+// renderPlain: a code-font status tag, a bold title line, one monospace meta line, the reason quoted.
+func renderPlain(it item) (string, []button) {
+	tag, title := plainTag[it.kind], plainTitle[it.kind]
+	if it.kind == "blocked" && it.stage == "failed" {
+		tag, title = "FAILED", "Failed"
+	}
+	lines := []string{"<code>" + tag + "</code>  <b>" + title + "</b>"}
+	if it.key != "" || it.title != "" {
+		lines = append(lines, strings.TrimSpace("<b>"+clean(it.key, 40)+"</b> "+clean(it.title, 80)))
+	}
+	repo := it.repo
+	for _, u := range []string{it.pr, it.issue} {
+		if m := repoRe.FindStringSubmatch(u); repo == "" && m != nil {
+			repo = m[1]
+		}
+	}
+	var meta []string
+	for _, v := range []string{clean(repo, 60), clean(it.stage, 20), strings.Trim(clean(it.model, 20)+"/"+clean(it.speed, 20), "/")} {
+		if v != "" {
+			meta = append(meta, v)
+		}
+	}
+	if it.cost != nil {
+		meta = append(meta, fmt.Sprintf("$%.2f", *it.cost))
+	}
+	if it.dur > 0 {
+		meta = append(meta, dur(it.dur))
+	}
+	if len(meta) > 0 {
+		lines = append(lines, "<code>"+strings.Join(meta, " · ")+"</code>")
+	}
+	if it.question != "" {
+		lines = append(lines, "<blockquote>"+clean(it.question, 300)+"</blockquote>",
+			"<i>Answer in</i> <code>smithy tui</code> <i>› Needs you, or</i> <code>smithy decisions pending</code>")
+	}
+	if it.reason != "" {
+		lines = append(lines, "<blockquote>"+clean(it.reason, 200)+"</blockquote>")
+	}
+	_, kb := renderButtons(it)
+	return strings.Join(lines, "\n"), kb
 }
