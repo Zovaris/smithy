@@ -628,6 +628,9 @@ func Run(o Options) int {
 	if gocache != "" {
 		env = append(env, "GOCACHE="+gocache)
 	}
+	if o.Sandbox == "native" {
+		env = append(env, NativeGitEnv(env)...)
+	}
 	if o.Sandbox == "container" {
 		box, err := container(o.Cwd, gitDir)
 		if err != nil {
