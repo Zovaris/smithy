@@ -142,17 +142,31 @@ func recordCard(log, cwd, account string) { setCard(log, cwd, "account="+account
 
 // setCard sets pairs on the warden card of a <warden home>/<batch>/<item>.log run.
 func setCard(log, cwd string, pairs ...string) {
+	if batch, id := cardOf(log, cwd); batch != "" {
+		_, _ = cards.Set(batch, id, pairs)
+	}
+}
+
+// launchCard records a --bg worker's pid on its warden card, creating the card if needed.
+func launchCard(log, cwd string, pid int) {
+	if batch, id := cardOf(log, cwd); batch != "" {
+		_ = cards.Launch(batch, id, pid)
+	}
+}
+
+// cardOf is the batch and item of a <warden home>/<batch>/<item>.log run; "" when it isn't one.
+func cardOf(log, cwd string) (string, string) {
 	if log == "" {
-		return
+		return "", ""
 	}
 	if !filepath.IsAbs(log) {
 		log = filepath.Join(cwd, log)
 	}
 	dir := filepath.Dir(log)
 	if realPath(filepath.Dir(dir)) != realPath(cards.Home()) {
-		return
+		return "", ""
 	}
-	_, _ = cards.Set(filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log"), pairs)
+	return filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log")
 }
 
 // poolDenied are deny rules for every pool account dir, wherever the user put it.

@@ -379,3 +379,13 @@ func TestSandboxCheckAgentPool(t *testing.T) {
 		t.Error("unreadable pool.json must refuse")
 	}
 }
+
+func TestNativeGitEnvUsesHTTPS(t *testing.T) {
+	env := NativeGitEnv([]string{"GIT_CONFIG_COUNT=1"})
+	got := strings.Join(env, "\n")
+	for _, want := range []string{"GIT_CONFIG_KEY_1=url.https://github.com/.insteadOf", "GIT_CONFIG_VALUE_1=git@github.com:", "GIT_CONFIG_VALUE_4=!gh auth git-credential", "GIT_CONFIG_COUNT=5"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("missing %q in %s", want, got)
+		}
+	}
+}

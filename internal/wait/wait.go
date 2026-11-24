@@ -680,6 +680,11 @@ func (w *batchWatcher) poll() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	if w.reapDead(rows) {
+		if rows, err = cards.Rows(w.name); err != nil {
+			return nil, err
+		}
+	}
 	out := w.pending
 	w.pending = nil
 	for _, r := range rows {
@@ -695,6 +700,21 @@ func (w *batchWatcher) poll() ([]string, error) {
 		}
 	}
 	return out, nil
+}
+
+// reapDead marks failed each card whose recorded worker pid is gone before it reported, so a
+// worker that died at start wakes the wait now instead of after warden.stuck_minutes.
+func (w *batchWatcher) reapDead(rows []cards.Row) bool {
+	changed := false
+	for _, r := range rows {
+		if final[r.State] || r.State == "pr_open" || r.State == "ready" || r.State == "failed" {
+			continue
+		}
+		if cards.Dead(w.name, r.ID, running, filepath.Join(cards.Home(), w.name, r.ID+".log")) {
+			changed = true
+		}
+	}
+	return changed
 }
 
 // relaunchLines asks for a new wait on each batch that still has a non-final card.
@@ -732,6 +752,8 @@ Targets (any mix):
   batch:<name>        a warden card needs the warden (--all: any card change), or a card's PR
                       turned green/red, conflicts, merged or closed (already so at the start: only for
                       merge-auto cards not ready, else red/conflict only; events in the batch's .wait-seen are skipped);
+                      a card whose worker pid (set by a background smithy agent) is gone before it
+                      reported is set failed ("worker exited: <last log line>") and wakes it;
                       polls cards every 10 s, PRs every 30 s; while a card is not final the
                       output ends with "relaunch: smithy wait batch:<name>"
   actions[:<branch>]  a workflow run on the branch (default: origin's default) finished red,

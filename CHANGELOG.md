@@ -5,6 +5,11 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Fixed: a warden worker that died at start (for example on an invalid `--model`) no longer hangs
+  `smithy wait batch:<batch>`. `smithy agent --bg` with a `<batch-dir>/<id>.log` writes the card
+  at launch (`working`, `last_beat` now, the worker's `pid`), and the batch wait turns a card whose
+  pid is gone before it reported into `failed` (`note=worker exited: <last log line>`) and wakes.
+
 - Added: `auto.sandbox` (off | native | container) isolates unattended workers on top of the
   `--profile auto` allow-list and fails closed: a worker whose sandbox can't start is not started,
   and serve launches nothing (log, `orchestrator_failed` to the TUI and Telegram). native runs

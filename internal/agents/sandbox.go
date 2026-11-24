@@ -484,3 +484,26 @@ func container(cwd, gitDir string) (Container, error) {
 	}
 	return c, nil
 }
+
+// NativeGitEnv routes git to GitHub over HTTPS with gh's credential helper: the native sandbox
+// denies ~/.ssh (keys and known_hosts) and its proxy only carries HTTPS, so SSH remotes fail.
+// It extends any GIT_CONFIG_COUNT entries already in env.
+func NativeGitEnv(env []string) []string {
+	n := 0
+	for _, kv := range env {
+		if v, ok := strings.CutPrefix(kv, "GIT_CONFIG_COUNT="); ok {
+			fmt.Sscan(v, &n)
+		}
+	}
+	pairs := [][2]string{
+		{"url.https://github.com/.insteadOf", "git@github.com:"},
+		{"url.https://github.com/.insteadOf", "ssh://git@github.com/"},
+		{"credential.https://github.com.helper", ""},
+		{"credential.https://github.com.helper", "!gh auth git-credential"},
+	}
+	out := []string{}
+	for i, p := range pairs {
+		out = append(out, fmt.Sprintf("GIT_CONFIG_KEY_%d=%s", n+i, p[0]), fmt.Sprintf("GIT_CONFIG_VALUE_%d=%s", n+i, p[1]))
+	}
+	return append(out, fmt.Sprintf("GIT_CONFIG_COUNT=%d", n+len(pairs)))
+}

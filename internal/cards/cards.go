@@ -69,6 +69,69 @@ func Beat(batch, id string) error {
 	})
 }
 
+// Launch records a started worker's pid on its card, creating the card as `working` (last_beat =
+// now) when the worker hasn't written one, so a worker that dies before its first write still
+// leaves a card that a batch wait and the stuck rule can see.
+func Launch(batch, id string, pid int) error {
+	if !idRe.MatchString(batch) || !idRe.MatchString(id) {
+		return fmt.Errorf("batch and id must match [A-Za-z0-9._-]+")
+	}
+	file := filepath.Join(Home(), batch, id+".json")
+	return config.WithLock(file, func() error {
+		cur := read(file)
+		if cur == nil {
+			cur = map[string]any{"id": id}
+		}
+		if s(cur, "state") == "" {
+			cur["state"] = "working"
+		}
+		cur["pid"] = pid
+		cur["updated"] = stampNow()
+		cur["last_beat"] = cur["updated"]
+		return write(file, cur)
+	})
+}
+
+// Dead marks a card failed when its recorded worker pid is no longer running and its state
+// isn't final, pr_open, ready or already stuck (blocked, failed, needs_decision): the worker exited without
+// reporting. alive reports whether a pid runs; log is the worker's log file. It returns true
+// when it changed the card.
+func Dead(batch, id string, alive func(int) bool, log string) bool {
+	file := filepath.Join(Home(), batch, id+".json")
+	changed := false
+	_ = config.WithLock(file, func() error {
+		cur := read(file)
+		pid, ok := cur["pid"].(float64)
+		if cur == nil || !ok || pid <= 0 || alive(int(pid)) {
+			return nil
+		}
+		switch s(cur, "state") {
+		case "merged", "reported", "dropped", "pr_open", "ready", "failed", "blocked", "needs_decision":
+			return nil
+		}
+		_, err := set(file, id, []string{"state=failed", "note=worker exited: " + lastLine(log)})
+		changed = err == nil
+		return err
+	})
+	return changed
+}
+
+func lastLine(file string) string {
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return "(no log)"
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	l := lines[len(lines)-1]
+	if rs := []rune(l); len(rs) > 300 {
+		l = string(rs[:300])
+	}
+	if l == "" {
+		return "(empty log)"
+	}
+	return l
+}
+
 func write(file string, cur map[string]any) error {
 	b, _ := json.MarshalIndent(cur, "", "  ")
 	tmp := fmt.Sprintf("%s.%d.tmp", file, os.Getpid())
