@@ -1,6 +1,6 @@
 # Image for `smithy config set auto.sandbox container`: each unattended worker runs as
 #   docker|podman run --rm -i --cap-drop ALL --security-opt no-new-privileges --read-only --tmpfs /tmp
-#     --pids-limit 512 --memory 4g --network none (auto.sandbox_network) -w <worktree>
+#     --pids-limit 512 --memory 4g --network <auto.sandbox_network, required> -w <worktree>
 #     -v <worktree> -v <git dir> (hooks and config :ro) -v ~/.smithy/plans -v ~/.smithy/warden
 #     -e <allowed names> <image> <agent argv>
 # Build: docker build -t smithy-sandbox:latest sandbox/   (or podman build)

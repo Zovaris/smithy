@@ -73,12 +73,27 @@ func TestContainerCheckNetworkAndCredential(t *testing.T) {
 
 func TestContainerSecrets(t *testing.T) {
 	sec := func(svc string) string { return map[string]string{"claude": "c", "anthropic": "a", "openai": "o"}[svc] }
-	got := ContainerSecrets([]string{"ANTHROPIC_API_KEY=env", "OPENAI_API_KEY="}, sec)
-	want := []string{"CLAUDE_CODE_OAUTH_TOKEN=c", "OPENAI_API_KEY=o"}
-	if !slices.Equal(got, want) {
-		t.Errorf("secrets = %v, want %v", got, want)
+	host := []string{"PATH=/bin", "ANTHROPIC_API_KEY=env", "OPENAI_API_KEY=hostopenai"}
+	cases := []struct {
+		kind, model string
+		want        []string
+	}{
+		{"claude", "", []string{"PATH=/bin", "ANTHROPIC_API_KEY=env", "CLAUDE_CODE_OAUTH_TOKEN=c"}},
+		{"codex", "", []string{"PATH=/bin", "OPENAI_API_KEY=hostopenai"}},
+		{"opencode", "opencode/big-pickle", []string{"PATH=/bin"}},
+		{"opencode", "anthropic/claude-x", []string{"PATH=/bin", "ANTHROPIC_API_KEY=env"}},
+		{"gemini", "", []string{"PATH=/bin"}},
 	}
-	env, names := ContainerEnv(append([]string{"PATH=/bin"}, got...))
+	for _, c := range cases {
+		if got := ContainerSecrets(host, ContainerCreds(c.kind, c.model), sec); !slices.Equal(got, c.want) {
+			t.Errorf("%s %s: env = %v, want %v", c.kind, c.model, got, c.want)
+		}
+	}
+	if got := ContainerSecrets([]string{"OPENAI_API_KEY="}, ContainerCreds("codex", ""), sec); !slices.Equal(got, []string{"OPENAI_API_KEY=", "OPENAI_API_KEY=o"}) {
+		t.Errorf("empty env value is filled from smithy auth: %v", got)
+	}
+	got := ContainerSecrets([]string{"PATH=/bin"}, ContainerCreds("claude", ""), sec)
+	env, names := ContainerEnv(got)
 	c := Container{Engine: "docker", Image: "i", Cwd: "/w", Env: names}
 	argv := strings.Join(c.Argv([]string{"claude"}), " ")
 	if strings.Contains(argv, "=c") || strings.Contains(argv, "=o") || !strings.Contains(argv, "-e CLAUDE_CODE_OAUTH_TOKEN ") {
@@ -141,7 +156,8 @@ func TestSandboxCheck(t *testing.T) {
 		{"native", "custom", probe("darwin", "/usr/bin/sandbox-exec"), false},
 		{"container", "claude", withCred(probe("linux", "podman")), true},
 		{"container", "claude", probe("linux", "podman"), false},
-		{"container", "codex", probe("linux", "podman"), true},
+		{"container", "codex", probe("linux", "podman"), false},
+		{"container", "opencode", probe("linux", "podman"), true},
 		{"container", "claude", probe("linux"), false},
 		{"bogus", "claude", probe("linux"), false},
 		{"native", "claude", withVersion(probe("darwin", "/usr/bin/sandbox-exec"), "2.1.330 (Claude Code)", nil), false},

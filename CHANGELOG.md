@@ -5,11 +5,13 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
-- Fixed: `auto.sandbox container` workers get their credentials: when the env lacks them,
-  `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` come from `smithy auth`
-  (`claude`, `anthropic`, `openai`), passed by name with the value only in the engine's env. A
-  claude container with no credential is refused and doctor fails with the fix (`claude
-  setup-token`, then `smithy auth set claude`).
+- Fixed: `auto.sandbox container` workers get their credentials, scoped to the harness (claude:
+  `CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`; codex: `OPENAI_API_KEY`; opencode: none unless
+  its model names that provider). When the env lacks them they come from `smithy auth`, passed by
+  name, never on argv; container env is visible to `docker inspect` and the engine socket. A
+  worker with no credential its harness needs is refused and doctor fails with the fix (`claude
+  setup-token`, then `smithy auth set claude`). On macOS the container runs as root inside the
+  engine VM; on Linux as your uid.
 - Fixed: container mode needs `auto.sandbox_network`; unset or `none` now refuses to start (claude
   couldn't reach its API, git couldn't push) and doctor fails. `bridge` is open egress with no
   domain allow-list; an egress allow-list proxy is planned for v0.17.

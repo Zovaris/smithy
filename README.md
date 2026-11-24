@@ -165,7 +165,9 @@ sending data out: least-privilege tokens matter most there. For more isolation s
 `smithy config set auto.sandbox native` (Claude Code's OS sandbox: host allow-list, writes only to the
 worktree and smithy's plans) or `container` (docker/podman; needs `auto.sandbox_network`, and `bridge` is open egress with no
 domain allow-list, unlike native: an egress allow-list proxy is planned for v0.17; claude needs a
-token from `claude setup-token` stored with `smithy auth set claude`); it fails closed, and
+token from `claude setup-token` stored with `smithy auth set claude`, visible to `docker inspect` and
+anyone with the engine socket; on macOS the container runs as root inside the engine VM, on Linux
+as your uid); it fails closed, and
 `smithy doctor` checks it ([settings](docs/settings.md)). Its settings are read from your user config only. The
 orchestrator itself is not sandboxed and may run repo tests; workers sign commits through your ssh-agent
 (use a dedicated signing key) and still get your `GH_TOKEN` (use a fine-grained, repo-scoped token).

@@ -229,25 +229,58 @@ const ContainerNoNetwork = "container needs a network: smithy config set auto.sa
 // never reaches the container.
 const ContainerNoCredential = "no claude credential for the container: run claude setup-token, then smithy auth set claude"
 
-// containerSecrets maps smithy auth services to the env names a container worker reads.
-var containerSecrets = [][2]string{{"claude", "CLAUDE_CODE_OAUTH_TOKEN"}, {"anthropic", "ANTHROPIC_API_KEY"}, {"openai", "OPENAI_API_KEY"}}
+// credNames are every model credential env name a container could carry.
+var credNames = []string{"CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"}
 
-// ContainerSecrets are NAME=value entries from smithy auth for the credentials env lacks. They go
-// only in the engine's env; the container gets them by name (-e NAME), never on argv.
-func ContainerSecrets(env []string, secret func(svc string) string) []string {
-	have := map[string]bool{}
-	for _, kv := range env {
-		if k, v, _ := strings.Cut(kv, "="); v != "" {
-			have[k] = true
+// ContainerCreds are the {smithy auth service, env name} pairs a harness kind's container worker
+// may carry, the only credentials it gets: claude its token or Anthropic key, codex its OpenAI key,
+// opencode none (its free models need no login) unless model names the anthropic or openai provider.
+func ContainerCreds(kind, model string) [][2]string {
+	claude := [][2]string{{"claude", "CLAUDE_CODE_OAUTH_TOKEN"}, {"anthropic", "ANTHROPIC_API_KEY"}}
+	openai := [][2]string{{"openai", "OPENAI_API_KEY"}}
+	switch kind {
+	case "claude":
+		return claude
+	case "codex":
+		return openai
+	case "opencode":
+		switch {
+		case strings.HasPrefix(model, "anthropic/"):
+			return claude[1:]
+		case strings.HasPrefix(model, "openai/"):
+			return openai
 		}
 	}
+	return nil
+}
+
+// ContainerSecrets drops from env the credential names creds doesn't list, then adds NAME=value
+// from smithy auth for the listed ones env lacks. Values stay in the engine's env; the container
+// gets them by name (-e NAME), never on argv.
+func ContainerSecrets(env []string, creds [][2]string, secret func(svc string) string) []string {
+	allowed := map[string]bool{}
+	for _, c := range creds {
+		allowed[c[1]] = true
+	}
+	have := map[string]bool{}
 	var out []string
-	for _, s := range containerSecrets {
-		if have[s[1]] || secret == nil {
+	for _, kv := range env {
+		k, v, _ := strings.Cut(kv, "=")
+		if slices.Contains(credNames, k) && !allowed[k] {
 			continue
 		}
-		if k := secret(s[0]); k != "" {
-			out = append(out, s[1]+"="+k)
+		if v != "" {
+			have[k] = true
+		}
+		out = append(out, kv)
+	}
+	for _, c := range creds {
+		if have[c[1]] || secret == nil {
+			continue
+		}
+		if k := secret(c[0]); k != "" {
+			out = append(out, c[1]+"="+k)
+			have[c[1]] = true
 		}
 	}
 	return out
@@ -266,15 +299,19 @@ func containerCheck(cli string, p Probe) error {
 	if n == "" || n == "none" {
 		return fmt.Errorf("%s", ContainerNoNetwork)
 	}
-	if Kind(cli) != "claude" {
+	creds := ContainerCreds(Kind(cli), "")
+	if len(creds) == 0 {
 		return nil
 	}
-	for _, s := range containerSecrets[:2] {
+	for _, s := range creds {
 		if (p.Getenv != nil && p.Getenv(s[1]) != "") || (p.Secret != nil && p.Secret(s[0]) != "") {
 			return nil
 		}
 	}
-	return fmt.Errorf("%s", ContainerNoCredential)
+	if Kind(cli) == "claude" {
+		return fmt.Errorf("%s", ContainerNoCredential)
+	}
+	return fmt.Errorf("no %s credential for the container: smithy auth set %s", cli, creds[0][0])
 }
 
 // SandboxDomains is DefaultSandboxDomains plus the comma list extra, without duplicates.
