@@ -5,6 +5,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.17.0 — 2026-11-24
+
 - Container refuses `auto.sandbox_network host` and, on the default image, harnesses it does not carry (only Claude Code and OpenCode); pool hints and help list every harness; docs match the proxy allow-list and restart rule.
 - Fixed: the proxy sidecar restarts when `auth.json` changes, so a new `smithy auth bind` reaches it (a single-file mount kept the old file after a rewrite); `*.opencode.ai` is in the default allow-list so OpenCode workers can fetch their models.
 - Added: the account pool works with `auto.sandbox container`: a pooled worker mounts only its own account dir and gets its config-dir variable; claude accounts use their own token (`smithy auth set claude:<account>`). Doctor allows the combination when every pooled account can run.
