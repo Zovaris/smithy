@@ -59,7 +59,7 @@ func loadSystem() System {
 func demoSystem() System {
 	return System{
 		Doctor: []string{"warden doctor", "ok   binary v0.15.0", "ok   git found", "ok   gh found and authenticated", "ok   claude found",
-			"ok   worktree root /home/dev/worktrees writable", "warn 2 orphaned worktrees (smithy warden cleanup)"},
+			"ok   worktree root /home/dev/worktrees writable", "ok   sandbox: native (claude, hosts github.com,api.github.com,api.anthropic.com,api.linear.app)", "warn 2 orphaned worktrees (smithy warden cleanup)"},
 		Settings: settingRows("claude", demoEffective),
 		Auth:     []string{"github ****9f2c", "linear ****a41b"},
 		Notify: []string{"token  ****x7Qa (/home/dev/.smithy/auth.json)", "chat 123456789", "kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached",
