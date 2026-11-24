@@ -101,7 +101,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return fail(err)
 		}
-		if err := os.MkdirAll(a.Dir, 0o700); err != nil {
+		if err := MakeDir(a.Dir); err != nil {
 			return fail(err)
 		}
 		argv := loginArgs(a.Harness)

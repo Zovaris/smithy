@@ -32,8 +32,9 @@ and only accounts you own: the providers' terms apply to each one.
   clear   <name>                    forgets a recorded limit
 smithy agent picks the least recently used account that is not limited, for the CLI it runs
 (AGENT_CLI=pool: any harness). A run that hits a usage limit marks the account limited until its
-reset (5h when the CLI does not say) and reruns once on the next account; when every account is
-limited it exits 75 and says the earliest reset. Files: ~/.smithy/pool.json, ~/.smithy/pool-state.json.`
+reset (5h when the CLI does not say). A read-only run, or one that left the worktree untouched,
+reruns once on the next account; any other exits 75 and blocks its warden card so warden
+relaunches it in the same worktree. With every account limited it exits 75 at once. Files: ~/.smithy/pool.json, ~/.smithy/pool-state.json.`
 
 // Harnesses are the CLIs a pool account can use, with the env var that points at its config dir.
 var Harnesses = map[string]string{"claude": "CLAUDE_CONFIG_DIR", "codex": "CODEX_HOME"}
@@ -61,7 +62,15 @@ type Status struct {
 func File() string      { return filepath.Join(ghx.Home(), "pool.json") }
 func StateFile() string { return filepath.Join(ghx.Home(), "pool-state.json") }
 
-var nameRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+var nameRe = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]*$`)
+
+// MakeDir creates an account dir and forces it to 0700 (MkdirAll keeps an existing dir's mode).
+func MakeDir(dir string) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	return os.Chmod(dir, 0o700)
+}
 
 // Load reads the accounts; none (and no error) when the file is missing.
 func Load() ([]Account, error) {
@@ -111,10 +120,15 @@ func writeAtomic(path string, b []byte) error {
 // Add records a new account; dir "" means ~/.smithy/accounts/<name>. The dir is created 0700.
 func Add(name, harness, dir string) (Account, error) {
 	if !nameRe.MatchString(name) {
-		return Account{}, fmt.Errorf("name must match [A-Za-z0-9._-]+")
+		return Account{}, fmt.Errorf("name must start with a letter, digit or _ and use only [A-Za-z0-9._-]")
 	}
 	if Harnesses[harness] == "" {
 		return Account{}, fmt.Errorf("harness %q has no per-account dir smithy knows (claude, codex)", harness)
+	}
+	for _, seg := range strings.FieldsFunc(dir, func(r rune) bool { return r == '/' || r == '\\' }) {
+		if seg == ".." {
+			return Account{}, fmt.Errorf("dir %q has a .. segment; give a plain path", dir)
+		}
 	}
 	if dir == "" {
 		dir = filepath.Join(ghx.Home(), "accounts", name)
@@ -138,7 +152,7 @@ func Add(name, harness, dir string) (Account, error) {
 				return fmt.Errorf("account %s already exists", name)
 			}
 		}
-		if err := os.MkdirAll(dir, 0o700); err != nil {
+		if err := MakeDir(dir); err != nil {
 			return err
 		}
 		return save(append(as, a))
@@ -308,102 +322,4 @@ func contains(l []string, s string) bool {
 		}
 	}
 	return false
-}
-
-var (
-	limitRe = regexp.MustCompile(`(?i)(hit your [a-z0-9 -]*limit|usage limit reached|rate_limit|you've hit your usage limit)`)
-	resetRe = regexp.MustCompile(`(?i)(?:resets|try again at)\s+(?:[a-z]{3,9}\.? \d{1,2}(?:st|nd|rd|th)?,? (?:\d{4},? )?)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?:\s*\(([^)]+)\))?`)
-)
-
-// Detect reads a finished run's log for a usage-limit result. For a claude json run (json true)
-// only a result line with is_error counts; for other CLIs a limit line counts when the run
-// failed (rc != 0), so an answer that merely mentions limits never marks an account. until is
-// the reset the CLI gave, else now + DefaultLimit.
-func Detect(log string, json bool, rc int, now time.Time) (until time.Time, ok bool) {
-	b, err := os.ReadFile(log)
-	if err != nil {
-		return
-	}
-	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
-	if len(lines) > 40 {
-		lines = lines[len(lines)-40:]
-	}
-	for i := len(lines) - 1; i >= 0; i-- {
-		l := lines[i]
-		var text string
-		if json {
-			t, isErr := claudeError(l)
-			if !isErr {
-				continue
-			}
-			text = t
-		} else {
-			if rc == 0 {
-				return
-			}
-			text = l
-		}
-		if limitRe.MatchString(text) {
-			return Reset(text, now), true
-		}
-	}
-	return
-}
-
-func claudeError(line string) (string, bool) {
-	var r struct {
-		Type    string            `json:"type"`
-		IsError bool              `json:"is_error"`
-		Result  string            `json:"result"`
-		Errors  []json.RawMessage `json:"errors"`
-		Error   string            `json:"error"`
-	}
-	line = strings.TrimSpace(line)
-	if !strings.HasPrefix(line, "{") || json.Unmarshal([]byte(line), &r) != nil || r.Type != "result" || !r.IsError {
-		return "", false
-	}
-	t := r.Result + " " + r.Error
-	for _, e := range r.Errors {
-		t += " " + string(e)
-	}
-	return t, true
-}
-
-// Reset parses "resets 3pm (Europe/Madrid)", "resets 14:30" or "try again at 3:05 PM" into the
-// next such time after now (in the named zone, else local); now + DefaultLimit when absent.
-func Reset(text string, now time.Time) time.Time {
-	m := resetRe.FindStringSubmatch(text)
-	if m == nil {
-		return now.Add(DefaultLimit)
-	}
-	loc := time.Local
-	if m[4] != "" {
-		if l, err := time.LoadLocation(strings.TrimSpace(m[4])); err == nil {
-			loc = l
-		}
-	}
-	var h, mi int
-	fmt.Sscanf(m[1], "%d", &h)
-	if m[2] != "" {
-		fmt.Sscanf(m[2], "%d", &mi)
-	}
-	switch strings.ToLower(m[3]) {
-	case "pm":
-		if h < 12 {
-			h += 12
-		}
-	case "am":
-		if h == 12 {
-			h = 0
-		}
-	}
-	if h > 23 || mi > 59 {
-		return now.Add(DefaultLimit)
-	}
-	n := now.In(loc)
-	t := time.Date(n.Year(), n.Month(), n.Day(), h, mi, 0, 0, loc)
-	if !t.After(now) {
-		t = t.AddDate(0, 0, 1)
-	}
-	return t
 }

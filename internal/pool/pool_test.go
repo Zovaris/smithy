@@ -113,19 +113,78 @@ func TestDetectOnlyCountsErrorResults(t *testing.T) {
 	log := filepath.Join(d, "l")
 	now := time.Now()
 	os.WriteFile(log, []byte(`{"type":"result","is_error":false,"result":"I explained what to do when you hit your usage limit"}`+"\n"), 0o600)
-	if _, ok := Detect(log, true, 0, now); ok {
+	if _, ok := Detect(log, "claude", 0, now); ok {
 		t.Fatal("a successful answer mentioning limits counted")
 	}
 	os.WriteFile(log, []byte(`{"type":"result","is_error":true,"result":"Claude AI usage limit reached"}`+"\n"), 0o600)
-	if u, ok := Detect(log, true, 1, now); !ok || !u.Equal(now.Add(DefaultLimit)) {
+	if u, ok := Detect(log, "claude", 1, now); !ok || !u.Equal(now.Add(DefaultLimit)) {
 		t.Fatalf("claude limit: %v %v", u, ok)
 	}
 	os.WriteFile(log, []byte("working\nERROR: You've hit your usage limit. Try again at 4:15 PM.\n"), 0o600)
-	if _, ok := Detect(log, false, 0, now); ok {
+	if _, ok := Detect(log, "codex", 0, now); ok {
 		t.Fatal("a successful text run counted")
 	}
-	if u, ok := Detect(log, false, 1, now); !ok || u.Hour() != 16 || u.Minute() != 15 {
+	if u, ok := Detect(log, "codex", 1, now); !ok || u.Hour() != 16 || u.Minute() != 15 {
 		t.Fatalf("codex limit: %v %v", u, ok)
+	}
+}
+
+func TestDetectIgnoresRateLimitInATestLog(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "l")
+	now := time.Now()
+	os.WriteFile(log, []byte("--- FAIL: TestRetry (0.01s)\n    client_test.go:40: got error rate_limit, want nil\nFAIL\nexit status 1\n"), 0o600)
+	for _, k := range []string{"claude", "codex", "opencode"} {
+		if _, ok := Detect(log, k, 1, now); ok {
+			t.Errorf("%s: a failing test log mentioning rate_limit counted", k)
+		}
+	}
+	os.WriteFile(log, []byte(`{"type":"result","is_error":true,"result":"API Error: rate_limit_error"}`+"\n"), 0o600)
+	if _, ok := Detect(log, "claude", 1, now); ok {
+		t.Error("bare rate_limit in a claude error counted")
+	}
+	os.WriteFile(log, []byte("ERROR: You've hit your usage limit.\nline\nline\nline\nline\nline\nline\n"), 0o600)
+	if _, ok := Detect(log, "codex", 1, now); ok {
+		t.Error("codex limit sentence far from the end counted")
+	}
+}
+
+func TestResetDateWeekdayAndUnknownZone(t *testing.T) {
+	now := time.Date(2026, 11, 23, 10, 0, 0, 0, time.UTC) // a Monday
+	if got := Reset("resets Nov 28, 3pm (UTC)", now); !got.Equal(time.Date(2026, 11, 28, 15, 0, 0, 0, time.UTC)) {
+		t.Errorf("date form → %v", got)
+	}
+	if got := Reset("resets Wed 9am (UTC)", now); !got.Equal(time.Date(2026, 11, 25, 9, 0, 0, 0, time.UTC)) {
+		t.Errorf("weekday form → %v", got)
+	}
+	if got := Reset("resets Monday 8am (UTC)", now); !got.Equal(time.Date(2026, 11, 30, 8, 0, 0, 0, time.UTC)) {
+		t.Errorf("past weekday → %v", got)
+	}
+	var warned []string
+	old := Warn
+	Warn = func(s string) { warned = append(warned, s) }
+	defer func() { Warn = old }()
+	if got := Reset("resets 3pm (Mars/Olympus)", now); !got.Equal(now.Add(DefaultLimit)) || len(warned) != 1 {
+		t.Errorf("unknown zone → %v, warnings %q", got, warned)
+	}
+}
+
+func TestAddRejectsUnsafeNamesAndDirs(t *testing.T) {
+	h := home(t)
+	for _, n := range []string{".", "..", ".hidden", "-x", "a/b", `a\b`, ""} {
+		if _, err := Add(n, "claude", ""); err == nil {
+			t.Errorf("name %q accepted", n)
+		}
+	}
+	if _, err := Add("ok", "claude", h+"/x/../y"); err == nil {
+		t.Error("dir with .. accepted")
+	}
+	loose := filepath.Join(h, "loose")
+	os.MkdirAll(loose, 0o755)
+	if _, err := Add("ok", "claude", loose); err != nil {
+		t.Fatal(err)
+	}
+	if fi, _ := os.Stat(loose); fi.Mode().Perm() != 0o700 {
+		t.Errorf("existing dir mode %v, want 0700", fi.Mode().Perm())
 	}
 }
 

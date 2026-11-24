@@ -2,6 +2,7 @@ package agents
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -18,7 +19,9 @@ func fakePoolClaude(t *testing.T) (prompt, log, ran string) {
 	ran = filepath.Join(d, "ran")
 	bin := filepath.Join(d, "claude")
 	script := "#!/bin/sh\necho \"$CLAUDE_CONFIG_DIR\" >> " + ran + "\n" +
-		"case \"$CLAUDE_CONFIG_DIR\" in *-limited) echo '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"You'\"'\"'ve hit your limit · resets 3pm (UTC)\",\"usage\":{\"input_tokens\":1,\"output_tokens\":0}}'; exit 1;; esac\n" +
+		"echo \"key=$ANTHROPIC_API_KEY oauth=$CLAUDE_CODE_OAUTH_TOKEN\" > " + filepath.Join(d, "env") + "\n" +
+		"[ -n \"$FAKE_TOUCH\" ] && echo partial > touched.txt\n" +
+		"case \"$CLAUDE_CONFIG_DIR\" in *-limited) echo 'first attempt'; echo '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"You'\"'\"'ve hit your limit · resets 3pm (UTC)\",\"usage\":{\"input_tokens\":1,\"output_tokens\":0}}'; exit 1;; esac\n" +
 		"echo '{\"type\":\"result\",\"result\":\"all done\",\"total_cost_usd\":0.5,\"usage\":{\"input_tokens\":3,\"output_tokens\":7}}'\n"
 	os.WriteFile(bin, []byte(script), 0o755)
 	t.Setenv("AGENT_CLI", bin)
@@ -38,15 +41,20 @@ func TestAgentPoolFailsOverOnceOnALimit(t *testing.T) {
 	if _, err := pool.Add("b", "claude", filepath.Join(home, "b")); err != nil {
 		t.Fatal(err)
 	}
-	if rc := AgentMain([]string{"--timeout", "0", "--log", log, p}); rc != 0 {
+	t.Setenv("ANTHROPIC_API_KEY", "sk-should-not-pass")
+	t.Setenv("CLAUDE_CODE_OAUTH_TOKEN", "tok-should-not-pass")
+	if rc := AgentMain([]string{"--readonly", "--timeout", "0", "--log", log, p}); rc != 0 {
 		t.Fatalf("rc = %d", rc)
 	}
 	r, _ := os.ReadFile(ran)
 	if got := strings.Fields(string(r)); len(got) != 2 || !strings.HasSuffix(got[0], "a-limited") || !strings.HasSuffix(got[1], "/b") {
 		t.Fatalf("runs = %q", got)
 	}
-	if b, _ := os.ReadFile(log); string(b) != "all done\n" {
-		t.Fatalf("log = %q", b)
+	if b, _ := os.ReadFile(log); !strings.Contains(string(b), "first attempt") || !strings.HasSuffix(string(b), "all done\n") {
+		t.Fatalf("log not appended: %q", b)
+	}
+	if e, _ := os.ReadFile(filepath.Join(home, "env")); strings.TrimSpace(string(e)) != "key= oauth=" {
+		t.Fatalf("pooled run kept credentials: %q", e)
 	}
 	if u := pool.State()["a"].LimitedUntil; u.Hour() != 15 || !u.After(time.Now()) {
 		t.Fatalf("a limited until %v", u)
@@ -80,7 +88,7 @@ func TestAgentPoolSecondLimitExits75(t *testing.T) {
 	home := os.Getenv("SMITHY_HOME")
 	pool.Add("a", "claude", filepath.Join(home, "a-limited"))
 	pool.Add("b", "claude", filepath.Join(home, "b-limited"))
-	if rc := AgentMain([]string{"--timeout", "0", "--log", log, p}); rc != ExitLimited {
+	if rc := AgentMain([]string{"--readonly", "--timeout", "0", "--log", log, p}); rc != ExitLimited {
 		t.Fatalf("rc = %d", rc)
 	}
 	st := pool.State()
@@ -100,9 +108,79 @@ func TestAgentPoolOffRunsAsBefore(t *testing.T) {
 	}
 }
 
+func gitRepo(t *testing.T) string {
+	t.Helper()
+	d := t.TempDir()
+	for _, a := range [][]string{{"init", "-q", "-b", "feat/x"}, {"-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "init"}} {
+		if out, err := exec.Command("git", append([]string{"-C", d}, a...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", a, err, out)
+		}
+	}
+	return d
+}
+
+// limitedBatch sets up a warden card dir and two accounts, the first limited.
+func limitedBatch(t *testing.T) (p, log, ran, wh string) {
+	t.Helper()
+	p, _, ran = fakePoolClaude(t)
+	home := os.Getenv("SMITHY_HOME")
+	pool.Add("a", "claude", filepath.Join(home, "a-limited"))
+	pool.Add("b", "claude", filepath.Join(home, "b"))
+	wh = t.TempDir()
+	t.Setenv("WARDEN_HOME", wh)
+	os.MkdirAll(filepath.Join(wh, "b1"), 0o755)
+	return p, filepath.Join(wh, "b1", "01-x.log"), ran, wh
+}
+
+func TestAgentPoolRetriesAnUntouchedWriteRun(t *testing.T) {
+	p, log, ran, _ := limitedBatch(t)
+	repo := gitRepo(t)
+	if rc := AgentMain([]string{"--timeout", "0", "--cwd", repo, "--log", log, p}); rc != 0 {
+		t.Fatalf("rc = %d", rc)
+	}
+	if r, _ := os.ReadFile(ran); strings.Count(string(r), "\n") != 2 {
+		t.Fatalf("runs = %q", r)
+	}
+}
+
+func TestAgentPoolNeverRetriesAWriteRunWithPartialWork(t *testing.T) {
+	p, log, ran, wh := limitedBatch(t)
+	repo := gitRepo(t)
+	t.Setenv("FAKE_TOUCH", "1")
+	if rc := AgentMain([]string{"--timeout", "0", "--cwd", repo, "--log", log, p}); rc != ExitLimited {
+		t.Fatalf("rc = %d", rc)
+	}
+	if r, _ := os.ReadFile(ran); strings.Count(string(r), "\n") != 1 {
+		t.Fatalf("retried after partial work: %q", r)
+	}
+	if b, _ := os.ReadFile(log); !strings.Contains(string(b), "first attempt") {
+		t.Fatalf("log = %q", b)
+	}
+	card, _ := os.ReadFile(filepath.Join(wh, "b1", "01-x.json"))
+	if !strings.Contains(string(card), `"state": "blocked"`) || !strings.Contains(string(card), "account a limited until") || !strings.Contains(string(card), "relaunch on another account") {
+		t.Fatalf("card = %s", card)
+	}
+}
+
+func TestAgentPoolNeverRetriesOutsideGit(t *testing.T) {
+	p, log, ran, _ := limitedBatch(t)
+	if rc := AgentMain([]string{"--timeout", "0", "--cwd", t.TempDir(), "--log", log, p}); rc != ExitLimited {
+		t.Fatalf("rc = %d", rc)
+	}
+	if r, _ := os.ReadFile(ran); strings.Count(string(r), "\n") != 1 {
+		t.Fatalf("runs = %q", r)
+	}
+}
+
 func TestAutoDeniedCoversPoolAccounts(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	custom := filepath.Join(t.TempDir(), "elsewhere")
+	if _, err := pool.Add("c", "claude", custom); err != nil {
+		t.Fatal(err)
+	}
 	d := strings.Join(AutoDenied([]string{"/bin/smithy"}), "\n")
-	for _, want := range []string{"Read(~/.smithy/accounts/**)", "Edit(~/.smithy/accounts/**)", "Edit(~/.smithy/pool.json)", "Bash(*.smithy/accounts*)", "Bash(/bin/smithy pool *)"} {
+	p := filepath.ToSlash(custom)
+	for _, want := range []string{"Read(/" + p + "/**)", "Edit(/" + p + "/**)", "Bash(*" + p + "*)", "Read(~/.smithy/accounts/**)", "Edit(~/.smithy/accounts/**)", "Edit(~/.smithy/pool.json)", "Bash(*.smithy/accounts*)", "Bash(/bin/smithy pool *)"} {
 		if !strings.Contains(d, want) {
 			t.Errorf("AutoDenied lacks %s", want)
 		}

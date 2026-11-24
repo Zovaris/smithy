@@ -52,7 +52,8 @@ passes, the agent's whole process group is killed (Unix; on Windows only the age
 smithy agent exits 124; --bg runs are watched by a detached smithy that does the same.
 Pool (smithy pool, off until an account is added): a claude or codex run (AGENT_CLI=pool: any)
 uses the least recently used account that is not limited, through CLAUDE_CONFIG_DIR or CODEX_HOME;
-a usage-limit result marks it limited and reruns once on the next one; exit 75 when none is left.
+a usage-limit result marks it limited; a read-only or untouched run reruns once on the next one,
+any other exits 75 with its warden card blocked (relaunch in the same worktree).
 Extra flags for the chosen CLI: $AGENT_ARGS. Workers get WARDEN_HARNESS set to the CLI and the
 parent harness's variables removed, so their own scripts detect the right harness.
 --bg prints ` + "`<pid> <log>`" + ` and returns at once; otherwise prints the agent's output when it ends
@@ -84,6 +85,7 @@ type Options struct {
 	PoolEnv    []string // the pool account's config-dir variable (smithy pool), added to the worker's env
 	Account    string   // the pool account this run uses
 	poolSkip   []string // accounts already tried (limited) in this run
+	poolStart  string   // the worktree's HEAD before the first attempt ("" when not a git repo)
 }
 
 // ProfileEnv carries --profile to every smithy agent an agent starts, so workers under an
@@ -143,7 +145,7 @@ func AutoDenied(smithy []string) []string {
 		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json"} {
 		d = append(d, "Edit("+f+")") // Edit rules cover every file-editing tool, Write included
 	}
-	return d
+	return append(d, poolDenied()...)
 }
 
 // Kind is the CLI kind of an agent name or path: its base name, with agent meaning cursor.
@@ -451,6 +453,11 @@ func withPath(a []string, path string) []string {
 // WARDEN_HARNESS and the AGENT_* run variables set.
 func Env(base []string, s Spec, o Options) []string {
 	drop := map[string]bool{ProfileEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
+	if len(o.PoolEnv) > 0 {
+		for _, k := range PoolDropEnv {
+			drop[k] = true
+		}
+	}
 	for _, k := range ParentVars {
 		drop[k] = true
 	}
@@ -558,7 +565,13 @@ func Run(o Options) int {
 	case ph != "":
 		var rc int
 		if acct, rc = acquire(ph, &o); rc != 0 {
+			if len(o.poolSkip) > 0 {
+				blockCard(o, o.poolSkip[0])
+			}
 			return rc
+		}
+		if len(o.poolSkip) == 0 {
+			o.poolStart = head(o.Cwd)
 		}
 		if cli == "pool" && acct.Name != "" {
 			cli = acct.Harness
@@ -614,7 +627,11 @@ func Run(o Options) int {
 		if !filepath.IsAbs(path) {
 			path = filepath.Join(o.Cwd, path)
 		}
-		out, err = os.Create(path)
+		if len(o.poolSkip) > 0 {
+			out, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		} else {
+			out, err = os.Create(path)
+		}
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -642,7 +659,7 @@ func Run(o Options) int {
 		select {
 		case err := <-done:
 			var ee *exec.ExitError
-			if err != nil && !(errors.As(err, &ee) && ee.ExitCode() == 124) {
+			if err != nil && !(errors.As(err, &ee) && (ee.ExitCode() == 124 || ee.ExitCode() == ExitLimited)) {
 				fmt.Fprintf(os.Stderr, "smithy agent: %s exited right after starting (%v): %s\n", s.Argv[0], err, lastLine(log))
 				return 1
 			}
@@ -653,19 +670,20 @@ func Run(o Options) int {
 	}
 	rc := wait(cmd, o.Timeout, out)
 	out.Close()
-	hit := acct.Name != "" && limited(acct, out.Name(), jsonResult(s.Argv), rc)
+	hit := acct.Name != "" && limited(acct, out.Name(), Kind(s.Argv[0]), rc)
 	if jsonResult(s.Argv) {
 		finish(out.Name(), o.Log != "", o.Account)
 	}
 	if hit {
-		if len(o.poolSkip) == 0 {
+		if len(o.poolSkip) == 0 && (o.ReadOnly || untouched(o.Cwd, o.poolStart)) {
 			if o.Log == "" {
 				os.Remove(out.Name())
 			}
-			fmt.Fprintln(os.Stderr, "smithy agent: retrying once on the next pool account")
+			fmt.Fprintln(os.Stderr, "smithy agent: nothing changed yet; retrying once on the next pool account")
 			o.poolSkip, o.PoolEnv, o.Account = []string{acct.Name}, nil, ""
 			return Run(o)
 		}
+		blockCard(o, acct.Name)
 		rc = ExitLimited
 	}
 	if b, err := os.ReadFile(out.Name()); err == nil {

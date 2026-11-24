@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -83,9 +84,50 @@ func earliestOr(h string, now time.Time) time.Time {
 	return now.Add(pool.DefaultLimit)
 }
 
+// PoolDropEnv are credentials that would override the account's own login in a pooled run.
+var PoolDropEnv = []string{"CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "CODEX_API_KEY", "CLAUDE_CONFIG_DIR", "CODEX_HOME"}
+
+// head is cwd's HEAD commit ("" outside a git repo).
+func head(cwd string) string {
+	out, err := exec.Command("git", "-C", cwd, "rev-parse", "HEAD").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// untouched reports whether a write run left no trace a retry could redo: same HEAD as before,
+// a clean status, and its branch neither tracking a remote nor present on origin. Outside git
+// (start "") it is never untouched.
+func untouched(cwd, start string) bool {
+	if start == "" || head(cwd) != start {
+		return false
+	}
+	st, err := exec.Command("git", "-C", cwd, "status", "--porcelain").Output()
+	if err != nil || strings.TrimSpace(string(st)) != "" {
+		return false
+	}
+	if exec.Command("git", "-C", cwd, "rev-parse", "--verify", "--quiet", "@{u}").Run() == nil {
+		return false
+	}
+	br, err := exec.Command("git", "-C", cwd, "symbolic-ref", "--quiet", "--short", "HEAD").Output()
+	if err != nil {
+		return false
+	}
+	return exec.Command("git", "-C", cwd, "rev-parse", "--verify", "--quiet", "refs/remotes/origin/"+strings.TrimSpace(string(br))).Run() != nil
+}
+
+// blockCard marks a warden item blocked on a limited account, so warden relaunches it in the
+// same worktree once an account is free.
+func blockCard(o Options, account string) {
+	until := pool.State()[account].LimitedUntil
+	note := fmt.Sprintf("account %s limited until %s; relaunch on another account", account, until.Local().Format("2006-01-02 15:04"))
+	setCard(o.Log, o.Cwd, "state=blocked", "note="+note)
+}
+
 // limited checks a finished run's log for a usage limit and, when hit, marks the account.
-func limited(a pool.Account, log string, json bool, rc int) bool {
-	until, ok := pool.Detect(log, json, rc, poolNow())
+func limited(a pool.Account, log, kind string, rc int) bool {
+	until, ok := pool.Detect(log, kind, rc, poolNow())
 	if !ok {
 		return false
 	}
@@ -96,7 +138,10 @@ func limited(a pool.Account, log string, json bool, rc int) bool {
 }
 
 // recordCard writes the account on the warden card of a <warden home>/<batch>/<item>.log run.
-func recordCard(log, cwd, account string) {
+func recordCard(log, cwd, account string) { setCard(log, cwd, "account="+account) }
+
+// setCard sets pairs on the warden card of a <warden home>/<batch>/<item>.log run.
+func setCard(log, cwd string, pairs ...string) {
 	if log == "" {
 		return
 	}
@@ -107,5 +152,19 @@ func recordCard(log, cwd, account string) {
 	if realPath(filepath.Dir(dir)) != realPath(cards.Home()) {
 		return
 	}
-	_, _ = cards.Set(filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log"), []string{"account=" + account})
+	_, _ = cards.Set(filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log"), pairs)
+}
+
+// poolDenied are deny rules for every pool account dir, wherever the user put it.
+func poolDenied() []string {
+	as, _ := pool.Load()
+	var d []string
+	for _, a := range as {
+		if !filepath.IsAbs(a.Dir) {
+			continue
+		}
+		p := filepath.ToSlash(a.Dir)
+		d = append(d, "Read(/"+p+"/**)", "Edit(/"+p+"/**)", "Bash(*"+p+"*)")
+	}
+	return d
 }
