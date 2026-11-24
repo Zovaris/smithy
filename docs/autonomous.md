@@ -22,6 +22,28 @@ A daily cap and an optional hours window bound the spend. `smithy tui` shows the
 agents and the cost of each issue, and edits settings in place. Every setting is listed in
 [settings.md](settings.md).
 
+## Daemon (harness build)
+
+In the harness build, the serve loop runs inside `smithy daemon`, which also serves a local API
+and writes every event to `~/.smithy/smithy.db`. `smithy auto serve` starts it in the foreground
+(same flags, same view) or, when one already runs, attaches and prints its events.
+
+```
+smithy daemon --bg                             # prints "<pid> <url>"; log ~/.smithy/daemon.log
+curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/state
+```
+
+- `GET /v1/state`, `GET /v1/events?since=<seq>` (SSE, resumes with `Last-Event-ID`),
+  `POST /v1/decisions` (`{"id","answer"}`: the first answer wins; later ones get the outcome, 409).
+- It binds `127.0.0.1` only. Every request needs the token (`~/.smithy/daemon.token`, 0600) or a
+  `Tailscale-User-Login` listed in `daemon.allow`; anything else gets 401. The token works only
+  with a loopback `Host`, the login only with a `*.ts.net` one, so a DNS-rebound web page can't
+  use the API.
+- Remote access: `tailscale serve --bg 7477` puts it on your tailnet over HTTPS with the
+  identity header; smithy has no Tailscale code. Any local process can send that header, so set
+  `daemon.allow` only on a machine where every local user is trusted (the dedicated OS user above).
+- `smithy doctor` reports whether it runs, a stale `daemon.json`, and a token readable by others.
+
 ## Notifications
 
 ```
