@@ -16,209 +16,138 @@
 [![Cursor](https://img.shields.io/badge/Cursor-supported-000000)](#harnesses)
 [![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-supported-4285f4?logo=googlegemini&logoColor=white)](#harnesses)
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Skills](#skills) ·
-[Harnesses](#harnesses) · [The smithy binary](#the-smithy-binary) · [Settings](#settings)
+[Install](#install) · [How it works](#how-it-works) · [Skills](#skills) ·
+[Autonomous mode](#autonomous-mode) · [Harnesses](#harnesses) · [Docs](#docs)
 
 </div>
 
-smithy turns your coding agent into a small engineering team. It plans before it builds, writes
-the failing test first, checks its work with independent reviewers, runs tasks in parallel and
-keeps pull requests green until they merge.
+smithy turns your coding agent into a small engineering team: it plans before it builds, writes
+the failing test first, runs tasks in parallel and keeps every pull request green until it merges.
 
-- **Any harness** that loads `SKILL.md` skills: Claude Code, Codex, OpenCode, Cursor, Gemini CLI,
-  Pi, DeepSeek Harness.
-- **Requires** git. Built for GitHub: the [GitHub CLI](https://cli.github.com) (`gh`) is
-  recommended; with only `GH_TOKEN`/`GITHUB_TOKEN` smithy uses the API, and with neither it pushes
-  the branch and prints a compare URL.
+## Highlights
 
-## Quick start
+- **Plans first.** Brainstorm, spec and a task list before any code.
+- **Test-first.** Every change starts from a failing test.
+- **Proof, not claims.** "Tests pass" is a recorded receipt in the PR, and secrets are scanned before every push.
+- **Parallel.** Many tasks at once, one worktree and one PR each.
+- **PRs stay green.** CI fixes, rebases and review threads are handled for you.
+- **You decide.** Nothing reaches production without your yes.
+- **Learns with your yes.** Lessons backed by evidence go into your repo's standards.
+- **Runs unattended.** Label an issue `auto` and it gets built.
+- **Any harness.** Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Pi and DeepSeek Harness.
+
+## Install
 
 ```bash
 npx skills add Zovaris/smithy -g
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh
 ```
 
-The second line installs the `smithy` binary the skills run ([details](#install)). Pick every skill (at least `use-smithy`) and the agents to install to. Then, in your agent:
+The first line installs the skills; pick at least `use-smithy`. The second installs the `smithy`
+binary they run, after verifying its checksum and build attestation.
 
-1. **"run use-smithy setup"** — models, settings, and an optional pointer in your `AGENTS.md`.
-2. **Describe a task** (or start `/smelt <task>`) — planned and built test-first, ending in a PR.
-3. **Hand over several tasks** (or `/warden <tasks>`) — one worker and PR each, after your yes.
+Then, in your agent:
+
+1. **"run use-smithy setup"** to choose models and settings.
+2. **Describe a task** (or `/smelt <task>`): it gets planned, built test-first and opened as a PR.
+3. **Hand over several tasks** (or `/warden <tasks>`): you get one worker and one PR for each.
+
+Requires git. [`gh`](https://cli.github.com) is recommended; without it, smithy falls back to
+`GH_TOKEN` or prints a compare URL. More options: [docs/install.md](docs/install.md).
+
+### For agents
+
+If you are an AI agent asked to install smithy, follow these steps:
+
+1. **Install the skills:** run `npx skills add Zovaris/smithy -g -y --skill '*' -a <your-harness>`.
+2. **Ask about the binary:** ask the user before running `install.sh`, then run it only on their yes.
+3. **Run setup:** read the installed `use-smithy` skill and run its setup with the user.
+
+Never store keys in config files: use `smithy auth set <name>`. Details are in
+[docs/install.md](docs/install.md).
 
 ## How it works
 
 ![How the smithy skills work together](docs/flow.svg)
 
-- **use-smithy** is loaded by the agent on its own and routes each piece of work to the skill that
-  fits.
-- **smelt** and **warden** share one task list (`NN-<slug>.md` files with status, blockers and PR),
-  in the repo or in `~/.smithy/plans/`. Plan with smelt, build one task at a time or hand the list
-  to warden.
-- **Proof, not claims:** every "tests pass" is a recorded receipt (`smithy receipt`) pasted into
-  the PR, and `smithy scan` checks the change for secrets before anything is pushed.
-- **tend** keeps every open PR green: CI fixes, rebases after sibling merges, review threads.
-- **It learns, with your yes:** after a PR, smelt proposes up to 3 lessons, each citing evidence
-  (a receipt, a failing test, a review finding); warden's final message lists the decisions it
-  made alone. What you accept lands in `docs/agents/STANDARDS.md` or `scripts/SCRIPTS.md`, which
-  every later session and worker reads first. ledger keeps both small: a rule budget, and lines
-  whose files are gone are retired (`smithy drift` flags them).
-- **You decide** the plan, scope, and merges: nothing reaches the production branch without your
-  explicit yes. Agents work silently and send their questions up to the session you talk to.
-- Commits are atomic in your repo's style, PRs follow your template, branches are named
-  by `smithy names branch` (`feat/…`, `fix/…`), and finished worktrees are removed every time.
+| Step | What happens |
+|---|---|
+| **Route** | use-smithy picks the right skill for each request |
+| **Plan** | smelt writes a task list (`NN-<slug>.md`) shared with warden |
+| **Build** | one task with smelt, or many in parallel with warden |
+| **Prove** | `smithy receipt` records test runs; `smithy scan` blocks secrets |
+| **Keep green** | tend fixes CI, rebases and answers reviews |
+| **Learn** | up to 3 lessons per PR, each with evidence, kept only on your yes |
 
 ## Skills
 
-| Skill | Started by | What it does |
-|---|---|---|
-| [use-smithy](skills/use-smithy/README.md) | the agent | Routes work to the installed skills and holds the shared rules. **Install it.** |
-| [smelt](skills/smelt/README.md) | you or the agent · `/smelt` | One task, step by step: brainstorm, spec, TDD, test agents, review, receipts, secret scan, PR. `fast`, `normal` or `full` (adds a hostile run of the built system). |
-| [warden](skills/warden/README.md) | you or the agent, after your yes · `/warden` | Many tasks in parallel: one silent worker and worktree per task, each to its own PR. |
-| [tend](skills/tend/README.md) | you · `/tend`, or smelt and warden | Keeps PRs mergeable: CI, rebases, review comments; can watch the repo: new PRs, labeled issues, red workflow runs, base moves, Dependabot alerts. |
-| [ledger](skills/ledger/README.md) | the agent or you | ADRs, glossary, standards, scripts index, module READMEs, codebase map, doc drift, comment policy. |
-| [scout](skills/scout/README.md) | the agent or you | Read-only answers with sources, on your cheap model. |
-| [hush](skills/hush/README.md) | you or the agent · `/hush` | Does the task with no talk; ends with one `done:` line. |
-| [simple](skills/simple/README.md) | the agent | Short, plain replies with no filler. Off with "normal mode". |
+| Skill | What it does |
+|---|---|
+| [use-smithy](skills/use-smithy/README.md) | Routes work to the other skills. **Install it.** |
+| [smelt](skills/smelt/README.md) | One task end to end: spec, TDD, review, PR |
+| [warden](skills/warden/README.md) | Many tasks in parallel, one worker and PR each |
+| [tend](skills/tend/README.md) | Keeps PRs mergeable and watches the repo |
+| [ledger](skills/ledger/README.md) | ADRs, glossary, standards and doc drift |
+| [scout](skills/scout/README.md) | Read-only answers with sources |
+| [hush](skills/hush/README.md) | Does the task with no talk |
+| [simple](skills/simple/README.md) | Short, plain replies |
+
+## Autonomous mode
+
+Label an issue `auto` on GitHub or Linear, and smithy builds it unattended and reports back.
+
+![How autonomous mode works](docs/auto.svg)
+
+```bash
+smithy config set auto.sources github,linear
+smithy auto serve      # Esc/q stops it
+smithy tui             # queue, running agents, cost, settings
+```
+
+The spend is bounded by a daily cap and an hours window. Workers can run in a sandbox, and an
+opt-in pool spreads the work across your own accounts. Read
+[docs/autonomous.md](docs/autonomous.md) before running it: issue text can carry injected
+instructions.
 
 ## Harnesses
 
-Nothing depends on one vendor. Per harness, only three things change: how you start a skill, how
-warden starts workers, and whether a session waiting on a background command resumes on its own
-(otherwise it waits in the foreground).
+| Harness | Start a skill | Warden workers |
+|---|---|---|
+| Claude Code (desktop, CLI) | `/smelt` | app sessions, `claude --bg` |
+| Codex CLI | `$smelt` | `codex exec` |
+| OpenCode | `@smelt` | `opencode run` |
+| Cursor CLI | `/smelt` | `agent -p` |
+| Gemini CLI | "use smelt" | `gemini -p` |
+| Pi | `/skill:smelt` | `pi -p` |
+| DeepSeek Harness | `/smelt` | `dsh headless` |
 
-| Harness | Skills folder (global) | Start a skill | Warden workers | Resumes after background wait |
-|---|---|---|---|---|
-| Claude Code desktop | `~/.claude/skills` | `/smelt` | app sessions (`start_session`) | yes |
-| Claude Code CLI | `~/.claude/skills` | `/smelt` | `claude --bg` | yes |
-| Codex CLI | `~/.agents/skills` | `$smelt` | `smithy agent` → `codex exec` | no: foreground watcher |
-| OpenCode | `~/.config/opencode/skills`, `~/.agents/skills` | `@smelt` | `smithy agent` → `opencode run --standalone` | yes |
-| Pi | `~/.pi/agent/skills`, `~/.agents/skills` | `/skill:smelt` | `smithy agent` → `pi -p` | no: foreground watcher |
-| DeepSeek Harness | `~/.dsh/skills`, `~/.agents/skills` | `/smelt` | `smithy agent` → `dsh headless` | yes |
-| Gemini CLI | `~/.gemini/skills`, `~/.agents/skills` | ask: "use smelt" | `smithy agent` → `gemini -p` | with `backgroundCompletionBehavior: inject` |
-| Cursor CLI | `~/.cursor/skills`, `~/.agents/skills` | `/smelt` | `smithy agent` → `agent -p` | no: foreground watcher |
-
-`smithy agent` runs workers headless with each CLI's flags for writing files, running commands
-and opening PRs without prompts (`AGENT_CLI` picks one, `AGENT_ARGS` adds flags, `AGENT_CMD`
-plugs in anything else). Every skill can be run by an agent; only warden is kept out of implicit
-invocation (`allow_implicit_invocation: false` in `skills/warden/agents/openai.yaml` for Codex), and it still
-asks for a yes before it starts sessions.
+Skills folders, background behavior and custom agents: [docs/harnesses.md](docs/harnesses.md).
 
 ## The smithy binary
 
 ![How a skill runs the smithy binary](docs/binary.svg)
 
-Everything mechanical (settings, branch names, task lists, status cards, commits and PRs in your
-repo's style, waiting on CI) is one small Go binary, `smithy`, that you install once:
-
-- [`install.sh`](install.sh) downloads it for your platform from the GitHub release into
-  `~/.smithy/bin/<version>/`, verifying the checksum and the GitHub build attestation (so it
-  needs `gh`). Without `gh` it installs nothing unless you set `SMITHY_ALLOW_UNATTESTED=1`, which
-  accepts the checksum alone. A mismatch always refuses.
-- Each skill ships a small launcher that runs that binary and never downloads anything. If the
-  skills' version isn't installed (or `smithy doctor` sees a mismatch), the agent asks whether it
-  should run `install.sh` for you or you will. Update both at once with `sh -s -- --update`.
-
-Agents wait on GitHub without spending tokens:
+One small Go binary does the mechanical work: settings, branch names, task lists, commits, PRs and
+waiting on CI without spending tokens.
 
 ```bash
-smithy wait pr:42                 # checks finished (with failed names), merged, closed, conflict, review
-smithy wait run:123 branch:main   # a workflow run, or every run on the branch's latest commit
-smithy wait watch:all             # PRs, issues, red runs, base moves, alerts
-smithy status                     # every task list and warden batch on this machine
-smithy receipt run -- go test ./... # record a verify run (exit, output digest, commit) for the PR
-smithy scan                       # keys, tokens and secret files in what the change adds
+smithy wait pr:42                    # until checks finish, merge, conflict or review
+smithy status                        # every task list and batch on this machine
+smithy receipt run -- go test ./...  # record a test run for the PR
+smithy scan                          # secrets in what the change adds
 ```
 
-To use `smithy` in your own terminal, accept the PATH offer in use-smithy setup (on Windows, add
-`%USERPROFILE%\.smithy\bin` to your user PATH). `smithy --help` lists every command.
+`smithy --help` lists every command.
 
-## Settings
+## Docs
 
-Two JSON files, the repo's first: `<repo>/.smithy/config.json` and `~/.smithy/config.json`. You
-never edit them by hand: use-smithy setup asks everything up front, or each skill asks the first
-time it needs a value. `smithy config list` shows every setting and where it came from; all of
-them, with defaults, are in [docs/settings.md](docs/settings.md). API keys (e.g. Linear) live apart
-in `~/.smithy/auth.json` (mode 0600): `smithy auth set linear < keyfile`, never in a config file. Any process running as you (agents
-included) can read it, so use a test or least-privilege key.
-Telegram notifications from `smithy auto serve`: `smithy auth set telegram` (bot token), `smithy config set notify.telegram.chat <id>`, then `smithy notify test`.
+- [Install and update](docs/install.md)
+- [Settings](docs/settings.md)
+- [Autonomous mode](docs/autonomous.md)
+- [Harnesses](docs/harnesses.md)
+- [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
-## Autonomous mode
-
-tend `auto` watches GitHub issues (and Linear, once `linear.team` is set and a key is stored with
-`smithy auth set linear` or in `LINEAR_API_KEY`) and builds each
-qualified one unattended through warden, reporting progress back on the issue. Issues opt in with
-the `auto` label; a daily cap and an optional hours window bound the spend. `smithy tui` shows
-the queue, running batches and agents, cost per issue, and edits settings in place.
-
-![How autonomous mode works](docs/auto.svg)
-
-```
-smithy config set auto.sources github,linear
-smithy config set linear.team ENG
-smithy config set auto.max_per_day 20
-smithy auto serve          # the loop outside the LLM; Esc/q stops it, agents keep running
-```
-
-Security: run unattended mode under a dedicated OS user or machine, with a least-privilege GitHub
-token and a test or least-privilege Linear key. Issue text can carry injected instructions; the
-`smithy agent --profile auto` allow-list (explicit git/gh subcommands, denied config, credential and
-network commands, denied secret files) reduces that risk but cannot remove it. Codex runs in its
-workspace-write sandbox with network on (push needs it) and approvals off, so nothing stops it
-sending data out: least-privilege tokens matter most there. For more isolation set
-`smithy config set auto.sandbox native` (Claude Code's OS sandbox: host allow-list, writes only to the
-worktree and smithy's plans) or `container` (docker/podman; needs `auto.sandbox_network`, and `bridge` is open egress with no
-domain allow-list, unlike native: an egress allow-list proxy is planned for v0.17; claude needs a
-token from `claude setup-token` stored with `smithy auth set claude`, visible to `docker inspect` and
-anyone with the engine socket; on macOS the container runs as root inside the engine VM, on Linux
-as your uid); it fails closed, and
-`smithy doctor` checks it ([settings](docs/settings.md)). Its settings are read from your user config only. The
-orchestrator itself is not sandboxed and may run repo tests; workers sign commits through your ssh-agent
-(use a dedicated signing key) and still get your `GH_TOKEN` (use a fine-grained, repo-scoped token).
-
-### Account pool
-
-Off until you add an account. Each one is your own account on an official CLI, signed in once in
-its own config dir; smithy agent picks the least recently used one that is not rate limited and,
-when a run hits a usage limit, marks it until its reset. A read-only or untouched run reruns once
-on the next account; a run with partial work stops (exit 75) and warden resumes it in the same
-worktree.
-
-```
-smithy pool add work claude          # dir ~/.smithy/accounts/work (CLAUDE_CONFIG_DIR)
-smithy pool add home claude
-smithy pool add cx codex             # CODEX_HOME
-smithy pool login work               # opens the CLI with that dir: sign in, then exit
-smithy pool list                     # status, resets at, runs and cost today (also smithy tui, System)
-smithy config set auto.agent pool    # optional: serve's orchestrator may use any harness in the pool
-```
-
-When every account is limited, `smithy agent` exits 75 and serve launches nothing until the
-earliest reset (Telegram kind `limited`). Use only accounts you own, through the official CLIs,
-with no proxy or relay in between: each provider's terms apply to each account. Unattended claude
-workers are denied reading every account dir.
-
-## Install
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh             # binary, latest
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.16.2    # binary, pinned
-npx skills add Zovaris/smithy -g -y --skill '*' -a claude-code -a codex   # no prompts
-npx skills add Zovaris/smithy@v0.16.2 -g                                   # pin a release
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # skills + binary
-```
-
-Drop `-g` to install into the current project only. Requires the
-[skills CLI](https://github.com/vercel-labs/skills) (Node 22.20+) and git;
-[`gh`](https://cli.github.com) signed in is recommended, not required.
-
-## Roadmap
-
-GitHub is the only forge today (Linear is an issue source for autonomous mode, not a forge).
-Other forges (GitLab, Bitbucket) come later; there is no `glab` support now.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). One version for the whole repo, tagged `vX.Y.Z` with a
-GitHub release; changes are in [CHANGELOG.md](CHANGELOG.md).
+GitHub is the only forge today; GitLab and Bitbucket come later.
 
 ## Credits
 

@@ -58,14 +58,14 @@
   <rect class="warden" x="408" y="110" width="170" height="140" rx="12"/>
   <text class="k" x="493" y="136" text-anchor="middle">PER BATCH</text>
   <text class="t" x="493" y="158" text-anchor="middle">orchestrator</text>
-  <text class="s" x="493" y="178" text-anchor="middle">fresh claude -p</text>
-  <text class="s" x="493" y="195" text-anchor="middle">follows warden</text>
+  <text class="s" x="493" y="178" text-anchor="middle">fresh agent session</text>
+  <text class="s" x="493" y="195" text-anchor="middle">any harness</text>
   <text class="s" x="493" y="212" text-anchor="middle">auto allow-list</text>
   <rect class="worker" x="610" y="40" width="150" height="122" rx="12"/>
   <text class="k" x="685" y="66" text-anchor="middle">PER ISSUE</text>
   <text class="t" x="685" y="88" text-anchor="middle">worker</text>
   <text class="s" x="685" y="108" text-anchor="middle">own worktree</text>
-  <text class="s" x="685" y="125" text-anchor="middle">sandbox off · native</text>
+  <text class="s" x="685" y="125" text-anchor="middle">sandbox off, native</text>
   <text class="s" x="685" y="142" text-anchor="middle">or container</text>
   <rect class="smelt" x="610" y="196" width="150" height="98" rx="12"/>
   <text class="t" x="685" y="222" text-anchor="middle">account pool</text>
