@@ -55,4 +55,3 @@ func TestHistory(t *testing.T) {
 		t.Fatalf("History view does not render:\n%s", out)
 	}
 }
-
