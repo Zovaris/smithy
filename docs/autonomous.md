@@ -41,7 +41,7 @@ machine, with a fine-grained, repo-scoped GitHub token and a test or least-privi
   |---|---|
   | Claude Code | smithy's allow-list: explicit git/gh subcommands; config edits, credential and network commands, and secret files denied |
   | Codex | its workspace-write sandbox, network on (push needs it), approvals off |
-  | Others | their own headless mode, no smithy allow-list: use `container` |
+  | Others | their own headless mode, no smithy allow-list: use `container` with `proxy` (needs your own `auto.sandbox_image`) |
 
   None of these removes the risk. Nothing stops Codex or the others sending data out, so
   least-privilege tokens matter most there.
@@ -58,7 +58,7 @@ it.
 |---|---|---|
 | `off` (default) | the guard above only | every harness |
 | `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off, so push and `gh` fail; Gemini CLI is refused (its sandbox can't limit hosts) |
-| `container` | docker or podman, read-only root, dropped capabilities | Claude Code, Codex, OpenCode |
+| `container` | docker or podman, read-only root, dropped capabilities; with `auto.sandbox_network proxy`, egress allow-list and secrets | Claude Code and OpenCode in the default image; others with your own `auto.sandbox_image` |
 
 Container mode notes:
 

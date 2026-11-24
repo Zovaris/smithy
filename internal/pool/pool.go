@@ -33,8 +33,8 @@ and only accounts you own: the providers' terms apply to each one.
   clear   <name>                    forgets a recorded limit
 smithy agent picks the least recently used account that is not limited, for the CLI it runs
 (AGENT_CLI=pool: any harness). A run that hits a usage limit marks the account limited until its
-reset (5h when the CLI does not say); limits are detected for claude and codex, the others only
-rotate. A read-only run, or one that left the worktree untouched,
+reset (5h when the CLI does not say); limits are detected for claude, codex, opencode,
+gemini and pi; cursor and dsh only rotate. A read-only run, or one that left the worktree untouched,
 reruns once on the next account; any other exits 75 and blocks its warden card so warden
 relaunches it in the same worktree. With every account limited it exits 75 at once. Files: ~/.smithy/pool.json, ~/.smithy/pool-state.json.`
 

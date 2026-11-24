@@ -319,7 +319,7 @@ func Doctor(args []string) int {
 	}
 	if a := config.Get("auto.agent", ""); a == "pool" {
 		if agents.PoolHarness("pool") == "" {
-			r.warn("auto.agent pool but no pool account (smithy auto serve can't start an orchestrator)", "smithy pool add <name> claude|codex, then smithy pool login <name>")
+			r.warn("auto.agent pool but no pool account (smithy auto serve can't start an orchestrator)", "smithy pool add <name> <harness>, then smithy pool login <name>")
 		} else {
 			r.ok("auto.agent: pool")
 		}
