@@ -9,28 +9,29 @@ import (
 	"github.com/charmbracelet/colorprofile"
 )
 
-// theme is the semantic palette and glyph set for one background, color profile and charset.
+// theme is the Steel palette (TK-28) and glyph set for one background, color profile and charset.
+// Depth comes from the background tiers, not boxes; the one ember marks what runs or has focus.
 type theme struct {
-	accent, ok, warn, err, muted, text, surface, border color.Color
-	forge                                               []color.Color // ember → orange → gold
-	warmWhite                                           color.Color   // shimmer target
-	steel, heat, spark                                  []color.Color // anvil shading, face glow, spark age
-	plain                                               bool          // no color: lean on bold and reverse
-	g                                                   glyphs
+	accent, ok, warn, err, info             color.Color   // ember and the signals: ok, waits on you, failed, link
+	dim, text, strong, muted                color.Color   // text tiers
+	surface, raised, focus, overlay, border color.Color   // background tiers: screen, blocks, open block, panels
+	ramp                                    []color.Color // steel ramp for dither, dark → light
+	plain                                   bool          // no color: lean on bold and reverse
+	g                                       glyphs
 }
 
 type glyphs struct {
-	sel, on, half, off, pass, fail, dot, tee, elbow, pipe, bar string
-	shades                                                     []string // light → full
-	ticks                                                      []rune   // sparkline levels
-	unicode                                                    bool
+	sel, on, half, off, pass, fail, wait, dot, tee, elbow, pipe, bar string
+	shades                                                           []string // light → full
+	ticks                                                            []rune   // sparkline levels
+	unicode                                                          bool
 }
 
-var uniGlyphs = glyphs{sel: "▸", on: "●", half: "◐", off: "○", pass: "✓", fail: "✗", dot: "·", tee: "├─", elbow: "└─",
+var uniGlyphs = glyphs{sel: "▸", on: "●", half: "◐", off: "○", pass: "✓", fail: "✗", wait: "?", dot: "·", tee: "├─", elbow: "└─",
 	pipe: "│", bar: "━", shades: []string{"░", "▒", "▓", "█"}, ticks: []rune("▁▂▃▄▅▆▇█"), unicode: true}
 
-var asciiGlyphs = glyphs{sel: ">", on: "*", half: "~", off: "o", pass: "+", fail: "x", dot: "-", tee: "|-", elbow: "`-",
-	pipe: "|", bar: "=", shades: []string{".", ":", "#", "@"}, ticks: []rune("_.-=+*#@")}
+var asciiGlyphs = glyphs{sel: ">", on: "*", half: "~", off: "o", pass: "+", fail: "x", wait: "?", dot: "-", tee: "|-", elbow: "`-",
+	pipe: "|", bar: "=", shades: []string{".", "-", "=", "#"}, ticks: []rune("_.-=+*#@")}
 
 // utf8Locale reports whether the locale can draw box and block glyphs.
 func utf8Locale() bool {
@@ -51,27 +52,31 @@ func newTheme(dark bool, p colorprofile.Profile, unicode bool) theme {
 		return ld(full(c(a16), c(a256), c(light)), full(c(a16), c(a256), c(darkHex)))
 	}
 	t := theme{
-		accent:  tok("11", "214", "#C2410C", "#FFB547"),
-		ok:      tok("10", "78", "#15803D", "#5FD38D"),
-		warn:    tok("3", "179", "#A16207", "#F2C14E"),
-		err:     tok("9", "203", "#B91C1C", "#FF6B6B"),
-		muted:   tok("8", "244", "#78716C", "#7A7470"),
-		text:    tok("7", "253", "#1C1917", "#ECE7E2"),
-		surface: tok("0", "236", "#F5F0EB", "#1E1B19"),
-		border:  tok("8", "239", "#D6CFC8", "#3A3532"),
+		accent:  tok("11", "208", "#C2541A", "#F2762E"),
+		ok:      tok("10", "78", "#1F8A5B", "#4CC38A"),
+		warn:    tok("3", "178", "#9A6B00", "#E3B341"),
+		err:     tok("9", "203", "#C2362F", "#F47067"),
+		info:    tok("12", "75", "#1F6FCF", "#6CB6FF"),
+		dim:     tok("8", "103", "#8592A3", "#7A879A"),
+		text:    tok("7", "251", "#2C3746", "#B4C0CE"),
+		strong:  tok("15", "255", "#0E1116", "#E6EDF5"),
+		muted:   tok("8", "103", "#5E6B7D", "#8593A6"),
+		surface: tok("0", "233", "#F4F6F9", "#0E1116"),
+		raised:  tok("0", "234", "#EBEFF4", "#131820"),
+		focus:   tok("0", "235", "#E1E7EE", "#1A212B"),
+		overlay: tok("0", "236", "#D8E0E9", "#222B37"),
+		border:  tok("8", "237", "#C3CDD9", "#2C3746"),
 		g:       asciiGlyphs,
 	}
 	if unicode {
 		t.g = uniGlyphs
 	}
-	t.forge = []color.Color{c("#B3260B"), c("#F25C05"), c("#FFB547")}
-	t.warmWhite = c("#FFF1D6")
-	t.steel = lipgloss.Blend1D(7, c("#151A22"), c("#2C3746"), c("#56657A"), c("#93A3B8"), c("#D5DEE8"))
-	t.heat = lipgloss.Blend1D(6, c("#56657A"), c("#B3260B"), c("#F25C05"), c("#FFB547"), c("#FFF1C1"))
-	t.spark = lipgloss.Blend1D(6, c("#FFFFFF"), c("#FFD36E"), c("#F25C05"), c("#8A1A06"))
+	t.ramp = []color.Color{c("#0E1116"), c("#131820"), c("#1A212B"), c("#222B37"), c("#2C3746"), c("#3B4A5E")}
 	if p <= colorprofile.Ascii {
 		t.plain = true
-		t.accent, t.ok, t.warn, t.err, t.muted, t.text, t.surface, t.border = nil, nil, nil, nil, nil, nil, nil, nil
+		t.accent, t.ok, t.warn, t.err, t.info = nil, nil, nil, nil, nil
+		t.dim, t.text, t.strong, t.muted = nil, nil, nil, nil
+		t.surface, t.raised, t.focus, t.overlay, t.border = nil, nil, nil, nil, nil
 	}
 	return t
 }

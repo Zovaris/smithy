@@ -6,6 +6,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 ## Unreleased
 
 - Added: a harness build (`go build -tags harness ./cmd/smithy`, released as `smithy-harness-<os>-<arch>`) beside the stdlib-only skills build, with a SQLite store (`~/.smithy/smithy.db`, WAL, append-only events, migrations) on pure-Go `modernc.org/sqlite` (ADR 0009). In the skills build, `smithy daemon`, `attach` and `board` say how to get it.
+- `smithy tui` restyled to Steel (TK-28): steel background tiers instead of boxes (a border only on the focused block), dim/base/strong text tiers, one ember for what runs or has focus, `?` for what waits on you, a half-block gradient header with ember sparks, a Bayer shimmer on running items and a dithered progress edge. Motion runs at 15 fps only while something moves; the new `tui.reduce_motion` setting keeps every frame still.
 
 ## v0.17.0 — 2026-11-24
 

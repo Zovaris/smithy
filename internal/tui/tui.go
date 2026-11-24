@@ -202,6 +202,7 @@ type Model struct {
 	motion    bool
 	framing   bool // a frame loop is scheduled
 	ticks     int
+	frames    int // frames drawn; moves the shimmer on running items
 	status    string
 	toast     string
 	toastTill time.Time
@@ -270,7 +271,7 @@ func New(noAnim, demo bool) Model {
 		events.Off = true
 		load = Demo
 	}
-	motion := !noAnim && os.Getenv("SMITHY_REDUCE_MOTION") == "" && p != colorprofile.Ascii
+	motion := motionOn(noAnim, os.Getenv("SMITHY_REDUCE_MOTION"), config.Get("tui.reduce_motion", "false"), p)
 	m := newModel(options{profile: p, dark: true, unicode: utf8Locale(), motion: motion, toast: first || demo,
 		seed: uint64(time.Now().UnixNano()), now: time.Now, load: load})
 	if demo {
@@ -279,6 +280,31 @@ func New(noAnim, demo bool) Model {
 		m.loadSys = demoSystem
 	}
 	return m
+}
+
+// motionOn is false for --no-anim, SMITHY_REDUCE_MOTION, tui.reduce_motion=true or no color:
+// then every frame is static.
+func motionOn(noAnim bool, env, setting string, p colorprofile.Profile) bool {
+	return !noAnim && env == "" && setting != "true" && p != colorprofile.Ascii
+}
+
+// running is a stage that moves: building or checking.
+func running(stage string) bool { return stage == "building" || stage == "checking" }
+
+// running reports whether any item is building or checking.
+func (m Model) running() bool {
+	for _, it := range m.items() {
+		if running(stageOf(it)) {
+			return true
+		}
+	}
+	return false
+}
+
+// band is the shimmer center for a text n cells wide, offset by k so rows don't move in lockstep.
+func (m Model) band(n, k int) float64 {
+	span := n + 2*shimmerHalf
+	return float64((m.frames+k*7)%span) - shimmerHalf
 }
 
 func setPaused(on bool) error {
@@ -292,7 +318,7 @@ func capPercent(w Watcher) float64 {
 	return min(float64(w.Today)/float64(w.Cap), 1)
 }
 
-// Init starts the refresh loop, asks for the background color and strikes the anvil once.
+// Init starts the refresh loop, asks for the background color and strikes the plate once.
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{tick(), tea.RequestBackgroundColor}
 	if m.motion {
@@ -316,9 +342,9 @@ func (m Model) reload() tea.Cmd {
 
 func (m Model) sprite() sprite {
 	if m.width >= 110 {
-		return bigAnvil
+		return bigPlate
 	}
-	return smallAnvil
+	return smallPlate
 }
 
 func (m *Model) strike(n int) tea.Cmd {
@@ -339,7 +365,7 @@ func (m *Model) animate() tea.Cmd {
 }
 
 func (m Model) busy() bool {
-	return m.fx.busy() || abs(m.capPos-capPercent(m.snap.Watcher)) > 0.002 || abs(m.capVel) > 0.002
+	return m.fx.busy() || (m.motion && m.running()) || abs(m.capPos-capPercent(m.snap.Watcher)) > 0.002 || abs(m.capVel) > 0.002
 }
 
 func abs(f float64) float64 {
@@ -381,6 +407,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.strike(10)
 	case frameMsg:
 		m.framing = false
+		m.frames++
 		m.fx.step()
 		m.capPos, m.capVel = m.spring.Update(m.capPos, m.capVel, capPercent(m.snap.Watcher))
 		if m.busy() {

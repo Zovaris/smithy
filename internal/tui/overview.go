@@ -74,7 +74,7 @@ func (m Model) cardThroughput(w, h int) ([]string, string) {
 		return n
 	}
 	mut := t.fg(t.muted)
-	upC, downC := t.forge[2], t.ok
+	upC, downC := t.info, t.ok
 	if t.plain {
 		upC = nil
 	}
@@ -115,7 +115,7 @@ func (m Model) cardThroughput(w, h int) ([]string, string) {
 	upRamp := []color.Color{upC}
 	downRamp := []color.Color{downC}
 	if rich {
-		upRamp = lipgloss.Blend1D(max(hu, 2), t.forge[0], t.forge[1], t.forge[2])
+		upRamp = lipgloss.Blend1D(max(hu, 2), t.ramp[5], t.info)
 		downRamp = lipgloss.Blend1D(max(hd, 2), lipgloss.Color("#1F5A36"), t.ok)
 	}
 	grid := mut.Render("·")
@@ -256,7 +256,7 @@ func (m Model) cardAgents(w, h int) ([]string, string) {
 		if !sv.SessionAt.IsZero() {
 			el = " " + t.g.dot + " " + dur(m.snap.At.Sub(sv.SessionAt))
 		}
-		orch = t.fg(t.accent).Render(t.g.on) + " " + t.fg(t.text).Render("orchestrator") +
+		orch = t.fg(t.accent).Render(t.g.on) + " " + t.fg(t.strong).Render("orchestrator") +
 			t.fg(t.muted).Render(short(fmt.Sprintf("  %s pid %d%s", or(sv.Agent), sv.SessionPID, el), max(w-14, 10)))
 	}
 	if total == 0 {
@@ -293,22 +293,26 @@ func (m Model) cardAgents(w, h int) ([]string, string) {
 		lines = append(lines, orch)
 	}
 	sort.SliceStable(live, func(i, j int) bool { return m.beatAge(live[i]) < m.beatAge(live[j]) })
-	spin := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	if !t.g.unicode {
-		spin = []string{"|", "/", "-", "\\"}
-	}
 	for k, it := range live {
 		if k >= 3 || len(lines) >= h {
 			break
 		}
 		st := stageOf(it)
-		g := spin[(m.ticks+k)%len(spin)]
-		if st == "blocked" {
+		g, gc := t.g.on, m.stageColor(st)
+		switch {
+		case it.Stage == "decide":
+			g, gc = t.g.wait, t.warn
+		case st == "blocked":
 			g = t.g.fail
-		} else if st == "ready" {
+		case st == "ready":
 			g = t.g.pass
 		}
-		lines = append(lines, t.fg(m.stageColor(st)).Render(g)+" "+t.fg(t.text).Render(short(it.ID+" "+it.Title, w-22))+
+		title := short(it.ID+" "+it.Title, w-22)
+		name := t.fg(t.text).Render(title)
+		if m.motion && running(st) {
+			name = t.shimmer(title, m.band(len([]rune(title)), k))
+		}
+		lines = append(lines, t.fg(gc).Render(g)+" "+name+
 			t.fg(t.muted).Render("  "+st+" "+t.g.dot+" "+m.beat(it)))
 	}
 	return lines, fmt.Sprintf("%d live", total)
