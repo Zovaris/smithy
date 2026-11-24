@@ -133,7 +133,7 @@ func TestDetectIgnoresRateLimitInATestLog(t *testing.T) {
 	log := filepath.Join(t.TempDir(), "l")
 	now := time.Now()
 	os.WriteFile(log, []byte("--- FAIL: TestRetry (0.01s)\n    client_test.go:40: got error rate_limit, want nil\nFAIL\nexit status 1\n"), 0o600)
-	for _, k := range []string{"claude", "codex", "opencode"} {
+	for _, k := range []string{"claude", "codex", "opencode", "gemini", "pi"} {
 		if _, ok := Detect(log, k, 1, now); ok {
 			t.Errorf("%s: a failing test log mentioning rate_limit counted", k)
 		}
@@ -248,5 +248,50 @@ func TestEveryHarnessLogsInWithItsOwnDir(t *testing.T) {
 	}
 	if _, err := Add("x", "nope", ""); err == nil {
 		t.Fatal("unknown harness accepted")
+	}
+}
+
+// The texts below are copied from each CLI's source, at the commits named, so a reworded message
+// shows up here as a failing fixture rather than as accounts that never rotate.
+func TestDetectOpenCodeGeminiPi(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "l")
+	now := time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC)
+	cases := []struct {
+		kind, text string
+		rc         int
+		ok         bool
+		until      time.Time
+	}{
+		// sst/opencode@63f2ac53 packages/core/src/session/to-session-error.ts:38-40,135; printed by
+		// packages/cli/src/run/ui.ts:22-24 ("Error: " on stderr) with exitCode 1 (run/noninteractive.ts:306).
+		{"opencode", "> build\n\x1b[91m\x1b[1mError: \x1b[0mOpenCode Go weekly usage limit reached. Switch to a free model, or turn on Extra Usage on the Go page in OpenCode Console to keep going.\n", 1, true, now.Add(DefaultLimit)},
+		{"opencode", "Error: Free usage limit reached. Connect a provider or subscribe to OpenCode Go to keep going, or switch models.\n", 1, true, now.Add(DefaultLimit)},
+		{"opencode", "Error: ChatGPT usage limit reached. Check ChatGPT Settings → Usage for details.\n", 1, true, now.Add(DefaultLimit)},
+		// sst/opencode@63f2ac53 packages/core/src/plugin/provider/claude-agent/language-model/claude-agent-error.ts:40-42.
+		{"opencode", "Error: Claude Code subscription limit reached (five hour). Resets at 2026-11-24T17:00:00.000Z.\n", 1, true, time.Date(2026, 11, 24, 17, 0, 0, 0, time.UTC)},
+		{"opencode", "Error: OpenCode Go usage limit reached.\n", 0, false, time.Time{}},
+		{"opencode", "I explained the usage limit reached message\nError: Session failed\n", 1, false, time.Time{}},
+		// google-gemini/gemini-cli@03862c41 packages/core/src/utils/quotaRetryFailure.test.ts:28 (server
+		// text of a TerminalQuotaError, googleQuotaErrors.ts:318-323), printed by packages/cli/index.ts:197-203
+		// with the prefix "An unexpected critical error occurred: " and exit 1.
+		{"gemini", "An unexpected critical error occurred: You have exhausted your capacity on this model. Your quota will reset after 16h03m18s.\n", 1, true, now.Add(16*time.Hour + 3*time.Minute + 18*time.Second)},
+		{"gemini", "An unexpected critical error occurred: You have exhausted your capacity on this model.\n", 1, true, now.Add(DefaultLimit)},
+		{"gemini", "You have exhausted your capacity on this model. Your quota will reset after 1h.\n", 1, false, time.Time{}},
+		{"gemini", "An unexpected critical error occurred: You have exhausted your capacity on this model.\n", 0, false, time.Time{}},
+		// badlogic/pi-mono@642a705e packages/coding-agent/src/modes/print-mode.ts:151-153 prints the
+		// provider's errorMessage on stderr and exits 1; packages/ai/src/utils/retry.ts:7-34 lists the
+		// account-limit texts, packages/ai/src/api/openai-responses.ts:36 the ChatGPT workspace one.
+		{"pi", "429 {\"error\":{\"type\":\"GoUsageLimitError\",\"message\":\"Monthly usage limit reached\"}}\n", 1, true, now.Add(DefaultLimit)},
+		{"pi", "You exceeded your current quota, please check your plan and billing details. insufficient_quota\n", 1, true, now.Add(DefaultLimit)},
+		{"pi", "You've reached your ChatGPT workspace's usage limit. Ask your workspace admin to increase it at admin.openai.com → Workspace → Usage limits.\n", 1, true, now.Add(DefaultLimit)},
+		{"pi", "429 rate_limit_error: Number of request tokens has exceeded your per-minute rate limit\n", 1, false, time.Time{}},
+		{"pi", "insufficient_quota\n", 0, false, time.Time{}},
+	}
+	for _, c := range cases {
+		os.WriteFile(log, []byte(c.text), 0o600)
+		u, ok := Detect(log, c.kind, c.rc, now)
+		if ok != c.ok || (ok && !u.Equal(c.until)) {
+			t.Errorf("%s rc=%d %q → %v %v, want %v %v", c.kind, c.rc, c.text, u, ok, c.until, c.ok)
+		}
 	}
 }

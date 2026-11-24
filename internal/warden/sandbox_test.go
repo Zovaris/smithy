@@ -2,6 +2,7 @@ package warden
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/pool"
 )
 
 func sandboxReport(t *testing.T, mode, goos string, have ...string) (string, bool) {
@@ -46,7 +48,7 @@ func sandboxReportWith(t *testing.T, mode, goos, network, token string, have ...
 			return b, nil
 		}
 		return "", errors.New("no")
-	}, Version: func(string) (string, error) { return version, nil }}
+	}, Version: func(string) (string, error) { return version, nil }, Exists: func(f string) bool { _, err := os.Stat(f); return err == nil }}
 	r := &report{}
 	o, _, _ := capture(t, func() int { sandboxDoctor(r, p); return 0 })
 	return o, r.failed
@@ -79,16 +81,30 @@ func TestSandboxDoctor(t *testing.T) {
 func TestSandboxDoctorPoolContainer(t *testing.T) {
 	t.Setenv("SMITHY_HOME", t.TempDir())
 	t.Setenv("SMITHY_CONFIG", filepath.Join(t.TempDir(), "c.json"))
-	for k, v := range map[string]string{"auto.sandbox": "container", "auto.agent": "pool"} {
+	for k, v := range map[string]string{"auto.sandbox": "container", "auto.agent": "pool", "auto.sandbox_network": "bridge"} {
 		if err := config.Set(config.UserFile(), k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
+	if err := os.WriteFile(pool.File(), []byte(`{"accounts":[{"name":"a","harness":"claude","dir":"/acct/a"},{"name":"b","harness":"codex","dir":"/acct/b"}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	p := agents.Probe{GOOS: "linux", Look: func(b string) (string, error) { return b, nil }}
 	r := &report{}
 	o, _, _ := capture(t, func() int { sandboxDoctor(r, p); return 0 })
-	if !r.failed || !strings.Contains(o, "pool and container don't combine yet") {
-		t.Errorf("want a FAIL line for pool + container:\n%s", o)
+	if !r.failed || !strings.Contains(o, "smithy auth set claude:a") {
+		t.Errorf("a claude account without its token must FAIL:\n%s", o)
+	}
+	p.Secret = func(svc string) string {
+		if svc == "claude:a" {
+			return "tok"
+		}
+		return ""
+	}
+	r = &report{}
+	o, _, _ = capture(t, func() int { sandboxDoctor(r, p); return 0 })
+	if r.failed {
+		t.Errorf("every pooled account can run:\n%s", o)
 	}
 }
 
@@ -105,5 +121,17 @@ func TestSandboxDoctorContainerRefusals(t *testing.T) {
 	o, failed = sandboxReportWith(t, "container", "linux", "bridge", "", "docker")
 	if !failed || !strings.Contains(o, "claude setup-token, then smithy auth set claude") {
 		t.Errorf("no credential must FAIL:\n%s", o)
+	}
+}
+
+func TestSandboxDoctorProxy(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	o, failed := sandboxReportWith(t, "container", "darwin", "proxy", "tok", "docker")
+	if !failed || !strings.Contains(o, "no linux smithy for the proxy sidecar") {
+		t.Errorf("no binary: failed=%v\n%s", failed, o)
+	}
+	o, failed = sandboxReportWith(t, "container", "linux", "proxy", "tok", "docker")
+	if failed || !strings.Contains(o, "egress proxy smithy-proxy on smithy-internal, hosts github.com,") || strings.Contains(o, "open egress") {
+		t.Errorf("binary: failed=%v\n%s", failed, o)
 	}
 }

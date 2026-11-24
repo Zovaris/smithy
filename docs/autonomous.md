@@ -41,7 +41,7 @@ machine, with a fine-grained, repo-scoped GitHub token and a test or least-privi
   |---|---|
   | Claude Code | smithy's allow-list: explicit git/gh subcommands; config edits, credential and network commands, and secret files denied |
   | Codex | its workspace-write sandbox, network on (push needs it), approvals off |
-  | Others | their own headless mode, no smithy allow-list: use `container` |
+  | Others | their own headless mode, no smithy allow-list: use `container` with `proxy` (needs your own `auto.sandbox_image`) |
 
   None of these removes the risk. Nothing stops Codex or the others sending data out, so
   least-privilege tokens matter most there.
@@ -57,13 +57,26 @@ it.
 | Mode | Isolation | Works with |
 |---|---|---|
 | `off` (default) | the guard above only | every harness |
-| `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off, so push and `gh` fail |
-| `container` | docker or podman, read-only root, dropped capabilities | Claude Code, Codex, OpenCode |
+| `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off, so push and `gh` fail; Gemini CLI is refused (its sandbox can't limit hosts) |
+| `container` | docker or podman, read-only root, dropped capabilities; with `auto.sandbox_network proxy`, egress allow-list and secrets | Claude Code and OpenCode in the default image; others with your own `auto.sandbox_image` |
 
 Container mode notes:
 
-- **Network:** it needs `auto.sandbox_network`. `bridge` is open egress with no domain allow-list;
-  an egress proxy is planned for v0.17.
+- **Network:** it needs `auto.sandbox_network`. `proxy` puts workers on an internal network whose
+  only exit is the `smithy-proxy` sidecar: GitHub, the model APIs, package registries and
+  `auto.sandbox_domains`, nothing else. `bridge` is open egress with no domain allow-list.
+- **Secrets (proxy only):** the worker never gets the key. Bind it to its host, then the worker
+  calls the proxy, which adds the key and scrubs it from the response:
+
+  ```sh
+  smithy auth set linear < key.txt
+  smithy auth bind linear api.linear.app GET,POST
+  # inside the worker: curl http://smithy-proxy:8877/s/linear/graphql
+  ```
+
+  Writes are refused unless bound; `smithy auth ask <name> on` holds them until
+  `smithy proxy approve <id>` instead. The sidecar needs a linux smithy binary
+  (`auto.sandbox_proxy_binary`, see [settings](settings.md)).
 - **Credentials:** each worker gets only its own harness's credential from `smithy auth`:
 
   | Harness | Credential |
@@ -84,10 +97,10 @@ signed in once in its own config dir.
 |---|---|---|
 | Claude Code | `CLAUDE_CONFIG_DIR` | yes |
 | Codex | `CODEX_HOME` | yes |
-| OpenCode | `XDG_DATA_HOME` | no |
-| Gemini CLI | `GEMINI_CLI_HOME` | no |
+| OpenCode | `XDG_DATA_HOME` | yes |
+| Gemini CLI | `GEMINI_CLI_HOME` | yes |
 | Cursor CLI | `CURSOR_CONFIG_DIR` | no |
-| Pi | `PI_CODING_AGENT_DIR` | no |
+| Pi | `PI_CODING_AGENT_DIR` | yes |
 | DeepSeek Harness | `DSH_HOME` | no |
 
 Every harness rotates across its accounts. Where the limit is not detected yet, a limited run fails
@@ -114,5 +127,8 @@ provider's terms apply to each account.
 
 - **Hiding the account dirs:** `native` hides them from workers. With the sandbox `off`, only
   Claude Code workers get a deny rule for them.
-- **Container:** the pool doesn't combine with `container` yet, so `smithy doctor` fails and serve
-  launches nothing.
+- **Container:** a pooled container worker mounts only its own account's dir and gets its
+  config-dir variable (`CODEX_HOME`, `XDG_DATA_HOME`, ...). A claude account's Keychain login never
+  reaches a container, so each needs its own token: run `claude setup-token` signed in as that
+  account, then `smithy auth set claude:<account>`. `smithy doctor` fails until every claude account
+  in the pool has one.

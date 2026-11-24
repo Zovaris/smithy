@@ -475,9 +475,6 @@ func TestSandboxCheckAgentPool(t *testing.T) {
 	if err := SandboxCheckAgent("native", "pool", withVersion(ok, "2.0.0", nil)); err == nil || !strings.Contains(err.Error(), "older") {
 		t.Errorf("claude accounts get the version floor: %v", err)
 	}
-	if err := SandboxCheckAgent("container", "pool", probe("linux", "docker")); err == nil || !strings.Contains(err.Error(), "pool") {
-		t.Errorf("pool + container must refuse: %v", err)
-	}
 	if err := SandboxCheckAgent("off", "pool", ok); err != nil {
 		t.Errorf("off: %v", err)
 	}
@@ -500,5 +497,111 @@ func TestNativeGitEnvUsesHTTPS(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("missing %q in %s", want, got)
 		}
+	}
+}
+
+func TestSandboxCheckGeminiNativeRefused(t *testing.T) {
+	for _, goos := range []string{"darwin", "linux"} {
+		err := SandboxCheck("native", "gemini", probe(goos, "/usr/bin/sandbox-exec", "gemini"))
+		if err == nil {
+			t.Fatalf("%s: gemini native must be refused", goos)
+		}
+		for _, want := range []string{"gemini", "host", "auto.sandbox container"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("%s: refusal %q lacks %q", goos, err, want)
+			}
+		}
+	}
+}
+
+func TestSandboxCheckAgentPoolContainer(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	setNetwork(t, "bridge")
+	if err := os.WriteFile(pool.File(), []byte(`{"accounts":[{"name":"a","harness":"claude","dir":"/acct/a"},{"name":"b","harness":"codex","dir":"/acct/b"}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p := probe("linux", "docker")
+	if err := SandboxCheckAgent("container", "pool", p); err == nil || !strings.Contains(err.Error(), "smithy auth set claude:a") {
+		t.Errorf("a claude account needs its own token: %v", err)
+	}
+	p.Secret = func(svc string) string {
+		if svc == "claude" {
+			return "shared"
+		}
+		return ""
+	}
+	if err := SandboxCheckAgent("container", "pool", p); err == nil {
+		t.Error("the shared claude token is not the account's login")
+	}
+	p.Secret = func(svc string) string {
+		if svc == "claude:a" {
+			return "tok"
+		}
+		return ""
+	}
+	if err := SandboxCheckAgent("container", "pool", p); err != nil {
+		t.Errorf("every account can run: %v", err)
+	}
+	setNetwork(t, "none")
+	if err := SandboxCheckAgent("container", "pool", p); err == nil || err.Error() != ContainerNoNetwork {
+		t.Errorf("network still checked: %v", err)
+	}
+}
+
+func TestPoolContainerCreds(t *testing.T) {
+	if got := PoolContainerCreds(pool.Account{Name: "w", Harness: "claude"}); !slices.Equal(got, [][2]string{{"claude:w", "CLAUDE_CODE_OAUTH_TOKEN"}}) {
+		t.Errorf("claude = %v", got)
+	}
+	if got := PoolContainerCreds(pool.Account{Name: "w", Harness: "codex"}); got != nil {
+		t.Errorf("codex logs in from its dir: %v", got)
+	}
+}
+
+func TestContainerMountsPoolAccount(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	setNetwork(t, "bridge")
+	cwd, a, b := t.TempDir(), t.TempDir(), t.TempDir()
+	body := `{"accounts":[{"name":"a","harness":"codex","dir":"` + a + `"},{"name":"b","harness":"codex","dir":"` + b + `"}]}`
+	if err := os.WriteFile(pool.File(), []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, err := container(cwd, "", pool.Account{Name: "a", Harness: "codex", Dir: a})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(c.Mounts, a) || slices.Contains(c.Mounts, b) {
+		t.Errorf("only the run's account dir is mounted: %v", c.Mounts)
+	}
+	if !slices.Contains(c.Env, "CODEX_HOME") {
+		t.Errorf("the account's env var passes in: %v", c.Env)
+	}
+	for _, bad := range []string{filepath.Dir(a), os.Getenv("SMITHY_HOME")} {
+		if _, err := container(cwd, "", pool.Account{Name: "x", Harness: "codex", Dir: bad}); err == nil {
+			t.Errorf("a dir holding other accounts or smithy home must refuse: %s", bad)
+		}
+	}
+	c, err = container(cwd, "", pool.Account{})
+	if err != nil || slices.Contains(c.Mounts, a) || len(c.Env) != 0 {
+		t.Errorf("no account, no account dir: %v %v %v", c.Mounts, c.Env, err)
+	}
+}
+
+func TestContainerCheckDefaultImageHarnesses(t *testing.T) {
+	setNetwork(t, "bridge")
+	p := withCred(probe("linux", "docker"))
+	for _, cli := range []string{"codex", "gemini", "cursor", "pi", "dsh"} {
+		if err := SandboxCheck("container", cli, p); err == nil || !strings.Contains(err.Error(), "auto.sandbox_image") {
+			t.Errorf("%s on the default image: want refusal naming auto.sandbox_image, got %v", cli, err)
+		}
+	}
+	if err := SandboxCheck("container", "opencode", p); err != nil {
+		t.Errorf("opencode is in the default image: %v", err)
+	}
+}
+
+func TestContainerRefusesHostNetwork(t *testing.T) {
+	setNetwork(t, "host")
+	if err := SandboxCheck("container", "opencode", withCred(probe("linux", "docker"))); err == nil || !strings.Contains(err.Error(), "host") {
+		t.Errorf("host network shares the host's: want refusal, got %v", err)
 	}
 }

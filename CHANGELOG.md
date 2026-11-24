@@ -5,6 +5,13 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Container refuses `auto.sandbox_network host` and, on the default image, harnesses it does not carry (only Claude Code and OpenCode); pool hints and help list every harness; docs match the proxy allow-list and restart rule.
+- Fixed: the proxy sidecar restarts when `auth.json` changes, so a new `smithy auth bind` reaches it (a single-file mount kept the old file after a rewrite); `*.opencode.ai` is in the default allow-list so OpenCode workers can fetch their models.
+- Added: the account pool works with `auto.sandbox container`: a pooled worker mounts only its own account dir and gets its config-dir variable; claude accounts use their own token (`smithy auth set claude:<account>`). Doctor allows the combination when every pooled account can run.
+- `auto.sandbox native` now refuses Gemini CLI workers with the reason: its seatbelt profiles either open every host or need a proxy smithy doesn't ship, and on Linux it only offers docker/podman. Use `auto.sandbox container`.
+- Account pool: usage limits are now detected for OpenCode, Gemini CLI and Pi too (each from its own error text, last lines of a failed run), so a limited account is marked until its reset instead of only rotating.
+- Added: `auto.sandbox_network proxy` for container workers: an internal network whose only exit is the `smithy-proxy` sidecar (`smithy proxy serve`), which tunnels only to GitHub, the model APIs, package registries and `auto.sandbox_domains`, and logs what it refuses.
+- Added: secrets for container workers that never see them: `smithy auth bind <name> <host> [METHODS]` lets the proxy send a stored key to that host (`http://smithy-proxy:8877/s/<name>/<path>`), dropping the worker's own auth headers and scrubbing the key from responses; writes are refused unless bound, or held for `smithy proxy approve <id>` with `smithy auth ask <name> on`.
 - Fixed: stopping `smithy auto serve` mid-cycle could leave a stale heartbeat (`~/.smithy/auto/serve.json`) written by the abandoned cycle.
 
 ## v0.16.3 — 2026-11-23
@@ -12,7 +19,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - Account pool: OpenCode, Gemini CLI, Cursor CLI, Pi and DeepSeek Harness accounts, each with its own config dir (`smithy pool add <name> <harness>`). Usage limits are detected for Claude Code and Codex; the others rotate.
 - README: autonomous mode diagram (`docs/auto.svg`) and the TUI's cost and settings views.
 - README rewritten to be scannable: highlights, short tables, one-line examples. Details live in `docs/install.md`, `docs/harnesses.md` and `docs/autonomous.md`.
-- Docs: per-harness guard under `--profile auto` (smithy allow-list is Claude Code only), native sandbox codex runs with network off, pool does not combine with container yet.
+- Docs: per-harness guard under `--profile auto` (smithy allow-list is Claude Code only), native sandbox codex runs with network off.
 
 ## v0.16.2 — 2026-11-23
 
