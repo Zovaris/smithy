@@ -10,6 +10,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - `smithy tui` restyled to Steel (TK-28): steel background tiers instead of boxes (a border only on the focused block), dim/base/strong text tiers, one ember for what runs or has focus, `?` for what waits on you, a half-block gradient header with ember sparks, a Bayer shimmer on running items and a dithered progress edge. Motion runs at 15 fps only while something moves; the new `tui.reduce_motion` setting keeps every frame still.
 
 - Added: `smithy daemon` (harness build): the auto serve loop plus a loopback-only API (`GET /v1/state`, `GET /v1/events` as resumable SSE, `POST /v1/decisions` where the first answer wins) with every event in the SQLite store. Requests need `~/.smithy/daemon.token` or a `Tailscale-User-Login` in the new `daemon.allow`; `daemon.port` picks the port. In the harness build `smithy auto serve` starts the daemon or attaches to it; `smithy doctor` checks it.
+- Added: `smithy attach [url]` (harness build), a terminal client of the daemon: live events, pending decisions answered with keys 1-9 (first answer wins), reconnect with backoff and resume from the last seq without repeating events. `smithy auto serve` attached to a daemon now also reconnects.
 
 ## v0.17.0 — 2026-11-24
 
