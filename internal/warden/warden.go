@@ -487,8 +487,11 @@ func sandboxDoctor(r *report, p agents.Probe) {
 			sock = "engine default"
 		}
 		r.ok("sandbox: container (" + e + ", socket " + sock + ", image " + userSetting("auto.sandbox_image", agents.DefaultSandboxImage) + ", network " + net + ")")
-		if net == "bridge" || net == "host" {
-			r.warn("sandbox container: network "+net+" is open egress with no domain allow-list (native has one)", "an egress allow-list proxy is planned for v0.17; use auto.sandbox native for an allow-list now")
+		switch net {
+		case "bridge", "host":
+			r.warn("sandbox container: network "+net+" is open egress with no domain allow-list (native has one)", "smithy config set auto.sandbox_network proxy")
+		case "proxy":
+			r.ok("sandbox container: egress proxy " + agents.ProxyName + " on " + agents.ProxyNetwork + ", hosts " + strings.Join(agents.ProxyDomains(userSetting("auto.sandbox_domains", "")), ","))
 		}
 	case agents.Kind(cli) == "codex":
 		r.ok("sandbox: native (codex workspace-write, network off)")

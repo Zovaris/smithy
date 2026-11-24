@@ -2,6 +2,7 @@ package warden
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -46,7 +47,7 @@ func sandboxReportWith(t *testing.T, mode, goos, network, token string, have ...
 			return b, nil
 		}
 		return "", errors.New("no")
-	}, Version: func(string) (string, error) { return version, nil }}
+	}, Version: func(string) (string, error) { return version, nil }, Exists: func(f string) bool { _, err := os.Stat(f); return err == nil }}
 	r := &report{}
 	o, _, _ := capture(t, func() int { sandboxDoctor(r, p); return 0 })
 	return o, r.failed
@@ -105,5 +106,17 @@ func TestSandboxDoctorContainerRefusals(t *testing.T) {
 	o, failed = sandboxReportWith(t, "container", "linux", "bridge", "", "docker")
 	if !failed || !strings.Contains(o, "claude setup-token, then smithy auth set claude") {
 		t.Errorf("no credential must FAIL:\n%s", o)
+	}
+}
+
+func TestSandboxDoctorProxy(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	o, failed := sandboxReportWith(t, "container", "darwin", "proxy", "tok", "docker")
+	if !failed || !strings.Contains(o, "no linux smithy for the proxy sidecar") {
+		t.Errorf("no binary: failed=%v\n%s", failed, o)
+	}
+	o, failed = sandboxReportWith(t, "container", "linux", "proxy", "tok", "docker")
+	if failed || !strings.Contains(o, "egress proxy smithy-proxy on smithy-internal, hosts github.com,") || strings.Contains(o, "open egress") {
+		t.Errorf("binary: failed=%v\n%s", failed, o)
 	}
 }

@@ -225,7 +225,7 @@ func DockerHost(engine string, p Probe) (set, endpoint string) {
 
 // ContainerNoNetwork is why a container with no network is refused: claude can't reach its API
 // and git can't push.
-const ContainerNoNetwork = "container needs a network: smithy config set auto.sandbox_network bridge (open egress) or a proxied network"
+const ContainerNoNetwork = "container needs a network: smithy config set auto.sandbox_network proxy (egress allow-list and secrets) or bridge (open egress)"
 
 // ContainerNoCredential is why a claude container with no credential is refused: a Keychain login
 // never reaches the container.
@@ -300,6 +300,11 @@ func containerCheck(cli string, p Probe) error {
 	}
 	if n == "" || n == "none" {
 		return fmt.Errorf("%s", ContainerNoNetwork)
+	}
+	if n == "proxy" {
+		if _, err := proxyBinary(p); err != nil {
+			return err
+		}
 	}
 	creds := ContainerCreds(Kind(cli), "")
 	if len(creds) == 0 {
@@ -556,7 +561,7 @@ func (c Container) Argv(argv []string) []string {
 // API keys and proxy settings. A GitHub token passes only as SMITHY_SANDBOX_GH_TOKEN (a scoped
 // token), renamed GH_TOKEN; the host's own GitHub tokens never do.
 var containerPass = []string{ProfileEnv, "WARDEN_HARNESS", "AGENT_PROMPT_FILE", "AGENT_MODEL", "AGENT_EFFORT", "AGENT_READONLY",
-	"ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "OPENAI_API_KEY", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy"}
+	"ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN", "OPENAI_API_KEY", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SMITHY_PROXY"}
 
 // ContainerEnv is the engine's env (base, with GH_TOKEN set to SMITHY_SANDBOX_GH_TOKEN or removed)
 // and the names to pass into the container.
