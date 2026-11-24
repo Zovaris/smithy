@@ -696,3 +696,13 @@ func TestAgentClaudeBackgroundWritesUsage(t *testing.T) {
 	b, _ := os.ReadFile(log)
 	t.Fatalf("no usage from a background run; log = %q", b)
 }
+
+func TestResolveTier(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	if got := ResolveTier("claude", "claude-haiku-5-5"); got != "claude-haiku-5-5" {
+		t.Fatalf("model name changed: %q", got)
+	}
+	if got := ResolveTier("claude", "cheap"); got != "" {
+		t.Fatalf("unset tier must fall back to the default, got %q", got)
+	}
+}

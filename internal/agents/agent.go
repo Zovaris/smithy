@@ -291,6 +291,7 @@ func ResolveCLI(getenv func(string) string, have func(string) bool) string {
 // argument), extra the split $AGENT_ARGS and gitDir the repo's common git dir (codex only).
 func Build(cli string, o Options, prompt string, extra []string, gitDir string, getenv func(string) string) (Spec, error) {
 	var a []string
+	o.Model = ResolveTier(cli, o.Model)
 	opt := func(flag string) {
 		if o.Model != "" {
 			a = append(a, flag, o.Model)
@@ -935,3 +936,27 @@ const AutoNote = "Unattended run: shell access is limited by policy. If a comman
 	"use smithy commands (smithy worktree add, smithy commit, smithy pr) instead of raw git or gh " +
 	"where they exist. Report blocked only when a git, gh, test or smithy step your task needs " +
 	"is denied in its simplest form."
+
+// tierHarness names the harness whose models.<harness>.<tier> settings a headless CLI uses.
+var tierHarness = map[string]string{"claude": "claude-cli", "codex": "codex", "opencode": "opencode", "gemini": "gemini", "cursor": "cursor", "pi": "pi", "dsh": "dsh"}
+
+// ResolveTier turns a tier name (cheap, mid, strong, judge) into the user's model for that CLI's
+// harness; an unset tier gives "" (the CLI's default model) with one warning. Any other value is a
+// model name and passes through.
+func ResolveTier(cli, model string) string {
+	switch model {
+	case "cheap", "mid", "strong", "judge":
+	default:
+		return model
+	}
+	h := tierHarness[filepath.Base(cli)]
+	if h == "" {
+		h = filepath.Base(cli)
+	}
+	m, err := config.ModelFor(h, model)
+	if err != nil || m == "" {
+		fmt.Fprintf(os.Stderr, "smithy agent: no %s model set for %s (smithy config set-model %s <name>); using the CLI's default\n", model, h, model)
+		return ""
+	}
+	return m
+}
