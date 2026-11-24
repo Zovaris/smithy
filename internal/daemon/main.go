@@ -3,7 +3,6 @@
 package daemon
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -15,7 +14,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -266,33 +264,25 @@ func lastSeq(ctx context.Context, base, tok string) (int64, error) {
 }
 
 func follow(ctx context.Context, base, tok string, since int64, w io.Writer) error {
-	r, _ := http.NewRequestWithContext(ctx, "GET", base+"/v1/events?since="+strconv.FormatInt(since, 10), nil)
-	r.Header.Set("Authorization", "Bearer "+tok)
-	res, err := http.DefaultClient.Do(r)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		return fmt.Errorf("daemon events: %s", res.Status)
-	}
-	sc := bufio.NewScanner(res.Body)
-	sc.Buffer(make([]byte, 64<<10), 1<<20)
-	for sc.Scan() {
-		data, ok := strings.CutPrefix(sc.Text(), "data: ")
-		if !ok {
-			continue
-		}
-		var e store.Event
-		if json.Unmarshal([]byte(data), &e) != nil || e.Kind != "log" {
-			continue
-		}
-		var d struct {
-			Line string `json:"line"`
-		}
-		if json.Unmarshal(e.Data, &d) == nil {
-			fmt.Fprintln(w, e.Time.Local().Format("2006-01-02 15:04:05"), auto.Clean(d.Line))
+	ch := make(chan ClientMsg, 64)
+	go (&Client{Base: base, Token: tok}).Follow(ctx, since, ch)
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case m := <-ch:
+			if m.Err != nil {
+				fmt.Fprintln(w, "smithy auto serve: lost the daemon, retrying:", m.Err)
+			}
+			if m.Event == nil || m.Event.Kind != "log" {
+				continue
+			}
+			var d struct {
+				Line string `json:"line"`
+			}
+			if json.Unmarshal(m.Event.Data, &d) == nil {
+				fmt.Fprintln(w, m.Event.Time.Local().Format("2006-01-02 15:04:05"), auto.Clean(d.Line))
+			}
 		}
 	}
-	return sc.Err()
 }
