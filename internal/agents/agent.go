@@ -20,6 +20,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/pool"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -49,6 +50,10 @@ above medium is capped at medium. Passed as --effort (claude) or -c model_reason
 Timeout: --timeout, else the agent.timeout setting (minutes, default 90; 0 = none). When it
 passes, the agent's whole process group is killed (Unix; on Windows only the agent process), "timed out after Nm" goes to the log and
 smithy agent exits 124; --bg runs are watched by a detached smithy that does the same.
+Pool (smithy pool, off until an account is added): a claude or codex run (AGENT_CLI=pool: any)
+uses the least recently used account that is not limited, through CLAUDE_CONFIG_DIR or CODEX_HOME;
+a usage-limit result marks it limited; a read-only or untouched run reruns once on the next one,
+any other exits 75 with its warden card blocked (relaunch in the same worktree).
 Extra flags for the chosen CLI: $AGENT_ARGS. Workers get WARDEN_HARNESS set to the CLI and the
 parent harness's variables removed, so their own scripts detect the right harness.
 --bg prints ` + "`<pid> <log>`" + ` and returns at once; otherwise prints the agent's output when it ends
@@ -77,6 +82,10 @@ type Options struct {
 	Profile    string
 	SmithyBins []string // absolute paths of the smithy binary and launcher, allowed under --profile auto
 	AddDirs    []string // directories outside the working dir the agent may use (--add-dir), set under --profile auto
+	PoolEnv    []string // the pool account's config-dir variable (smithy pool), added to the worker's env
+	Account    string   // the pool account this run uses
+	poolSkip   []string // accounts already tried (limited) in this run
+	poolStart  string   // the worktree's HEAD before the first attempt ("" when not a git repo)
 }
 
 // ProfileEnv carries --profile to every smithy agent an agent starts, so workers under an
@@ -120,21 +129,23 @@ func AutoDenied(smithy []string) []string {
 		"Bash(*>*)", "Bash(* | tee *)", "Bash(*|tee *)",
 		// shell readers must not reach the secrets the Read rules protect
 		"Bash(*auth.json*)", "Bash(*.ssh*)", "Bash(*.config/gh*)", "Bash(*.aws*)", "Bash(*.netrc*)", "Bash(*.git-credentials*)",
-		"Bash(find * -exec*)", "Bash(find * -delete*)", "Bash(sed -n *w *)"}
+		"Bash(find * -exec*)", "Bash(find * -delete*)", "Bash(sed -n *w *)",
+		// pool accounts (smithy pool) hold other accounts' logins
+		"Bash(*.smithy/accounts*)", "Bash(smithy pool *)"}
 	for _, b := range smithy {
 		if filepath.IsAbs(b) {
-			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config set *)", "Bash("+b+" config set-model *)")
+			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config set *)", "Bash("+b+" config set-model *)", "Bash("+b+" pool *)")
 		}
 	}
-	for _, f := range []string{"~/.smithy/auth.json", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
+	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
 		d = append(d, "Read("+f+")")
 	}
-	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
+	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.smithy/accounts/**", "~/.smithy/pool.json", "~/.smithy/pool-state.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
 		"~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile", "~/.zshenv", "~/.claude/**",
 		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json"} {
 		d = append(d, "Edit("+f+")") // Edit rules cover every file-editing tool, Write included
 	}
-	return d
+	return append(d, poolDenied()...)
 }
 
 // Kind is the CLI kind of an agent name or path: its base name, with agent meaning cursor.
@@ -404,7 +415,7 @@ func jsonResult(argv []string) bool {
 
 // finish rewrites a claude json log to text and records its usage: the sidecar next to a named
 // log and a "usage" event (batch and item from a <warden home>/<batch>/<item>.log path).
-func finish(log string, named bool) {
+func finish(log string, named bool, account string) {
 	u, ok := usage.Finish(log)
 	if !named {
 		os.Remove(usage.Sidecar(log))
@@ -412,7 +423,7 @@ func finish(log string, named bool) {
 	if !ok {
 		return
 	}
-	e := events.Event{Kind: "usage", Usage: &u}
+	e := events.Event{Kind: "usage", Usage: &u, Account: account}
 	if named {
 		e.Detail = filepath.Base(log)
 		if dir := filepath.Dir(log); realPath(filepath.Dir(dir)) == realPath(cards.Home()) {
@@ -442,6 +453,11 @@ func withPath(a []string, path string) []string {
 // WARDEN_HARNESS and the AGENT_* run variables set.
 func Env(base []string, s Spec, o Options) []string {
 	drop := map[string]bool{ProfileEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
+	if len(o.PoolEnv) > 0 {
+		for _, k := range PoolDropEnv {
+			drop[k] = true
+		}
+	}
 	for _, k := range ParentVars {
 		drop[k] = true
 	}
@@ -459,6 +475,7 @@ func Env(base []string, s Spec, o Options) []string {
 	if o.Profile != "" {
 		env = append(env, ProfileEnv+"="+o.Profile)
 	}
+	env = append(env, o.PoolEnv...)
 	return append(env, "AGENT_PROMPT_FILE="+o.PromptFile, "AGENT_MODEL="+o.Model, "AGENT_EFFORT="+o.Effort, "AGENT_READONLY="+ro, "WARDEN_HARNESS="+s.Harness)
 }
 
@@ -538,6 +555,28 @@ func Run(o Options) int {
 		o.AddDirs = AutoDirs(o.SmithyBins)
 	}
 	gitDir := ""
+	ph := PoolHarness(cli)
+	var acct pool.Account
+	switch {
+	case ph != "" && o.Bg:
+		if cli == "pool" {
+			cli = peekHarness(ph)
+		}
+	case ph != "":
+		var rc int
+		if acct, rc = acquire(ph, &o); rc != 0 {
+			if len(o.poolSkip) > 0 {
+				blockCard(o, o.poolSkip[0])
+			}
+			return rc
+		}
+		if len(o.poolSkip) == 0 {
+			o.poolStart = head(o.Cwd)
+		}
+		if cli == "pool" && acct.Name != "" {
+			cli = acct.Harness
+		}
+	}
 	if Kind(cli) == "codex" && !o.ReadOnly {
 		gitDir, _ = ghx.Run("git", "-C", o.Cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	}
@@ -588,7 +627,11 @@ func Run(o Options) int {
 		if !filepath.IsAbs(path) {
 			path = filepath.Join(o.Cwd, path)
 		}
-		out, err = os.Create(path)
+		if len(o.poolSkip) > 0 {
+			out, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		} else {
+			out, err = os.Create(path)
+		}
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -598,7 +641,7 @@ func Run(o Options) int {
 	cmd.Dir, cmd.Env = o.Cwd, Env(os.Environ(), s, o)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, out, out
 	if o.Bg {
-		if o.Timeout > 0 || jsonResult(s.Argv) {
+		if o.Timeout > 0 || jsonResult(s.Argv) || ph != "" {
 			if cmd, err = supervisor(o, out.Name()); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return 1
@@ -616,7 +659,7 @@ func Run(o Options) int {
 		select {
 		case err := <-done:
 			var ee *exec.ExitError
-			if err != nil && !(errors.As(err, &ee) && ee.ExitCode() == 124) {
+			if err != nil && !(errors.As(err, &ee) && (ee.ExitCode() == 124 || ee.ExitCode() == ExitLimited)) {
 				fmt.Fprintf(os.Stderr, "smithy agent: %s exited right after starting (%v): %s\n", s.Argv[0], err, lastLine(log))
 				return 1
 			}
@@ -627,8 +670,21 @@ func Run(o Options) int {
 	}
 	rc := wait(cmd, o.Timeout, out)
 	out.Close()
+	hit := acct.Name != "" && limited(acct, out.Name(), Kind(s.Argv[0]), rc)
 	if jsonResult(s.Argv) {
-		finish(out.Name(), o.Log != "")
+		finish(out.Name(), o.Log != "", o.Account)
+	}
+	if hit {
+		if len(o.poolSkip) == 0 && (o.ReadOnly || untouched(o.Cwd, o.poolStart)) {
+			if o.Log == "" {
+				os.Remove(out.Name())
+			}
+			fmt.Fprintln(os.Stderr, "smithy agent: nothing changed yet; retrying once on the next pool account")
+			o.poolSkip, o.PoolEnv, o.Account = []string{acct.Name}, nil, ""
+			return Run(o)
+		}
+		blockCard(o, acct.Name)
+		rc = ExitLimited
 	}
 	if b, err := os.ReadFile(out.Name()); err == nil {
 		os.Stdout.Write(b)

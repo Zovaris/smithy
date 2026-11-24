@@ -110,10 +110,10 @@ Recovery ladder, one rung per wake:
 2. One corrective line to the worker (**tell**).
 3. Relaunch in the **same worktree**, only while the item's `launches` is below 3 (first launch
    included): bump `launches`, then `smithy brief <batch> <id>` again (it adds the relaunch line).
-4. At the cap, set the card `state=blocked` and tell the user
-   with the `note`; the item stays listed as blocked until they act.
+4. At the cap, set the card `state=blocked` and tell the user with the `note`; the item stays
+   listed as blocked until they act.
 
-Never a fresh worktree for the same task.
+Never a fresh worktree for the same task. Exit 75 (`account … limited`): rung 3 once one is free.
 
 Takeover data: every stuck report, and the final message for any item not merged, gives per item
 the worktree path, branch, session id or pid, and log path (`<batch-dir>/<id>.log`), so the user

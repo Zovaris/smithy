@@ -30,19 +30,19 @@
 │ state  on (smithy auto serve sends)                                          ││   linear.cycle           -              unset   Linear cycle filter: curren… │
 │ last sent 2026-11-23 09:12                                                   ││   linear.initiative      -              unset   Linear initiative name filt… │
 │                                                                              ││   linear.states          unstarted,bac… default Linear workflow state types… │
-│ Doctor                                                                       ││                                                                              │
-│ warden doctor                                                                ││ warden.*                                                                     │
-│ ok   binary v0.15.0                                                          ││   warden.merge           manual         user    auto: warden merges green P… │
-│ ok   git found                                                               ││   warden.cleanup         auto           default auto: end finished workers … │
-│ ok   gh found and authenticated                                              ││   warden.max             5              default parallel workers (a token-c… │
-│ ok   claude found                                                            ││   warden.mode            smelt normal   default batch check speed: smelt fa… │
-│ ok   worktree root /home/dev/worktrees writable                              ││   warden.stuck_minutes   15             default minutes without a worker he… │
-│ warn 2 orphaned worktrees (smithy warden cleanup)                            ││   warden.worker_model    route          default route: pick cheap/mid/stron… │
-│                                                                              ││                                                                              │
-│                                                                              ││ notify.*                                                                     │
-│                                                                              ││   notify.telegram.chat   123456789      user    Telegram chat id serve noti… │
-│                                                                              ││   notify.kinds           pr_ready,bloc… default comma list of notification … │
-│                                                                              ││                                                                              │
-│                                                                              ││ enter edits · u unsets · auth stays in smithy auth                           │
+│ Pool  smithy pool                                                            ││                                                                              │
+│ account    harness status   resets      runs    cost                         ││ warden.*                                                                     │
+│ work       claude  ok       -              6   $3.42                         ││   warden.merge           manual         user    auto: warden merges green P… │
+│ home       claude  limited  11-23 14:00    9   $5.10                         ││   warden.cleanup         auto           default auto: end finished workers … │
+│ codex      codex   ok       -              2       -                         ││   warden.max             5              default parallel workers (a token-c… │
+│                                                                              ││   warden.mode            smelt normal   default batch check speed: smelt fa… │
+│ Doctor                                                                       ││   warden.stuck_minutes   15             default minutes without a worker he… │
+│ warden doctor                                                                ││   warden.worker_model    route          default route: pick cheap/mid/stron… │
+│ ok   binary v0.15.0                                                          ││                                                                              │
+│ ok   git found                                                               ││ notify.*                                                                     │
+│ ok   gh found and authenticated                                              ││   notify.telegram.chat   123456789      user    Telegram chat id serve noti… │
+│ ok   claude found                                                            ││   notify.kinds           pr_ready,bloc… default comma list of notification … │
+│ ok   worktree root /home/dev/worktrees writable                              ││                                                                              │
+│ warn 2 orphaned worktrees (smithy warden cleanup)                            ││ enter edits · u unsets · auth stays in smithy auth                           │
 ╰──────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────╯
  ↑↓ move  enter edit  u unset setting  r refresh  l log                                                                               tab views  ? help  q quit 

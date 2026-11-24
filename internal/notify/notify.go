@@ -34,14 +34,15 @@ const Usage = `usage: smithy notify test | status
 Telegram notifications, sent by smithy auto serve from events.jsonl. Setup:
   smithy auth set telegram            (the bot token from @BotFather, on stdin)
   smithy config set notify.telegram.chat <chat id>
-  smithy config set notify.kinds pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached
+  smithy config set notify.kinds pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited
 test sends one test message; status shows the token (masked), chat, kinds, last send and last error.`
 
 // Kinds are every notification kind, in the default notify.kinds order.
-var Kinds = []string{"pr_ready", "blocked", "stuck", "decision", "orchestrator_failed", "serve_down", "cap_reached"}
+var Kinds = []string{"pr_ready", "blocked", "stuck", "decision", "orchestrator_failed", "serve_down", "cap_reached", "limited"}
 
 var label = map[string]string{"pr_ready": "PR ready", "blocked": "blocked", "stuck": "stuck", "decision": "decision pending",
-	"orchestrator_failed": "orchestrator failed", "serve_down": "serve stopped", "cap_reached": "daily cap reached"}
+	"orchestrator_failed": "orchestrator failed", "serve_down": "serve stopped", "cap_reached": "daily cap reached",
+	"limited": "every pool account limited"}
 
 // APIBase is the Telegram Bot API origin (a var for tests only; never a setting, so the token
 // can't be sent elsewhere by a config edit).
@@ -216,6 +217,10 @@ func classify(e events.Event) (item, bool) {
 	case e.Kind == "orchestrator_failed", e.Kind == "serve_down":
 		it.kind = e.Kind
 		it.dedupe = e.Kind + "|" + e.T.Format(time.RFC3339)
+		return it, true
+	case e.Kind == "limited" && e.Account == "":
+		it.kind = e.Kind
+		it.dedupe = e.Kind + "|" + e.Detail
 		return it, true
 	case e.Kind == "cap_reached":
 		it.kind = e.Kind

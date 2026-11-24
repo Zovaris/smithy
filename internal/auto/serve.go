@@ -22,6 +22,7 @@ import (
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/notify"
+	"github.com/Zovaris/smithy/internal/pool"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -184,6 +185,8 @@ type Server struct {
 	mkdr   func(string) (string, error)
 	note   *notify.Notifier
 	capDay string // local day a cap_reached event was last recorded (issue cap or spend cap)
+	// limitedAt is the reset time a "limited" event was last recorded for (smithy pool).
+	limitedAt time.Time
 }
 
 // NewServer checks no other serve is running and writes the first heartbeat.
@@ -408,7 +411,7 @@ func (sv *Server) Cycle() time.Duration {
 			}
 			sv.hb.SessionPID, sv.hb.SessionDir = 0, ""
 		}
-		if sv.overCap(s) {
+		if sv.overCap(s) || sv.poolHeld() {
 			break
 		}
 		if err := acquire(LockFile(), func(b []byte) bool {
@@ -475,6 +478,26 @@ func (sv *Server) overCap(s Settings) bool {
 	if d := t.Format("2006-01-02"); sv.capDay != d {
 		sv.capDay = d
 		_ = events.Append(events.Event{Kind: "cap_reached", Detail: msg})
+	}
+	return true
+}
+
+// poolHeld reports whether every pool account serve's agent could use is limited; it logs the
+// earliest reset each time and records one "limited" event per reset time.
+func (sv *Server) poolHeld() bool {
+	h := agents.PoolHarness(sv.hb.Agent)
+	if h == "" {
+		return false
+	}
+	until, all := pool.Earliest(h, now())
+	if !all {
+		return false
+	}
+	msg := "every pool account is limited; earliest reset " + until.Local().Format("2006-01-02 15:04")
+	sv.logf("serve: %s; nothing launches until then", msg)
+	if !sv.limitedAt.Equal(until) {
+		sv.limitedAt = until
+		_ = events.Append(events.Event{Kind: "limited", Detail: msg})
 	}
 	return true
 }

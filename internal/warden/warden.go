@@ -317,7 +317,13 @@ func Doctor(args []string) int {
 		r.warn("workers: subagent fallback; they end with this session ("+why+")",
 			"say it in the plan line; install a headless agent CLI for workers that outlive this session")
 	}
-	if a := config.Get("auto.agent", ""); a != "" {
+	if a := config.Get("auto.agent", ""); a == "pool" {
+		if agents.PoolHarness("pool") == "" {
+			r.warn("auto.agent pool but no pool account (smithy auto serve can't start an orchestrator)", "smithy pool add <name> claude|codex, then smithy pool login <name>")
+		} else {
+			r.ok("auto.agent: pool")
+		}
+	} else if a != "" {
 		bins := map[string]string{"claude": "claude", "codex": "codex", "opencode": "opencode", "gemini": "gemini", "cursor": "agent", "pi": "pi", "dsh": "dsh"}
 		kind := agents.Kind(a)
 		b, ok := bins[kind]

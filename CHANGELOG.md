@@ -5,6 +5,18 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: account pool (`smithy pool add|login|list|remove|clear`), off until an account is added.
+  Your own claude (CLAUDE_CONFIG_DIR) and codex (CODEX_HOME) accounts in `~/.smithy/pool.json`;
+  `smithy agent` runs on the least recently used one that is not limited (`AGENT_CLI=pool` or
+  `auto.agent pool`: any harness), records it on the warden card and the usage event, and on a
+  usage-limit result marks it limited until the reset it states (5h otherwise) in
+  `~/.smithy/pool-state.json`. It reruns once on the next account (log appended) only when the run
+  was read-only or left the worktree untouched (same HEAD, clean, nothing pushed); otherwise it
+  exits 75 and blocks the warden card (`account <name> limited until <t>`) so warden relaunches it
+  in the same worktree. A pooled run drops `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` and
+  `OPENAI_API_KEY` so the account's login is used. Serve holds while every account is limited and
+  says the earliest reset; Telegram kind `limited`; the TUI System view shows a pool table.
+  Unattended workers are denied every account dir and `smithy pool`.
 - Added: edit settings from `smithy tui` System view. Every known key plus the harness's models,
   grouped, with value, source and meaning; enter opens a typed input (bool/enum choice, number,
   list, text), a confirm step shows old → new and the scope (tab: user or repo), `u` unsets back to
