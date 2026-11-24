@@ -198,9 +198,9 @@ workers are denied reading every account dir.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh             # binary, latest
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.16.1    # binary, pinned
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.16.2    # binary, pinned
 npx skills add Zovaris/smithy -g -y --skill '*' -a claude-code -a codex   # no prompts
-npx skills add Zovaris/smithy@v0.16.1 -g                                   # pin a release
+npx skills add Zovaris/smithy@v0.16.2 -g                                   # pin a release
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # skills + binary
 ```
 
