@@ -5,8 +5,8 @@
 #     -e <allowed names> <image> <agent argv>
 # Build: docker build -t smithy-sandbox:latest sandbox/   (or podman build)
 # Status: the image and the run command are unit-tested only; no live run yet.
-# golang:1.24-bookworm, pinned by digest (multi-arch index).
-FROM golang:1.24-bookworm@sha256:1a6d4452c65dea36aac2e2d606b01b4a029ec90cc1ae53890540ce6173ea77ac
+# Bump: take the latest golang:<x.y.z>-bookworm tag and its index digest from Docker Hub, and `npm view @anthropic-ai/claude-code version`.
+FROM golang:1.27.4-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends git gh ca-certificates nodejs npm \
