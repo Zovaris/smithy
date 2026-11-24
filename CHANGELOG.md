@@ -5,6 +5,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- README: autonomous mode diagram (`docs/auto.svg`) and the TUI's cost and settings views.
+
 ## v0.16.2 — 2026-11-23
 
 - Fixed: the `auto.sandbox_network` description in `smithy config list` and the TUI says the setting is required (empty or `none` refuses to start container workers; `bridge` is open egress).
