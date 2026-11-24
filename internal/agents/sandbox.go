@@ -665,6 +665,14 @@ func container(cwd, gitDir string, acct pool.Account) (Container, error) {
 		if fi, err := os.Stat(acct.Dir); err != nil || !fi.IsDir() {
 			return Container{}, fmt.Errorf("pool account %s: dir %s: not found (smithy pool login %s)", acct.Name, acct.Dir, acct.Name)
 		}
+		own := realPath(acct.Dir)
+		holds := own == realPath(ghx.Home()) || strings.HasPrefix(realPath(ghx.Home()), own+string(filepath.Separator))
+		for _, d := range secret {
+			holds = holds || strings.HasPrefix(d, own+string(filepath.Separator))
+		}
+		if holds {
+			return Container{}, fmt.Errorf("pool account %s: dir %s holds another account's dir or %s; give it a dir of its own", acct.Name, acct.Dir, ghx.Home())
+		}
 		c.Mounts = append(c.Mounts, acct.Dir)
 		c.Env = append(c.Env, pool.Harnesses[acct.Harness])
 	}

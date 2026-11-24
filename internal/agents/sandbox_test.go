@@ -575,6 +575,11 @@ func TestContainerMountsPoolAccount(t *testing.T) {
 	if !slices.Contains(c.Env, "CODEX_HOME") {
 		t.Errorf("the account's env var passes in: %v", c.Env)
 	}
+	for _, bad := range []string{filepath.Dir(a), os.Getenv("SMITHY_HOME")} {
+		if _, err := container(cwd, "", pool.Account{Name: "x", Harness: "codex", Dir: bad}); err == nil {
+			t.Errorf("a dir holding other accounts or smithy home must refuse: %s", bad)
+		}
+	}
 	c, err = container(cwd, "", pool.Account{})
 	if err != nil || slices.Contains(c.Mounts, a) || len(c.Env) != 0 {
 		t.Errorf("no account, no account dir: %v %v %v", c.Mounts, c.Env, err)
