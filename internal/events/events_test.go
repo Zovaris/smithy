@@ -134,3 +134,15 @@ func TestProxyEventsOwnFileMergedOnRead(t *testing.T) {
 		t.Errorf("merged %+v", es)
 	}
 }
+
+func TestTapSeesAppendedEvents(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	var got []Event
+	Tap = func(e Event) { got = append(got, e) }
+	defer func() { Tap = nil }()
+	Append(Event{Kind: "serve_down", Detail: "x"})
+	AppendProxy(Event{Kind: "proxy_ask"})
+	if len(got) != 1 || got[0].Kind != "serve_down" || got[0].T.IsZero() {
+		t.Fatalf("%+v", got)
+	}
+}
