@@ -19,7 +19,7 @@ import (
 // Usage is the text for `smithy proxy --help`.
 const Usage = `usage: smithy proxy serve [--addr :8877] [--allow host,...] [--ask-timeout 5m] | approve <id> | deny <id>
 serve is the egress proxy a container worker uses under auto.sandbox_network proxy (smithy agent
-starts it as the smithy-proxy sidecar): CONNECT only to --allow hosts on 443, and
+starts it as the smithy-proxy sidecar, which sees only auth.json read-only and ~/.smithy/proxy): CONNECT only to --allow hosts on 443, and
 /s/<secret>/<path> sends a key bound with smithy auth bind to its host. A write held by an ask
 secret is logged as a secret_ask event; approve or deny it by id, else it is denied after --ask-timeout.`
 
@@ -33,7 +33,7 @@ func EventsApprover(timeout, poll time.Duration) func(context.Context, Ask) bool
 		rand.Read(b)
 		id := hex.EncodeToString(b)
 		start := time.Now().Add(-time.Second)
-		if events.Append(events.Event{Kind: "secret_ask", ID: id, Detail: a.Name + " " + a.Method + " " + a.Host + a.Path + " (smithy proxy approve " + id + ")"}) != nil {
+		if events.AppendProxy(events.Event{Kind: "secret_ask", ID: id, Detail: a.Name + " " + a.Method + " " + a.Host + a.Path + " (smithy proxy approve " + id + ")"}) != nil {
 			return false
 		}
 		ctx, cancel := context.WithTimeout(ctx, timeout)
@@ -49,7 +49,7 @@ func EventsApprover(timeout, poll time.Duration) func(context.Context, Ask) bool
 			}
 			select {
 			case <-ctx.Done():
-				events.Append(events.Event{Kind: "secret_denied", ID: id, Detail: "timed out"})
+				events.AppendProxy(events.Event{Kind: "secret_denied", ID: id, Detail: "timed out"})
 				return false
 			case <-t.C:
 			}
@@ -75,7 +75,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 			return fail(2, fmt.Errorf("bad id %q", args[1]))
 		}
 		kind := map[string]string{"approve": "secret_approved", "deny": "secret_denied"}[args[0]]
-		if err := events.Append(events.Event{Kind: kind, ID: args[1]}); err != nil {
+		if err := events.AppendProxy(events.Event{Kind: kind, ID: args[1]}); err != nil {
 			return fail(1, err)
 		}
 		fmt.Fprintln(stdout, kind, args[1])
@@ -111,7 +111,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 				line := fmt.Sprintf("%s %s %s %s %d", e.Kind, e.Name, e.Method, e.Host, e.Status)
 				fmt.Fprintln(stderr, time.Now().UTC().Format(time.RFC3339), line)
 				if e.Status >= 400 {
-					events.Append(events.Event{Kind: "proxy_denied", Detail: line})
+					events.AppendProxy(events.Event{Kind: "proxy_denied", Detail: line})
 				}
 			}}
 		fmt.Fprintf(stderr, "smithy proxy: listening on %s, %d allowed hosts\n", addr, len(allow))

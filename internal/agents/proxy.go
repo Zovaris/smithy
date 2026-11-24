@@ -79,8 +79,8 @@ func ProxyDomains(extra string) []string {
 }
 
 // ProxySidecar is the smithy-proxy container: on smithy-egress, read-only, no capabilities, running the
-// linux smithy as `smithy proxy serve` with SMITHY_HOME on the host's smithy home (auth.json for
-// bound secrets, events.jsonl for the log and approvals). Workers never mount that dir.
+// linux smithy as `smithy proxy serve` with only auth.json (read-only, bound secrets) and
+// <home>/proxy (its events: asks, approvals, refusals) mounted. Workers mount neither.
 type ProxySidecar struct {
 	Engine, Image, Bin, Home, User string
 	Allow                          []string
@@ -88,7 +88,7 @@ type ProxySidecar struct {
 
 // Hash identifies the sidecar's config, so a changed allow list or binary restarts it.
 func (s ProxySidecar) Hash() string {
-	h := sha256.Sum256([]byte(strings.Join([]string{EgressNetwork, s.Image, s.Bin, s.Home, s.User, strings.Join(s.Allow, ",")}, "\x00")))
+	h := sha256.Sum256([]byte(strings.Join([]string{EgressNetwork, "narrow-mounts", s.Image, s.Bin, s.Home, s.User, strings.Join(s.Allow, ",")}, "\x00")))
 	return hex.EncodeToString(h[:8])
 }
 
@@ -99,7 +99,7 @@ func (s ProxySidecar) RunArgv() []string {
 	if s.User != "" {
 		a = append(a, "--user", s.User)
 	}
-	return append(a, "-v", s.Bin+":/usr/local/bin/smithy-proxy:ro", "-v", s.Home+":/smithy", "-e", "SMITHY_HOME=/smithy",
+	return append(a, "-v", s.Bin+":/usr/local/bin/smithy-proxy:ro", "-v", filepath.Join(s.Home, "auth.json")+":/smithy/auth.json:ro", "-v", filepath.Join(s.Home, "proxy")+":/smithy/proxy", "-e", "SMITHY_HOME=/smithy",
 		"--entrypoint", "/usr/local/bin/smithy-proxy", s.Image, "proxy", "serve", "--addr", ":"+strconv.Itoa(proxy.Port), "--allow", strings.Join(s.Allow, ","))
 }
 
@@ -111,6 +111,14 @@ func (s ProxySidecar) Ensure(env []string) error {
 		c.Env = env
 		out, err := c.CombinedOutput()
 		return strings.TrimSpace(string(out)), err
+	}
+	if err := os.MkdirAll(filepath.Join(s.Home, "proxy"), 0o700); err != nil {
+		return err
+	}
+	// a missing file would make the engine create a directory in its place
+	if f, err := os.OpenFile(filepath.Join(s.Home, "auth.json"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600); err == nil {
+		f.WriteString("{}\n")
+		f.Close()
 	}
 	for _, n := range [][]string{{ProxyNetwork, "--internal"}, {EgressNetwork}} {
 		if _, err := run("network", "inspect", n[0]); err != nil {

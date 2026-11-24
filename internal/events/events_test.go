@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -115,5 +116,21 @@ func TestOff(t *testing.T) {
 	}
 	if _, err := os.Stat(File()); !os.IsNotExist(err) {
 		t.Fatal("Off still wrote")
+	}
+}
+
+func TestProxyEventsOwnFileMergedOnRead(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	now := time.Now()
+	Append(Event{T: now, Kind: "launch"})
+	if err := AppendProxy(Event{T: now.Add(-time.Hour), Kind: "secret_ask", ID: "a"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(ProxyFile()); err != nil || filepath.Dir(ProxyFile()) != filepath.Join(ghx.Home(), "proxy") {
+		t.Fatalf("proxy file %s: %v", ProxyFile(), err)
+	}
+	es, _ := Read(time.Time{}, 0)
+	if len(es) != 2 || es[0].Kind != "secret_ask" || es[1].Kind != "launch" {
+		t.Errorf("merged %+v", es)
 	}
 }

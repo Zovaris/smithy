@@ -42,10 +42,18 @@ func TestProxySidecarArgv(t *testing.T) {
 	a := s.RunArgv()
 	j := strings.Join(a, " ")
 	for _, want := range []string{"docker run -d --rm --name smithy-proxy", "--network smithy-egress", "--cap-drop ALL", "--read-only",
-		"-v /b/smithy-linux:/usr/local/bin/smithy-proxy:ro", "-v /h/.smithy:/smithy", "-e SMITHY_HOME=/smithy",
+		"-v /b/smithy-linux:/usr/local/bin/smithy-proxy:ro", "-v /h/.smithy/auth.json:/smithy/auth.json:ro", "-v /h/.smithy/proxy:/smithy/proxy", "-e SMITHY_HOME=/smithy",
 		"--entrypoint /usr/local/bin/smithy-proxy img proxy serve --addr :8877 --allow github.com,x.dev"} {
 		if !strings.Contains(j, want) {
 			t.Errorf("argv lacks %q: %s", want, j)
+		}
+	}
+	for i, x := range a {
+		if i > 0 && a[i-1] == "-v" {
+			host := strings.Split(x, ":")[0]
+			if host == "/h/.smithy" || strings.Contains(host, "accounts") || strings.Contains(host, "plans") || strings.Contains(host, "warden") || strings.Contains(host, "config") {
+				t.Errorf("sidecar mounts %s", x)
+			}
 		}
 	}
 	if strings.Contains(j, "bridge") || strings.Contains(j, " -p ") {
