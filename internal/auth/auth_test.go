@@ -148,3 +148,18 @@ func TestMainSetReadsStdinOnly(t *testing.T) {
 		t.Errorf("remove: %d", code)
 	}
 }
+
+func TestPerAccountService(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	if err := Set("claude:work.2", "tok"); err != nil {
+		t.Fatal(err)
+	}
+	if Stored("claude:work.2") != "tok" {
+		t.Error("per-account key not stored")
+	}
+	for _, bad := range []string{"claude:", ":a", "claude:a:b", "claude:a/b"} {
+		if err := Set(bad, "k"); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+}
