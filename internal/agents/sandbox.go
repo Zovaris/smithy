@@ -294,6 +294,13 @@ func containerCheck(cli string, p Probe) error {
 	if err := containerBase(p); err != nil {
 		return err
 	}
+	if k := Kind(cli); k != "claude" && k != "opencode" {
+		if img, err := SandboxSetting("auto.sandbox_image", DefaultSandboxImage); err != nil {
+			return err
+		} else if img == DefaultSandboxImage {
+			return fmt.Errorf("the default sandbox image carries claude and opencode only: build an image with %s and set auto.sandbox_image", k)
+		}
+	}
 	creds := ContainerCreds(Kind(cli), "")
 	if len(creds) == 0 {
 		return nil
@@ -329,6 +336,9 @@ func containerBase(p Probe) error {
 	}
 	if n == "" || n == "none" {
 		return fmt.Errorf("%s", ContainerNoNetwork)
+	}
+	if n == "host" {
+		return fmt.Errorf("auto.sandbox_network host shares the host's network, so the container isolates nothing: use proxy (or bridge)")
 	}
 	if n == "proxy" {
 		if _, err := proxyBinary(p); err != nil {

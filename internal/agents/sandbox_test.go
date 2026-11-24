@@ -585,3 +585,23 @@ func TestContainerMountsPoolAccount(t *testing.T) {
 		t.Errorf("no account, no account dir: %v %v %v", c.Mounts, c.Env, err)
 	}
 }
+
+func TestContainerCheckDefaultImageHarnesses(t *testing.T) {
+	setNetwork(t, "bridge")
+	p := withCred(probe("linux", "docker"))
+	for _, cli := range []string{"codex", "gemini", "cursor", "pi", "dsh"} {
+		if err := SandboxCheck("container", cli, p); err == nil || !strings.Contains(err.Error(), "auto.sandbox_image") {
+			t.Errorf("%s on the default image: want refusal naming auto.sandbox_image, got %v", cli, err)
+		}
+	}
+	if err := SandboxCheck("container", "opencode", p); err != nil {
+		t.Errorf("opencode is in the default image: %v", err)
+	}
+}
+
+func TestContainerRefusesHostNetwork(t *testing.T) {
+	setNetwork(t, "host")
+	if err := SandboxCheck("container", "opencode", withCred(probe("linux", "docker"))); err == nil || !strings.Contains(err.Error(), "host") {
+		t.Errorf("host network shares the host's: want refusal, got %v", err)
+	}
+}

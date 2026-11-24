@@ -125,7 +125,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 			return fail(err)
 		}
 		if len(rows) == 0 {
-			fmt.Fprintln(stdout, "no accounts (smithy pool add <name> claude|codex)")
+			fmt.Fprintln(stdout, "no accounts (smithy pool add <name> <harness>)")
 			return 0
 		}
 		fmt.Fprintf(stdout, "%-12s %-7s %-8s %-12s %5s %8s  %s\n", "ACCOUNT", "HARNESS", "STATUS", "RESETS", "RUNS", "COST", "DIR")

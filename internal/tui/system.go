@@ -152,7 +152,7 @@ func (m Model) systemLines(w, rw, rh int) (left, right []string) {
 	}
 	left = append(left, "", head.Render("Pool")+mut.Render("  smithy pool"))
 	if len(s.Pool) == 0 {
-		left = append(left, mut.Render("off (smithy pool add <name> claude|codex)"))
+		left = append(left, mut.Render("off (smithy pool add <name> <harness>)"))
 	} else {
 		left = append(left, mut.Render(fmt.Sprintf("%-10s %-7s %-8s %-11s %4s %7s", "account", "harness", "status", "resets", "runs", "cost")))
 	}
