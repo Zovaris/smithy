@@ -181,6 +181,7 @@ func Prompt(dir string, hours float64) string {
 type Server struct {
 	Opt    ServeOptions
 	Log    func(string)
+	logMu  sync.Mutex // an abandoned cycle and stopped() may log at the same time
 	hb     Heartbeat
 	mkdr   func(string) (string, error)
 	note   *notify.Notifier
@@ -303,6 +304,8 @@ func (sv *Server) beat() error {
 
 func (sv *Server) logf(format string, a ...any) {
 	if sv.Log != nil {
+		sv.logMu.Lock()
+		defer sv.logMu.Unlock()
 		sv.Log(Clean(fmt.Sprintf(format, a...)))
 	}
 }
