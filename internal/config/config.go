@@ -65,7 +65,7 @@ var Known = []Setting{
 	{"auto.sandbox", "off", "smithy agent", "isolation for unattended workers (--profile auto) on top of the allow-list: off, native (claude/codex OS sandbox) or container (docker/podman); fails closed: a worker whose sandbox can't start is not started; auto.sandbox* are read from the user settings only, never a repo's"},
 	{"auto.sandbox_domains", "", "smithy agent", "comma list of extra hosts a native-sandboxed worker may reach (github.com, api.github.com, api.anthropic.com, api.linear.app always)"},
 	{"auto.sandbox_image", "smithy-sandbox:latest", "smithy agent", "container image for auto.sandbox container (build it from sandbox/Dockerfile)"},
-	{"auto.sandbox_network", "", "smithy agent", "docker/podman --network for auto.sandbox container; empty = none (no network: push and gh fail inside); set bridge or a proxied network knowingly"},
+	{"auto.sandbox_network", "", "smithy agent", "docker/podman --network for auto.sandbox container; required: empty or none refuses to start workers (no network for the API or push); bridge = open egress with no domain allow-list, or a proxied network"},
 	{"auto.sandbox_memory", "4g", "smithy agent", "docker/podman --memory for auto.sandbox container"},
 	{"auto.sandbox_weaker_net", "true", "smithy agent", "macOS native sandbox: enableWeakerNetworkIsolation so gh and other Go CLIs can verify TLS (opens the system TLS trust service to the worker); false turns it off and gh then fails inside workers"},
 	{"auto.merge", "manual", "tend auto", "merge mode for auto batches (production stays the user's, always)"},
