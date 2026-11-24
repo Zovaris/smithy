@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/progress"
 	"charm.land/lipgloss/v2"
 )
 
@@ -88,9 +87,7 @@ func (m Model) capBar(w int) string {
 		n := int(m.capPos*float64(w) + 0.5)
 		return "[" + strings.Repeat("#", n) + strings.Repeat(".", max(w-n, 0)) + "]"
 	}
-	bar := progress.New(progress.WithColors(t.forge...), progress.WithoutPercentage(),
-		progress.WithFillCharacters('█', '░'), progress.WithWidth(w))
-	return bar.ViewAs(m.capPos)
+	return t.ditherBar(w, m.capPos)
 }
 
 func (m Model) statusRows() (watcher, today, agents, prs string) {
@@ -113,7 +110,7 @@ func (m Model) statusRows() (watcher, today, agents, prs string) {
 		rd + dot + val.Render(fmt.Sprintf("%d CI running", ciRunning))
 }
 
-// header is the anvil, the name and the status: 7 rows from 110 columns, 6 from 80, 4 below.
+// header is the steel plate, the name and the status: 7 rows from 110 columns, 6 from 80, 4 below.
 func (m Model) header(w int) []string {
 	t := m.th
 	mut := t.fg(t.muted)
@@ -136,7 +133,7 @@ func (m Model) header(w int) []string {
 		return []string{pad(" "+word[0]+"  "+clock, w), pad(" "+word[1], w), pad(" "+word[2], w), pad(" "+watcher, w)}
 	}
 	if w < 110 {
-		anvil := m.anvil(smallAnvil)
+		anvil := m.plateRows(smallPlate)
 		name := []string{word[0], word[1], word[2], meta}
 		var out []string
 		for i := range anvil {
@@ -148,14 +145,14 @@ func (m Model) header(w int) []string {
 		}
 		return append(out, pad(" "+watcher+mut.Render("   ")+today, w), pad(" "+agents+mut.Render("   ")+prs, w))
 	}
-	anvil := m.anvil(bigAnvil)
+	anvil := m.plateRows(bigPlate)
 	name := []string{"", word[0], word[1], word[2], meta, "", ""}
 	status := []string{"", label("watcher") + watcher, label("today") + today, label("agents") + agents, label("PRs") + prs, "", label("") + clock}
 	sw := 0
 	for _, s := range status {
 		sw = max(sw, lipgloss.Width(s))
 	}
-	left := 1 + bigAnvil.w() + 3
+	left := 1 + bigPlate.w() + 3
 	nameW := max(w-left-sw-5, 16)
 	var out []string
 	for i := range anvil {

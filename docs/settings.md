@@ -58,6 +58,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `linear.project` / `linear.milestone` / `linear.initiative` | unset | Name filters (project: a comma list; initiative via the issue's project). |
 | `linear.cycle` | unset | `current` or a cycle number. |
 | `linear.states` | `unstarted,backlog` | Linear workflow state types that count as new work. |
+| `tui.reduce_motion` | `false` | `true` draws every `smithy tui` frame still: no sparks, shimmer or sliding bars (like `--no-anim` or `SMITHY_REDUCE_MOTION`). |
 | `git.branch` | `{type}/{key}-{slug}` | Branch names (`smithy names`); e.g. `agent/{key}-{slug}`. |
 | `git.worktree` | `{parent}/worktrees/{repo}-{branch}` | Where worktrees go. |
 | `watch.events` / `watch.every` / `watch.max` | `checks,merged,closed,conflict,review,comment,push,new,updated` / `30` / `50` | What wakes a waiting agent on `pr:` and list targets (`actions`, `base` and `alerts` always report), seconds between polls, minutes before a heartbeat. |

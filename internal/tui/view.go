@@ -185,7 +185,10 @@ func (m Model) box(title, badge string, focused bool, border color.Color, r rect
 	if !t.g.unicode {
 		tl, tr, bl, br, hz, vt = "+", "+", "+", "+", "-", "|"
 	}
-	ts := t.fg(t.text).Bold(!t.plain)
+	if !focused {
+		tl, tr, bl, br, hz, vt = " ", " ", " ", " ", " ", " "
+	}
+	ts := t.fg(t.strong).Bold(!t.plain)
 	if focused {
 		ts = t.fg(t.accent).Bold(true)
 	}
@@ -371,9 +374,9 @@ func (m Model) table(cols []col, rs []row, sel int, focused bool, w, h int, empt
 			}
 			st := lipgloss.NewStyle().Reverse(true).Bold(true)
 			if !t.plain {
-				st = lipgloss.NewStyle().Bold(true).Foreground(t.surface).Background(t.accent)
+				st = lipgloss.NewStyle().Bold(true).Foreground(t.strong).Background(t.focus)
 			}
-			lines = append(lines, st.Render(pad(p.String(), w)))
+			lines = append(lines, t.fg(t.accent).Background(t.focus).Bold(!t.plain).Render(t.g.sel)+st.Render(pad(p.String()[len(t.g.sel):], w-1)))
 			continue
 		}
 		b.WriteString("  ")
@@ -484,7 +487,7 @@ func (m Model) tabLabel(v view) string {
 	badge := ""
 	if v == vNeeds {
 		if n := len(m.rows(vNeeds)); n > 0 {
-			badge = fmt.Sprintf(" %d", n)
+			badge = fmt.Sprintf(" %s %d", m.th.g.wait, n)
 		}
 	}
 	if m.compactTabs() && v != m.view {
@@ -518,7 +521,11 @@ func (m Model) tabbar(w int) string {
 			}
 			b.WriteString(st.Render(l))
 		case v == vNeeds && needs > 0:
-			b.WriteString(t.fg(t.warn).Bold(!t.plain).Render(l))
+			st := lipgloss.NewStyle().Bold(true).Reverse(true)
+			if !t.plain {
+				st = lipgloss.NewStyle().Bold(true).Foreground(t.surface).Background(t.warn)
+			}
+			b.WriteString(st.Render(l))
 		default:
 			b.WriteString(t.fg(t.muted).Render(l))
 		}
@@ -643,7 +650,7 @@ func (m Model) modalBox(w, h int) string {
 	lines = append(lines, foot...)
 	st := m.panelStyle(t.accent).Width(bw)
 	if !t.plain {
-		st = st.Background(t.surface)
+		st = st.Background(t.overlay)
 	}
 	return st.Render(strings.Join(lines, "\n"))
 }
@@ -654,7 +661,7 @@ func (m Model) textBox() string {
 	pct := t.fg(t.muted).Render(fmt.Sprintf("%3.0f%%", m.text.ScrollPercent()*100))
 	st := m.panelStyle(t.accent)
 	if !t.plain {
-		st = st.Background(t.surface)
+		st = st.Background(t.overlay)
 	}
 	return st.Render(title + "\n\n" + m.text.View() + "\n" + pct)
 }
@@ -680,7 +687,7 @@ func (m Model) helpBox(w, h int) string {
 	}
 	st := m.panelStyle(t.accent).Width(bw)
 	if !t.plain {
-		st = st.Background(t.surface)
+		st = st.Background(t.overlay)
 	}
 	return st.Render(strings.Join(lines, "\n"))
 }
