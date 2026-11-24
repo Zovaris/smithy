@@ -22,6 +22,25 @@ A daily cap and an optional hours window bound the spend. `smithy tui` shows the
 agents and the cost of each issue, and edits settings in place. Every setting is listed in
 [settings.md](settings.md).
 
+## Built-in tracker (harness build)
+
+`smithy board` keeps tasks in `~/.smithy/smithy.db`; `auto.sources board` makes the watcher
+read it like any source (the `auto` label and filters apply). A task is new work while it is
+`todo`, unclaimed and every task in `blocked_by` is done or canceled.
+
+```
+smithy board add "Fix login" --labels auto --priority 2
+smithy board list --state todo
+smithy board claim B-1 --by me --ttl 30m
+smithy board set B-1 --state review --pr https://github.com/o/r/pull/7
+```
+
+With `board.linear_sync true`, `smithy board sync` (and every board poll) syncs with Linear by
+field ownership: Linear owns title, body, priority and labels; the board owns state, claims, PRs
+and branch. Issues in `linear.states` under the `linear.*` filters are imported as `todo`; later
+edits are read with an `updatedAt` cursor (no webhooks), and state changes and new PR links are
+pushed back. A board task linked to Linear refuses local edits to the fields Linear owns.
+
 ## Notifications
 
 ```
