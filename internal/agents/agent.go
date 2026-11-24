@@ -77,6 +77,9 @@ type Options struct {
 	Profile    string
 	SmithyBins []string // absolute paths of the smithy binary and launcher, allowed under --profile auto
 	AddDirs    []string // directories outside the working dir the agent may use (--add-dir), set under --profile auto
+	// Sandbox is auto.sandbox for this run (off, native, container); SandboxSettings the claude
+	// --settings JSON under native.
+	Sandbox, SandboxSettings string
 }
 
 // ProfileEnv carries --profile to every smithy agent an agent starts, so workers under an
@@ -316,6 +319,9 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 				a = append(a, "--add-dir", d)
 			}
 		}
+		if o.Sandbox == "native" {
+			a = append(a, "--settings", o.SandboxSettings)
+		}
 		opt("--model")
 		if o.Effort != "" {
 			a = append(a, "--effort", o.Effort)
@@ -327,7 +333,7 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if o.ReadOnly {
 			a = append(a, "--sandbox", "read-only")
 		} else {
-			a = append(a, "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true")
+			a = append(a, "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access="+strconv.FormatBool(o.Sandbox != "native"))
 			if gitDir != "" {
 				a = append(a, "--add-dir", gitDir)
 			}
@@ -441,7 +447,7 @@ func withPath(a []string, path string) []string {
 // Env is the worker's environment: base without the parent harness's variables, with
 // WARDEN_HARNESS and the AGENT_* run variables set.
 func Env(base []string, s Spec, o Options) []string {
-	drop := map[string]bool{ProfileEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
+	drop := map[string]bool{ProfileEnv: true, SandboxRoleEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
 	for _, k := range ParentVars {
 		drop[k] = true
 	}
@@ -537,9 +543,23 @@ func Run(o Options) int {
 		o.SmithyBins = SmithyPaths()
 		o.AddDirs = AutoDirs(o.SmithyBins)
 	}
+	if o.Profile == "auto" && os.Getenv(SandboxRoleEnv) != "orchestrator" {
+		mode, err := SandboxMode()
+		if err == nil {
+			err = SandboxCheck(mode, cli, HostProbe())
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
+			return 1
+		}
+		o.Sandbox = mode
+	}
 	gitDir := ""
-	if Kind(cli) == "codex" && !o.ReadOnly {
+	if (Kind(cli) == "codex" && !o.ReadOnly) || o.Sandbox == "native" || o.Sandbox == "container" {
 		gitDir, _ = ghx.Run("git", "-C", o.Cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	}
+	if o.Sandbox == "native" && Kind(cli) == "claude" {
+		o.SandboxSettings = nativeSettings(&o, gitDir)
 	}
 	prompt := ""
 	if cli != "custom" {
@@ -557,6 +577,14 @@ func Run(o Options) int {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
+	}
+	asJSON := jsonResult(s.Argv)
+	env := Env(os.Environ(), s, o)
+	if o.Sandbox == "container" {
+		box := container(o.Cwd, gitDir)
+		env, box.Env = ContainerEnv(env)
+		s.Argv[0] = filepath.Base(s.Argv[0]) // a host path means nothing inside the image
+		s.Argv = box.Argv(s.Argv)
 	}
 	if fi, err := os.Stat(o.Cwd); err != nil || !fi.IsDir() {
 		fmt.Fprintf(os.Stderr, "smithy agent: cd: %s: No such file or directory\n", o.Cwd)
@@ -595,10 +623,10 @@ func Run(o Options) int {
 		return 1
 	}
 	cmd := exec.Command(s.Argv[0], s.Argv[1:]...)
-	cmd.Dir, cmd.Env = o.Cwd, Env(os.Environ(), s, o)
+	cmd.Dir, cmd.Env = o.Cwd, env
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, out, out
 	if o.Bg {
-		if o.Timeout > 0 || jsonResult(s.Argv) {
+		if o.Timeout > 0 || asJSON {
 			if cmd, err = supervisor(o, out.Name()); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return 1
@@ -627,7 +655,7 @@ func Run(o Options) int {
 	}
 	rc := wait(cmd, o.Timeout, out)
 	out.Close()
-	if jsonResult(s.Argv) {
+	if asJSON {
 		finish(out.Name(), o.Log != "")
 	}
 	if b, err := os.ReadFile(out.Name()); err == nil {
