@@ -28,7 +28,102 @@ func withVersion(p Probe, v string, err error) Probe {
 	return p
 }
 
+func withCred(p Probe) Probe {
+	p.Secret = func(svc string) string {
+		if svc == "claude" {
+			return "tok"
+		}
+		return ""
+	}
+	return p
+}
+
+func setNetwork(t *testing.T, n string) {
+	t.Helper()
+	t.Setenv("SMITHY_CONFIG", filepath.Join(t.TempDir(), "c.json"))
+	if n != "" {
+		if err := config.Set(config.UserFile(), "auto.sandbox_network", n); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestContainerCheckNetworkAndCredential(t *testing.T) {
+	for _, n := range []string{"", "none"} {
+		setNetwork(t, n)
+		if err := SandboxCheck("container", "claude", withCred(probe("linux", "docker"))); err == nil || err.Error() != ContainerNoNetwork {
+			t.Errorf("network %q: want refusal, got %v", n, err)
+		}
+	}
+	setNetwork(t, "bridge")
+	if err := SandboxCheck("container", "claude", probe("linux", "docker")); err == nil || !strings.Contains(err.Error(), "claude setup-token, then smithy auth set claude") {
+		t.Errorf("no credential: %v", err)
+	}
+	p := probe("linux", "docker")
+	p.Getenv = func(k string) string {
+		if k == "ANTHROPIC_API_KEY" {
+			return "k"
+		}
+		return ""
+	}
+	if err := SandboxCheck("container", "claude", p); err != nil {
+		t.Errorf("env credential: %v", err)
+	}
+}
+
+func TestContainerSecrets(t *testing.T) {
+	sec := func(svc string) string { return map[string]string{"claude": "c", "anthropic": "a", "openai": "o"}[svc] }
+	got := ContainerSecrets([]string{"ANTHROPIC_API_KEY=env", "OPENAI_API_KEY="}, sec)
+	want := []string{"CLAUDE_CODE_OAUTH_TOKEN=c", "OPENAI_API_KEY=o"}
+	if !slices.Equal(got, want) {
+		t.Errorf("secrets = %v, want %v", got, want)
+	}
+	env, names := ContainerEnv(append([]string{"PATH=/bin"}, got...))
+	c := Container{Engine: "docker", Image: "i", Cwd: "/w", Env: names}
+	argv := strings.Join(c.Argv([]string{"claude"}), " ")
+	if strings.Contains(argv, "=c") || strings.Contains(argv, "=o") || !strings.Contains(argv, "-e CLAUDE_CODE_OAUTH_TOKEN ") {
+		t.Errorf("secret values must stay off argv: %s", argv)
+	}
+	if !slices.Contains(env, "CLAUDE_CODE_OAUTH_TOKEN=c") {
+		t.Errorf("value must be in the engine env: %v", env)
+	}
+}
+
+func TestContainerEngineKiri(t *testing.T) {
+	p := probe("darwin")
+	p.Home = "/h"
+	p.Exists = func(f string) bool { return f == "/h/.kiri/bin/docker" }
+	if e := ContainerEngine(p); e != "/h/.kiri/bin/docker" {
+		t.Errorf("engine = %q", e)
+	}
+}
+
+func TestDockerHost(t *testing.T) {
+	socks := map[string]bool{}
+	p := Probe{Home: "/h", Exists: func(f string) bool { return socks[f] }, Getenv: func(string) string { return "" },
+		Context: func(string) string { return "unix:///h/.orbstack/run/docker.sock" }}
+	if set, ep := DockerHost("docker", p); set != "" || ep != "" {
+		t.Errorf("no socket anywhere: %q %q", set, ep)
+	}
+	socks["/h/.kiri/run/docker.sock"], socks["/var/run/docker.sock"] = true, true
+	if set, _ := DockerHost("docker", p); set != "unix:///h/.kiri/run/docker.sock" {
+		t.Errorf("dead context falls back to kiri first: %q", set)
+	}
+	socks["/h/.orbstack/run/docker.sock"] = true
+	if set, ep := DockerHost("docker", p); set != "" || ep != "unix:///h/.orbstack/run/docker.sock" {
+		t.Errorf("live context is kept: %q %q", set, ep)
+	}
+	p.Getenv = func(string) string { return "tcp://x" }
+	if set, ep := DockerHost("docker", p); set != "" || ep != "tcp://x" {
+		t.Errorf("DOCKER_HOST wins: %q %q", set, ep)
+	}
+	if set, _ := DockerHost("podman", p); set != "" {
+		t.Errorf("podman unchanged: %q", set)
+	}
+}
+
 func TestSandboxCheck(t *testing.T) {
+	setNetwork(t, "bridge")
 	cases := []struct {
 		mode, cli string
 		p         Probe
@@ -44,7 +139,9 @@ func TestSandboxCheck(t *testing.T) {
 		{"native", "codex", probe("darwin"), true},
 		{"native", "opencode", probe("darwin", "/usr/bin/sandbox-exec"), false},
 		{"native", "custom", probe("darwin", "/usr/bin/sandbox-exec"), false},
-		{"container", "claude", probe("linux", "podman"), true},
+		{"container", "claude", withCred(probe("linux", "podman")), true},
+		{"container", "claude", probe("linux", "podman"), false},
+		{"container", "codex", probe("linux", "podman"), true},
 		{"container", "claude", probe("linux"), false},
 		{"bogus", "claude", probe("linux"), false},
 		{"native", "claude", withVersion(probe("darwin", "/usr/bin/sandbox-exec"), "2.1.330 (Claude Code)", nil), false},
@@ -61,13 +158,13 @@ func TestSandboxCheck(t *testing.T) {
 }
 
 func TestContainerEngine(t *testing.T) {
-	if e := ContainerEngine(probe("linux", "docker", "podman").Look); e != "docker" {
+	if e := ContainerEngine(probe("linux", "docker", "podman")); e != "docker" {
 		t.Errorf("engine = %q, want docker first", e)
 	}
-	if e := ContainerEngine(probe("linux", "podman").Look); e != "podman" {
+	if e := ContainerEngine(probe("linux", "podman")); e != "podman" {
 		t.Errorf("engine = %q, want podman", e)
 	}
-	if e := ContainerEngine(probe("linux").Look); e != "" {
+	if e := ContainerEngine(probe("linux")); e != "" {
 		t.Errorf("engine = %q, want none", e)
 	}
 }

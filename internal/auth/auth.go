@@ -114,6 +114,19 @@ func Get(svc string) (key, from string, err error) {
 	return "", "", nil
 }
 
+// Stored is service's key from the auth file only, never an env var (whose name a repo's
+// <service>.key_env could pick). No key or an unreadable file is "".
+func Stored(svc string) string {
+	if check(svc) != nil {
+		return ""
+	}
+	m, err := load()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(m[svc].Key)
+}
+
 // Set stores service's key, atomically, mode 0600.
 func Set(svc, key string) error {
 	if err := check(svc); err != nil {

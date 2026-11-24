@@ -481,8 +481,15 @@ func sandboxDoctor(r *report, p agents.Probe) {
 	case err != nil:
 		r.bad("sandbox "+mode+": "+err.Error()+"; unattended workers will not start", "fix it, or smithy config set auto.sandbox off")
 	case mode == "container":
-		r.ok("sandbox: container (" + agents.ContainerEngine(p.Look) + ", image " + userSetting("auto.sandbox_image", agents.DefaultSandboxImage) + ")")
-		r.warn("sandbox container: not live-tested yet; smithy has only unit-tested the docker/podman command", "run one worker by hand and check its log before relying on it")
+		e, net := agents.ContainerEngine(p), userSetting("auto.sandbox_network", "")
+		_, sock := agents.DockerHost(e, p)
+		if sock == "" {
+			sock = "engine default"
+		}
+		r.ok("sandbox: container (" + e + ", socket " + sock + ", image " + userSetting("auto.sandbox_image", agents.DefaultSandboxImage) + ", network " + net + ")")
+		if net == "bridge" || net == "host" {
+			r.warn("sandbox container: network "+net+" is open egress with no domain allow-list (native has one)", "an egress allow-list proxy is planned for v0.17; use auto.sandbox native for an allow-list now")
+		}
 	case agents.Kind(cli) == "codex":
 		r.ok("sandbox: native (codex workspace-write, network off)")
 		r.warn("sandbox native with codex: workers have no network, so git push and gh fail inside them", "push and open PRs through smithy outside the worker, or use auto.sandbox container")

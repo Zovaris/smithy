@@ -5,6 +5,21 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Fixed: `auto.sandbox container` workers get their credentials: when the env lacks them,
+  `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` come from `smithy auth`
+  (`claude`, `anthropic`, `openai`), passed by name with the value only in the engine's env. A
+  claude container with no credential is refused and doctor fails with the fix (`claude
+  setup-token`, then `smithy auth set claude`).
+- Fixed: container mode needs `auto.sandbox_network`; unset or `none` now refuses to start (claude
+  couldn't reach its API, git couldn't push) and doctor fails. `bridge` is open egress with no
+  domain allow-list; an egress allow-list proxy is planned for v0.17.
+- Fixed: with `DOCKER_HOST` unset and a dead docker context, the engine socket is found (Kiri,
+  OrbStack, Colima, Docker Desktop, `/var/run/docker.sock`), and docker is found at
+  `~/.kiri/bin/docker` or `~/.orbstack/bin/docker` off PATH. Doctor prints the engine and socket.
+- Added: the sandbox image ships OpenCode 2.4.0 (release tarball, digest-checked) next to
+  claude-code. OpenCode has no smithy allow-list, so the container is its isolation; live-tested
+  with `opencode/big-pickle` under Kiri.
+
 ## v0.16.0 — 2026-11-23
 
 - Added: `notify.style` (`plain`, default, or `emoji`) for Telegram messages.

@@ -638,6 +638,11 @@ func Run(o Options) int {
 			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
 			return 1
 		}
+		hp := HostProbe()
+		if set, _ := DockerHost(box.Engine, hp); set != "" {
+			env = append(env, "DOCKER_HOST="+set)
+		}
+		env = append(env, ContainerSecrets(env, hp.Secret)...)
 		env, box.Env = ContainerEnv(env)
 		s.Argv[0] = filepath.Base(s.Argv[0]) // a host path means nothing inside the image
 		s.Argv = box.Argv(s.Argv)
