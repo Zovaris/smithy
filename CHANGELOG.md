@@ -6,6 +6,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 ## Unreleased
 
 - `ROADMAP.md`: what is planned for v0.17 and v0.18, and the backlog.
+- Fixed: stopping `smithy auto serve` mid-cycle could leave a stale heartbeat (`~/.smithy/auto/serve.json`) written by the abandoned cycle.
 
 ## v0.16.3 — 2026-11-23
 

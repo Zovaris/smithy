@@ -182,6 +182,8 @@ type Server struct {
 	Opt    ServeOptions
 	Log    func(string)
 	logMu  sync.Mutex // an abandoned cycle and stopped() may log at the same time
+	beatMu sync.Mutex // guards ended: an abandoned cycle must not rewrite the heartbeat after Run removed it
+	ended  bool
 	hb     Heartbeat
 	mkdr   func(string) (string, error)
 	note   *notify.Notifier
@@ -294,6 +296,11 @@ func (sv *Server) adopt() {
 func (sv *Server) Heartbeat() Heartbeat { return sv.hb }
 
 func (sv *Server) beat() error {
+	sv.beatMu.Lock()
+	defer sv.beatMu.Unlock()
+	if sv.ended {
+		return nil
+	}
 	b, _ := json.MarshalIndent(sv.hb, "", "  ")
 	f := ServeFile()
 	if err := os.MkdirAll(filepath.Dir(f), 0o700); err != nil {
@@ -313,7 +320,12 @@ func (sv *Server) logf(format string, a ...any) {
 // Run loops until ctx ends, --once's cycle is done or --max-hours passes, then removes the
 // heartbeat. A running orchestrator is left alone.
 func (sv *Server) Run(ctx context.Context) error {
-	defer os.Remove(ServeFile())
+	defer func() {
+		sv.beatMu.Lock()
+		sv.ended = true
+		os.Remove(ServeFile())
+		sv.beatMu.Unlock()
+	}()
 	var deadline <-chan time.Time
 	if sv.Opt.MaxHours > 0 {
 		t := time.NewTimer(time.Duration(sv.Opt.MaxHours * float64(time.Hour)))
