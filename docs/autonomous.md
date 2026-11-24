@@ -35,11 +35,16 @@ smithy notify test
 Issue text can carry injected instructions. Run unattended mode under a dedicated OS user or
 machine, with a fine-grained, repo-scoped GitHub token and a test or least-privilege Linear key.
 
-- **Allow-list.** Workers run with `smithy agent --profile auto`, which allows only explicit
-  git/gh subcommands and denies config edits, credential and network commands, and secret files.
-  This reduces the risk but cannot remove it.
-- **Codex.** Codex runs in its workspace-write sandbox with network on (push needs it) and
-  approvals off. Nothing stops it sending data out, so least-privilege tokens matter most there.
+- **What each harness gets under `--profile auto`:**
+
+  | Harness | Guard |
+  |---|---|
+  | Claude Code | smithy's allow-list: explicit git/gh subcommands; config edits, credential and network commands, and secret files denied |
+  | Codex | its workspace-write sandbox, network on (push needs it), approvals off |
+  | Others | their own headless mode, no smithy allow-list: use `container` |
+
+  None of these removes the risk. Nothing stops Codex or the others sending data out, so
+  least-privilege tokens matter most there.
 - **Not sandboxed.** The orchestrator itself is not sandboxed and may run repo tests.
 - **Credentials workers keep.** Workers sign commits through your ssh-agent, so use a dedicated
   signing key. They still get your `GH_TOKEN`.
@@ -51,8 +56,8 @@ it.
 
 | Mode | Isolation | Works with |
 |---|---|---|
-| `off` (default) | allow-list only | every harness |
-| `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code, Codex (macOS, Linux) |
+| `off` (default) | the guard above only | every harness |
+| `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off, so push and `gh` fail |
 | `container` | docker or podman, read-only root, dropped capabilities | Claude Code, Codex, OpenCode |
 
 Container mode notes:
@@ -102,8 +107,12 @@ smithy config set auto.agent pool    # optional: the orchestrator may use any po
 ```
 
 When every account is limited, `smithy agent` exits 75 and serve waits for the earliest reset,
-then notifies you on Telegram.
+then notifies you on Telegram if it is set up.
 
 Use only accounts you own, through the official CLIs, with no proxy or relay in between: each
-provider's terms apply to each account. Account dirs are hidden from workers in `native` and
-`container` sandboxes; with the sandbox `off`, only Claude Code workers get a deny rule for them.
+provider's terms apply to each account.
+
+- **Hiding the account dirs:** `native` hides them from workers. With the sandbox `off`, only
+  Claude Code workers get a deny rule for them.
+- **Container:** the pool doesn't combine with `container` yet, so `smithy doctor` fails and serve
+  launches nothing.
