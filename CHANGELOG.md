@@ -5,6 +5,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: a harness build (`go build -tags harness ./cmd/smithy`, released as `smithy-harness-<os>-<arch>`) beside the stdlib-only skills build, with a SQLite store (`~/.smithy/smithy.db`, WAL, append-only events, migrations) on pure-Go `modernc.org/sqlite` (ADR 0009). In the skills build, `smithy daemon`, `attach` and `board` say how to get it.
+
 ## v0.17.0 — 2026-11-24
 
 - Container refuses `auto.sandbox_network host` and, on the default image, harnesses it does not carry (only Claude Code and OpenCode); pool hints and help list every harness; docs match the proxy allow-list and restart rule.
