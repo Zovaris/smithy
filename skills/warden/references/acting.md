@@ -113,8 +113,7 @@ Recovery ladder, one rung per wake:
 4. At the cap, set the card `state=blocked` and tell the user with the `note`; the item stays
    listed as blocked until they act.
 
-Never a fresh worktree for the same task. Note `account <name> limited until <t>` (exit 75): go
-straight to rung 3 once `smithy pool list` shows an account free.
+Never a fresh worktree for the same task. Exit 75 (`account … limited`): rung 3 once one is free.
 
 Takeover data: every stuck report, and the final message for any item not merged, gives per item
 the worktree path, branch, session id or pid, and log path (`<batch-dir>/<id>.log`), so the user
