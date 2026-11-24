@@ -1,48 +1,48 @@
-                                                                                                                                                                
-     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄       ╔═╗╔╦╗╦╔╦╗╦ ╦╦ ╦                             watcher  ● watching github, linear (TES) · next poll 35s · serve pid 4242 claude 
- ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀       ╚═╗║║║║ ║ ╠═╣╚╦╝                             today    ███████████░░  69 / 80 launched                                         
-          ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ╚═╝╩ ╩╩ ╩ ╩ ╩ ╩                              agents   5 working · 0 waiting · 2 stuck                                         
-              ▀▀▀▀▀▀▀              DEMO  autonomous forge · dev · smithy       PRs      3 ready for you · 1 CI running                                          
-         ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
-        ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
-  1 Overview   2 Agents   3 Incoming   4 Needs you 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System                                                   
-╭─ Agents · 15 · sort stage ────────────────────────────────────────────────────────────────────────────╮╭─ Preview ───────────────────────────────────────────╮
-│   issue       title                       repo        model   stage     CI         PR      beat       ││ orchestrator pid 5150                               │
-│ ▸ serve       orchestrator · claude · p…  -           -       orchestr  -          -       -          ││ orchestrator · claude · pid 5150 · auto-2026-11-23… │
-│   TES-212     Show CI time per PR         smithy      cheap   blocked   -          -       2m ago     ││                                                     │
-│   TES-211     Typed config loader         ledger-web  strong  blocked   ✗ red      #2011   38m ago    ││ timeline                                            │
-│   TES-209     Add SSO for admins          smithy      cheap   ready     ✓ green    #2009   1m ago     ││ no events yet                                       │
-│   TES-210     Speed up cold start         atlas       mid     ready     ✓ green    #2010   2m ago     ││                                                     │
-│   TES-207     Upgrade to Go 1.27          atlas       mid     pr_open   ◐ running  #2007   1m ago     ││ log  l opens it all                                 │
-│   TES-208     Drop the legacy CSV impor…  ledger-web  strong  pr_open   ✓ green    #2008   1m ago     ││ no log yet                                          │
-│   TES-206     Split the billing service   smithy      cheap   checking  -          -       1m ago     ││                                                     │
-│   TES-205     Retry webhooks with backo…  ledger-web  strong  checking  -          -       1m ago     ││                                                     │
-│   TES-203     Cache board queries         smithy      cheap   building  -          -       53s ago    ││                                                     │
-│   TES-204     Paginate the audit log      atlas       mid     building  -          -       1m ago     ││                                                     │
-│   TES-202     Rate-limit the export API   ledger-web  strong  building  -          -       42s ago    ││                                                     │
-│   TES-200     Add dark mode to the repo…  smithy      cheap   queued    -          -       -          ││                                                     │
-│   TES-201     Fix flaky login test        atlas       mid     queued    -          -       -          ││                                                     │
-│   TES-213     Archive stale branches      atlas       mid     merged    ✓ green    #2013   2m ago     ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-│                                                                                                       ││                                                     │
-╰───────────────────────────────────────────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────────╯
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                                                                                                 
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   ╔═╗╔╦╗╦╔╦╗╦ ╦╦ ╦                             watcher  ● watching github, linear (TES) · next poll 35s · serve pid 4242 claude 
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   ╚═╗║║║║ ║ ╠═╣╚╦╝                             today    ███████████▓▒  69 / 80 launched                                         
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   ╚═╝╩ ╩╩ ╩ ╩ ╩ ╩                              agents   5 working · 0 waiting · 2 stuck                                         
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀    DEMO  autonomous forge · dev · smithy       PRs      3 ready for you · 1 CI running                                          
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                                                                                                 
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                         14:30:00                                                                
+  1 Overview   2 Agents   3 Incoming   4 Needs you ? 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System                                                 
+╭─ Agents · 15 · sort stage ────────────────────────────────────────────────────────────────────────────╮   Preview                                             
+│   issue       title                       repo        model   stage     CI         PR      beat       │  orchestrator pid 5150                                
+│ ▸ serve       orchestrator · claude · p…  -           -       orchestr  -          -       -          │  orchestrator · claude · pid 5150 · auto-2026-11-23…  
+│   TES-212     Show CI time per PR         smithy      cheap   blocked   -          -       2m ago     │                                                       
+│   TES-211     Typed config loader         ledger-web  strong  blocked   ✗ red      #2011   38m ago    │  timeline                                             
+│   TES-209     Add SSO for admins          smithy      cheap   ready     ✓ green    #2009   1m ago     │  no events yet                                        
+│   TES-210     Speed up cold start         atlas       mid     ready     ✓ green    #2010   2m ago     │                                                       
+│   TES-207     Upgrade to Go 1.27          atlas       mid     pr_open   ● running  #2007   1m ago     │  log  l opens it all                                  
+│   TES-208     Drop the legacy CSV impor…  ledger-web  strong  pr_open   ✓ green    #2008   1m ago     │  no log yet                                           
+│   TES-206     Split the billing service   smithy      cheap   checking  -          -       1m ago     │                                                       
+│   TES-205     Retry webhooks with backo…  ledger-web  strong  checking  -          -       1m ago     │                                                       
+│   TES-203     Cache board queries         smithy      cheap   building  -          -       53s ago    │                                                       
+│   TES-204     Paginate the audit log      atlas       mid     building  -          -       1m ago     │                                                       
+│   TES-202     Rate-limit the export API   ledger-web  strong  building  -          -       42s ago    │                                                       
+│   TES-200     Add dark mode to the repo…  smithy      cheap   queued    -          -       -          │                                                       
+│   TES-201     Fix flaky login test        atlas       mid     queued    -          -       -          │                                                       
+│   TES-213     Archive stale branches      atlas       mid     merged    ✓ green    #2013   2m ago     │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+╰───────────────────────────────────────────────────────────────────────────────────────────────────────╯                                                       
  ↑↓ move  ←→ pane  enter details  l log  o open  c copy  s sort  / filter                                                             tab views  ? help  q quit 

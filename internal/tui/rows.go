@@ -228,10 +228,10 @@ func (m Model) stageColor(s string) color.Color {
 	switch s {
 	case "ready", "merged":
 		return t.ok
-	case "pr_open", "checking":
+	case "pr_open":
+		return t.info
+	case "checking", "building":
 		return t.accent
-	case "building":
-		return t.warn
 	case "blocked":
 		return t.err
 	}
@@ -246,7 +246,7 @@ func (m Model) ciCell(s string) cell {
 	case "red", "fail", "failure":
 		return cell{s: t.g.fail + " red", c: t.err}
 	case "pending", "running", "queued", "in_progress":
-		return cell{s: t.g.half + " running", c: t.warn}
+		return cell{s: t.g.on + " running", c: t.accent}
 	}
 	return cell{s: "-", c: t.muted}
 }
@@ -485,7 +485,7 @@ func (m Model) needRows() []row {
 		if len(f) > 0 {
 			det = append(det, [2]string{"date", f[0]})
 		}
-		out = append(out, row{cells: []cell{{s: "?", c: chipC, bold: true}, {s: what, c: t.text}, {s: "decided by " + by, c: t.muted}, {s: "a accept · x reject", c: t.accent}},
+		out = append(out, row{cells: []cell{{s: t.g.wait, c: chipC, bold: true}, {s: what, c: t.text}, {s: "decided by " + by, c: t.muted}, {s: "a accept · x reject", c: t.accent}},
 			url: ref, copy: q, cmd: cmd, title: "Decision " + fmt.Sprint(n+1) + ": " + question, detail: det, search: "decision " + chip,
 			decision: n + 1, chip: chip, chipC: chipC,
 			explain: []string{
@@ -547,14 +547,17 @@ func (m Model) kindLook(k, detail string) (string, color.Color) {
 	case "skipped":
 		return "-", t.muted
 	case "launched":
-		return t.g.half, t.warn
+		return t.g.on, t.accent
 	case "ci":
 		c := m.ciCell(detail)
 		return strings.Fields(c.s)[0], c.c
 	case "merged", "report":
 		return t.g.pass, t.ok
 	case "stage":
-		if detail == "blocked" || detail == "failed" || detail == "needs_decision" {
+		if detail == "needs_decision" {
+			return t.g.wait, t.warn
+		}
+		if detail == "blocked" || detail == "failed" {
 			return t.g.fail, t.err
 		}
 		return t.g.on, t.accent

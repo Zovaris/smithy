@@ -20,7 +20,7 @@ type Setting struct {
 	Secret                            bool
 }
 
-var groupOrder = []string{"auto", "linear", "warden", "notify", "decide", "agent", "ask", "tasks", "git", "watch", "tend", "route", "stack", "models"}
+var groupOrder = []string{"auto", "linear", "warden", "notify", "decide", "agent", "ask", "tasks", "git", "watch", "tend", "route", "stack", "tui", "models"}
 
 // settingRows lists every known key plus the current harness's models, grouped, with value and source from eff.
 func settingRows(h string, eff func(string) (string, string, error)) []Setting {
@@ -366,7 +366,7 @@ func (m Model) editBox(w int) string {
 	}
 	st := m.panelStyle(t.accent).Width(bw)
 	if !t.plain {
-		st = st.Background(t.surface)
+		st = st.Background(t.overlay)
 	}
 	return st.Render(strings.Join(lines, "\n"))
 }
