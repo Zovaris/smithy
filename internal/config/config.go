@@ -30,7 +30,7 @@ var Known = []Setting{
 	{"git.worktree", "{parent}/worktrees/{repo}-{branch}", "smelt warden tend", "worktree path template ({branch} with / as -)"},
 	{"tasks.ignore", "ask", "smelt plan", "with tasks.commit false: gitignore (commit a .gitignore line) or exclude (local .git/info/exclude)"},
 	{"warden.merge", "ask", "warden", "auto: warden merges green PRs (workers never do); manual: warden lists green PRs for the user; unset: warden asks per batch"},
-	{"warden.cleanup", "auto", "warden", "auto: end finished workers and remove worktrees and local branches without asking"},
+	{"warden.cleanup", "auto", "warden", "auto: end finished workers and remove worktrees and local branches without asking; ask: warden asks before ending them"},
 	{"warden.max", "5", "warden", "parallel workers (a token-cost cap)"},
 	{"warden.mode", "smelt normal", "warden", "batch check speed: smelt fast, smelt normal, smelt full or plain"},
 	{"warden.stuck_minutes", "15", "warden", "minutes without a worker heartbeat (cards beat or cards set) before its item is stuck"},
@@ -56,12 +56,22 @@ var Known = []Setting{
 	{"auto.model_prefix", "model:", "smithy auto", "label prefix for the worker tier (model:cheap, model:mid, model:strong)"},
 	{"auto.speed_prefix", "speed:", "smithy auto", "label prefix for the smelt speed (speed:fast, speed:normal, speed:full)"},
 	{"auto.max_per_day", "20", "smithy auto", "issues launched per local calendar day; the rest stay queued (an auto.hours window across midnight can launch up to 2x this overnight)"},
+	{"auto.max_cost_per_day", "", "smithy auto serve", "USD of reported agent cost per local day; at or over it serve starts nothing new until tomorrow (running workers finish); only reported cost counts (claude), unknown cost counts as 0; empty = no cap"},
 	{"auto.hours", "", "smithy auto", "launch window HH:MM-HH:MM in local time (22:00-07:00 wraps midnight); empty = always"},
 	{"auto.every", "60", "smithy auto", "seconds between polls of each source"},
 	{"auto.paused", "false", "smithy auto", "true holds smithy auto take: nothing launches until it is false again (p in smithy tui)"},
-	{"auto.agent", "", "smithy auto serve", "agent CLI for serve's orchestrator (claude, codex, opencode…); empty = the one smithy agent detects"},
+	{"auto.agent", "", "smithy auto serve", "agent CLI for serve's orchestrator (claude, codex, opencode…, or pool: any smithy pool account); empty = the one smithy agent detects"},
 	{"auto.session_hours", "3", "smithy auto serve", "hours one orchestrator session may run before smithy agent ends it (its workers keep going)"},
+	{"auto.sandbox", "off", "smithy agent", "isolation for unattended workers (--profile auto) on top of the allow-list: off, native (claude/codex OS sandbox) or container (docker/podman); fails closed: a worker whose sandbox can't start is not started; auto.sandbox* are read from the user settings only, never a repo's"},
+	{"auto.sandbox_domains", "", "smithy agent", "comma list of extra hosts a native-sandboxed worker may reach (github.com, api.github.com, api.anthropic.com, api.linear.app always)"},
+	{"auto.sandbox_image", "smithy-sandbox:latest", "smithy agent", "container image for auto.sandbox container (build it from sandbox/Dockerfile)"},
+	{"auto.sandbox_network", "", "smithy agent", "docker/podman --network for auto.sandbox container; empty = none (no network: push and gh fail inside); set bridge or a proxied network knowingly"},
+	{"auto.sandbox_memory", "4g", "smithy agent", "docker/podman --memory for auto.sandbox container"},
+	{"auto.sandbox_weaker_net", "true", "smithy agent", "macOS native sandbox: enableWeakerNetworkIsolation so gh and other Go CLIs can verify TLS (opens the system TLS trust service to the worker); false turns it off and gh then fails inside workers"},
 	{"auto.merge", "manual", "tend auto", "merge mode for auto batches (production stays the user's, always)"},
+	{"notify.telegram.chat", "", "smithy auto serve", "Telegram chat id serve notifies (bot token: smithy auth set telegram); empty = no notifications"},
+	{"notify.style", "plain", "smithy auto serve", "Telegram message look: emoji (an icon per line) or plain (status tag, one monospace detail line, no emoji)"},
+	{"notify.kinds", "pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited", "smithy auto serve", "comma list of notification kinds sent to Telegram"},
 	{"linear.key_env", "LINEAR_API_KEY", "smithy auto", "name of the env var holding the Linear personal API key (never the key); wins over smithy auth set linear (~/.smithy/auth.json)"},
 	{"linear.team", "", "smithy auto", "required: Linear team keys smithy may work in (e.g. ENG,OPS); empty, the Linear source refuses to poll"},
 	{"linear.project", "", "smithy auto", "Linear project name filter; comma list"},
@@ -288,6 +298,19 @@ func Effective(key string) (string, string, error) {
 	return "", "", ErrUnset
 }
 
+// UserGet reads key from the user's settings file only, never the repo's (a cloned repo must not
+// loosen a security setting); fallback when unset. A file that can't be read is an error.
+func UserGet(key, fallback string) (string, error) {
+	v, ok, err := readKeyErr(UserFile(), key)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return fallback, nil
+	}
+	return v, nil
+}
+
 // Get returns a key's effective value, or fallback when it is unset.
 func Get(key, fallback string) string {
 	if v, _, err := Effective(key); err == nil {
@@ -401,7 +424,8 @@ func Normalize(key, value string) (string, string, error) {
 		return v, "", nil
 	}
 	if key != "agent.effort" {
-		return value, "", nil
+		v, err := typed(key, value)
+		return v, "", err
 	}
 	switch v := strings.ToLower(strings.TrimSpace(value)); v {
 	case "low", "medium":
@@ -533,16 +557,13 @@ func Main(args []string) int {
 		}
 		fmt.Println(v)
 	case "set", "unset":
-		rest, file := args[1:], UserFile()
+		rest, repo := args[1:], false
 		if len(rest) > 0 && rest[0] == "--repo" {
-			if file = RepoFile(); file == "" {
-				fmt.Fprintln(os.Stderr, "not in a git repo")
+			if _, err := scopeFile(true); err != nil {
+				fmt.Fprintln(os.Stderr, err)
 				return 2
 			}
-			if strings.HasSuffix(file, filepath.Join(".agents", "config.json")) {
-				file = filepath.Join(filepath.Dir(filepath.Dir(file)), ".smithy", "config.json")
-			}
-			rest = rest[1:]
+			rest, repo = rest[1:], true
 		}
 		if args[0] == "unset" {
 			if len(rest) != 1 {
@@ -553,7 +574,7 @@ func Main(args []string) int {
 				fmt.Fprintln(os.Stderr, err)
 				return 2
 			}
-			ok, err := Unset(file, rest[0])
+			file, ok, err := Remove(repo, rest[0])
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return 1
@@ -573,20 +594,19 @@ func Main(args []string) int {
 			fmt.Fprintln(os.Stderr, err)
 			return 2
 		}
-		val, note, err := Normalize(rest[0], rest[1])
-		if err != nil {
+		if _, _, err := Normalize(rest[0], rest[1]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 2
 		}
+		file, val, note, err := Apply(repo, rest[0], rest[1])
 		if note != "" {
 			fmt.Fprintln(os.Stderr, note)
 		}
-		rest[1] = val
-		if err := Set(file, rest[0], rest[1]); err != nil {
+		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
-		fmt.Printf("saved %s = %s (%s)\n", rest[0], rest[1], file)
+		fmt.Printf("saved %s = %s (%s)\n", rest[0], val, file)
 	case "migrate":
 		moved := Migrate()
 		if len(moved) == 0 {

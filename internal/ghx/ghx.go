@@ -9,16 +9,47 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"testing"
 )
 
 // Home is the smithy state dir: $SMITHY_HOME or ~/.smithy.
+// Under `go test` it never returns the user's real ~/.smithy: a test that set no temp home gets a
+// per-process temp dir (exported so child processes share it), so tests cannot leak events or alerts.
 func Home() string {
-	if h := os.Getenv("SMITHY_HOME"); h != "" {
-		return h
+	home := os.Getenv("SMITHY_HOME")
+	if home == "" {
+		d, _ := os.UserHomeDir()
+		home = filepath.Join(d, ".smithy")
 	}
+	if testing.Testing() && filepath.Clean(home) == startHome {
+		testHomeOnce.Do(func() {
+			testHome, _ = os.MkdirTemp("", "smithy-test-home-")
+		})
+		os.Setenv("SMITHY_HOME", testHome)
+		return testHome
+	}
+	return home
+}
+
+var (
+	testHomeOnce sync.Once
+	testHome     string
+)
+
+// In a test binary SMITHY_HOME points at a temp dir from the start, so the smithy binaries tests
+// run as child processes inherit it too.
+func init() {
+	if testing.Testing() {
+		Home()
+	}
+}
+
+// startHome is the user's real ~/.smithy, taken before any test can change $HOME.
+var startHome = func() string {
 	d, _ := os.UserHomeDir()
 	return filepath.Join(d, ".smithy")
-}
+}()
 
 // SkillDir is the skill's scripts folder the launcher ran from (empty when run directly).
 func SkillDir() string { return os.Getenv("SMITHY_SKILL_DIR") }

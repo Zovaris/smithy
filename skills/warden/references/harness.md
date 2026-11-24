@@ -10,7 +10,7 @@ before spawning: a respawn reuses it; a relaunch renders it again (`references/a
 
 | Operation | How |
 |---|---|
-| **spawn** worker | `smithy agent --bg [--model <m>] --cwd <worktree> --log <batch-dir>/<id>.log <batch-dir>/<id>.brief.md` |
+| **spawn** worker | `smithy agent --bg [--model <m>] --cwd <worktree> --log <batch-dir>/<id>.log <batch-dir>/<id>.brief.md` (writes the card as `working` with the worker's pid; a worker that dies before reporting turns it `failed`) |
 | **tell** worker | append to `<batch-dir>/<id>.inbox.md`, then respawn it in the same worktree |
 | **wake** warden | `smithy wait batch:<batch>` as a background job; if the harness can't wake on exit, in the foreground (returns within `--max` minutes) |
 | **end** worker | `kill <pid>` if alive |

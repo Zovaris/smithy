@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -301,6 +302,7 @@ type Settings struct {
 	Hours                                 string
 	MaxPerDay, Every                      int
 	Paused                                bool
+	MaxCostPerDay                         *float64 // auto.max_cost_per_day in USD; nil when unset
 }
 
 // LoadSettings reads the auto.* settings.
@@ -321,6 +323,13 @@ func LoadSettings() (Settings, error) {
 	var err error
 	if s.MaxPerDay, err = strconv.Atoi(config.Get("auto.max_per_day", "20")); err != nil || s.MaxPerDay < 0 {
 		return s, fmt.Errorf("auto.max_per_day must be a whole number >= 0")
+	}
+	if v := strings.TrimSpace(config.Get("auto.max_cost_per_day", "")); v != "" {
+		c, err := strconv.ParseFloat(v, 64)
+		if err != nil || c < 0 || math.IsInf(c, 0) || math.IsNaN(c) {
+			return s, fmt.Errorf("auto.max_cost_per_day must be a number of USD >= 0, or empty for no cap")
+		}
+		s.MaxCostPerDay = &c
 	}
 	if s.Every, err = strconv.Atoi(config.Get("auto.every", "60")); err != nil || s.Every < 1 {
 		return s, fmt.Errorf("auto.every must be a whole number of seconds >= 1")
@@ -796,14 +805,7 @@ func bodyLines(s string) []string {
 // batchStarted reports whether a warden batch over dir has a card past queued: its workers
 // started even if nobody moved the task files off todo.
 func batchStarted(dir string) bool {
-	home := os.Getenv("SMITHY_HOME")
-	if home == "" {
-		h, err := os.UserHomeDir()
-		if err != nil {
-			return false
-		}
-		home = filepath.Join(h, ".smithy")
-	}
+	home := ghx.Home()
 	want, _ := filepath.EvalSymlinks(dir)
 	batches, _ := os.ReadDir(filepath.Join(home, "warden"))
 	for _, b := range batches {
@@ -823,7 +825,7 @@ func batchStarted(dir string) bool {
 		}
 		cs, _ := os.ReadDir(bd)
 		for _, c := range cs {
-			if c.Name() == "batch.json" || filepath.Ext(c.Name()) != ".json" {
+			if !strings.HasSuffix(c.Name(), ".json") || c.Name() == "batch.json" || strings.HasSuffix(c.Name(), ".usage.json") {
 				continue
 			}
 			var card struct {

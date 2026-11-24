@@ -71,6 +71,8 @@ type Watcher struct {
 	Paused   bool
 	Team     string
 	Serve    auto.ServeStatus
+	Spend    []float64 // reported agent cost per local day, the last 7 days, today last; nil when none reported
+	SpendCap *float64  // auto.max_cost_per_day; nil when unset
 }
 
 // Batch is one warden batch and its items.
@@ -201,7 +203,9 @@ func Load(now time.Time) Snapshot {
 		snap.Errors = append(snap.Errors, "events: "+err.Error())
 	} else {
 		snap.Events = es
+		snap.Watcher.Spend = spendOf(es, now)
 	}
+	snap.Watcher.SpendCap = s.MaxCostPerDay
 	snap.Repo = repoName()
 
 	if d, err := pendingDecisions(); err != nil {
@@ -525,6 +529,16 @@ func itemMeta(batch string) (map[string]meta, string) {
 		repo = filepath.Base(plan.Repo)
 	}
 	return out, repo
+}
+
+// spendOf is the last 7 days of reported cost, nil when no event reports one.
+func spendOf(es []events.Event, now time.Time) []float64 {
+	for _, e := range es {
+		if e.Kind == "usage" && e.Usage != nil && e.Usage.CostUSD != nil {
+			return events.Spend(es, now, 7)
+		}
+	}
+	return nil
 }
 
 func or(s string) string {

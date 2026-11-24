@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/events"
+	tok "github.com/Zovaris/smithy/internal/usage"
 )
 
 func setup(t *testing.T) string {
@@ -504,6 +505,20 @@ func TestBoard(t *testing.T) {
 		t.Fatalf("held item should have null updated: %s", js)
 	}
 
+	if parsed.Items[0].Usage != nil || strings.Contains(js, `"usage"`) {
+		t.Fatalf("usage without a sidecar: %s", js)
+	}
+	writeFile(t, filepath.Join(h, "b1", "a.log.usage.json"), `{"input_tokens":1,"output_tokens":2,"cache_read_tokens":0,"cache_write_tokens":0,"cost_usd":0.4}`)
+	js, _ = Board("b1", true)
+	var withUsage struct {
+		Usage *tok.Usage
+		Items []Row
+	}
+	json.Unmarshal([]byte(js), &withUsage)
+	if withUsage.Items[0].Usage == nil || withUsage.Items[0].Usage.Output != 2 || withUsage.Usage == nil || *withUsage.Usage.CostUSD != 0.4 {
+		t.Fatalf("usage: %s", js)
+	}
+
 	if _, err := Board("zzz", false); err == nil {
 		t.Fatal("want error")
 	}
@@ -660,5 +675,13 @@ func TestGate(t *testing.T) {
 	Set("g", "r", []string{"security=ran"})
 	if err := Gate("g", "r"); err != nil {
 		t.Errorf("ran: %v", err)
+	}
+}
+
+func TestIsCardFile(t *testing.T) {
+	for n, want := range map[string]bool{"01-a.json": true, "batch.json": false, "01-a.log.usage.json": false, "01-a.log": false} {
+		if IsCardFile(n) != want {
+			t.Fatalf("IsCardFile(%q) = %v", n, !want)
+		}
 	}
 }

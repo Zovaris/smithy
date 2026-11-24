@@ -5,6 +5,85 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.16.0 — 2026-11-23
+
+- Added: `notify.style` (`plain`, default, or `emoji`) for Telegram messages.
+- Fixed: tests no longer write to your real `~/.smithy` (test `stage` events reached Telegram as
+  real alerts). Under `go test` the smithy home is a temp dir unless a test sets one, and
+  `tests/run.sh` exports a temp `SMITHY_HOME`.
+- Changed: Telegram notifications are rich HTML: an emoji header per kind, the item key and title,
+  repo, stage, model · speed, known cost and duration, the reason in a quote, the pending question
+  and how to answer it for decisions, and Open PR / Open issue buttons (http(s) only); every value
+  is escaped and link previews are off. `smithy notify test --all` sends a sample of every kind.
+
+- Fixed: under `auto.sandbox native`, git reaches GitHub over HTTPS with `gh auth git-credential`
+  (SSH remotes and `~/.ssh` stay blocked inside the sandbox), so sandboxed workers can push.
+- Fixed: `smithy agent` resolves the tiers `cheap`, `mid`, `strong` and `judge` to your models for
+  that CLI's harness (`models.<harness>.<tier>`); an unset tier uses the CLI's default with a warning.
+- Changed: the container sandbox image (`sandbox/Dockerfile`) is on Go 1.27.4, pinned by digest.
+- Fixed: a warden worker that died at start (for example on an invalid `--model`) no longer hangs
+  `smithy wait batch:<batch>`. `smithy agent --bg` with a `<batch-dir>/<id>.log` writes the card
+  at launch (`working`, `last_beat` now, the worker's `pid`), and the batch wait turns a card whose
+  pid is gone before it reported into `failed` (`note=worker exited: <last log line>`) and wakes.
+
+- Added: `auto.sandbox` (off | native | container) isolates unattended workers on top of the
+  `--profile auto` allow-list and fails closed: a worker whose sandbox can't start is not started,
+  and serve launches nothing (log, `orchestrator_failed` to the TUI and Telegram). native runs
+  Claude Code with `--settings` for its sandbox: strict host allow-list (GitHub, Anthropic, Linear
+  plus `auto.sandbox_domains`), shell writes only to the worktree, its git dir, `~/.smithy/plans`,
+  `~/.smithy/warden` and the Go cache, secrets unreadable, no unsandboxed retry; `--add-dir` is
+  narrowed to match. Live-tested on macOS. codex runs with network off. container wraps the worker
+  in `docker|podman run --rm` with the worktree and plans mounted and a scrubbed env (image:
+  `auto.sandbox_image`, `sandbox/Dockerfile`); unit-tested only, live test pending. `smithy doctor`
+  checks each mode (sandbox-exec, bwrap + socat, docker/podman) and the TUI System view shows it.
+  `auto.sandbox*` are read from the user settings only; an unreadable file fails closed; native
+  needs claude 2.1.331 or newer. Containers run with `--network none` by default, a read-only root,
+  tmpfs /tmp, pid and memory limits (`auto.sandbox_memory`) and read-only git hooks and config.
+  `auto.sandbox_weaker_net` turns off macOS's weaker network isolation (gh then fails inside).
+
+- Added: account pool (`smithy pool add|login|list|remove|clear`), off until an account is added.
+  Your own claude (CLAUDE_CONFIG_DIR) and codex (CODEX_HOME) accounts in `~/.smithy/pool.json`;
+  `smithy agent` runs on the least recently used one that is not limited (`AGENT_CLI=pool` or
+  `auto.agent pool`: any harness), records it on the warden card and the usage event, and on a
+  usage-limit result marks it limited until the reset it states (5h otherwise) in
+  `~/.smithy/pool-state.json`. It reruns once on the next account (log appended) only when the run
+  was read-only or left the worktree untouched (same HEAD, clean, nothing pushed); otherwise it
+  exits 75 and blocks the warden card (`account <name> limited until <t>`) so warden relaunches it
+  in the same worktree. A pooled run drops `ANTHROPIC_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` and
+  `OPENAI_API_KEY` so the account's login is used. Serve holds while every account is limited and
+  says the earliest reset; Telegram kind `limited`; the TUI System view shows a pool table.
+  Unattended workers are denied every account dir and `smithy pool`.
+- Added: edit settings from `smithy tui` System view. Every known key plus the harness's models,
+  grouped, with value, source and meaning; enter opens a typed input (bool/enum choice, number,
+  list, text), a confirm step shows old → new and the scope (tab: user or repo), `u` unsets back to
+  the default. Writes go through `config.Apply`/`config.Remove`, the same path as
+  `smithy config set|unset`; secret-valued keys are locked (auth stays in `smithy auth`); demo mode
+  only says the command it would run.
+- Changed: `smithy config set` validates typed keys the way the code reads them: booleans
+  (`auto.paused`, `decide.enabled`), whole numbers (`warden.max`, `auto.every` at least 1), non-negative
+  numbers (`watch.every`, `auto.session_hours`, `auto.max_cost_per_day`, …) and choices (`auto.mode`, `warden.merge`,
+  `warden.mode`, `tasks.location`, …); comma lists are trimmed.
+
+- Added: token use and cost per run. `smithy agent` runs Claude Code with `--output-format json`,
+  then turns the log back into the plain answer and writes `<log>.usage.json` (input, output,
+  cache read/write tokens, `cost_usd` from `total_cost_usd`) plus a `usage` event. `smithy cards
+  board --json` shows each item's `usage` and the batch total. An error result keeps a readable
+  `error: <subtype>: <message>` line in the log; runs without `--log` (consult) still count. Other CLIs report nothing yet and
+  show `-`: never an estimate.
+- Added: the TUI shows a cost column in Agents and Done, and "spend today" with a 7-day sparkline
+  in the Overview's Daily cap card.
+- Added: `auto.max_cost_per_day` (unset by default): when today's reported spend reaches it,
+  `smithy auto serve` launches nothing until tomorrow, logs why and records one `cap_reached`
+  event per day.
+- Added: Telegram notifications, sent by `smithy auto serve` (never an agent) from events.jsonl
+  and the cards: PR ready, item blocked, stuck or waiting on a decision, orchestrator failed,
+  serve stopped, daily cap reached. Bot token in `smithy auth set telegram`, chat in
+  `notify.telegram.chat`, kinds in `notify.kinds`. Once per (item, kind), at most 20 a minute
+  (the overflow folded into one summary), no issue bodies or keys; a failed send is logged once,
+  retried each cycle for 24 h (then dropped, logged) and never stops serve; unknown kinds are
+  ignored with a warning in `smithy notify status`. `smithy notify test|status`; the TUI System view shows the setup.
+- Added: events `orchestrator_failed`, `cap_reached` (once a day) and `serve_down` in events.jsonl.
+
 ## v0.15.0 — 2026-11-23
 
 - Added: `smithy worktree add <repo> <branch> <from>` creates a task worktree at its standard

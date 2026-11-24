@@ -139,6 +139,7 @@ time it needs a value. `smithy config list` shows every setting and where it cam
 them, with defaults, are in [docs/settings.md](docs/settings.md). API keys (e.g. Linear) live apart
 in `~/.smithy/auth.json` (mode 0600): `smithy auth set linear < keyfile`, never in a config file. Any process running as you (agents
 included) can read it, so use a test or least-privilege key.
+Telegram notifications from `smithy auto serve`: `smithy auth set telegram` (bot token), `smithy config set notify.telegram.chat <id>`, then `smithy notify test`.
 
 ## Autonomous mode
 
@@ -160,15 +161,42 @@ token and a test or least-privilege Linear key. Issue text can carry injected in
 `smithy agent --profile auto` allow-list (explicit git/gh subcommands, denied config, credential and
 network commands, denied secret files) reduces that risk but cannot remove it. Codex runs in its
 workspace-write sandbox with network on (push needs it) and approvals off, so nothing stops it
-sending data out: least-privilege tokens matter most there.
+sending data out: least-privilege tokens matter most there. For more isolation set
+`smithy config set auto.sandbox native` (Claude Code's OS sandbox: host allow-list, writes only to the
+worktree and smithy's plans) or `container` (docker/podman, not live-tested yet); it fails closed, and
+`smithy doctor` checks it ([settings](docs/settings.md)). Its settings are read from your user config only. The
+orchestrator itself is not sandboxed and may run repo tests; workers sign commits through your ssh-agent
+(use a dedicated signing key) and still get your `GH_TOKEN` (use a fine-grained, repo-scoped token).
+
+### Account pool
+
+Off until you add an account. Each one is your own account on an official CLI, signed in once in
+its own config dir; smithy agent picks the least recently used one that is not rate limited and,
+when a run hits a usage limit, marks it until its reset. A read-only or untouched run reruns once
+on the next account; a run with partial work stops (exit 75) and warden resumes it in the same
+worktree.
+
+```
+smithy pool add work claude          # dir ~/.smithy/accounts/work (CLAUDE_CONFIG_DIR)
+smithy pool add home claude
+smithy pool add cx codex             # CODEX_HOME
+smithy pool login work               # opens the CLI with that dir: sign in, then exit
+smithy pool list                     # status, resets at, runs and cost today (also smithy tui, System)
+smithy config set auto.agent pool    # optional: serve's orchestrator may use any harness in the pool
+```
+
+When every account is limited, `smithy agent` exits 75 and serve launches nothing until the
+earliest reset (Telegram kind `limited`). Use only accounts you own, through the official CLIs,
+with no proxy or relay in between: each provider's terms apply to each account. Unattended claude
+workers are denied reading every account dir.
 
 ## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh             # binary, latest
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.15.0    # binary, pinned
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.16.0    # binary, pinned
 npx skills add Zovaris/smithy -g -y --skill '*' -a claude-code -a codex   # no prompts
-npx skills add Zovaris/smithy@v0.15.0 -g                                   # pin a release
+npx skills add Zovaris/smithy@v0.16.0 -g                                   # pin a release
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # skills + binary
 ```
 

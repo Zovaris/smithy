@@ -16,6 +16,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	tok "github.com/Zovaris/smithy/internal/usage"
 )
 
 // RaiseImpact, when set, may raise a new question's impact (never lower it); it reports whether it did.
@@ -66,6 +67,69 @@ func Beat(batch, id string) error {
 		cur["last_beat"] = stampNow()
 		return write(file, cur)
 	})
+}
+
+// Launch records a started worker's pid on its card, creating the card as `working` (last_beat =
+// now) when the worker hasn't written one, so a worker that dies before its first write still
+// leaves a card that a batch wait and the stuck rule can see.
+func Launch(batch, id string, pid int) error {
+	if !idRe.MatchString(batch) || !idRe.MatchString(id) {
+		return fmt.Errorf("batch and id must match [A-Za-z0-9._-]+")
+	}
+	file := filepath.Join(Home(), batch, id+".json")
+	return config.WithLock(file, func() error {
+		cur := read(file)
+		if cur == nil {
+			cur = map[string]any{"id": id}
+		}
+		if s(cur, "state") == "" {
+			cur["state"] = "working"
+		}
+		cur["pid"] = pid
+		cur["updated"] = stampNow()
+		cur["last_beat"] = cur["updated"]
+		return write(file, cur)
+	})
+}
+
+// Dead marks a card failed when its recorded worker pid is no longer running and its state
+// isn't final, pr_open, ready or already stuck (blocked, failed, needs_decision): the worker exited without
+// reporting. alive reports whether a pid runs; log is the worker's log file. It returns true
+// when it changed the card.
+func Dead(batch, id string, alive func(int) bool, log string) bool {
+	file := filepath.Join(Home(), batch, id+".json")
+	changed := false
+	_ = config.WithLock(file, func() error {
+		cur := read(file)
+		pid, ok := cur["pid"].(float64)
+		if cur == nil || !ok || pid <= 0 || alive(int(pid)) {
+			return nil
+		}
+		switch s(cur, "state") {
+		case "merged", "reported", "dropped", "pr_open", "ready", "failed", "blocked", "needs_decision":
+			return nil
+		}
+		_, err := set(file, id, []string{"state=failed", "note=worker exited: " + lastLine(log)})
+		changed = err == nil
+		return err
+	})
+	return changed
+}
+
+func lastLine(file string) string {
+	b, err := os.ReadFile(file)
+	if err != nil {
+		return "(no log)"
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	l := lines[len(lines)-1]
+	if rs := []rune(l); len(rs) > 300 {
+		l = string(rs[:300])
+	}
+	if l == "" {
+		return "(empty log)"
+	}
+	return l
 }
 
 func write(file string, cur map[string]any) error {
@@ -222,6 +286,8 @@ type Row struct {
 	LastBeat *string `json:"last_beat"`
 	Updated  *string `json:"updated"`
 	Text     string  `json:"text"`
+	// Usage is what the item's worker run reported (<batch>/<id>.log.usage.json); nil when unknown.
+	Usage *tok.Usage `json:"usage,omitempty"`
 }
 
 func ageMin(card map[string]any) (float64, bool) { return since(card, "updated") }
@@ -327,7 +393,7 @@ func Rows(batch string) ([]Row, error) {
 	entries, _ := os.ReadDir(dir)
 	for _, e := range entries {
 		n := e.Name()
-		if strings.HasSuffix(n, ".json") && n != "batch.json" {
+		if IsCardFile(n) {
 			id := strings.TrimSuffix(n, ".json")
 			if _, ok := items[id]; !ok {
 				items[id] = map[string]any{}
@@ -359,6 +425,9 @@ func Rows(batch string) ([]Row, error) {
 				r.Age = fmt.Sprintf("%dm", int(a+0.5))
 			}
 		}
+		if u, ok := tok.Read(filepath.Join(dir, id+".log")); ok {
+			r.Usage = &u
+		}
 		r.Beat = "-"
 		if b := s(card, "last_beat"); b != "" {
 			r.LastBeat = &b
@@ -378,6 +447,18 @@ func or(v string) string {
 	return v
 }
 
+// Total sums the reported usage of rows; ok is false when none reported any.
+func Total(rows []Row) (tok.Usage, bool) {
+	var t tok.Usage
+	ok := false
+	for _, r := range rows {
+		if r.Usage != nil {
+			t, ok = t.Add(*r.Usage), true
+		}
+	}
+	return t, ok
+}
+
 // Board renders a batch as a table, or JSON.
 func Board(batch string, asJSON bool) (string, error) {
 	rows, err := Rows(batch)
@@ -385,7 +466,11 @@ func Board(batch string, asJSON bool) (string, error) {
 		return "", err
 	}
 	if asJSON {
-		b, _ := json.MarshalIndent(map[string]any{"batch": batch, "items": rows}, "", "  ")
+		out := map[string]any{"batch": batch, "items": rows}
+		if t, ok := Total(rows); ok {
+			out["usage"] = t
+		}
+		b, _ := json.MarshalIndent(out, "", "  ")
 		return string(b), nil
 	}
 	head := []string{"item", "stage", "state", "phase", "done", "pr", "ci", "age", "beat", "question / note"}
@@ -600,4 +685,10 @@ func hasKey(pairs []string, k string) bool {
 		}
 	}
 	return false
+}
+
+// IsCardFile reports whether a batch dir entry is an item's card: a .json file other than
+// batch.json and other than a usage sidecar (<id>.log.usage.json).
+func IsCardFile(name string) bool {
+	return strings.HasSuffix(name, ".json") && name != "batch.json" && !strings.HasSuffix(name, ".usage.json")
 }

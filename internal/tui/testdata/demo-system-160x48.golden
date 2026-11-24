@@ -6,43 +6,43 @@
          ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
   1 Overview   2 Agents   3 Incoming   4 Needs you 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System                                                   
-╭─ Health · read-only ─────────────────────────────────────────────────────────╮╭─ Settings · auto · linear · warden ──────────────────────────────────────────╮
+╭─ Health · read-only ─────────────────────────────────────────────────────────╮╭─ Settings · 59 · enter edits ────────────────────────────────────────────────╮
 │ Versions                                                                     ││ auto.*                                                                       │
-│ binary  0.15.0                                                               ││ auto.sources          github,linear    user                                  │
-│ skills  0.15.0  ✓ match                                                      ││ auto.mode             labeled          default                               │
-│                                                                              ││ auto.label            auto             default                               │
-│ Serve  smithy auto serve                                                     ││ auto.max_per_day      80               user                                  │
-│ running  pid 4242 · agent claude · orchestrating · last cycle 25s ago        ││ auto.hours            -                unset                                 │
-│ session /home/dev/.smithy/auto/sessions/20261123-091500.log  l opens it      ││ auto.every            60               default                               │
-│                                                                              ││ auto.paused           false            default                               │
-│ Paths                                                                        ││                                                                              │
-│ home    /home/dev/.smithy                                                    ││ linear.*                                                                     │
-│ events  /home/dev/.smithy/events.jsonl  (412.7 KB)                           ││ linear.team           TES              user                                  │
-│                                                                              ││ linear.project        -                unset                                 │
-│ Auth  keys are masked                                                        ││                                                                              │
-│ github ****9f2c                                                              ││ warden.*                                                                     │
-│ linear ****a41b                                                              ││ warden.max            5                default                               │
-│                                                                              ││ warden.merge          manual           user                                  │
-│ Doctor                                                                       ││ warden.cleanup        auto             default                               │
-│ warden doctor                                                                ││ warden.mode           smelt normal     default                               │
-│ ok   binary v0.15.0                                                          ││                                                                              │
-│ ok   git found                                                               ││ Read-only here: change with smithy config set <key> <value>.                 │
-│ ok   gh found and authenticated                                              ││                                                                              │
-│ ok   claude found                                                            ││                                                                              │
+│ binary  0.15.0                                                               ││ ▸ auto.sources           github,linear  user    comma list of issue sources… │
+│ skills  0.15.0  ✓ match                                                      ││   auto.mode              labeled        default labeled: only issues with t… │
+│                                                                              ││   auto.label             auto           default label that opts an issue in… │
+│ Serve  smithy auto serve                                                     ││   auto.model_prefix      model:         default label prefix for the worker… │
+│ running  pid 4242 · agent claude · orchestrating · last cycle 25s ago        ││   auto.speed_prefix      speed:         default label prefix for the smelt … │
+│ session /home/dev/.smithy/auto/sessions/20261123-091500.log  l opens it      ││   auto.max_per_day       80             user    issues launched per local c… │
+│                                                                              ││   auto.max_cost_per_day  -              unset   USD of reported agent cost … │
+│ Paths                                                                        ││   auto.hours             -              unset   launch window HH:MM-HH:MM i… │
+│ home    /home/dev/.smithy                                                    ││   auto.every             60             default seconds between polls of ea… │
+│ events  /home/dev/.smithy/events.jsonl  (412.7 KB)                           ││   auto.paused            false          default true holds smithy auto take… │
+│                                                                              ││   auto.agent             -              unset   agent CLI for serve's orche… │
+│ Auth  keys are masked                                                        ││   auto.session_hours     3              default hours one orchestrator sess… │
+│ github ****9f2c                                                              ││   auto.sandbox           off            default isolation for unattended wo… │
+│ linear ****a41b                                                              ││   auto.sandbox_domains   -              unset   comma list of extra hosts a… │
+│                                                                              ││   auto.sandbox_image     smithy-sandbo… default container image for auto.sa… │
+│ Notify  Telegram, smithy notify test                                         ││   auto.sandbox_network   -              unset   docker/podman --network for… │
+│ token  ****x7Qa (/home/dev/.smithy/auth.json)                                ││   auto.sandbox_memory    4g             default docker/podman --memory for … │
+│ chat 123456789                                                               ││   auto.sandbox_weaker_n… true           default macOS native sandbox: enabl… │
+│ kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_r… ││   auto.merge             manual         default merge mode for auto batches… │
+│ state  on (smithy auto serve sends)                                          ││                                                                              │
+│ last sent 2026-11-23 09:12                                                   ││ linear.*                                                                     │
+│                                                                              ││   linear.key_env         LINEAR_API_KEY default name of the env var holding… │
+│ Pool  smithy pool                                                            ││   linear.team            TES            user    required: Linear team keys … │
+│ account    harness status   resets      runs    cost                         ││   linear.project         -              unset   Linear project name filter;… │
+│ work       claude  ok       -              6   $3.42                         ││   linear.milestone       -              unset   Linear project milestone na… │
+│ home       claude  limited  11-23 14:00    9   $5.10                         ││   linear.cycle           -              unset   Linear cycle filter: curren… │
+│ codex      codex   ok       -              2       -                         ││   linear.initiative      -              unset   Linear initiative name filt… │
+│                                                                              ││   linear.states          unstarted,bac… default Linear workflow state types… │
+│ Doctor                                                                       ││                                                                              │
+│ warden doctor                                                                ││ warden.*                                                                     │
+│ ok   binary v0.15.0                                                          ││   warden.merge           manual         user    auto: warden merges green P… │
+│ ok   git found                                                               ││   warden.cleanup         auto           default auto: end finished workers … │
+│ ok   gh found and authenticated                                              ││   warden.max             5              default parallel workers (a token-c… │
+│ ok   claude found                                                            ││   warden.mode            smelt normal   default batch check speed: smelt fa… │
 │ ok   worktree root /home/dev/worktrees writable                              ││                                                                              │
-│ warn 2 orphaned worktrees (smithy warden cleanup)                            ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
-│                                                                              ││                                                                              │
+│ ok   sandbox: native (claude, hosts github.com,api.github.com,api.anthropic… ││ enter edits · u unsets · auth stays in smithy auth                           │
 ╰──────────────────────────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────────────────────────╯
- r refresh  l log                                                                                                                     tab views  ? help  q quit 
+ ↑↓ move  enter edit  u unset setting  r refresh  l log                                                                               tab views  ? help  q quit 

@@ -19,7 +19,11 @@ import (
 
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/notify"
+	"github.com/Zovaris/smithy/internal/pool"
+	"github.com/Zovaris/smithy/internal/usage"
 )
 
 // ServeUsage is the text for `smithy auto serve --help`.
@@ -175,10 +179,15 @@ func Prompt(dir string, hours float64) string {
 
 // Server is one smithy auto serve run. Log gets one line per event.
 type Server struct {
-	Opt  ServeOptions
-	Log  func(string)
-	hb   Heartbeat
-	mkdr func(string) (string, error)
+	Opt    ServeOptions
+	Log    func(string)
+	logMu  sync.Mutex // an abandoned cycle and stopped() may log at the same time
+	hb     Heartbeat
+	mkdr   func(string) (string, error)
+	note   *notify.Notifier
+	capDay string // local day a cap_reached event was last recorded (issue cap or spend cap)
+	// limitedAt is the reset time a "limited" event was last recorded for (smithy pool).
+	limitedAt time.Time
 }
 
 // NewServer checks no other serve is running and writes the first heartbeat.
@@ -208,7 +217,7 @@ func NewServer(o ServeOptions, log func(string)) (*Server, error) {
 		return nil, err
 	}
 	s, _ := LoadSettings()
-	sv := &Server{Opt: o, Log: log, mkdr: taskDir,
+	sv := &Server{Opt: o, Log: log, mkdr: taskDir, note: notify.New(log),
 		hb: Heartbeat{PID: os.Getpid(), PIDStart: procStart(os.Getpid()), Started: now(), Agent: o.Agent, Every: s.Every, State: "idle"}}
 	sv.adopt()
 	return sv, sv.beat()
@@ -295,6 +304,8 @@ func (sv *Server) beat() error {
 
 func (sv *Server) logf(format string, a ...any) {
 	if sv.Log != nil {
+		sv.logMu.Lock()
+		defer sv.logMu.Unlock()
 		sv.Log(Clean(fmt.Sprintf(format, a...)))
 	}
 }
@@ -347,6 +358,10 @@ func (sv *Server) stopped() {
 		msg += fmt.Sprintf("; orchestrator pid %d keeps running (log %s; smithy tui or smithy cards board shows its workers)", sv.hb.SessionPID, sv.hb.SessionLog)
 	}
 	sv.logf("%s", msg)
+	events.Append(events.Event{Kind: "serve_down", Detail: "serve stopped"})
+	if sv.note != nil {
+		sv.note.Final(now())
+	}
 }
 
 // Cycle polls once and, when no orchestrator is running, takes the queue into a task dir and
@@ -395,8 +410,12 @@ func (sv *Server) Cycle() time.Duration {
 			}
 			for _, id := range gaveUp {
 				sv.logf("giving up on %s: orchestrators started nothing %d times; it stays launched", id, MaxRequeues+1)
+				events.Append(events.Event{Kind: "orchestrator_failed", ID: id, Detail: "orchestrators started nothing; gave up"})
 			}
 			sv.hb.SessionPID, sv.hb.SessionDir = 0, ""
+		}
+		if sv.overCap(s) || sv.poolHeld() {
+			break
 		}
 		if err := acquire(LockFile(), func(b []byte) bool {
 			var l Session
@@ -416,6 +435,10 @@ func (sv *Server) Cycle() time.Duration {
 			if r.Why != "empty queue" {
 				sv.logf("auto none: %s", r.Why)
 			}
+			if day := now().Format("2006-01-02"); strings.HasPrefix(r.Why, "daily cap") && sv.capDay != day {
+				sv.capDay = day
+				events.Append(events.Event{Kind: "cap_reached", Detail: r.Why})
+			}
 		default:
 			if err := sv.launch(r.Dir); err != nil {
 				os.Remove(LockFile())
@@ -424,6 +447,7 @@ func (sv *Server) Cycle() time.Duration {
 				}
 				os.RemoveAll(r.Dir)
 				sv.logf("serve: orchestrator did not start, %d issue(s) back in the queue: %v", r.Count, err)
+				events.Append(events.Event{Kind: "orchestrator_failed", Detail: fmt.Sprintf("did not start, %d issue(s) back in the queue", r.Count)})
 			} else {
 				sv.hb.State = "orchestrating"
 				sv.logf("orchestrator started: pid %d, %d issue(s), %s, log %s", sv.hb.SessionPID, r.Count, r.Dir, sv.hb.SessionLog)
@@ -431,7 +455,54 @@ func (sv *Server) Cycle() time.Duration {
 		}
 	}
 	_ = sv.beat()
+	if sv.note != nil {
+		go sv.note.Flush(now())
+	}
 	return time.Duration(s.Every) * time.Second
+}
+
+// overCap reports whether today's reported spend is at or over auto.max_cost_per_day; it logs
+// each time and records one cap_reached event per day.
+func (sv *Server) overCap(s Settings) bool {
+	if s.MaxCostPerDay == nil {
+		return false
+	}
+	t := now()
+	es, err := events.Read(time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location()), 0)
+	if err != nil {
+		sv.logf("serve: spend: %v", err)
+	}
+	spent := events.Spend(es, t, 1)[0]
+	if spent < *s.MaxCostPerDay {
+		return false
+	}
+	msg := fmt.Sprintf("daily spend cap %s reached (%s today)", usage.Cost(s.MaxCostPerDay), usage.Cost(&spent))
+	sv.logf("serve: %s; nothing launches until tomorrow", msg)
+	if d := t.Format("2006-01-02"); sv.capDay != d {
+		sv.capDay = d
+		_ = events.Append(events.Event{Kind: "cap_reached", Detail: msg})
+	}
+	return true
+}
+
+// poolHeld reports whether every pool account serve's agent could use is limited; it logs the
+// earliest reset each time and records one "limited" event per reset time.
+func (sv *Server) poolHeld() bool {
+	h := agents.PoolHarness(sv.hb.Agent)
+	if h == "" {
+		return false
+	}
+	until, all := pool.Earliest(h, now())
+	if !all {
+		return false
+	}
+	msg := "every pool account is limited; earliest reset " + until.Local().Format("2006-01-02 15:04")
+	sv.logf("serve: %s; nothing launches until then", msg)
+	if !sv.limitedAt.Equal(until) {
+		sv.limitedAt = until
+		_ = events.Append(events.Event{Kind: "limited", Detail: msg})
+	}
+	return true
 }
 
 type logWriter struct{ sv *Server }
@@ -453,6 +524,9 @@ func (sv *Server) launch(dir string) error {
 	if err != nil {
 		return err
 	}
+	if err := sandboxReady(sv.hb.Agent); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(SessionsDir(), 0o700); err != nil {
 		return err
 	}
@@ -466,7 +540,7 @@ func (sv *Server) launch(dir string) error {
 	cmd := exec.Command(exe, "agent", "--bg", "--profile", "auto", "--timeout", strconv.FormatFloat(hours*60, 'f', -1, 64),
 		"--cwd", sv.Opt.Cwd, "--log", log, prompt)
 	cmd.Dir = sv.Opt.Cwd
-	env := agents.Scrub(os.Environ())
+	env := append(agents.Scrub(os.Environ()), agents.SandboxRoleEnv+"=orchestrator")
 	if sv.hb.Agent != "custom" {
 		env = append(env, "AGENT_CLI="+sv.hb.Agent)
 	}
@@ -490,6 +564,21 @@ func (sv *Server) launch(dir string) error {
 	sv.hb.SessionPID, sv.hb.SessionLog, sv.hb.SessionAt, sv.hb.SessionDir, sv.hb.SessionPS = pid, f[1], now(), dir, procStart(pid)
 	b, _ := json.Marshal(Session{PID: pid, Log: f[1], Dir: dir, At: sv.hb.SessionAt, Start: sv.hb.SessionPS})
 	return writeAtomic(LockFile(), append(b, '\n'))
+}
+
+// sandboxReady fails closed before an orchestrator starts when auto.sandbox can't sandbox the
+// workers it would launch with agent.
+var sandboxReady = defaultSandboxReady
+
+func defaultSandboxReady(agent string) error {
+	mode, err := agents.SandboxMode()
+	if err == nil {
+		err = agents.SandboxCheckAgent(mode, agent, agents.HostProbe())
+	}
+	if err != nil {
+		return fmt.Errorf("auto.sandbox: %v; nothing launches until it is fixed (smithy doctor)", err)
+	}
+	return nil
 }
 
 // View draws the live serve view until done closes or the user stops serve; logs carries each

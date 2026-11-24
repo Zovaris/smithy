@@ -156,7 +156,7 @@ func WaitTurn(args []string) int {
 			entries, _ := os.ReadDir(dir)
 			for _, e := range entries {
 				n := e.Name()
-				if strings.HasSuffix(n, ".json") && n != "batch.json" && cardState(dir, strings.TrimSuffix(n, ".json")) == "working" {
+				if cards.IsCardFile(n) && cardState(dir, strings.TrimSuffix(n, ".json")) == "working" {
 					working++
 				}
 			}
@@ -317,7 +317,13 @@ func Doctor(args []string) int {
 		r.warn("workers: subagent fallback; they end with this session ("+why+")",
 			"say it in the plan line; install a headless agent CLI for workers that outlive this session")
 	}
-	if a := config.Get("auto.agent", ""); a != "" {
+	if a := config.Get("auto.agent", ""); a == "pool" {
+		if agents.PoolHarness("pool") == "" {
+			r.warn("auto.agent pool but no pool account (smithy auto serve can't start an orchestrator)", "smithy pool add <name> claude|codex, then smithy pool login <name>")
+		} else {
+			r.ok("auto.agent: pool")
+		}
+	} else if a != "" {
 		bins := map[string]string{"claude": "claude", "codex": "codex", "opencode": "opencode", "gemini": "gemini", "cursor": "agent", "pi": "pi", "dsh": "dsh"}
 		kind := agents.Kind(a)
 		b, ok := bins[kind]
@@ -344,6 +350,7 @@ func Doctor(args []string) int {
 			}
 		}
 	}
+	sandboxDoctor(r, agents.HostProbe())
 	for _, s := range []string{"smelt", "hush", "scout", "tend", "use-smithy"} {
 		if p, ok := findSkill(s); ok {
 			r.ok(s + " skill: " + p)
@@ -454,4 +461,38 @@ func firstLine(s string) string {
 		l = l[:120]
 	}
 	return l
+}
+
+// sandboxDoctor reports auto.sandbox: off says so, native and container check what they need
+// here (sandbox-exec on macOS, bwrap and socat on Linux, docker or podman) for the auto.agent CLI.
+func sandboxDoctor(r *report, p agents.Probe) {
+	mode, err := agents.SandboxMode()
+	if err != nil {
+		r.bad(err.Error(), "smithy config set auto.sandbox <off|native|container>")
+		return
+	}
+	cli := config.Get("auto.agent", "")
+	if cli == "" {
+		cli = agents.ResolveCLI(os.Getenv, func(b string) bool { _, err := p.Look(b); return err == nil })
+	}
+	switch err := agents.SandboxCheckAgent(mode, cli, p); {
+	case mode == "off":
+		r.ok("sandbox: off (unattended workers rely on the allow-list; smithy config set auto.sandbox native|container)")
+	case err != nil:
+		r.bad("sandbox "+mode+": "+err.Error()+"; unattended workers will not start", "fix it, or smithy config set auto.sandbox off")
+	case mode == "container":
+		r.ok("sandbox: container (" + agents.ContainerEngine(p.Look) + ", image " + userSetting("auto.sandbox_image", agents.DefaultSandboxImage) + ")")
+		r.warn("sandbox container: not live-tested yet; smithy has only unit-tested the docker/podman command", "run one worker by hand and check its log before relying on it")
+	case agents.Kind(cli) == "codex":
+		r.ok("sandbox: native (codex workspace-write, network off)")
+		r.warn("sandbox native with codex: workers have no network, so git push and gh fail inside them", "push and open PRs through smithy outside the worker, or use auto.sandbox container")
+	default:
+		r.ok("sandbox: native (claude, hosts " + strings.Join(agents.SandboxDomains(userSetting("auto.sandbox_domains", "")), ",") + ")")
+	}
+}
+
+// userSetting is an auto.sandbox* key from the user settings only (agents.SandboxSetting).
+func userSetting(key, def string) string {
+	v, _ := agents.SandboxSetting(key, def)
+	return v
 }

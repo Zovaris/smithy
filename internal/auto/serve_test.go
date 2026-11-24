@@ -2,6 +2,7 @@ package auto
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -10,7 +11,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/pool"
+	"github.com/Zovaris/smithy/internal/usage"
 )
 
 // fakeSmithy is a stand-in for `smithy agent --bg`: it records its argv and the prompt, then
@@ -24,6 +29,7 @@ func fakeSmithy(t *testing.T) (dir string) {
 	script := filepath.Join(dir, "smithy")
 	body := "#!/bin/sh\necho \"$@\" >> " + filepath.Join(dir, "argv") + "\n" +
 		"for a; do last=$a; done\ncat \"$last\" >> " + filepath.Join(dir, "prompts") + "\n" +
+		"echo \"$SMITHY_SANDBOX_ROLE\" >> " + filepath.Join(dir, "role") + "\n" +
 		"echo \"$FAKE_PID $4/x.log\"\n"
 	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
 		t.Fatal(err)
@@ -130,6 +136,83 @@ func TestServePausedLaunchesNothing(t *testing.T) {
 	sv.Cycle()
 	if _, err := os.Stat(filepath.Join(fake, "argv")); err == nil {
 		t.Error("launched while paused")
+	}
+}
+
+func TestServeSpendCapLaunchesNothing(t *testing.T) {
+	_, fake := serveSetup(t)
+	config.Set(config.UserFile(), "auto.max_cost_per_day", "1.5")
+	c := 1.6
+	events.Append(events.Event{Kind: "usage", Usage: &usage.Usage{CostUSD: &c}})
+	var logs []string
+	sv := newTestServer(t, &logs)
+	sv.Cycle()
+	sv.Cycle()
+	if _, err := os.Stat(filepath.Join(fake, "argv")); err == nil {
+		t.Error("launched over the spend cap")
+	}
+	if !strings.Contains(strings.Join(logs, "\n"), "daily spend cap $1.50 reached ($1.60 today)") {
+		t.Errorf("logs = %q", logs)
+	}
+	es, _ := events.Read(time.Time{}, 0)
+	n := 0
+	for _, e := range es {
+		if e.Kind == "cap_reached" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("cap_reached events = %d, want 1", n)
+	}
+
+	config.Set(config.UserFile(), "auto.max_cost_per_day", "5")
+	sv.Cycle()
+	if _, err := os.Stat(filepath.Join(fake, "argv")); err != nil {
+		t.Error("not launched under a raised cap")
+	}
+}
+
+func TestServeHoldsWhileEveryPoolAccountIsLimited(t *testing.T) {
+	_, fake := serveSetup(t)
+	if _, err := pool.Add("a", "claude", ""); err != nil {
+		t.Fatal(err)
+	}
+	pool.MarkLimited("a", time.Now().Add(time.Hour))
+	var logs []string
+	sv := newTestServer(t, &logs)
+	sv.Cycle()
+	sv.Cycle()
+	if _, err := os.Stat(filepath.Join(fake, "argv")); err == nil {
+		t.Error("launched with every pool account limited")
+	}
+	if !strings.Contains(strings.Join(logs, "\n"), "every pool account is limited; earliest reset") {
+		t.Errorf("logs = %q", logs)
+	}
+	es, _ := events.Read(time.Time{}, 0)
+	n := 0
+	for _, e := range es {
+		if e.Kind == "limited" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("limited events = %d, want 1", n)
+	}
+	pool.Clear("a")
+	sv.Cycle()
+	if _, err := os.Stat(filepath.Join(fake, "argv")); err != nil {
+		t.Error("not launched once an account was free")
+	}
+}
+
+func TestSpendCapSetting(t *testing.T) {
+	home(t)
+	if s, err := LoadSettings(); err != nil || s.MaxCostPerDay != nil {
+		t.Fatalf("unset cap = %v, %v", s.MaxCostPerDay, err)
+	}
+	config.Set(config.UserFile(), "auto.max_cost_per_day", "-1")
+	if _, err := LoadSettings(); err == nil {
+		t.Fatal("negative cap accepted")
 	}
 }
 
@@ -282,5 +365,38 @@ func TestRequeueSkipsStartedBatch(t *testing.T) {
 	}
 	if n, _, err := Requeue(dir); err != nil || n != 0 {
 		t.Fatalf("requeued %d, err %v", n, err)
+	}
+}
+
+// auto.sandbox fails closed: when the sandbox cannot start, serve launches nothing, puts the
+// issue back and records orchestrator_failed (Telegram and the TUI read events).
+func TestServeSandboxUnavailableLaunchesNothing(t *testing.T) {
+	_, dir := serveSetup(t)
+	sandboxReady = func(string) error { return errors.New("auto.sandbox: no docker or podman on PATH") }
+	t.Cleanup(func() { sandboxReady = defaultSandboxReady })
+	var logs []string
+	newTestServer(t, &logs).Cycle()
+	if _, err := os.Stat(filepath.Join(dir, "argv")); err == nil {
+		t.Error("orchestrator launched without its sandbox")
+	}
+	if st, _ := Load(); len(st.Queue) != 1 {
+		t.Errorf("issue not requeued: %+v", st)
+	}
+	if !strings.Contains(strings.Join(logs, "\n"), "no docker or podman") {
+		t.Errorf("logs = %q", logs)
+	}
+	es, _ := events.Read(time.Time{}, 0)
+	if len(es) == 0 || es[len(es)-1].Kind != "orchestrator_failed" {
+		t.Errorf("no orchestrator_failed event: %+v", es)
+	}
+}
+
+func TestServeMarksOrchestratorRole(t *testing.T) {
+	_, dir := serveSetup(t)
+	t.Setenv("FAKE_PID", "999998")
+	var logs []string
+	newTestServer(t, &logs).Cycle()
+	if b, _ := os.ReadFile(filepath.Join(dir, "role")); strings.TrimSpace(string(b)) != "orchestrator" {
+		t.Errorf("orchestrator env lacks %s=orchestrator: %q (logs %q)", agents.SandboxRoleEnv, b, logs)
 	}
 }

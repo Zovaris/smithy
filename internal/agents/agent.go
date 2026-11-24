@@ -16,8 +16,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/pool"
+	"github.com/Zovaris/smithy/internal/usage"
 )
 
 const agentUsage = `Harness-agnostic agent runner: runs one headless coding agent on a prompt file.
@@ -26,7 +30,9 @@ const agentUsage = `Harness-agnostic agent runner: runs one headless coding agen
 Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list below.
   AGENT_CMD   any shell command; gets the prompt on stdin and in $AGENT_PROMPT_FILE, the model
               in $AGENT_MODEL, and $AGENT_READONLY=1 for read-only runs
-  claude      claude -p --permission-mode ${AGENT_PERMISSION_MODE:-auto}   (plan when read-only)
+  claude      claude -p --permission-mode ${AGENT_PERMISSION_MODE:-auto}   (plan when read-only);
+              JSON output unless $AGENT_ARGS picks a format: the log keeps the plain answer
+              and the reported usage goes to <log>.usage.json and a usage event
   codex       codex exec --sandbox workspace-write, the repo's git dir writable and network on
               (so workers can commit, push and open PRs); read-only sandbox when read-only
   opencode    opencode run --standalone --auto (plan agent when read-only); -m provider/model
@@ -44,6 +50,10 @@ above medium is capped at medium. Passed as --effort (claude) or -c model_reason
 Timeout: --timeout, else the agent.timeout setting (minutes, default 90; 0 = none). When it
 passes, the agent's whole process group is killed (Unix; on Windows only the agent process), "timed out after Nm" goes to the log and
 smithy agent exits 124; --bg runs are watched by a detached smithy that does the same.
+Pool (smithy pool, off until an account is added): a claude or codex run (AGENT_CLI=pool: any)
+uses the least recently used account that is not limited, through CLAUDE_CONFIG_DIR or CODEX_HOME;
+a usage-limit result marks it limited; a read-only or untouched run reruns once on the next one,
+any other exits 75 with its warden card blocked (relaunch in the same worktree).
 Extra flags for the chosen CLI: $AGENT_ARGS. Workers get WARDEN_HARNESS set to the CLI and the
 parent harness's variables removed, so their own scripts detect the right harness.
 --bg prints ` + "`<pid> <log>`" + ` and returns at once; otherwise prints the agent's output when it ends
@@ -72,6 +82,13 @@ type Options struct {
 	Profile    string
 	SmithyBins []string // absolute paths of the smithy binary and launcher, allowed under --profile auto
 	AddDirs    []string // directories outside the working dir the agent may use (--add-dir), set under --profile auto
+	// Sandbox is auto.sandbox for this run (off, native, container); SandboxSettings the claude
+	// --settings JSON under native.
+	Sandbox, SandboxSettings string
+	PoolEnv                  []string // the pool account's config-dir variable (smithy pool), added to the worker's env
+	Account                  string   // the pool account this run uses
+	poolSkip                 []string // accounts already tried (limited) in this run
+	poolStart                string   // the worktree's HEAD before the first attempt ("" when not a git repo)
 }
 
 // ProfileEnv carries --profile to every smithy agent an agent starts, so workers under an
@@ -115,21 +132,23 @@ func AutoDenied(smithy []string) []string {
 		"Bash(*>*)", "Bash(* | tee *)", "Bash(*|tee *)",
 		// shell readers must not reach the secrets the Read rules protect
 		"Bash(*auth.json*)", "Bash(*.ssh*)", "Bash(*.config/gh*)", "Bash(*.aws*)", "Bash(*.netrc*)", "Bash(*.git-credentials*)",
-		"Bash(find * -exec*)", "Bash(find * -delete*)", "Bash(sed -n *w *)"}
+		"Bash(find * -exec*)", "Bash(find * -delete*)", "Bash(sed -n *w *)",
+		// pool accounts (smithy pool) hold other accounts' logins
+		"Bash(*.smithy/accounts*)", "Bash(smithy pool *)"}
 	for _, b := range smithy {
 		if filepath.IsAbs(b) {
-			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config set *)", "Bash("+b+" config set-model *)")
+			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config set *)", "Bash("+b+" config set-model *)", "Bash("+b+" pool *)")
 		}
 	}
-	for _, f := range []string{"~/.smithy/auth.json", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
+	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
 		d = append(d, "Read("+f+")")
 	}
-	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
+	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.smithy/accounts/**", "~/.smithy/pool.json", "~/.smithy/pool-state.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
 		"~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile", "~/.zshenv", "~/.claude/**",
 		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json"} {
 		d = append(d, "Edit("+f+")") // Edit rules cover every file-editing tool, Write included
 	}
-	return d
+	return append(d, poolDenied()...)
 }
 
 // Kind is the CLI kind of an agent name or path: its base name, with agent meaning cursor.
@@ -272,6 +291,7 @@ func ResolveCLI(getenv func(string) string, have func(string) bool) string {
 // argument), extra the split $AGENT_ARGS and gitDir the repo's common git dir (codex only).
 func Build(cli string, o Options, prompt string, extra []string, gitDir string, getenv func(string) string) (Spec, error) {
 	var a []string
+	o.Model = ResolveTier(cli, o.Model)
 	opt := func(flag string) {
 		if o.Model != "" {
 			a = append(a, flag, o.Model)
@@ -298,7 +318,11 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if o.ReadOnly {
 			perm = "plan"
 		}
-		a = []string{"claude", "-p", "--permission-mode", perm}
+		a = []string{"claude", "-p"}
+		if !hasArg(extra, "--output-format") {
+			a = append(a, "--output-format", "json")
+		}
+		a = append(a, "--permission-mode", perm)
 		if o.Profile == "auto" && !o.ReadOnly {
 			a = append(append(a, "--allowedTools"), AutoTools(o.SmithyBins)...)
 			a = append(append(a, "--disallowedTools"), AutoDenied(o.SmithyBins)...)
@@ -306,6 +330,9 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 			for _, d := range o.AddDirs {
 				a = append(a, "--add-dir", d)
 			}
+		}
+		if o.Sandbox == "native" {
+			a = append(a, "--settings", o.SandboxSettings)
 		}
 		opt("--model")
 		if o.Effort != "" {
@@ -318,7 +345,7 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if o.ReadOnly {
 			a = append(a, "--sandbox", "read-only")
 		} else {
-			a = append(a, "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true")
+			a = append(a, "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access="+strconv.FormatBool(o.Sandbox != "native"))
 			if gitDir != "" {
 				a = append(a, "--add-dir", gitDir)
 			}
@@ -373,6 +400,54 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 	return Spec{withPath(a, path), stdin, cli}, nil
 }
 
+func hasArg(a []string, flag string) bool {
+	for _, x := range a {
+		if x == flag || strings.HasPrefix(x, flag+"=") {
+			return true
+		}
+	}
+	return false
+}
+
+// jsonResult reports whether argv is a claude run smithy switched to --output-format json, whose
+// result line Finish turns back into text and a usage sidecar.
+func jsonResult(argv []string) bool {
+	for i := 0; i+1 < len(argv); i++ {
+		if argv[i] == "--output-format" && argv[i+1] == "json" {
+			return Kind(argv[0]) == "claude"
+		}
+	}
+	return false
+}
+
+// finish rewrites a claude json log to text and records its usage: the sidecar next to a named
+// log and a "usage" event (batch and item from a <warden home>/<batch>/<item>.log path).
+func finish(log string, named bool, account string) {
+	u, ok := usage.Finish(log)
+	if !named {
+		os.Remove(usage.Sidecar(log))
+	}
+	if !ok {
+		return
+	}
+	e := events.Event{Kind: "usage", Usage: &u, Account: account}
+	if named {
+		e.Detail = filepath.Base(log)
+		if dir := filepath.Dir(log); realPath(filepath.Dir(dir)) == realPath(cards.Home()) {
+			e.Batch, e.Item = filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log")
+		}
+	}
+	_ = events.Append(e)
+}
+
+// realPath resolves symlinks so a linked warden home still matches; p as given when it can't.
+func realPath(p string) string {
+	if r, err := filepath.EvalSymlinks(p); err == nil {
+		return r
+	}
+	return filepath.Clean(p)
+}
+
 // withPath runs an absolute or relative CLI path in place of the bare name.
 func withPath(a []string, path string) []string {
 	if strings.ContainsRune(path, os.PathSeparator) || strings.ContainsRune(path, '/') {
@@ -384,7 +459,12 @@ func withPath(a []string, path string) []string {
 // Env is the worker's environment: base without the parent harness's variables, with
 // WARDEN_HARNESS and the AGENT_* run variables set.
 func Env(base []string, s Spec, o Options) []string {
-	drop := map[string]bool{ProfileEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
+	drop := map[string]bool{ProfileEnv: true, SandboxRoleEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
+	if len(o.PoolEnv) > 0 {
+		for _, k := range PoolDropEnv {
+			drop[k] = true
+		}
+	}
 	for _, k := range ParentVars {
 		drop[k] = true
 	}
@@ -402,6 +482,7 @@ func Env(base []string, s Spec, o Options) []string {
 	if o.Profile != "" {
 		env = append(env, ProfileEnv+"="+o.Profile)
 	}
+	env = append(env, o.PoolEnv...)
 	return append(env, "AGENT_PROMPT_FILE="+o.PromptFile, "AGENT_MODEL="+o.Model, "AGENT_EFFORT="+o.Effort, "AGENT_READONLY="+ro, "WARDEN_HARNESS="+s.Harness)
 }
 
@@ -481,8 +562,50 @@ func Run(o Options) int {
 		o.AddDirs = AutoDirs(o.SmithyBins)
 	}
 	gitDir := ""
-	if Kind(cli) == "codex" && !o.ReadOnly {
+	ph := PoolHarness(cli)
+	var acct pool.Account
+	switch {
+	case ph != "" && o.Bg:
+		if cli == "pool" {
+			cli = peekHarness(ph)
+		}
+	case ph != "":
+		var rc int
+		if acct, rc = acquire(ph, &o); rc != 0 {
+			if len(o.poolSkip) > 0 {
+				blockCard(o, o.poolSkip[0])
+			}
+			return rc
+		}
+		if len(o.poolSkip) == 0 {
+			o.poolStart = head(o.Cwd)
+		}
+		if cli == "pool" && acct.Name != "" {
+			cli = acct.Harness
+		}
+	}
+	// after the pool picked the harness, so the check is the CLI that actually runs
+	if o.Profile == "auto" && os.Getenv(SandboxRoleEnv) != "orchestrator" {
+		mode, err := SandboxMode()
+		if err == nil {
+			err = SandboxCheck(mode, cli, HostProbe())
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
+			return 1
+		}
+		o.Sandbox = mode
+	}
+	if (Kind(cli) == "codex" && !o.ReadOnly) || o.Sandbox == "native" || o.Sandbox == "container" {
 		gitDir, _ = ghx.Run("git", "-C", o.Cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	}
+	gocache := ""
+	if o.Sandbox == "native" && Kind(cli) == "claude" {
+		var err error
+		if o.SandboxSettings, gocache, err = nativeSettings(&o, gitDir); err != nil {
+			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
+			return 1
+		}
 	}
 	prompt := ""
 	if cli != "custom" {
@@ -500,6 +623,24 @@ func Run(o Options) int {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
+	}
+	asJSON := jsonResult(s.Argv)
+	env := Env(os.Environ(), s, o)
+	if gocache != "" {
+		env = append(env, "GOCACHE="+gocache)
+	}
+	if o.Sandbox == "native" {
+		env = append(env, NativeGitEnv(env)...)
+	}
+	if o.Sandbox == "container" {
+		box, err := container(o.Cwd, gitDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
+			return 1
+		}
+		env, box.Env = ContainerEnv(env)
+		s.Argv[0] = filepath.Base(s.Argv[0]) // a host path means nothing inside the image
+		s.Argv = box.Argv(s.Argv)
 	}
 	if fi, err := os.Stat(o.Cwd); err != nil || !fi.IsDir() {
 		fmt.Fprintf(os.Stderr, "smithy agent: cd: %s: No such file or directory\n", o.Cwd)
@@ -531,17 +672,21 @@ func Run(o Options) int {
 		if !filepath.IsAbs(path) {
 			path = filepath.Join(o.Cwd, path)
 		}
-		out, err = os.Create(path)
+		if len(o.poolSkip) > 0 {
+			out, err = os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+		} else {
+			out, err = os.Create(path)
+		}
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	cmd := exec.Command(s.Argv[0], s.Argv[1:]...)
-	cmd.Dir, cmd.Env = o.Cwd, Env(os.Environ(), s, o)
+	cmd.Dir, cmd.Env = o.Cwd, env
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, out, out
 	if o.Bg {
-		if o.Timeout > 0 {
+		if o.Timeout > 0 || asJSON || ph != "" {
 			if cmd, err = supervisor(o, out.Name()); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return 1
@@ -554,13 +699,15 @@ func Run(o Options) int {
 			fmt.Fprintln(os.Stderr, err)
 			return 1
 		}
+		launchCard(log, o.Cwd, cmd.Process.Pid)
 		done := make(chan error, 1)
 		go func() { done <- cmd.Wait() }()
 		select {
 		case err := <-done:
 			var ee *exec.ExitError
-			if err != nil && !(errors.As(err, &ee) && ee.ExitCode() == 124) {
+			if err != nil && !(errors.As(err, &ee) && (ee.ExitCode() == 124 || ee.ExitCode() == ExitLimited)) {
 				fmt.Fprintf(os.Stderr, "smithy agent: %s exited right after starting (%v): %s\n", s.Argv[0], err, lastLine(log))
+				setCard(log, o.Cwd, "state=failed", "note=worker exited: "+lastLine(log))
 				return 1
 			}
 		case <-time.After(startCheck):
@@ -570,6 +717,22 @@ func Run(o Options) int {
 	}
 	rc := wait(cmd, o.Timeout, out)
 	out.Close()
+	hit := acct.Name != "" && limited(acct, out.Name(), Kind(cli), rc)
+	if asJSON {
+		finish(out.Name(), o.Log != "", o.Account)
+	}
+	if hit {
+		if len(o.poolSkip) == 0 && (o.ReadOnly || untouched(o.Cwd, o.poolStart)) {
+			if o.Log == "" {
+				os.Remove(out.Name())
+			}
+			fmt.Fprintln(os.Stderr, "smithy agent: nothing changed yet; retrying once on the next pool account")
+			o.poolSkip, o.PoolEnv, o.Account = []string{acct.Name}, nil, ""
+			return Run(o)
+		}
+		blockCard(o, acct.Name)
+		rc = ExitLimited
+	}
 	if b, err := os.ReadFile(out.Name()); err == nil {
 		os.Stdout.Write(b)
 	}
@@ -749,13 +912,7 @@ func AutoDirs(bins []string) []string {
 			}
 		}
 	}
-	home := os.Getenv("SMITHY_HOME")
-	if home == "" {
-		if h, err := os.UserHomeDir(); err == nil {
-			home = filepath.Join(h, ".smithy")
-		}
-	}
-	add(home)
+	add(ghx.Home())
 	for _, b := range bins {
 		if filepath.Base(filepath.Dir(b)) == "scripts" {
 			add(filepath.Dir(filepath.Dir(filepath.Dir(b))))
@@ -775,3 +932,27 @@ const AutoNote = "Unattended run: shell access is limited by policy. If a comman
 	"use smithy commands (smithy worktree add, smithy commit, smithy pr) instead of raw git or gh " +
 	"where they exist. Report blocked only when a git, gh, test or smithy step your task needs " +
 	"is denied in its simplest form."
+
+// tierHarness names the harness whose models.<harness>.<tier> settings a headless CLI uses.
+var tierHarness = map[string]string{"claude": "claude-cli", "codex": "codex", "opencode": "opencode", "gemini": "gemini", "cursor": "cursor", "pi": "pi", "dsh": "dsh"}
+
+// ResolveTier turns a tier name (cheap, mid, strong, judge) into the user's model for that CLI's
+// harness; an unset tier gives "" (the CLI's default model) with one warning. Any other value is a
+// model name and passes through.
+func ResolveTier(cli, model string) string {
+	switch model {
+	case "cheap", "mid", "strong", "judge":
+	default:
+		return model
+	}
+	h := tierHarness[filepath.Base(cli)]
+	if h == "" {
+		h = filepath.Base(cli)
+	}
+	m, err := config.ModelFor(h, model)
+	if err != nil || m == "" {
+		fmt.Fprintf(os.Stderr, "smithy agent: no %s model set for %s (smithy config set-model %s <name>); using the CLI's default\n", model, h, model)
+		return ""
+	}
+	return m
+}
