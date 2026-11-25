@@ -44,10 +44,48 @@ type Discord struct {
 	// Poll is how long Receive waits for events (default 25 s).
 	Poll   time.Duration
 	Client *http.Client
+	// BufferWait is how long the Gateway reader waits on a full event buffer before it drops
+	// the event and logs it (default 10 s).
+	BufferWait time.Duration
 
 	mu    sync.Mutex
 	gw    *dgw
 	guild string
+	log   func(string)
+}
+
+// SetLog sets where the connector reports what it had to drop; the hub sets it to its own Log.
+func (d *Discord) SetLog(f func(string)) {
+	d.mu.Lock()
+	d.log = f
+	d.mu.Unlock()
+}
+
+// deliver hands in to Receive, waiting up to BufferWait while the buffer is full; past that the
+// event is dropped and logged rather than stalling the Gateway (heartbeats share this reader).
+func (d *Discord) deliver(g *dgw, in Inbound) {
+	select {
+	case g.in <- in:
+		return
+	default:
+	}
+	wait := d.BufferWait
+	if wait <= 0 {
+		wait = 10 * time.Second
+	}
+	t := time.NewTimer(wait)
+	defer t.Stop()
+	select {
+	case g.in <- in:
+	case <-g.done:
+	case <-t.C:
+		d.mu.Lock()
+		log := d.log
+		d.mu.Unlock()
+		if log != nil {
+			log("connect discord: event buffer full for " + wait.String() + ", dropped one inbound event")
+		}
+	}
 }
 
 // dgw is one live Gateway connection; its reader fills in and ends with err.
@@ -366,10 +404,7 @@ func (d *Discord) connect(ctx context.Context) (*dgw, error) {
 					seq.Unlock()
 				}
 				if in, ok := d.event(ev); ok {
-					select {
-					case g.in <- in:
-					default:
-					}
+					d.deliver(g, in)
 				}
 			case 1:
 				_ = beat()

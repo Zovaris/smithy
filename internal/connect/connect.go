@@ -344,6 +344,11 @@ func (h *Hub) Handle(ctx context.Context, c Connector, in Inbound) {
 // queued sends every few seconds.
 func (h *Hub) Run(ctx context.Context) {
 	var wg sync.WaitGroup
+	for _, c := range h.Conns {
+		if l, ok := c.(interface{ SetLog(func(string)) }); ok && h.Log != nil {
+			l.SetLog(h.Log)
+		}
+	}
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
