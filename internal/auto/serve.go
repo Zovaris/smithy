@@ -355,10 +355,12 @@ func (sv *Server) Run(ctx context.Context) error {
 		select {
 		case every = <-res:
 		case <-ctx.Done():
+			sv.finishCycle(res)
 			sv.stopped()
 			return nil
 		case <-deadline:
 			sv.logf("serve: --max-hours reached")
+			sv.finishCycle(res)
 			sv.stopped()
 			return nil
 		}
@@ -376,6 +378,19 @@ func (sv *Server) Run(ctx context.Context) error {
 			return nil
 		case <-time.After(every):
 		}
+	}
+}
+
+// cycleGrace is how long Run waits for a cycle still in flight when it stops.
+var cycleGrace = 30 * time.Second
+
+// finishCycle waits for the cycle in flight so Run never returns while it still reads settings
+// or sources; a cycle stuck longer than cycleGrace is left behind and logged.
+func (sv *Server) finishCycle(res <-chan time.Duration) {
+	select {
+	case <-res:
+	case <-time.After(cycleGrace):
+		sv.logf("serve: a cycle was still running %s after stop; leaving it", cycleGrace)
 	}
 }
 
