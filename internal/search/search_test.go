@@ -126,6 +126,27 @@ func TestGitEngineHonoursIgnore(t *testing.T) {
 	}
 }
 
+func TestGitEngineSkipsSymlinkOutsideRoot(t *testing.T) {
+	root := gitRepo(t)
+	outside := filepath.Join(t.TempDir(), "secret.txt")
+	write(t, filepath.Dir(outside), "secret.txt", "Needle outside\n")
+	if err := os.Symlink(outside, filepath.Join(root, "link.txt")); err != nil {
+		t.Skip("no symlinks:", err)
+	}
+	if out, err := exec.Command("git", "-C", root, "add", "link.txt").CombinedOutput(); err != nil {
+		t.Fatal(string(out))
+	}
+	r, err := Run(Options{Root: root, Pattern: "Needle", Engine: EngineGit})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range r.Matches {
+		if m.Path == "link.txt" {
+			t.Fatalf("followed a tracked symlink out of the root: %+v", m)
+		}
+	}
+}
+
 func TestRgEngineMatchesWalk(t *testing.T) {
 	rg, err := exec.LookPath("rg")
 	if err != nil {
