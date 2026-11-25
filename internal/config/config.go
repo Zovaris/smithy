@@ -57,6 +57,7 @@ var Known = []Setting{
 	{"auto.speed_prefix", "speed:", "smithy auto", "label prefix for the smelt speed (speed:fast, speed:normal, speed:full)"},
 	{"auto.max_per_day", "20", "smithy auto", "issues launched per local calendar day; the rest stay queued (an auto.hours window across midnight can launch up to 2x this overnight)"},
 	{"auto.max_cost_per_day", "", "smithy auto serve", "USD of reported agent cost per local day; at or over it serve starts nothing new until tomorrow (running workers finish); only reported cost counts (claude), unknown cost counts as 0; empty = no cap"},
+	{"auto.retry_stronger", "true", "smithy auto", "a launched issue reported blocked goes back to the queue once on the next model tier (cheap→mid→strong; unlabeled→strong) instead of being reported blocked; recorded as a retry_stronger event"},
 	{"auto.hours", "", "smithy auto", "launch window HH:MM-HH:MM in local time (22:00-07:00 wraps midnight); empty = always"},
 	{"auto.every", "60", "smithy auto", "seconds between polls of each source"},
 	{"daemon.port", "7477", "smithy daemon", "loopback port of the daemon's API (harness build); it never listens beyond 127.0.0.1"},
