@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/daemon"
 )
@@ -338,16 +337,12 @@ func (m chatView) skillsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m chatView) selRow(w int, sel bool, s string) string {
-	t := m.th
+// selRow marks the selected row with the accent pointer; the rest keep the same indent.
+func (m chatView) selRow(sel bool, s string) string {
 	if !sel {
 		return "  " + s
 	}
-	st := lipgloss.NewStyle()
-	if t.border != nil {
-		st = st.Background(t.border)
-	}
-	return st.Width(w).MaxWidth(w).Render(t.fg(t.accent).Render(t.g.sel) + " " + s)
+	return m.th.fg(m.th.accent).Render(m.th.g.sel) + " " + s
 }
 
 // setupPanel is the first-run screen and the ctrl+l / /agent / /model picker.
@@ -406,7 +401,7 @@ func (m chatView) setupPanel(w int) []string {
 		if !a.Ready && a.Fix != "" {
 			info = dim.Render(fmt.Sprintf("%-8s", state)) + " " + t.fg(t.text).Render(a.Fix)
 		}
-		rows = append(rows, m.selRow(w, i == m.setupSel, t.fg(c).Render(g)+" "+strong.Render(name)+" "+info+cur))
+		rows = append(rows, m.selRow(i == m.setupSel, t.fg(c).Render(g)+" "+strong.Render(name)+" "+info+cur))
 	}
 	rows = append(rows, "")
 	if m.setupNote != "" {
@@ -440,9 +435,9 @@ func (m chatView) skillsPanel(w int) []string {
 		return dim.Render("[ ]")
 	}
 	rows = append(rows, "  "+t.fg(t.muted).Render("INJECTED INTO EVERY SESSION"))
-	rows = append(rows, m.selRow(w, m.setupSel == 0, box(s.Kit.MCP)+" "+strong.Render(fmt.Sprintf("%-20s", "smithy MCP server"))+dim.Render("board, cards and decisions as tools")))
+	rows = append(rows, m.selRow(m.setupSel == 0, box(s.Kit.MCP)+" "+strong.Render(fmt.Sprintf("%-20s", "smithy MCP server"))+dim.Render("board, cards and decisions as tools")))
 	for i, sk := range s.Skills {
-		rows = append(rows, m.selRow(w, m.setupSel == i+1, box(slices.Contains(s.Kit.Skills, sk))+" "+strong.Render(fmt.Sprintf("%-20s", sk))+dim.Render("skill")))
+		rows = append(rows, m.selRow(m.setupSel == i+1, box(slices.Contains(s.Kit.Skills, sk))+" "+strong.Render(fmt.Sprintf("%-20s", sk))+dim.Render("skill")))
 	}
 	if len(s.Skills) == 0 {
 		rows = append(rows, "  "+dim.Render("no smithy skills installed: press i"))
