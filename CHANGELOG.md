@@ -65,6 +65,7 @@ part above `### Details`.
 - Connectors honour HTTP 429: Telegram `parameters.retry_after`, Slack `Retry-After` and Discord `retry_after` are waited out (at most a minute, three tries) before the send fails into the retry queue.
 - The intake planner runs under the daemon context (stopped on shutdown) and keeps at most 1 MiB of its stdout and 4 KiB of stderr.
 - Discord Gateway: a full 64-event buffer now makes the reader wait up to 10 s for `Receive` before dropping an event, and a drop is logged through the hub instead of happening silently.
+- `smithy doctor` warns when `daemon.allow` is set: the daemon trusts `Tailscale-User-Login` on `*.ts.net` requests, so it trusts any local user on this machine; the setting description says so.
 
 ## v0.19.0 — 2026-11-24
 

@@ -4,8 +4,10 @@ import (
 	"errors"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/Zovaris/smithy/internal/auto"
+	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/daemon"
 )
 
@@ -28,6 +30,10 @@ func daemonDoctor(r *report) {
 		r.warn("daemon: stale "+daemon.InfoFile()+" (pid "+strconv.Itoa(i.PID)+" is gone)", "start it again (smithy daemon --bg) or remove the file")
 	default:
 		r.ok("daemon: running (pid " + strconv.Itoa(i.PID) + ", http://" + i.Addr + ")")
+	}
+	if a := strings.TrimSpace(config.Get("daemon.allow", "")); a != "" {
+		r.warn("daemon.allow is set ("+a+"): the daemon trusts the Tailscale-User-Login header on *.ts.net requests, so it trusts any local user on this machine who can reach its port",
+			"keep it only on a single-user machine, or smithy config unset daemon.allow and use the token link (smithy web)")
 	}
 	if _, err := os.Stat(daemon.TokenFile()); err == nil {
 		if _, err := daemon.LoadToken(daemon.TokenFile(), false); err != nil {

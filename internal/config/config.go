@@ -60,7 +60,7 @@ var Known = []Setting{
 	{"auto.hours", "", "smithy auto", "launch window HH:MM-HH:MM in local time (22:00-07:00 wraps midnight); empty = always"},
 	{"auto.every", "60", "smithy auto", "seconds between polls of each source"},
 	{"daemon.port", "7477", "smithy daemon", "loopback port of the daemon's API (harness build); it never listens beyond 127.0.0.1"},
-	{"daemon.allow", "", "smithy daemon", "comma list of Tailscale logins (Tailscale-User-Login via tailscale serve) allowed to use the daemon's API; empty: only the local token"},
+	{"daemon.allow", "", "smithy daemon", "comma list of Tailscale logins (Tailscale-User-Login via tailscale serve) allowed to use the daemon's API; empty: only the local token. Set, it trusts any local user on this machine (the header is not authenticated past tailscale serve), so smithy doctor warns"},
 	{"auto.paused", "false", "smithy auto", "true holds smithy auto take: nothing launches until it is false again (p in smithy tui)"},
 	{"auto.agent", "", "smithy auto serve", "agent CLI for serve's orchestrator (claude, codex, opencode…, or pool: any smithy pool account); empty = the one smithy agent detects"},
 	{"auto.session_hours", "3", "smithy auto serve", "hours one orchestrator session may run before smithy agent ends it (its workers keep going)"},

@@ -78,6 +78,22 @@ func TestSandboxDoctor(t *testing.T) {
 	}
 }
 
+func TestDaemonAllowWarns(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	t.Setenv("SMITHY_CONFIG", filepath.Join(t.TempDir(), "c.json"))
+	r := &report{}
+	if o, _, _ := capture(t, func() int { daemonDoctor(r); return 0 }); strings.Contains(o, "warn") {
+		t.Fatalf("warned with daemon.allow empty:\n%s", o)
+	}
+	if err := config.Set(config.UserFile(), "daemon.allow", "me@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	o, _, _ := capture(t, func() int { daemonDoctor(r); return 0 })
+	if !strings.Contains(o, "warn") || !strings.Contains(o, "trusts any local user on this machine") || r.failed {
+		t.Fatalf("daemon.allow set must warn, not fail:\n%s", o)
+	}
+}
+
 func TestSandboxDoctorPoolContainer(t *testing.T) {
 	t.Setenv("SMITHY_HOME", t.TempDir())
 	t.Setenv("SMITHY_CONFIG", filepath.Join(t.TempDir(), "c.json"))
