@@ -5,7 +5,7 @@
 ```bash
 npx skills add Zovaris/smithy -g                                          # pick skills and agents
 npx skills add Zovaris/smithy -g -y --skill '*' -a claude-code -a codex   # no prompts
-npx skills add Zovaris/smithy@v0.18.0 -g                                  # pin a release
+npx skills add Zovaris/smithy@v0.19.0 -g                                  # pin a release
 ```
 
 Drop `-g` to install into the current project only. This needs the
@@ -15,7 +15,7 @@ Drop `-g` to install into the current project only. This needs the
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh              # latest
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.18.0    # pinned
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.19.0    # pinned
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # skills + binary
 ```
 
