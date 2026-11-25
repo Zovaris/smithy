@@ -8,6 +8,14 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- `smithy bench run --agent <cli>` runs smithy's own 20-task benchmark and records pass rate, time, tokens and cost.
+
+### Details
+
+- `internal/bench`: 20 fixture Go repos (bugs, features, refactors, docs) with tests as the oracle and a reference solution each; every task runs in a fresh git repo through `smithy agent --profile auto`, tests are restored before grading, results go to `~/.smithy/bench/<id>.json`. `api:` agents wait for the api backend.
+
 ## v0.21.0 — 2026-11-25
 
 ### Highlights
