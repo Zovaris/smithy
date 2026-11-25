@@ -3,17 +3,25 @@ package docs
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/Zovaris/smithy/internal/search"
+	"github.com/Zovaris/smithy/internal/text"
 )
 
 const searchUsage = `smithy search: searches project docs and decisions, best sources first.
-  smithy search "<query>" [--adr|--glossary|--all] [--max N]
+  smithy search "<query>" [--adr|--glossary|--all|--code] [--regex] [--max N]
 Order: ADRs (docs/adr) > glossary > module READMEs > other docs (docs/**, README, AGENTS.md,
 CLAUDE.md). Case-insensitive fixed-string match. Prints ` + "`file:line: text`" + `, at most N lines
-(default 40). Exit 1 when nothing matches.`
+(default 40). Exit 1 when nothing matches.
+--code searches every file of the repo instead (ignored, hidden and binary files skipped) with the
+ripgrep shipped next to smithy, rg on PATH, git ls-files or a plain walk, fastest first;
+SMITHY_RG=<path> or off overrides the rg it picks. --regex reads the query as a regular
+expression. Output is capped at N matches, 220 characters a line and 64 KB.`
 
 var searchPrune = map[string]bool{
 	".git": true, "node_modules": true, "vendor": true, "dist": true, "build": true, "target": true, ".venv": true,
@@ -165,7 +173,7 @@ func Search(args []string) int {
 		fmt.Fprintln(os.Stderr, searchUsage)
 		return 2
 	}
-	q, scope, max := "", "all", 40
+	q, scope, max, regex := "", "all", 40, false
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--":
@@ -179,6 +187,10 @@ func Search(args []string) int {
 			scope = "glossary"
 		case "--all":
 			scope = "all"
+		case "--code":
+			scope = "code"
+		case "--regex":
+			regex = true
 		case "--max":
 			if i+1 >= len(args) {
 				fmt.Fprintln(os.Stderr, searchUsage)
@@ -201,6 +213,9 @@ func Search(args []string) int {
 	}
 	if root := strings.TrimSpace(git("rev-parse", "--show-toplevel")); root != "" {
 		_ = os.Chdir(root)
+	}
+	if scope == "code" {
+		return searchCode(q, regex, max)
 	}
 	var out []string
 	switch scope {
@@ -228,6 +243,36 @@ func Search(args []string) int {
 	}
 	if len(out) > max {
 		fmt.Printf("… %d more (narrow the query or use --adr/--glossary)\n", len(out)-max)
+	}
+	return 0
+}
+
+func searchCode(q string, regex bool, max int) int {
+	binDir := ""
+	if exe, err := os.Executable(); err == nil {
+		if r, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = r
+		}
+		binDir = filepath.Dir(exe)
+	}
+	if max == 0 {
+		max = 40
+	}
+	r, err := search.Run(search.Options{Root: ".", Pattern: q, Fixed: !regex, IgnoreCase: !regex,
+		MaxMatches: max, MaxLine: 220, Rg: search.FindRg(binDir)})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return 2
+	}
+	if len(r.Matches) == 0 {
+		fmt.Fprintf(os.Stderr, "no match for \"%s\"\n", text.Clean(q))
+		return 1
+	}
+	for _, m := range r.Matches {
+		fmt.Println(m)
+	}
+	if r.Truncated {
+		fmt.Printf("… capped at %d matches or %d bytes (narrow the query)\n", max, search.DefaultMaxBytes)
 	}
 	return 0
 }

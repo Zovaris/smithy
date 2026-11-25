@@ -33,6 +33,7 @@ jobs:
               [ "$os" = windows ] || gzip -9 "$out"
             done
           done
+          sh scripts/fetch-ripgrep.sh dist
           tar -czf dist/smithy-skills.tar.gz -C skills --owner=0 --group=0 --numeric-owner hush ledger scout simple smelt tend use-smithy warden
           (cd dist && sha256sum * > checksums.txt)
           ls -la dist
