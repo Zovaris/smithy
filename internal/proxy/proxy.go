@@ -1,7 +1,7 @@
-// Package proxy is smithy's egress proxy for container workers (auto.sandbox_network proxy): it
-// tunnels CONNECT only to allowed hosts on port 443, and sends stored keys for the worker
-// (http://smithy-proxy:<port>/s/<name>/<path>) to the key's bound hosts over HTTPS, so the worker
-// never holds a key. No TLS interception. Its log keeps kind, host, method, name and status only.
+// Package proxy is smithy's egress proxy, run natively next to the daemon (smithy proxy serve) or
+// in-process by smithy mcp's secret tool: it tunnels CONNECT only to allowed hosts on port 443, and
+// sends stored keys for the worker (http://127.0.0.1:<port>/s/<name>/<path>) to the key's bound
+// hosts over HTTPS, so the worker never holds a key. No TLS interception. Its log keeps kind, host, method, name and status only.
 package proxy
 
 import (
@@ -21,8 +21,11 @@ import (
 	"github.com/Zovaris/smithy/internal/auth"
 )
 
-// Port is where the sidecar listens; workers reach it as smithy-proxy:<Port>.
+// Port is where smithy proxy serve listens by default.
 const Port = 8877
+
+// DefaultAddr is serve's default listen address: loopback only, so the bound keys stay on this machine.
+var DefaultAddr = "127.0.0.1:8877"
 
 // MaxBody caps a secret call's response, read whole so the key can be scrubbed from it.
 const MaxBody = 32 << 20

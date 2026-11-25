@@ -91,9 +91,6 @@ func runAPI(o Options, cli string) int {
 		return needsHarness("agent --backend api")
 	}
 	mode, err := SandboxMode()
-	if err == nil && mode == "container" {
-		err = errAPIContainer
-	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
 		return 1
