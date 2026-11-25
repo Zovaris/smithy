@@ -66,7 +66,8 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   (`kit.mcp`, `kit.skills`) and the skills and MCP servers each harness has installed;
   `PUT /v1/setup/default` (`{"agent","model"}`), `PUT /v1/setup/kit` (`{"mcp","skills"}`, skills
   must be installed smithy skills) and `POST /v1/setup/skills/install` (`{"harness"}`, empty for
-  every detected one) change them. The TUI's first run, `ctrl+l`, `/agent`, `/model`, `/skills`
+  every detected one) change them. `GET /v1/agents/{id}/models[?refresh=1]` lists the models
+  agent `id` (a CLI or `api:<provider>`) reports, default first, cached for a day. The TUI's first run, `ctrl+l`, `/agent`, `/model`, `/skills`
   and the web's Setup screen use these.
 - It tails `~/.smithy/events.jsonl` and the proxy's log into its store (once per line, across
   rotation and restarts) and turns them into decisions: a proxy `secret_ask` is `secret:<id>`
