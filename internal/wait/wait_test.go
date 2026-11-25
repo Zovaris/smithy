@@ -36,7 +36,7 @@ D="$FAKE_GH"
 if [ -e "$D/fail-$1-$2" ]; then echo boom >&2; exit 1; fi
 case "$1 $2" in
   "auth status") [ -e "$D/signedout" ] && exit 1; exit 0 ;;
-  "pr view") cat "$D/pr.json" ;;
+  "pr view") [ -e "$D/slow-pr-view" ] && sleep 0.3; cat "$D/pr.json"; : >"$D/served-pr-view" ;;
   "run view") cat "$D/run.json" ;;
   "run list") cat "$D/runs.json" ;;
   "pr list") cat "$D/prs.json" ;;
@@ -52,6 +52,14 @@ func (e env) put(t *testing.T, name, body string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(e.dir, name), []byte(body), 0o644); err != nil {
 		t.Error(err)
+	}
+}
+
+func (e env) awaitServed(call string) {
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		if _, err := os.Stat(filepath.Join(e.dir, "served-"+call)); err == nil {
+			return
+		}
 	}
 }
 
@@ -618,9 +626,10 @@ func TestMainWakesOnChange(t *testing.T) {
 
 func TestMainEventsOption(t *testing.T) {
 	e := sandbox(t)
+	e.put(t, "slow-pr-view", "")
 	e.put(t, "pr.json", prFixture{rollup: pending}.json())
 	go func() {
-		time.Sleep(150 * time.Millisecond)
+		e.awaitServed("pr-view")
 		e.put(t, "pr.json", prFixture{rollup: pending, comments: 2}.json())
 	}()
 	o, _, c := mainOut(t, "pr:5", "--every", "0.05", "--max", "0.1", "--events", "comment")

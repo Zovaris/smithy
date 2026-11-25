@@ -27,11 +27,14 @@ import (
 )
 
 // Usage is the text for `smithy daemon --help`.
-const Usage = `usage: smithy daemon [--bg] [--port <n>] [--agent <cli>] [--once] [--max-hours <n>]
+const Usage = `usage: smithy daemon [--bg] [--port <n>] [--idle-exit <d>] [--agent <cli>] [--once] [--max-hours <n>]
 Runs the auto loop (the one smithy auto serve ran) and a local API on 127.0.0.1:<daemon.port>
 (default 7477), writing every event to ~/.smithy/smithy.db. In a terminal it shows the serve view
-(Esc, q or Ctrl+C asks to stop); stopping leaves the orchestrator and its workers running.
-  --bg         start detached; prints "<pid> <url>", log in ~/.smithy/daemon.log
+(Esc, q or Ctrl+C asks to stop); stopping leaves the orchestrator and its workers running. This
+foreground form is for hosts (systemd, a server); on a laptop bare smithy starts the daemon itself.
+  --bg         start detached; prints "<pid> <url>", log in ~/.smithy/daemon.log; exits on its own
+               after daemon.idle_exit (default 30m) with no clients and no running work
+  --idle-exit  exit after this long idle (a duration like 30m; 0 never, the foreground default)
   --port       listen port (default: daemon.port); the address is always loopback
   --agent, --once, --max-hours   as smithy auto serve
 API (every request needs "Authorization: Bearer <~/.smithy/daemon.token>", or through tailscale
@@ -51,12 +54,18 @@ refuse becomes a decision (perm:<id>/<n>) until someone answers; other agents ru
 once per turn. A reply in a session's chat-connector thread is that session's next message.
 Worker events (events.jsonl, the proxy log) are tailed into the store; proxy secret asks,
 ready items and needs_decision items become decisions whose answers go back to the asker.
-Stop a --bg daemon with: kill <pid> (~/.smithy/daemon.json shows it).`
+Stop a background daemon with: smithy stop.`
 
 type flags struct {
 	bg   bool
 	port int
+	idle time.Duration
+	// idleSet is true when --idle-exit was given.
+	idleSet bool
 }
+
+// Version is this binary's version, reported in GET /v1/state.
+var Version = "dev"
 
 func splitFlags(args []string) (flags, []string, error) {
 	f := flags{port: -1}
@@ -75,6 +84,16 @@ func splitFlags(args []string) (flags, []string, error) {
 				return f, nil, errors.New("--port takes a port number")
 			}
 			f.port = n
+		case "--idle-exit":
+			if i+1 >= len(args) {
+				return f, nil, errors.New("--idle-exit needs a value")
+			}
+			i++
+			d, err := ParseIdle(args[i])
+			if err != nil {
+				return f, nil, errors.New("--idle-exit takes a duration like 30m, or 0")
+			}
+			f.idle, f.idleSet = d, true
 		default:
 			rest = append(rest, a)
 		}
@@ -116,9 +135,43 @@ func Main(args []string, view auto.View) int {
 		}
 	}
 	if f.bg {
-		return background(f.port, rest)
+		idle := f.idle
+		if !f.idleSet {
+			if idle, err = ConfigIdle(); err != nil {
+				fmt.Fprintln(os.Stderr, "smithy daemon:", err)
+				return 2
+			}
+		}
+		i, err := StartBackground(f.port, idle, rest)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "smithy daemon:", err)
+			return 1
+		}
+		fmt.Println(i.PID, i.URL())
+		return 0
 	}
-	return foreground("smithy daemon", f.port, rest, view)
+	return foreground(runOpts{name: "smithy daemon", port: f.port, args: rest, view: view, idle: f.idle, writeInfo: true})
+}
+
+// ConfigIdle is daemon.idle_exit (default 30m).
+func ConfigIdle() (time.Duration, error) {
+	return ParseIdle(config.Get("daemon.idle_exit", DefaultIdleExit))
+}
+
+// ConfigPort is daemon.port (default 7477).
+func ConfigPort() (int, error) {
+	port, err := strconv.Atoi(config.Get("daemon.port", strconv.Itoa(DefaultPort)))
+	if err != nil || port < 0 || port > 65535 {
+		return 0, errors.New("daemon.port takes a port number")
+	}
+	return port, nil
+}
+
+// Standalone runs a private daemon inside this process on a free loopback port until ctx ends:
+// no daemon.json (other clients never find it) and no log lines on stdout. ready gets its
+// address once it listens; the return is serve's exit code.
+func Standalone(ctx context.Context, ready func(Info)) int {
+	return foreground(runOpts{name: "smithy --standalone", port: 0, ctx: ctx, quiet: true, ready: ready})
 }
 
 // ServeOrAttach is `smithy auto serve` in the harness build: it attaches to a running daemon,
@@ -139,10 +192,24 @@ func ServeOrAttach(args []string, view auto.View) int {
 		fmt.Fprintln(os.Stderr, "smithy auto serve: daemon.port takes a port number")
 		return 2
 	}
-	return foreground("smithy auto serve", port, args, view)
+	return foreground(runOpts{name: "smithy auto serve", port: port, args: args, view: view, writeInfo: true})
 }
 
-func foreground(name string, port int, serveArgs []string, view auto.View) int {
+type runOpts struct {
+	name  string
+	port  int
+	args  []string
+	view  auto.View
+	idle  time.Duration // 0: never exit when idle
+	ctx   context.Context
+	quiet bool
+	// writeInfo publishes ~/.smithy/daemon.json so bare smithy, chat and web find this daemon.
+	writeInfo bool
+	ready     func(Info)
+}
+
+func foreground(o runOpts) int {
+	name, port := o.name, o.port
 	st, err := store.Open(store.DefaultPath())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s: store: %v\n", name, err)
@@ -159,6 +226,7 @@ func foreground(name string, port int, serveArgs []string, view auto.View) int {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", name, err)
 		return 1
 	}
+	api.Version = Version
 	api.Route = api.RouteIntake(RouteBack)
 	api.Resume()
 	tctx, stopTails := context.WithCancel(context.Background())
@@ -177,8 +245,16 @@ func foreground(name string, port int, serveArgs []string, view auto.View) int {
 		go RunReport(tctx, hub, time.Hour)
 		go hub.Run(tctx)
 	}
+	parent := o.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	life, quit := context.WithCancel(parent)
+	defer quit()
 	h := auto.Hooks{
-		Tap: func(l string) { api.Append("log", "", map[string]string{"line": l}) },
+		Ctx:   life,
+		Quiet: o.quiet,
+		Tap:   func(l string) { api.Append("log", "", map[string]string{"line": l}) },
 		Started: func(sv *auto.Server) (func(), error) {
 			if len(conns) > 0 {
 				sv.StopNotify()
@@ -191,49 +267,63 @@ func foreground(name string, port int, serveArgs []string, view auto.View) int {
 			hs := &http.Server{Handler: api.Handler(), ReadHeaderTimeout: 10 * time.Second}
 			go hs.Serve(ln)
 			info := Info{PID: os.Getpid(), PIDStart: auto.ProcStart(os.Getpid()), Addr: ln.Addr().String(), Started: time.Now().UTC(), Log: os.Getenv("SMITHY_DAEMON_LOG")}
-			if err := WriteInfo(info); err != nil {
-				hs.Close()
-				return nil, err
+			if o.writeInfo {
+				if err := WriteInfo(info); err != nil {
+					hs.Close()
+					return nil, err
+				}
 			}
 			api.Append("daemon_up", "", map[string]any{"pid": info.PID, "addr": info.Addr})
+			if o.idle > 0 {
+				busy := func() bool { hb := sv.Heartbeat(); return hb.SessionRunning() }
+				go api.WatchIdle(life, o.idle, 15*time.Second, busy, func() {
+					api.Append("log", "", map[string]string{"line": fmt.Sprintf("daemon: idle for %s with no clients and no running work; exiting", o.idle)})
+					quit()
+				})
+			}
+			if o.ready != nil {
+				o.ready(info)
+			}
 			return func() {
 				api.Append("daemon_down", "", map[string]any{"pid": info.PID})
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 				defer cancel()
 				hs.Shutdown(ctx)
+				if !o.writeInfo {
+					return
+				}
 				if cur, _ := ReadInfo(); cur != nil && cur.PID == info.PID {
 					os.Remove(InfoFile())
 				}
 			}, nil
 		},
 	}
-	return auto.ServeMainHooks(name, serveArgs, view, h)
+	return auto.ServeMainHooks(name, o.args, o.view, h)
 }
 
-func background(port int, serveArgs []string) int {
+// StartBackground starts `smithy daemon` detached (log in ~/.smithy/daemon.log) and returns its
+// info once it listens. idle is its --idle-exit.
+func StartBackground(port int, idle time.Duration, serveArgs []string) (*Info, error) {
 	exe, err := os.Executable()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "smithy daemon:", err)
-		return 1
+		return nil, err
 	}
 	logPath := filepath.Join(ghx.Home(), "daemon.log")
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
-		fmt.Fprintln(os.Stderr, "smithy daemon:", err)
-		return 1
+		return nil, err
 	}
 	lf, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "smithy daemon:", err)
-		return 1
+		return nil, err
 	}
 	defer lf.Close()
-	cmd := exec.Command(exe, append([]string{"daemon", "--port", strconv.Itoa(port)}, serveArgs...)...)
+	args := append([]string{"daemon", "--port", strconv.Itoa(port), "--idle-exit", idle.String()}, serveArgs...)
+	cmd := exec.Command(exe, args...)
 	cmd.Stdout, cmd.Stderr = lf, lf
 	cmd.Env = append(os.Environ(), "SMITHY_DAEMON_LOG="+logPath)
 	detach(cmd)
 	if err := cmd.Start(); err != nil {
-		fmt.Fprintln(os.Stderr, "smithy daemon:", err)
-		return 1
+		return nil, err
 	}
 	pid := cmd.Process.Pid
 	exited := make(chan struct{})
@@ -241,16 +331,13 @@ func background(port int, serveArgs []string) int {
 	deadline := time.After(10 * time.Second)
 	for {
 		if i, _ := ReadInfo(); i != nil && i.PID == pid {
-			fmt.Println(pid, i.URL())
-			return 0
+			return i, nil
 		}
 		select {
 		case <-exited:
-			fmt.Fprintf(os.Stderr, "smithy daemon: exited before it listened; see %s\n", logPath)
-			return 1
+			return nil, fmt.Errorf("the daemon exited before it listened; see %s", logPath)
 		case <-deadline:
-			fmt.Fprintf(os.Stderr, "smithy daemon: pid %d did not listen within 10s; see %s\n", pid, logPath)
-			return 1
+			return nil, fmt.Errorf("daemon pid %d did not listen within 10s; see %s", pid, logPath)
 		case <-time.After(100 * time.Millisecond):
 		}
 	}

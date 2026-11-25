@@ -632,6 +632,10 @@ type View func(done <-chan struct{}, sv *Server, logs <-chan string) error
 type Hooks struct {
 	Tap     func(line string)
 	Started func(sv *Server) (stop func(), err error)
+	// Ctx, when set, is the loop's parent context: cancelling it stops serve like a signal does.
+	Ctx context.Context
+	// Quiet drops the plain log lines printed when there is no view (an in-process daemon under a TUI).
+	Quiet bool
 }
 
 // ServeMain runs `smithy auto serve`. view is used when stdout is a terminal; otherwise (or with
@@ -687,7 +691,9 @@ func ServeMainHooks(name string, args []string, view View, h Hooks) int {
 		last = l
 		mu.Unlock()
 		if !tty {
-			fmt.Println(now().Format("2006-01-02 15:04:05"), l)
+			if !h.Quiet {
+				fmt.Println(now().Format("2006-01-02 15:04:05"), l)
+			}
 			return
 		}
 		select {
@@ -695,7 +701,11 @@ func ServeMainHooks(name string, args []string, view View, h Hooks) int {
 		default:
 		}
 	}
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	parent := h.Ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	sv, err := NewServer(o, log)
 	if err != nil {

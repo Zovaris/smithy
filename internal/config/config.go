@@ -63,6 +63,7 @@ var Known = []Setting{
 	{"auto.hours", "", "smithy auto", "launch window HH:MM-HH:MM in local time (22:00-07:00 wraps midnight); empty = always"},
 	{"auto.every", "60", "smithy auto", "seconds between polls of each source"},
 	{"daemon.port", "7477", "smithy daemon", "loopback port of the daemon's API (harness build); it never listens beyond 127.0.0.1"},
+	{"daemon.idle_exit", "30m", "smithy daemon", "how long the background daemon bare smithy starts stays up with no clients (TUI, web, attach) and no running work before it exits on its own; a duration like 30m or 2h, 0 or off never"},
 	{"daemon.allow", "", "smithy daemon", "comma list of Tailscale logins (Tailscale-User-Login via tailscale serve) allowed to use the daemon's API; empty: only the local token. Set, it trusts any local user on this machine (the header is not authenticated past tailscale serve), so smithy doctor warns"},
 	{"auto.paused", "false", "smithy auto", "true holds smithy auto take: nothing launches until it is false again (p in smithy tui)"},
 	{"auto.agent", "", "smithy auto serve", "agent CLI for serve's orchestrator (claude, codex, opencode…, pool: any smithy pool account, or api:<provider>/<model>: smithy's own loop on your key, harness build, read from the user settings only); empty = the one smithy agent detects"},

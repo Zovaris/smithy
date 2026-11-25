@@ -17,6 +17,7 @@ part above `### Details`.
 - Removed: `auto.sandbox container`, `auto.sandbox_image`, `auto.sandbox_network`, `auto.sandbox_memory`, `auto.sandbox_proxy_binary`, the `smithy-proxy` sidecar and its networks, docker/podman detection, and `sandbox/Dockerfile`. A user config still on `container` stops workers with a message to set `native` or `off`; `smithy doctor` fails on it.
 - `smithy proxy serve` runs natively and now listens on `127.0.0.1:8877` by default (was every interface), so bound keys stay on this machine.
 - `smithy cleanup builds` no longer lists `smithy-*` images; `smithy uninstall` still removes the images and networks older versions left, when docker or podman is on PATH.
+- `internal/wait`: `TestMainEventsOption` no longer fails when the first poll starts after the test's update; the fake `gh` marks served calls and the test writes the change only after the baseline poll.
 ### New
 
 - The daemon runs agent sessions: start one with an agent, a folder and a first message, keep talking to it, stop it, and see every session with its status (harness build).
@@ -24,6 +25,13 @@ part above `### Details`.
 ### Details
 
 - `POST /v1/sessions`, `POST /v1/sessions/{id}/messages`, `POST /v1/sessions/{id}/stop` and `GET /v1/sessions`; session events (messages, live text, tool calls with args and output, diffs, usage, status) stream on `/v1/events` with the session id. `api:` sessions run in the daemon and turn a refused tool call into a `perm:<id>/<n>` decision; other agents run `smithy agent` per turn. Chat-thread replies reach the session; sessions left running by a stopped daemon show as failed.
+- **One command.** `smithy` (harness build) starts the daemon in the background when none runs and attaches; it keeps working after you quit, exits on its own after 30 idle minutes, and `smithy stop` ends it. `smithy --standalone` runs a private daemon that stops with the chat.
+
+### Details
+
+- `smithy chat`/bare `smithy` auto-start the daemon (`daemon.StartBackground`) and show "background, smithy stop ends it" in the footer; `--standalone` runs `daemon.Standalone` in-process on a free port without `daemon.json`.
+- New `daemon.idle_exit` (default `30m`): a `--bg` daemon exits with no open event streams, no API requests, no orchestrator session and no planning for that long; `smithy daemon --idle-exit <d>`.
+- New `smithy stop` (SIGTERM, waits 10s). `GET /v1/state` reports `version`; the chat warns on a mismatch, below the replayed history.
 - API-backend costs now come from OpenRouter's public price list, refreshed daily and kept for offline use, so new models are priced without a smithy release.
 
 ### Details

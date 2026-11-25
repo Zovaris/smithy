@@ -54,6 +54,7 @@ type State struct {
 	LastSeq int64      `json:"last_seq"`
 	Pending []Decision `json:"pending"`
 	Serve   any        `json:"serve,omitempty"`
+	Version string     `json:"version,omitempty"`
 }
 
 // Server serves the API over one store.
@@ -73,6 +74,8 @@ type Server struct {
 	BenchDir string
 	// Runners makes each session's runner; nil: DefaultRunner.
 	Runners RunnerFor
+	// Version is the daemon binary's version, reported in State so a client can warn on a mismatch.
+	Version string
 	// Ctx is the daemon's lifetime (cancelled on shutdown) for background work like planning; nil: Background.
 	Ctx context.Context
 
@@ -86,6 +89,8 @@ type Server struct {
 	sessions  map[string]*live
 	lastAgent string
 	starting  int
+	clients   atomic.Int64 // open event streams
+	seen      atomic.Int64 // unix nanos of the last API request or stream end
 }
 
 // New loads the decisions recorded in st. log may be nil.
@@ -95,6 +100,7 @@ func New(st *store.Store, token string, allow []string, log func(string)) (*Serv
 	}
 	sv := &Server{st: st, token: token, allow: allow, log: log, started: time.Now(),
 		decisions: map[string]*Decision{}, routed: map[string]bool{}, intakes: map[string]*intakePlan{}, wake: make(chan struct{}), sessions: map[string]*live{}}
+	sv.touch()
 	evs, err := st.Since(0)
 	if err != nil {
 		return nil, err
@@ -309,6 +315,7 @@ func (sv *Server) Handler() http.Handler {
 			return
 		}
 		r.Header.Set("X-Smithy-Who", who)
+		sv.touch()
 		mux.ServeHTTP(w, r)
 	})
 }
@@ -323,7 +330,7 @@ func (sv *Server) state(w http.ResponseWriter, r *http.Request) {
 	sv.mu.Lock()
 	last := sv.lastSeq
 	sv.mu.Unlock()
-	st := State{PID: os.Getpid(), Started: sv.started, LastSeq: last, Pending: sv.Pending()}
+	st := State{PID: os.Getpid(), Started: sv.started, LastSeq: last, Pending: sv.Pending(), Version: sv.Version}
 	if sv.ServeState != nil {
 		st.Serve = sv.ServeState()
 	}
@@ -444,6 +451,8 @@ func (sv *Server) events(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "streaming unsupported", 500)
 		return
 	}
+	sv.clients.Add(1)
+	defer func() { sv.touch(); sv.clients.Add(-1) }()
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.WriteHeader(200)
