@@ -1,0 +1,141 @@
+//go:build harness
+
+package daemon
+
+import (
+	"context"
+	"encoding/json"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/Zovaris/smithy/internal/connect"
+	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/notify"
+	"github.com/Zovaris/smithy/internal/store"
+)
+
+// KindInput is a user's message to a session (a reply in its chat thread).
+const KindInput = "user_input"
+
+const notesSource = "notes:connect"
+
+func session(id string) string {
+	kind, rest, _ := strings.Cut(id, ":")
+	if kind != "merge" && kind != "decide" {
+		return ""
+	}
+	p := strings.Split(rest, "/")
+	if len(p) < 2 {
+		return ""
+	}
+	return p[0] + "/" + p[1]
+}
+
+// NoteOf maps one store event to a notification. A ready or needs_decision stage is sent as the
+// decision the daemon asks for it (with buttons), never twice.
+func NoteOf(e store.Event) (connect.Note, bool) {
+	switch e.Kind {
+	case KindAsked:
+		var d Decision
+		if json.Unmarshal(e.Data, &d) != nil || d.ID == "" {
+			return connect.Note{}, false
+		}
+		n := connect.Note{Key: "asked|" + d.ID, Kind: "decision", Session: session(d.ID), Title: "Decision needed",
+			Text: line1(d.Question, 500), Decision: d.ID, Options: d.Options}
+		if strings.HasPrefix(d.ID, "merge:") {
+			n.Kind, n.Title = "pr_ready", "PR ready for review"
+		}
+		if len(d.Options) == 0 {
+			n.Text += "\nReply in this thread to answer."
+		}
+		return n, true
+	case "event":
+		var ev events.Event
+		if json.Unmarshal(e.Data, &ev) != nil {
+			return connect.Note{}, false
+		}
+		if ev.Kind == "stage" && (ev.Detail == "ready" || ev.Detail == "needs_decision") {
+			return connect.Note{}, false
+		}
+		sess := ""
+		if ev.Batch != "" && ev.Item != "" {
+			sess = ev.Batch + "/" + ev.Item
+		}
+		switch {
+		case ev.Kind == "merged":
+			return connect.Note{Key: "merged|" + sess + "|" + ev.PR, Kind: "pr_merged", Session: sess, Title: "PR merged · " + line1(ev.Item, 80), URL: ev.PR}, true
+		case ev.Kind == "ci" && (ev.Detail == "red" || ev.Detail == "failing" || ev.Detail == "failure"):
+			return connect.Note{Key: "ci_red|" + sess + "|" + ev.PR + "|" + ev.T.Format(time.RFC3339), Kind: "ci_red", Session: sess, Title: "CI red · " + line1(ev.Item, 80), URL: ev.PR}, true
+		}
+		a, ok := notify.Classify(ev)
+		if !ok {
+			return connect.Note{}, false
+		}
+		n := connect.Note{Key: a.Dedupe, Kind: a.Kind, Title: a.Label, Text: line1(a.Reason, 300), URL: a.PR}
+		n.Session = sess
+		if a.Key != "" {
+			n.Title += " · " + line1(a.Key, 80)
+		}
+		return n, true
+	}
+	return connect.Note{}, false
+}
+
+// Input records text from a chat thread as the session's user input.
+func (sv *Server) Input(session, text, by string) error {
+	_, err := sv.Append(KindInput, session, map[string]string{"text": text, "by": by, "via": "chat"})
+	return err
+}
+
+// NotesOnce sends every store event since the notes cursor through h; an answered decision
+// edits its messages. The first run starts at the newest event, so history is not replayed.
+func (sv *Server) NotesOnce(ctx context.Context, h *connect.Hub) error {
+	c, err := sv.st.Cursor(notesSource)
+	if err != nil {
+		return err
+	}
+	if c == "" {
+		sv.mu.Lock()
+		last := sv.lastSeq
+		sv.mu.Unlock()
+		_, err := sv.st.AppendCursor(nil, notesSource, strconv.FormatInt(last, 10))
+		return err
+	}
+	from, _ := strconv.ParseInt(c, 10, 64)
+	evs, err := sv.st.Since(from)
+	if err != nil {
+		return err
+	}
+	for _, e := range evs {
+		if e.Kind == KindAnswered {
+			var o Outcome
+			if json.Unmarshal(e.Data, &o) == nil {
+				h.Resolve(ctx, o.ID, line1(o.Answer, 200), line1(o.By, 80))
+			}
+		} else if n, ok := NoteOf(e); ok {
+			h.Notify(ctx, n)
+		}
+		if _, err := sv.st.AppendCursor(nil, notesSource, strconv.FormatInt(e.Seq, 10)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RunNotes runs NotesOnce on every new event (or every interval) until ctx ends.
+func (sv *Server) RunNotes(ctx context.Context, h *connect.Hub, every time.Duration) {
+	for ctx.Err() == nil {
+		sv.mu.Lock()
+		wake := sv.wake
+		sv.mu.Unlock()
+		if err := sv.NotesOnce(ctx, h); err != nil && sv.log != nil {
+			sv.log("notes: " + err.Error())
+		}
+		select {
+		case <-ctx.Done():
+		case <-wake:
+		case <-time.After(every):
+		}
+	}
+}
