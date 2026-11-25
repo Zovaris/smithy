@@ -13,6 +13,7 @@ const SCREENS: Record<RouteId, ComponentType> = {
   decisions: lazy(() => import("./screens/decisions")),
   agents: lazy(() => import("./screens/agents")),
   board: lazy(() => import("./screens/board")),
+  bench: lazy(() => import("./screens/bench")),
 };
 const Palette = lazy(() => import("./palette"));
 
