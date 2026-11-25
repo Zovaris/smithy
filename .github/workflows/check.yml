@@ -59,6 +59,8 @@ jobs:
           awk -v t="${total%\%}" -v min="$COVERAGE_MIN" 'BEGIN { if (t+0 < min+0) { print "coverage " t "% is below " min "%"; exit 1 } }'
       - name: Go tests, harness build (race detector)
         if: matrix.build == 'harness'
+        env:
+          SMITHY_REQUIRE_WEB_BUILD: "1" # the web e2e test runs on the real build, never skips
         run: go test -race -tags harness ./...
   integration:
     runs-on: ubuntu-latest
