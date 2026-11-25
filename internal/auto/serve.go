@@ -28,7 +28,8 @@ import (
 
 // ServeUsage is the text for `smithy auto serve --help`.
 const ServeUsage = `usage: smithy auto serve [--agent <cli>] [--once] [--max-hours <n>]
-Runs the auto loop in the foreground with no tokens: polls auto.sources every auto.every seconds and,
+Runs the auto loop in the foreground with no tokens (in the harness build it starts smithy daemon,
+which runs this loop, or attaches to it): polls auto.sources every auto.every seconds and,
 when auto take yields a task dir, starts one headless orchestrator session (smithy agent --bg
 --profile auto) that runs tend auto once on it. At most one orchestrator at a time; new issues stay
 queued until it ends. Its output goes to ~/.smithy/auto/sessions/<time>.log.
@@ -109,6 +110,9 @@ var procStart = func(pid int) string {
 	}
 	return strings.Join(strings.Fields(string(out)), " ")
 }
+
+// ProcStart is the start time ps reports for pid ("" when unknown).
+func ProcStart(pid int) string { return procStart(pid) }
 
 // AliveAs reports whether pid is alive and, when start is known, is still the process that
 // started then (a reused pid reads as dead).
@@ -290,6 +294,13 @@ func (sv *Server) adopt() {
 	if l := ReadLock(); l != nil {
 		sv.hb.SessionPID, sv.hb.SessionLog, sv.hb.SessionDir, sv.hb.SessionAt, sv.hb.SessionPS = l.PID, l.Log, l.Dir, l.At, l.Start
 	}
+}
+
+func (sv *Server) release() {
+	sv.beatMu.Lock()
+	sv.ended = true
+	os.Remove(ServeFile())
+	sv.beatMu.Unlock()
 }
 
 // Heartbeat is the current heartbeat.
@@ -597,9 +608,21 @@ func defaultSandboxReady(agent string) error {
 // event line. smithy wires tui.RunServeView here (charm modules stay in internal/tui).
 type View func(done <-chan struct{}, sv *Server, logs <-chan string) error
 
+// Hooks let smithy daemon wrap the serve loop: Tap sees every event line; Started runs once the
+// loop holds its lock and returns the function that undoes it when serve ends.
+type Hooks struct {
+	Tap     func(line string)
+	Started func(sv *Server) (stop func(), err error)
+}
+
 // ServeMain runs `smithy auto serve`. view is used when stdout is a terminal; otherwise (or with
 // a nil view) each event is one plain line.
 func ServeMain(args []string, view View) int {
+	return ServeMainHooks("smithy auto serve", args, view, Hooks{})
+}
+
+// ServeMainHooks is ServeMain under another command name, with hooks.
+func ServeMainHooks(name string, args []string, view View, h Hooks) int {
 	var o ServeOptions
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; a {
@@ -610,7 +633,7 @@ func ServeMain(args []string, view View) int {
 			o.Once = true
 		case "--agent", "--max-hours":
 			if i+1 >= len(args) {
-				fmt.Fprintf(os.Stderr, "smithy auto serve: %s needs a value\n", a)
+				fmt.Fprintf(os.Stderr, name+": %s needs a value\n", a)
 				return 2
 			}
 			i++
@@ -620,17 +643,17 @@ func ServeMain(args []string, view View) int {
 			}
 			f, err := strconv.ParseFloat(args[i], 64)
 			if err != nil || f <= 0 {
-				fmt.Fprintln(os.Stderr, "smithy auto serve: --max-hours takes a number > 0")
+				fmt.Fprintln(os.Stderr, name+": --max-hours takes a number > 0")
 				return 2
 			}
 			o.MaxHours = f
 		default:
-			fmt.Fprintf(os.Stderr, "smithy auto serve: unexpected argument %s\n%s\n", a, ServeUsage)
+			fmt.Fprintf(os.Stderr, name+": unexpected argument %s\n%s\n", a, ServeUsage)
 			return 2
 		}
 	}
 	if _, err := LoadSettings(); err != nil {
-		fmt.Fprintln(os.Stderr, "smithy auto serve:", err)
+		fmt.Fprintln(os.Stderr, name+":", err)
 		return 2
 	}
 	tty := view != nil && isTerminal(os.Stdout)
@@ -638,6 +661,9 @@ func ServeMain(args []string, view View) int {
 	var mu sync.Mutex
 	var last string
 	log := func(l string) {
+		if h.Tap != nil {
+			h.Tap(l)
+		}
 		mu.Lock()
 		last = l
 		mu.Unlock()
@@ -654,11 +680,20 @@ func ServeMain(args []string, view View) int {
 	defer cancel()
 	sv, err := NewServer(o, log)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "smithy auto serve:", Clean(err.Error()))
+		fmt.Fprintln(os.Stderr, name+":", Clean(err.Error()))
 		if errors.Is(err, agents.ErrNoCLI) {
 			return 2
 		}
 		return 1
+	}
+	if h.Started != nil {
+		stop, err := h.Started(sv)
+		if err != nil {
+			sv.release()
+			fmt.Fprintln(os.Stderr, name+":", Clean(err.Error()))
+			return 1
+		}
+		defer stop()
 	}
 	done := make(chan struct{})
 	go func() {
@@ -667,7 +702,7 @@ func ServeMain(args []string, view View) int {
 	}()
 	if tty {
 		if err := view(done, sv, logs); err != nil {
-			fmt.Fprintln(os.Stderr, "smithy auto serve: view:", err)
+			fmt.Fprintln(os.Stderr, name+": view:", err)
 		}
 		cancel()
 	}

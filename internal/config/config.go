@@ -50,7 +50,7 @@ var Known = []Setting{
 	{"decide.key_env", "", "smithy decide", "name of the env var holding the key (never the key); empty for a local model"},
 	{"decide.enabled", "true", "smithy decide", "false after three failed calls in a row; set true to turn it back on"},
 	{"decide.timeout", "3000", "smithy decide", "milliseconds before a decide call is dropped"},
-	{"auto.sources", "github", "smithy auto", "comma list of issue sources to poll: github, linear"},
+	{"auto.sources", "github", "smithy auto", "comma list of issue sources to poll: github, linear, board (harness build)"},
 	{"auto.mode", "labeled", "smithy auto", "labeled: only issues with the auto.label label; all: every issue that passes the source's filters"},
 	{"auto.label", "auto", "smithy auto", "label that opts an issue in (auto.mode labeled)"},
 	{"auto.model_prefix", "model:", "smithy auto", "label prefix for the worker tier (model:cheap, model:mid, model:strong)"},
@@ -59,6 +59,8 @@ var Known = []Setting{
 	{"auto.max_cost_per_day", "", "smithy auto serve", "USD of reported agent cost per local day; at or over it serve starts nothing new until tomorrow (running workers finish); only reported cost counts (claude), unknown cost counts as 0; empty = no cap"},
 	{"auto.hours", "", "smithy auto", "launch window HH:MM-HH:MM in local time (22:00-07:00 wraps midnight); empty = always"},
 	{"auto.every", "60", "smithy auto", "seconds between polls of each source"},
+	{"daemon.port", "7477", "smithy daemon", "loopback port of the daemon's API (harness build); it never listens beyond 127.0.0.1"},
+	{"daemon.allow", "", "smithy daemon", "comma list of Tailscale logins (Tailscale-User-Login via tailscale serve) allowed to use the daemon's API; empty: only the local token"},
 	{"auto.paused", "false", "smithy auto", "true holds smithy auto take: nothing launches until it is false again (p in smithy tui)"},
 	{"auto.agent", "", "smithy auto serve", "agent CLI for serve's orchestrator (claude, codex, opencode…, or pool: any smithy pool account); empty = the one smithy agent detects"},
 	{"auto.session_hours", "3", "smithy auto serve", "hours one orchestrator session may run before smithy agent ends it (its workers keep going)"},
@@ -73,6 +75,7 @@ var Known = []Setting{
 	{"notify.telegram.chat", "", "smithy auto serve", "Telegram chat id serve notifies (bot token: smithy auth set telegram); empty = no notifications"},
 	{"notify.style", "plain", "smithy auto serve", "Telegram message look: emoji (an icon per line) or plain (status tag, one monospace detail line, no emoji)"},
 	{"notify.kinds", "pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited", "smithy auto serve", "comma list of notification kinds sent to Telegram"},
+	{"board.linear_sync", "false", "smithy board", "true: smithy board sync and the board source pull title, body, priority and labels from Linear (linear.* filters) and push states and PRs back"},
 	{"linear.key_env", "LINEAR_API_KEY", "smithy auto", "name of the env var holding the Linear personal API key (never the key); wins over smithy auth set linear (~/.smithy/auth.json)"},
 	{"linear.team", "", "smithy auto", "required: Linear team keys smithy may work in (e.g. ENG,OPS); empty, the Linear source refuses to poll"},
 	{"linear.project", "", "smithy auto", "Linear project name filter; comma list"},
@@ -80,6 +83,7 @@ var Known = []Setting{
 	{"linear.cycle", "", "smithy auto", "Linear cycle filter: current or a cycle number"},
 	{"linear.initiative", "", "smithy auto", "Linear initiative name filter (via the issue's project)"},
 	{"linear.states", "unstarted,backlog", "smithy auto", "Linear workflow state types that count as new work"},
+	{"tui.reduce_motion", "false", "smithy tui", "true draws every frame still: no sparks, shimmer or sliding bars (like --no-anim or SMITHY_REDUCE_MOTION)"},
 }
 
 // ErrUnset means the key has no value and no default: ask the user once, then save it.

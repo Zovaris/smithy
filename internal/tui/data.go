@@ -33,6 +33,7 @@ type Snapshot struct {
 	Worktrees []Worktree
 	Activity  []Event
 	Events    []events.Event // the last 7 days of ~/.smithy/events.jsonl, oldest first
+	History   []events.Event // the last 30 days of it, oldest first, for the History view
 	Rates     map[string]int // API requests left per source, when the source reports it
 	Repo      string
 	Demo      bool
@@ -199,9 +200,13 @@ func Load(now time.Time) Snapshot {
 	snap.Worktrees = scanWorktrees(snap.Batches, now)
 	snap.Activity = activity(st, snap.Batches)
 	snap.Rates = st.Rate
-	if es, err := readEvents(now.AddDate(0, 0, -7), 20000); err != nil {
+	if es, err := readEvents(now.AddDate(0, 0, -30), 60000); err != nil {
 		snap.Errors = append(snap.Errors, "events: "+err.Error())
 	} else {
+		snap.History = es
+		week := now.AddDate(0, 0, -7)
+		i := sort.Search(len(es), func(i int) bool { return es[i].T.After(week) })
+		es = es[i:]
 		snap.Events = es
 		snap.Watcher.Spend = spendOf(es, now)
 	}
@@ -296,6 +301,10 @@ func sanitize(s Snapshot) Snapshot {
 		w := &s.Worktrees[i]
 		w.Path, w.Branch, w.Item = clean(w.Path), clean(w.Branch), clean(w.Item)
 		w.Status = cleanAll(w.Status)
+	}
+	for i := range s.History {
+		e := &s.History[i]
+		e.Kind, e.Batch, e.Item, e.Source, e.ID, e.PR, e.Detail = clean(e.Kind), clean(e.Batch), clean(e.Item), clean(e.Source), clean(e.ID), clean(e.PR), clean(e.Detail)
 	}
 	for i := range s.Events {
 		e := &s.Events[i]

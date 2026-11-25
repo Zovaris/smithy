@@ -19,8 +19,61 @@ smithy auto serve                              # Esc/q stops the loop; running a
 
 Issues opt in with the `auto` label. `model:` and `speed:` labels pick the tier and smelt speed.
 A daily cap and an optional hours window bound the spend. `smithy tui` shows the queue, running
-agents and the cost of each issue, and edits settings in place. Every setting is listed in
+agents and the cost of each issue, a History tab of past days' work with PR, cost and outcome, and
+edits settings in place. Every setting is listed in
 [settings.md](settings.md).
+
+## Daemon (harness build)
+
+In the harness build, the serve loop runs inside `smithy daemon`, which also serves a local API
+and writes every event to `~/.smithy/smithy.db`. `smithy auto serve` starts it in the foreground
+(same flags, same view) or, when one already runs, attaches and prints its events.
+
+```
+smithy daemon --bg                             # prints "<pid> <url>"; log ~/.smithy/daemon.log
+curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/state
+```
+
+- `GET /v1/state`, `GET /v1/events?since=<seq>` (SSE, resumes with `Last-Event-ID`),
+  `POST /v1/decisions` (`{"id","answer"}`: the first answer wins; later ones get the outcome, 409).
+- It tails `~/.smithy/events.jsonl` and the proxy's log into its store (once per line, across
+  rotation and restarts) and turns them into decisions: a proxy `secret_ask` is `secret:<id>`
+  (approve/deny, handed back as `smithy proxy approve|deny` would), a ready item is
+  `merge:<batch>/<item>` (merge/hold) and a `needs_decision` item `decide:<batch>/<item>/<key>`;
+  warden answers land on the card as `answer`, `answer_id` and `answered_by`. Telegram alerts
+  show the same id.
+- It binds `127.0.0.1` only. Every request needs the token (`~/.smithy/daemon.token`, 0600) or a
+  `Tailscale-User-Login` listed in `daemon.allow`; anything else gets 401. The token works only
+  with a loopback `Host`, the login only with a `*.ts.net` one, so a DNS-rebound web page can't
+  use the API.
+- Remote access: `tailscale serve --bg 7477` puts it on your tailnet over HTTPS with the
+  identity header; smithy has no Tailscale code. Any local process can send that header, so set
+  `daemon.allow` only on a machine where every local user is trusted (the dedicated OS user above).
+- `smithy attach [url]` follows it in a terminal UI: live events, the decisions waiting on you
+  (keys 1-9 answer; the first answer wins, a later one shows the recorded outcome), and on a lost
+  connection it retries and resumes after the last event seen, so a daemon restart neither
+  repeats nor drops events. Without a url it uses the local daemon and its token; a non-loopback
+  url sends no token (`daemon.allow` decides).
+- `smithy doctor` reports whether it runs, a stale `daemon.json`, and a token readable by others.
+
+## Built-in tracker (harness build)
+
+`smithy board` keeps tasks in `~/.smithy/smithy.db`; `auto.sources board` makes the watcher
+read it like any source (the `auto` label and filters apply). A task is new work while it is
+`todo`, unclaimed and every task in `blocked_by` is done or canceled.
+
+```
+smithy board add "Fix login" --labels auto --priority 2
+smithy board list --state todo
+smithy board claim B-1 --by me --ttl 30m
+smithy board set B-1 --state review --pr https://github.com/o/r/pull/7
+```
+
+With `board.linear_sync true`, `smithy board sync` (and every board poll) syncs with Linear by
+field ownership: Linear owns title, body, priority and labels; the board owns state, claims, PRs
+and branch. Issues in `linear.states` under the `linear.*` filters are imported as `todo`; later
+edits are read with an `updatedAt` cursor (no webhooks), and state changes and new PR links are
+pushed back. A board task linked to Linear refuses local edits to the fields Linear owns.
 
 ## Notifications
 

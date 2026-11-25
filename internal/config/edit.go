@@ -20,7 +20,7 @@ var enums = map[string][]string{
 	"auto.sandbox":   {"off", "native", "container"},
 }
 
-var bools = map[string]bool{"auto.paused": true, "auto.sandbox_weaker_net": true, "decide.enabled": true}
+var bools = map[string]bool{"auto.paused": true, "auto.sandbox_weaker_net": true, "decide.enabled": true, "tui.reduce_motion": true, "board.linear_sync": true}
 
 var numbers = map[string]bool{"warden.max": true, "warden.stuck_minutes": true, "ask.timeout": true, "agent.timeout": true,
 	"watch.every": true, "watch.max": true, "decide.timeout": true, "auto.max_per_day": true, "auto.every": true, "auto.session_hours": true,

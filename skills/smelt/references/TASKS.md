@@ -19,7 +19,7 @@ It asks at most twice per repo, ever (`.smithy/config.json` stays out of git; `g
    `exclude` adds it to `.git/info/exclude` (this machine only, nothing committed).
 
 `tasks.location` (default `repo`) switches the whole thing: `local` puts plans in
-`~/.smithy/plans/<repo>/<slug>/` (`$SMELT_PLANS`), `board` puts tasks on the user's tracker
+`~/.smithy/plans/<repo>/<slug>/` (`$SMELT_PLANS`), `board` puts tasks on the user's external tracker
 (GitHub Issues via `gh` when installed, or Linear/Jira through the harness's tools) and keeps the spec where
 `tasks.commit` says. `smithy config list` shows the current values.
 

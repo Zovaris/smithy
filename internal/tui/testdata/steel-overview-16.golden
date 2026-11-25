@@ -1,0 +1,30 @@
+   [90m███████████[m     [97;1m╔═╗╔╦╗╦╔╦╗╦[m [97;1m╦╦[m [97;1m╦[m                                                        [90m14:30:00[m 
+ [90m█████████████[m     [97;1m╚═╗║║║║[m [97;1m║[m [97;1m╠═╣╚╦╝[m                                                                 
+      [90m█████[m        [97;1m╚═╝╩[m [97;1m╩╩[m [97;1m╩[m [97;1m╩[m [97;1m╩[m [97;1m╩[m                                                                  
+    [90m█████████[m      [30;43;1m DEMO [m [90mautonomous forge · dev · smithy[m                                           
+ [92m● watching [37mgithub, linear (TES)[90m · next poll 35s · serve pid 4242 claude   [37m███████████[93m▓[90m▒[m  [37m69 / 80[90m l…[m
+ [37m5 working[90m · [37m0 waiting[90m · [91;1m2 stuck[90;22m   [92;1m3 ready for you[90;22m · [37m1 CI running[m                                   
+ [30;103;1m 1 Overview [m [90m 2 [m [90m 3 [m [30;43;1m 4 ? 8 [m [90m 5 [m [90m 6 [m [90m 7 [m [90m 8 [m [90m 9 [m [90m 10 [m                                              
+[93m╭─ [1mWork per hour[90;22m · last 24 h[m [93m────────────────────╮[90m   [97;1mAgents now[90;22m · 13 live[m [90m                          [m
+[93m│[m [94mlaunched ▇[m [37;1m104[m   [92mready/merged ▇[m [37;1m162[m            [93m│[90m [m [90m███████[93m█████████████████[94m███████[92m███████[91m████████[m [90m [m
+[93m│[m [90mup   [94m▃▄▂▂▅▂▃▂▃▃▅▃▃▃▁▄▃▃▃▂▃█▇▁[m                  [93m│[90m [m                                                [90m [m
+[93m│[m [90mdown [92m▄▂▃▄▅▆▃▃▆▅▃▅▆█▂▄▃▅▄▅▃▅▄▃[m                  [93m│[90m [m [90m●[m [37m2[m [90mqueued[m   [93m●[m [37m3[m [90mbuilding[m   [93m●[m [37m2[m [90mchecking[m       [90m [m
+[93m│[m [90m     -24h                         now[m          [93m│[90m [m [94m●[m [37m2[m [90mpr_open[m   [92m●[m [37m2[m [90mready[m   [91m●[m [37m2[m [90mblocked[m          [90m [m
+[93m│[m                                                [93m│[90m [m                                                [90m [m
+[93m╰────────────────────────────────────────────────╯[90m                                                  [m
+[90m   [97;1mDaily cap[90;22m · 86%[m [90m                                  [97;1mCI health[90;22m · 20 runs[m [90m                           [m
+[90m [m [37;1m69 / 80[90;22m launched today[m                         [90m  [m [92m■[m [92m■[m [92m■[m [92m■[m [91m□[m [92m■[m [92m■[m [92m■[m [91m□[m [92m■[m [92m■[m [92m■[m [92m■[m [92m■[m [91m□[m [92m■[m [92m■[m [91m□[m [91m□[m [91m□[m        [90m [m
+[90m [m [37m████████████████████████████████████████[93m▓[90m▒░░░░[m [90m  [m                                                [90m [m
+[90m [m                                                [90m  [m [33;1m70%[90;22m green over the last 20 runs[m                [90m [m
+[90m [m [90m7 days  [93m▄▄▃▃▄▃█[90m  36 33 20 20 32 26 69[m          [90m  [m [90mmedian CI time [37m9m[90m   p90 [37m14m[m                    [90m [m
+[90m [m [90mhours   [37many time[m                               [90m  [m                                                [90m [m
+[90m                                                                                                    [m
+[90m   [97;1mHow long it takes[90;22m · last 7 days[m [90m               [33m   [97;1mNeeds you[90;22m · 8[m [33m                                 [m
+[90m [m [37;1missue → PR ready[90;22m: median [37;1m1h57m[90;22m (slowest 10%: [37m…[m [90m [33m [m [33;1m8 items wait for you[m                           [33m [m
+[90m [m [90m  spread, fast → slow  [93m▁▁▁▂▃▅▆█▅▄▆▃[90m  98 items[m  [90m [33m [m                                                [33m [m
+[90m [m                                                [90m [33m [m [33m?[m [37mKeep this decision? Retry the export with b…[m [33m [m
+[90m [m [37;1mPR ready → merged[90;22m: median [37;1m1h44m[90;22m (slowest 10%:…[m [90m [33m [m [33m?[m [37mKeep this decision? Split billing into two …[m [33m [m
+[90m [m [90m  spread, fast → slow  [93m▁▄▄█▃█▃▅▄▄▃▃[90m  90 items[m  [90m [33m [m [91m?[m [37mRejected, waiting for the agent: Pin Go 1.2…[m [33m [m
+[90m [m                                                [90m [33m [m [90m+5 more · enter or 4 for the list[m              [33m [m
+[90m                                                  [33m                                                  [m
+ [93m↑↓[m [90mmove[m  [93menter[m [90mdetails[m                                                   [93mtab[m [90mviews[m  [93m?[m [90mhelp[m  [93mq[m [90mquit[m 

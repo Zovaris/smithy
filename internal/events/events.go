@@ -74,8 +74,21 @@ func flat(s string, n int) string {
 // home the proxy sidecar can write. Read merges it in.
 func ProxyFile() string { return filepath.Join(ghx.Home(), "proxy", "events.jsonl") }
 
+// Tap, when set, receives every event Append writes in this process (smithy daemon mirrors them
+// into its store).
+var Tap func(Event)
+
 // Append writes one event; errors are returned but callers may ignore them (the log is advisory).
-func Append(e Event) error { return appendTo(File(), e) }
+func Append(e Event) error {
+	if Tap != nil && !Off {
+		t := e
+		if t.T.IsZero() {
+			t.T = time.Now()
+		}
+		Tap(t)
+	}
+	return appendTo(File(), e)
+}
 
 // AppendProxy writes one event to ProxyFile.
 func AppendProxy(e Event) error { return appendTo(ProxyFile(), e) }
@@ -143,4 +156,19 @@ func Read(since time.Time, max int) ([]Event, error) {
 		out = out[len(out)-max:]
 	}
 	return out, nil
+}
+
+// DecisionID is the id smithy daemon gives the decision e asks or answers ("" when none):
+// secret:<id> for proxy asks, merge:<batch>/<item> for a ready item, decide:<batch>/<item>/<key>
+// for a needs_decision item (key is the card's decision_key). Telegram shows the same id.
+func DecisionID(e Event, key string) string {
+	switch {
+	case (e.Kind == "secret_ask" || e.Kind == "secret_approved" || e.Kind == "secret_denied") && e.ID != "":
+		return "secret:" + e.ID
+	case e.Kind == "stage" && e.Batch != "" && e.Item != "" && e.Detail == "ready":
+		return "merge:" + e.Batch + "/" + e.Item
+	case e.Kind == "stage" && e.Batch != "" && e.Item != "" && e.Detail == "needs_decision" && key != "":
+		return "decide:" + e.Batch + "/" + e.Item + "/" + key
+	}
+	return ""
 }

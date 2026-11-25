@@ -32,6 +32,14 @@ installed version doesn't match the skills, the agent asks whether to run `insta
 To use `smithy` in your own terminal, accept the PATH offer in use-smithy setup. On Windows, add
 `%USERPROFILE%\.smithy\bin` to your user PATH.
 
+## Harness build
+
+The release also ships `smithy-harness-<os>-<arch>`: the same commands plus `smithy daemon`,
+`smithy attach` and `smithy board` (ADR 0009). `install.sh` installs the skills build; until it
+asks which one you want (v0.19), download the harness asset from the
+[releases](https://github.com/Zovaris/smithy/releases) page or build it with
+`go build -tags harness ./cmd/smithy`.
+
 ## GitHub access
 
 | You have | smithy uses |

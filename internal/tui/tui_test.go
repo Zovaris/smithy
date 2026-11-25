@@ -194,7 +194,7 @@ func TestGolden(t *testing.T) {
 	for _, g := range []struct {
 		w, h int
 		v    view
-	}{{160, 48, vOverview}, {160, 48, vAgents}, {100, 30, vOverview}, {100, 30, vAgents}, {70, 24, vNeeds}, {160, 48, vDone}, {160, 48, vSystem}} {
+	}{{160, 48, vOverview}, {160, 48, vAgents}, {100, 30, vOverview}, {100, 30, vAgents}, {70, 24, vNeeds}, {160, 48, vDone}, {160, 48, vSystem}, {160, 48, vHistory}} {
 		m := demo(t, g.w, g.h)
 		m.view = g.v
 		s := demoSystem()
@@ -260,7 +260,7 @@ func TestKeys(t *testing.T) {
 	if m, _ = press(m, "shift+tab"); m.view != vOverview {
 		t.Fatalf("shift+tab -> %v", m.view)
 	}
-	if m, _ = press(m, "shift+tab"); m.view != vSystem {
+	if m, _ = press(m, "shift+tab"); m.view != vHistory {
 		t.Fatalf("shift+tab wraps -> %v", m.view)
 	}
 	if m, _ = press(m, "1"); m.view != vOverview {
@@ -562,38 +562,13 @@ func TestResize(t *testing.T) {
 	}
 }
 
-func TestAnvilShape(t *testing.T) {
-	for _, s := range []sprite{bigAnvil, smallAnvil} {
-		widths := make([]int, s.h())
-		for y, row := range s.mask {
-			widths[y] = strings.Count(row, "#")
-		}
-		face, waist := 0, s.w()
-		for y := s.faceY; y < s.faceY+3; y++ {
-			face = max(face, widths[y])
-		}
-		for _, w := range widths[s.faceY+3:] {
-			waist = min(waist, w)
-		}
-		base := widths[s.h()-2]
-		if !(face > base && base > 2*waist && waist > 0) {
-			t.Fatalf("not face > base > 2×waist: %v", widths)
-		}
-		horn := s.mask[s.faceY+1]
-		if horn[0] != '#' || s.mask[s.faceY][0] == '#' || s.mask[s.faceY+2][0] == '#' {
-			t.Fatal("the horn is not a point on the left")
-		}
-		heel := strings.LastIndex(s.mask[s.faceY], "#")
-		if strings.LastIndex(s.mask[s.faceY+1], "#") != heel || strings.LastIndex(s.mask[s.faceY+2], "#") != heel {
-			t.Fatal("the heel is not square on the right")
-		}
-		if feet := strings.TrimSpace(s.mask[s.h()-1]); !strings.Contains(feet, " ") {
-			t.Fatal("the base has no feet")
-		}
-	}
+func TestPlateSize(t *testing.T) {
 	m := demo(t, 160, 48)
-	if rows := m.anvil(bigAnvil); len(rows) != 7 || ansi.StringWidth(rows[3]) != 30 {
-		t.Fatalf("big anvil is %d rows", len(rows))
+	if rows := m.plateRows(bigPlate); len(rows) != 7 || ansi.StringWidth(rows[3]) != 30 {
+		t.Fatalf("big plate is %d rows", len(rows))
+	}
+	if rows := m.plateRows(smallPlate); len(rows) != 4 || ansi.StringWidth(rows[0]) != 16 {
+		t.Fatalf("small plate is %d rows", len(rows))
 	}
 }
 
@@ -606,14 +581,14 @@ func TestHeaderFrameDeterministic(t *testing.T) {
 		for i := 0; i < steps; i++ {
 			m.fx.step()
 		}
-		return strings.Join(m.anvil(bigAnvil), "\n") + strings.Join(m.wordmark(), "\n")
+		return strings.Join(m.plateRows(bigPlate), "\n") + strings.Join(m.wordmark(), "\n")
 	}
 	a := frameAt(42, 6)
 	if a != frameAt(42, 6) || a == frameAt(43, 6) {
 		t.Fatal("frames are not a function of the seed")
 	}
 	still := demo(t, 160, 48)
-	if a == strings.Join(still.anvil(bigAnvil), "\n")+strings.Join(still.wordmark(), "\n") {
+	if a == strings.Join(still.plateRows(bigPlate), "\n")+strings.Join(still.wordmark(), "\n") {
 		t.Fatal("a mid-spark frame equals the still one")
 	}
 	for _, w := range []int{160, 110, 109, 80, 79} {
@@ -631,6 +606,8 @@ func TestHeaderFrameDeterministic(t *testing.T) {
 func TestMotionStopsWhenIdle(t *testing.T) {
 	m := demo(t, 160, 48)
 	m.motion = true
+	m.load = func(time.Time) Snapshot { return Snapshot{At: fixedNow} }
+	m.snap.Batches = nil
 	nm, cmd := m.Update(strikeMsg{})
 	m = nm.(Model)
 	if cmd == nil || !m.framing || len(m.fx.sparks) == 0 {
@@ -794,7 +771,7 @@ func TestPillBadgeInside(t *testing.T) {
 	}
 	_, tabY, _, _ := m.frame()
 	bar := strings.Split(ansi.Strip(m.render()), "\n")[tabY]
-	if !strings.Contains(bar, fmt.Sprintf(" 4 Needs you %d   5 Done", n)) {
+	if !strings.Contains(bar, fmt.Sprintf(" 4 Needs you ? %d   5 Done", n)) {
 		t.Fatalf("tab bar = %q", bar)
 	}
 }

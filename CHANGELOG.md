@@ -5,6 +5,16 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- CI runs lint, tests (one job per build), integration and builds as parallel jobs behind a `check` gate; pull requests build one target per OS, main builds every release target.
+- `smithy tui` header draws the anvil again, shaded in Steel with Bayer dither and ember sparks.
+- Added: `smithy board` (harness build), a built-in tracker in the SQLite store: `add`, `list`, `show`, `set`, `claim` (with expiry) and `sync`. `auto.sources board` lets the watcher read it. With `board.linear_sync true` it syncs with Linear by field ownership: Linear owns title, body, priority and labels, the board owns state, claims and PRs; edits are polled with an `updatedAt` cursor.
+- Added: a harness build (`go build -tags harness ./cmd/smithy`, released as `smithy-harness-<os>-<arch>`) beside the stdlib-only skills build, with a SQLite store (`~/.smithy/smithy.db`, WAL, append-only events, migrations) on pure-Go `modernc.org/sqlite` (ADR 0009). In the skills build, `smithy daemon`, `attach` and `board` say how to get it.
+- `smithy tui` restyled to Steel (TK-28): steel background tiers instead of boxes (a border only on the focused block), dim/base/strong text tiers, one ember for what runs or has focus, `?` for what waits on you, a half-block gradient header with ember sparks, a Bayer shimmer on running items and a dithered progress edge. Motion runs at 15 fps only while something moves; the new `tui.reduce_motion` setting keeps every frame still.
+- Added: a History tab in `smithy tui` (key `0`): past days' finished work from the last 30 days of `~/.smithy/events.jsonl`, grouped by day with each day's count and known cost; each row shows the issue, PR, outcome, cost and finish time.
+- Added: `smithy daemon` (harness build): the auto serve loop plus a loopback-only API (`GET /v1/state`, `GET /v1/events` as resumable SSE, `POST /v1/decisions` where the first answer wins) with every event in the SQLite store. Requests need `~/.smithy/daemon.token` or a `Tailscale-User-Login` in the new `daemon.allow`; `daemon.port` picks the port. In the harness build `smithy auto serve` starts the daemon or attaches to it; `smithy doctor` checks it.
+- Added: `smithy daemon` tails `events.jsonl` and the proxy log into its store (rotation-safe, once per line across restarts) and turns proxy `secret_ask`s, ready items and `needs_decision` items into decisions (`secret:<id>`, `merge:<batch>/<item>`, `decide:<batch>/<item>/<key>`); an answer from any client goes back to the asker once (the proxy's approve/deny event, or `answer` on the card). Telegram alerts show the decision id.
+- Added: `smithy attach [url]` (harness build), a terminal client of the daemon: live events, pending decisions answered with keys 1-9 (first answer wins), reconnect with backoff and resume from the last seq without repeating events. `smithy auto serve` attached to a daemon now also reconnects.
+
 ## v0.17.0 — 2026-11-24
 
 - Container refuses `auto.sandbox_network host` and, on the default image, harnesses it does not carry (only Claude Code and OpenCode); pool hints and help list every harness; docs match the proxy allow-list and restart rule.

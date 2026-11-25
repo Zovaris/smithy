@@ -351,6 +351,7 @@ func Doctor(args []string) int {
 		}
 	}
 	sandboxDoctor(r, agents.HostProbe())
+	daemonDoctor(r)
 	for _, s := range []string{"smelt", "hush", "scout", "tend", "use-smithy"} {
 		if p, ok := findSkill(s); ok {
 			r.ok(s + " skill: " + p)

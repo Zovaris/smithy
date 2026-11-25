@@ -1,0 +1,48 @@
+                                                                                                                                                                
+     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄       ╔═╗╔╦╗╦╔╦╗╦ ╦╦ ╦                             watcher  ● watching github, linear (TES) · next poll 35s · serve pid 4242 claude 
+ ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀       ╚═╗║║║║ ║ ╠═╣╚╦╝                             today    ███████████▓▒  69 / 80 launched                                         
+          ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ╚═╝╩ ╩╩ ╩ ╩ ╩ ╩                              agents   5 working · 0 waiting · 2 stuck                                         
+              ▀▀▀▀▀▀▀              DEMO  autonomous forge · dev · smithy       PRs      3 ready for you · 1 CI running                                          
+         ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
+        ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
+  1 Overview   2 Agents   3 Incoming   4 Needs you ? 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System   0 History                                     
+╭─ History · 49 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   issue       title                                                                                                    PR       outcome   cost       at      │
+│ ▸ 2026-11-22  48 finished · $68.69                                                                                                                   Sun     │
+│   TES-1043    Typed config loader                                                                                      #1043    merged    $1.91      23:51   │
+│   #451        Cache board queries                                                                                      #1051    merged    $1.48      23:47   │
+│   TES-1044    Show CI time per PR                                                                                      #1044    merged    $0.49      23:41   │
+│   #445        Archive stale branches                                                                                   #1045    merged    $2.47      23:33   │
+│   TES-1053    Retry webhooks with backoff                                                                              #1053    merged    $2.23      23:31   │
+│   TES-1055    Upgrade to Go 1.27                                                                                       #1055    merged    $1.40      23:29   │
+│   TES-1047    Stream large downloads                                                                                   #1047    merged    $2.50      23:11   │
+│   TES-1050    Rate-limit the export API                                                                                #1050    merged    $1.94      22:23   │
+│   TES-1046    Make search fuzzy                                                                                        #1046    merged    $1.94      22:10   │
+│   #439        Upgrade to Go 1.27                                                                                       #1039    merged    $0.87      21:47   │
+│   #442        Speed up cold start                                                                                      #1042    merged    $2.56      21:25   │
+│   #448        Add dark mode to the report                                                                              #1048    closed    $0.26      20:34   │
+│   TES-1035    Cache board queries                                                                                      #1035    merged    $2.75      20:26   │
+│   TES-1038    Split the billing service                                                                                #1038    merged    $0.73      20:22   │
+│   #430        Make search fuzzy                                                                                        #1030    merged    $0.65      20:14   │
+│   TES-1041    Add SSO for admins                                                                                       #1041    merged    $0.33      20:08   │
+│   #433        Fix flaky login test                                                                                     #1033    merged    $0.24      19:48   │
+│   TES-1031    Stream large downloads                                                                                   #1031    merged    $0.63      19:47   │
+│   TES-1028    Show CI time per PR                                                                                      #1028    merged    $1.00      19:22   │
+│   TES-1037    Retry webhooks with backoff                                                                              #1037    merged    $2.23      19:11   │
+│   TES-1029    Archive stale branches                                                                                   #1029    merged    $1.38      19:04   │
+│   TES-1040    Drop the legacy CSV importer                                                                             #1040    closed    $0.71      19:02   │
+│   TES-1034    Rate-limit the export API                                                                                #1034    merged    $0.28      18:56   │
+│   #436        Paginate the audit log                                                                                   #1036    merged    $2.57      18:23   │
+│   TES-1032    Add dark mode to the report                                                                              #1032    closed    $2.36      18:19   │
+│   TES-1020    Paginate the audit log                                                                                   #1020    merged    $2.21      17:37   │
+│   TES-1022    Split the billing service                                                                                #1022    merged    $2.49      17:23   │
+│   TES-1026    Speed up cold start                                                                                      #1026    closed    $2.11      16:21   │
+│   #427        Typed config loader                                                                                      #1027    blocked   $1.52      15:49   │
+│   TES-1019    Cache board queries                                                                                      #1019    merged    $1.05      15:38   │
+│   #415        Stream large downloads                                                                                   #1015    merged    $0.60      15:35   │
+│   TES-1017    Fix flaky login test                                                                                     #1017    merged    $2.65      15:29   │
+│   #424        Drop the legacy CSV importer                                                                             #1024    merged    $0.40      15:22   │
+│   TES-1025    Add SSO for admins                                                                                       #1025    blocked   $1.70      15:16   │
+│   #421        Retry webhooks with backoff                                                                              #1021    merged    $1.90      15:10   │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ↑↓ move  enter details  o open  c copy  / filter                                                                                     tab views  ? help  q quit 
