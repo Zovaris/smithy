@@ -1,0 +1,32 @@
+  ? Merge #142 into release/v0.17?   m merge  l later                                               
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  › Add usage-limit detection for Pi (TK-6).                                                        
+
+    Pi prints its limit errors from packages/ai/src/errors.ts.                                      
+
+  ✓ Read · Grep · Edit · Bash
+
+    Done: a Pi limit now marks the account limited until its reset.                                 
+
+    running TK-29                                                                                   
+
+    failed TES-9                                                                                    
+
+  › Ask, or / for commands                                                                          
+  enter send   v mode: minimal   tab agents   ctrl+k palette  ● connecting · http://127.0.0.1:7477  
