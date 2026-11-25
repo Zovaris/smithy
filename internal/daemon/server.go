@@ -3,6 +3,7 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/store"
@@ -63,10 +65,14 @@ type Server struct {
 	ServeState func() any
 	// Route, when set, sends a won answer back to its asker (RouteBack); an error leaves it for Resume.
 	Route func(Decision, Outcome) error
+	// Plan, when set, replaces AgentPlan for chat intake (tests).
+	Plan func(ctx context.Context, idea string) ([]PlanTask, error)
 
 	mu        sync.Mutex
 	decisions map[string]*Decision
 	routed    map[string]bool
+	intakes   map[string]*intakePlan
+	planning  atomic.Bool
 	lastSeq   int64
 	wake      chan struct{}
 }
@@ -77,7 +83,7 @@ func New(st *store.Store, token string, allow []string, log func(string)) (*Serv
 		return nil, errors.New("daemon: empty token")
 	}
 	sv := &Server{st: st, token: token, allow: allow, log: log, started: time.Now(),
-		decisions: map[string]*Decision{}, routed: map[string]bool{}, wake: make(chan struct{})}
+		decisions: map[string]*Decision{}, routed: map[string]bool{}, intakes: map[string]*intakePlan{}, wake: make(chan struct{})}
 	evs, err := st.Since(0)
 	if err != nil {
 		return nil, err
@@ -107,6 +113,8 @@ func (sv *Server) apply(e store.Event) {
 				d.Outcome = &o
 			}
 		}
+	case KindIntake:
+		sv.applyIntake(e.Data)
 	case KindRouted:
 		var r struct{ ID string }
 		if json.Unmarshal(e.Data, &r) == nil {

@@ -150,7 +150,7 @@ func foreground(name string, port int, serveArgs []string, view auto.View) int {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", name, err)
 		return 1
 	}
-	api.Route = RouteBack
+	api.Route = api.RouteIntake(RouteBack)
 	api.Resume()
 	tctx, stopTails := context.WithCancel(context.Background())
 	defer stopTails()
@@ -160,7 +160,7 @@ func foreground(name string, port int, serveArgs []string, view auto.View) int {
 		fmt.Fprintf(os.Stderr, "%s: chat connectors: %s\n", name, text.Clean(cerr.Error()))
 	}
 	if len(conns) > 0 {
-		hub := &connect.Hub{Conns: conns, File: connect.File(), Kinds: connect.Kinds, Input: api.Input,
+		hub := &connect.Hub{Conns: conns, File: connect.File(), Kinds: connect.Kinds, Input: api.Input, Intake: api.Intake,
 			Answer: func(id, answer, by string) error { _, err := api.Answer(id, answer, by); return err },
 			Log:    func(l string) { api.Append("log", "", map[string]string{"line": l}) }}
 		go api.RunNotes(tctx, hub, 30*time.Second)

@@ -111,7 +111,7 @@ func TestTelegramReceiveFiltersChatAndUsers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ins) != 2 || ins[0] != (Inbound{Thread: "77", Text: "go on", By: "5"}) || ins[1] != (Inbound{Button: "abc:1", Ref: "9", By: "5"}) {
+	if len(ins) != 3 || ins[0] != (Inbound{Thread: "77", Text: "go on", By: "5"}) || ins[1] != (Inbound{Button: "abc:1", Ref: "9", By: "5"}) || ins[2] != (Inbound{Text: "main chat", By: "5"}) {
 		t.Fatalf("got %+v", ins)
 	}
 	if c.offset != 7 {
