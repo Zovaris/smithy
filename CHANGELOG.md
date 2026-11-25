@@ -15,6 +15,10 @@ part above `### Details`.
 ### Details
 
 - `POST /v1/sessions`, `POST /v1/sessions/{id}/messages`, `POST /v1/sessions/{id}/stop` and `GET /v1/sessions`; session events (messages, live text, tool calls with args and output, diffs, usage, status) stream on `/v1/events` with the session id. `api:` sessions run in the daemon and turn a refused tool call into a `perm:<id>/<n>` decision; other agents run `smithy agent` per turn. Chat-thread replies reach the session; sessions left running by a stopped daemon show as failed.
+- API-backend costs now come from OpenRouter's public price list, refreshed daily and kept for offline use, so new models are priced without a smithy release.
+
+### Details
+- `apiloop.Cost` reads `https://openrouter.ai/api/v1/models` (cached at `~/.smithy/cache/model-prices.json`, refetched after 24h, last good cache kept when offline or the answer is bad) instead of the hand-kept table; an unlisted model still has no cost, never a guess.
 
 ## v0.22.0 — 2026-11-25
 
