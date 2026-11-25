@@ -532,6 +532,9 @@ func sandboxDoctor(r *report, p agents.Probe) {
 	default:
 		r.ok("sandbox: native (claude, hosts " + strings.Join(agents.SandboxDomains(userSetting("auto.sandbox_domains", "")), ",") + ")")
 	}
+	if cli != "" && mode != "container" && !agents.SecretGuarded(cli) {
+		r.ok("guard: " + agents.Kind(cli) + " " + agents.UnguardedNote)
+	}
 }
 
 // userSetting is an auto.sandbox* key from the user settings only (agents.SandboxSetting).
