@@ -85,6 +85,7 @@ type Server struct {
 	wake      chan struct{}
 	sessions  map[string]*live
 	lastAgent string
+	starting  int
 }
 
 // New loads the decisions recorded in st. log may be nil.

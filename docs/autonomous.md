@@ -49,7 +49,7 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   the decision `perm:<id>/<n>` (allow/deny) and the session shows `needs_you` until someone
   answers; the secret rules are never asked. Other agents run `smithy agent` once per turn with
   the conversation so far in the prompt. A reply in a session's chat thread is its next message.
-  At most 16 live sessions and 8 queued messages each (429 past that).
+  At most 16 sessions working at once and 8 queued messages each (429 past that); a permission question shows the whole call, and tool output and text are redacted before they are stored.
 - It tails `~/.smithy/events.jsonl` and the proxy's log into its store (once per line, across
   rotation and restarts) and turns them into decisions: a proxy `secret_ask` is `secret:<id>`
   (approve/deny, handed back as `smithy proxy approve|deny` would), a ready item is

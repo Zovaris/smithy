@@ -49,7 +49,7 @@ func NoteOf(e store.Event) (connect.Note, bool) {
 		}
 		n := connect.Note{Key: "asked|" + d.ID, Kind: "decision", Session: session(d.ID), Title: "Decision needed",
 			Text: line1(d.Question, 500), Decision: d.ID, Options: d.Options}
-		if strings.HasPrefix(d.ID, "intake:") {
+		if strings.HasPrefix(d.ID, "intake:") || strings.HasPrefix(d.ID, "perm:") {
 			n.Text = lines(d.Question, 3500)
 		}
 		if strings.HasPrefix(d.ID, "merge:") {

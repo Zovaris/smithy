@@ -76,7 +76,10 @@ func (t *askTools) Permit(c apiloop.ToolCall) (bool, string) {
 	if hok, hwhy := t.hard.Permit(c); !hok {
 		return false, hwhy
 	}
-	q := "Let the agent run " + c.Name + " " + line1(string(c.Args), 300) + "? (" + line1(why, 200) + ")"
+	if len(c.Args) > MaxAskArgs {
+		return false, why + "; too long to show a person in full, so not asked"
+	}
+	q := "Let the agent run " + c.Name + " " + string(c.Args) + "? (" + line1(why, 200) + ")"
 	a, err := t.e.Ask(t.ctx, q, []string{"allow", "deny"})
 	if err != nil {
 		return false, "no answer: " + err.Error()
@@ -110,6 +113,9 @@ type cliRunner struct {
 func (r *cliRunner) Close() {}
 
 const stopGrace = 5 * time.Second
+
+// MaxAskArgs is the longest tool call shown in full in a permission question; a longer one is refused.
+const MaxAskArgs = 2 << 10
 
 // MaxTranscript caps the earlier conversation put in a CLI turn's prompt (the newest is kept).
 const MaxTranscript = 48 << 10

@@ -18,8 +18,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/text"
 	"github.com/Zovaris/smithy/internal/usage"
@@ -47,6 +49,7 @@ const (
 	MaxMessage      = 64 << 10
 	MaxQueued       = 8
 	MaxToolField    = 16 << 10
+	MaxQuestion     = 4 << 10
 	MaxDiff         = 64 << 10
 	permitWait      = 24 * time.Hour
 	sessionIDPrefix = "s-"
@@ -107,7 +110,6 @@ type live struct {
 }
 
 var (
-	cliAgent   = regexp.MustCompile(`^(acp:)?[a-z][a-z0-9-]{0,31}$`)
 	modelChars = regexp.MustCompile(`^[A-Za-z0-9._:/@+-]{1,128}$`)
 )
 
@@ -123,7 +125,7 @@ func ValidAgent(agent string) error {
 		}
 		_, _, err := apiloop.ParseTarget(agent)
 		return err
-	case cliAgent.MatchString(agent):
+	case slices.Contains(agents.CLIs, strings.TrimPrefix(agent, "acp:")):
 		return nil
 	}
 	return errors.New("agent: want a CLI name (claude, codex, …), acp:<cli> or api:<provider>/<model>")
@@ -250,11 +252,15 @@ func (sv *Server) StartSession(agent, dir, msg, by string) (Session, error) {
 	if n := sv.liveCountLocked(); n >= MaxSessions {
 		sv.mu.Unlock()
 		os.RemoveAll(sdir)
-		return Session{}, fmt.Errorf("%w: %d sessions are already running; stop one first", errBusy, n)
+		return Session{}, fmt.Errorf("%w: %d sessions are already working; stop one first", errBusy, n)
 	}
+	sv.starting++
 	sv.mu.Unlock()
 	r, err := rf(agent, d, sdir)
 	if err != nil {
+		sv.mu.Lock()
+		sv.starting--
+		sv.mu.Unlock()
 		os.RemoveAll(sdir)
 		return Session{}, fmt.Errorf("%w: %v", errBadRequest, text.Clean(err.Error()))
 	}
@@ -263,6 +269,7 @@ func (sv *Server) StartSession(agent, dir, msg, by string) (Session, error) {
 	ctx, cancel := context.WithCancel(sv.ctx())
 	l := &live{s: s, runner: r, inbox: make(chan string, MaxQueued), cancel: cancel}
 	sv.mu.Lock()
+	sv.starting--
 	if _, err := sv.appendLocked(KindSessionStarted, id, s); err != nil {
 		sv.mu.Unlock()
 		cancel()
@@ -271,21 +278,23 @@ func (sv *Server) StartSession(agent, dir, msg, by string) (Session, error) {
 	}
 	sv.sessions[id] = l
 	sv.lastAgent = agent
+	var qerr error
+	if strings.TrimSpace(msg) != "" {
+		qerr = sv.queueLocked(l, msg, by)
+		s = l.s
+	}
 	sv.mu.Unlock()
 	go sv.loop(ctx, l, l.inbox, r)
-	if strings.TrimSpace(msg) != "" {
-		if err := sv.SendSession(id, msg, by); err != nil {
-			return s, err
-		}
-		s.Status = StatusWorking
+	if qerr != nil {
+		return s, qerr
 	}
 	return s, nil
 }
 
 func (sv *Server) liveCountLocked() int {
-	n := 0
+	n := sv.starting
 	for _, l := range sv.sessions {
-		if l.runner != nil && !l.stopped {
+		if l.runner != nil && !l.stopped && (l.s.Status == StatusWorking || l.s.Status == StatusNeedsYou) {
 			n++
 		}
 	}
@@ -304,11 +313,13 @@ func (sv *Server) SendSession(id, msg, by string) error {
 		sv.mu.Unlock()
 		return errNoSession
 	}
-	if l.runner == nil || l.stopped {
+	if l.s.Status != StatusWorking && l.s.Status != StatusNeedsYou {
 		if n := sv.liveCountLocked(); n >= MaxSessions {
 			sv.mu.Unlock()
-			return fmt.Errorf("%w: %d sessions are already running; stop one first", errBusy, n)
+			return fmt.Errorf("%w: %d sessions are already working; stop one first", errBusy, n)
 		}
+	}
+	if l.runner == nil || l.stopped {
 		rf := sv.Runners
 		if rf == nil {
 			rf = DefaultRunner
@@ -328,18 +339,22 @@ func (sv *Server) SendSession(id, msg, by string) error {
 			r.Close()
 		}
 	}
+	err := sv.queueLocked(l, msg, by)
+	sv.mu.Unlock()
+	return err
+}
+
+func (sv *Server) queueLocked(l *live, msg, by string) error {
 	select {
 	case l.inbox <- msg:
 	default:
-		sv.mu.Unlock()
 		return fmt.Errorf("%w: %d messages already wait for this session", errBusy, MaxQueued)
 	}
-	_, err := sv.appendLocked(KindSessionMessage, id, map[string]string{"role": "user", "text": msg, "by": by})
+	_, err := sv.appendLocked(KindSessionMessage, l.s.ID, map[string]string{"role": "user", "text": msg, "by": by})
 	if err == nil {
 		l.history = append(l.history, Exchange{"user", msg})
 	}
-	sv.setStatusLocked(id, StatusWorking, "")
-	sv.mu.Unlock()
+	sv.setStatusLocked(l.s.ID, StatusWorking, "")
 	return err
 }
 
@@ -433,11 +448,13 @@ type emitter struct {
 
 func (e *emitter) Text(t string) {
 	if t != "" {
-		e.sv.Append(KindSessionText, e.id, map[string]string{"text": t})
+		e.sv.Append(KindSessionText, e.id, map[string]string{"text": proof.Redact(t)})
 	}
 }
 
 func (e *emitter) Tool(t ToolEvent) {
+	t.Args = json.RawMessage(proof.Redact(string(t.Args)))
+	t.Output = proof.Redact(t.Output)
 	if len(t.Args) > MaxToolField || !json.Valid(t.Args) {
 		t.Args, _ = json.Marshal(clipBytes(string(t.Args), MaxToolField))
 	}
@@ -473,7 +490,7 @@ func (e *emitter) Ask(ctx context.Context, question string, options []string) (s
 	}
 	l.asks++
 	id := "perm:" + e.id + "/" + strconv.Itoa(l.asks)
-	d := Decision{ID: id, Question: line1(question, 500), Options: options, Asked: time.Now().UTC()}
+	d := Decision{ID: id, Question: line1(question, MaxQuestion), Options: options, Asked: time.Now().UTC()}
 	if _, err := sv.appendLocked(KindAsked, e.id, d); err != nil {
 		sv.mu.Unlock()
 		return "", err
