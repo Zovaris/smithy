@@ -124,5 +124,5 @@ elif { [ -n "${SMITHY_TTY:-}" ] || [ -t 2 ]; } && { : < "$tty"; } 2>/dev/null; t
   ans=; read -r ans < "$tty" || true
   case $ans in y|Y|yes) "$home/bin/$exe" skills install >&2 || die "smithy skills install failed" ;; esac
 else
-  say "skills build installed; install the skill files with: $home/bin/$exe skills install (or npx skills add Zovaris/smithy -g)"
+  say "install the skill files with: $home/bin/$exe skills install (or npx skills add Zovaris/smithy -g)"
 fi
