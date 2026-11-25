@@ -17,7 +17,8 @@ Daily
                 report back, serve the loop
   board         built-in tracker: add, list, show, set, claim, sync (harness
                 build)
-  chat          fullscreen chat over a daemon (also bare smithy) (harness build)
+  chat          fullscreen chat over a daemon (also bare smithy, which starts
+                the daemon) (harness build)
   daemon        run the auto loop with a local API (events, decisions) (harness
                 build)
   receipt       run a command and record it as evidence for a claim
@@ -26,6 +27,7 @@ Daily
   scan          check a change's added lines and files for secrets
   search        search ADRs, glossary and docs, best sources first (--code: the
                 whole repo)
+  stop          stop the local background daemon (harness build)
   tasks         the shared task list (smithy tasks board --all)
   tui           live dashboard of the forge: agents, incoming issues, what needs
                 you, activity

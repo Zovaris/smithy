@@ -23,7 +23,8 @@ type helpDoc struct {
 var harnessSummary = map[string]string{
 	"daemon": "run the auto loop with a local API (events, decisions)",
 	"attach": "watch a daemon live: events, decisions, reconnect and resume",
-	"chat":   "fullscreen chat over a daemon (also bare smithy)",
+	"chat":   "fullscreen chat over a daemon (also bare smithy, which starts the daemon)",
+	"stop":   "stop the local background daemon",
 	"web":    "print or open the daemon's web UI link",
 	"board":  "built-in tracker: add, list, show, set, claim, sync",
 	"mcp":    "MCP server (stdio) for driven CLIs: board, ask, secret calls, search",
@@ -35,8 +36,9 @@ var helpDocs = map[string]helpDoc{
 	"version": {groupStart, []string{"smithy version", "smithy version --verbose"}, []string{"doctor"}},
 	"status":  {groupStart, []string{"smithy status"}, []string{"tasks", "cards"}},
 
-	"chat":    {groupDaily, []string{"smithy chat", "smithy chat http://127.0.0.1:7477"}, []string{"daemon", "attach"}},
-	"daemon":  {groupDaily, []string{"smithy daemon", "smithy daemon --bg", "smithy daemon --once"}, []string{"chat", "web", "auto"}},
+	"chat":    {groupDaily, []string{"smithy chat", "smithy chat --standalone", "smithy chat http://127.0.0.1:7477"}, []string{"stop", "daemon", "attach"}},
+	"stop":    {groupDaily, []string{"smithy stop"}, []string{"chat", "daemon"}},
+	"daemon":  {groupDaily, []string{"smithy daemon", "smithy daemon --bg", "smithy daemon --once"}, []string{"chat", "stop", "web", "auto"}},
 	"attach":  {groupDaily, []string{"smithy attach"}, []string{"daemon", "chat"}},
 	"web":     {groupDaily, []string{"smithy web", "smithy web open"}, []string{"daemon"}},
 	"board":   {groupDaily, []string{`smithy board add "Fix login" --priority 1`, "smithy board list --state todo", "smithy board show B-1"}, []string{"auto", "tasks"}},
