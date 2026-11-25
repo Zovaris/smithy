@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/cards"
+	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/pool"
 )
@@ -55,13 +56,22 @@ func peekHarness(h string) string {
 // acquire picks the run's account. rc != 0 means stop with that code (every account limited).
 func acquire(h string, o *Options) (pool.Account, int) {
 	now := poolNow()
-	a, err := pool.Acquire(h, now, o.poolSkip...)
+	var order []string
+	if h == "pool" {
+		order = poolOrder()
+	}
+	a, err := pool.AcquireIn(h, order, now, o.poolSkip...)
 	var lim *pool.Limited
 	switch {
 	case err == nil:
 		o.PoolEnv = []string{a.Env()}
 		o.Account = a.Name
 		fmt.Fprintf(os.Stderr, "smithy agent: pool account %s (%s)\n", a.Name, a.Harness)
+		if p := pool.Preferred(order); p != "" && p != a.Harness {
+			msg := fmt.Sprintf("every %s account is limited; falling back to %s", p, a.Harness)
+			fmt.Fprintln(os.Stderr, "smithy agent: pool:", msg)
+			_ = events.Append(events.Event{Kind: "pool_fallback", Account: a.Name, Detail: msg})
+		}
 		recordCard(o.Log, o.Cwd, a.Name)
 		return a, 0
 	case errors.As(err, &lim):
@@ -75,6 +85,17 @@ func acquire(h string, o *Options) (pool.Account, int) {
 	fmt.Fprintln(os.Stderr, "smithy agent:", msg)
 	_ = events.Append(events.Event{Kind: "limited", Detail: msg})
 	return pool.Account{}, ExitLimited
+}
+
+// poolOrder is pool.order as a list of harnesses, the order a pool run tries them in.
+func poolOrder() []string {
+	var l []string
+	for _, h := range strings.Split(config.Get("pool.order", ""), ",") {
+		if h = strings.TrimSpace(h); h != "" {
+			l = append(l, h)
+		}
+	}
+	return l
 }
 
 func earliestOr(h string, now time.Time) time.Time {
