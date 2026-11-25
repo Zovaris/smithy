@@ -10,10 +10,14 @@ part above `### Details`.
 
 ### New
 
+- smithy now installs where other CLIs do: the command is `~/.local/bin/smithy`, the versions live in `~/.local/share/smithy`. An old `~/.smithy/bin` install moves over by itself and keeps working for one release. If `~/.local/bin` is not on your PATH, install.sh prints the exact line for your shell.
+- `smithy uninstall` (or `uninstall.sh`) removes smithy: it lists everything first, with sizes, and asks. Your keys and plans in `~/.smithy` stay unless you pass `--purge`.
 - `pool.order` (e.g. `claude,codex`): when every account of one harness is limited, a pool run continues on the next pooled harness, logs the switch as a `pool_fallback` event and goes back once the limit resets.
 
 ### Details
 
+- Install layout (`internal/layout`): versions in `$XDG_DATA_HOME/smithy/versions/<v>` (default `~/.local/share`), dev builds in `.../smithy/dev`, the command at `$XDG_BIN_HOME/smithy` (default `~/.local/bin`); Windows `%LOCALAPPDATA%\smithy\versions` and `%LOCALAPPDATA%\Programs\smithy`. `install.sh` migrates `~/.smithy/bin/<v>` (leaving links there), offers the PATH line on a terminal (default no) and records the file in `~/.smithy/path-added`. The launchers (`shared/smithy`, `smithy.cmd`) look in the new layout first, then the old one; `smithy setup path add`, `smithy cleanup builds` and `smithy doctor` follow.
+- `smithy uninstall [--yes] [--purge [--confirm-purge]]` and `uninstall.sh`: remove only what smithy installed. `smithy skills install` now records the skill folders it writes in `~/.smithy/installed-skills`, so uninstall never touches other skills.
 - Injection kit (`agents.Inject`): per run, smithy can give a driven CLI MCP servers, skills, an appended system prompt and settings without touching the user's global config. Claude gets `--mcp-config`/`--strict-mcp-config`, `--plugin-dir`, `--append-system-prompt` and `--settings` (merged with smithy's own note and sandbox settings); codex a `CODEX_HOME` under the run dir with a `smithy` profile (auth linked from the user's home); opencode `OPENCODE_CONFIG_DIR`; gemini a settings file through `GEMINI_CLI_SYSTEM_SETTINGS_PATH`; pi `--skill` and `--append-system-prompt`. Pieces a CLI can't take are returned as unsupported.
 - `smithy search --code [--regex] "<query>"` searches the whole repo (ignored, hidden and binary files skipped) through the new `internal/search`: the ripgrep shipped next to the binary, rg on PATH, `git ls-files` in a repo or a stdlib walk, with caps on matches, line length (220) and bytes (64 KB); `SMITHY_RG=<path>|off` overrides. Docs search is unchanged.
 - Releases ship ripgrep 14.1.1 per platform as `smithy-rg-<os>-<arch>` plus `ripgrep-LICENSE.txt` (MIT or Unlicense): `scripts/fetch-ripgrep.sh` downloads each archive against pinned sha256 sums, and the build attestation covers them. `install.sh` installs it next to smithy after the same checksum and attestation checks, best effort.
