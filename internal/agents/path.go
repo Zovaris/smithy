@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
-const pathMarker = "# smithy: run `smithy` from any terminal"
+const pathMarker = layout.PathMarker
 
-func binDir() string { return filepath.Join(ghx.Home(), "bin") }
+func binDir() string { return layout.BinDir() }
 
 // RCFile is the shell startup file `setup path add` writes to, from $SHELL.
 func RCFile() string {
@@ -87,6 +87,10 @@ func pathCmd(args []string) int {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
+	RecordPathFile(rc)
 	fmt.Printf("added %s to %s; open a new terminal, then run `smithy status`\n", binDir(), rc)
 	return 0
 }
+
+// RecordPathFile notes rc in layout.PathRecord, so uninstall removes the PATH line it got.
+func RecordPathFile(rc string) { recordLine(layout.PathRecord(), rc) }

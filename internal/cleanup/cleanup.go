@@ -16,9 +16,10 @@ import (
 
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
-const Usage = "usage: smithy cleanup builds [--yes]\n  lists old smithy builds in $SMITHY_HOME/bin (keeps the current one and one previous; dev builds\n  after 14 days), stale smithy-* container images (not auto.sandbox_image) and stale worktrees of\n  the repo it runs in (clean including ignored files, not locked, with no commits beyond the base branch, not the folder it runs in), with the\n  space each takes; --yes deletes them. Worktrees with uncommitted changes are never touched."
+const Usage = "usage: smithy cleanup builds [--yes]\n  lists old smithy builds in ~/.local/share/smithy and the old ~/.smithy/bin (keeps the current one and one previous; dev builds\n  after 14 days), stale smithy-* container images (not auto.sandbox_image) and stale worktrees of\n  the repo it runs in (clean including ignored files, not locked, with no commits beyond the base branch, not the folder it runs in), with the\n  space each takes; --yes deletes them. Worktrees with uncommitted changes are never touched."
 
 // Item is one thing cleanup can remove: a build folder, an image id or a worktree path.
 type Item struct {
@@ -75,16 +76,21 @@ func duSize(p string) int64 {
 // devMaxAge is how long a per-checkout dev build (bin/dev/<key>) stays before cleanup lists it.
 const devMaxAge = 14 * 24 * time.Hour
 
-// Builds lists the version folders in bin (install.sh's bin/<version>/smithy) other than the one
-// bin/smithy points at and the newest other release, plus dev builds (bin/dev/<key>) untouched for
-// devMaxAge. Other folders and the folder of the running binary are never listed.
+// Builds lists old builds in a pre-0.21 ~/.smithy/bin: BuildsIn(bin, bin/dev, bin/smithy).
 func Builds(bin string) []Item {
+	return BuildsIn(bin, filepath.Join(bin, "dev"), filepath.Join(bin, "smithy"))
+}
+
+// BuildsIn lists the version folders in bin (install.sh's <versions>/<version>/smithy) other than
+// the one link points at and the newest other release, plus dev builds (<dev>/<key>) untouched for
+// devMaxAge. Other folders, links and the folder of the running binary are never listed.
+func BuildsIn(bin, dev, link string) []Item {
 	ents, err := os.ReadDir(bin)
 	if err != nil {
-		return nil
+		ents = nil
 	}
 	current := ""
-	if t, err := filepath.EvalSymlinks(filepath.Join(bin, "smithy")); err == nil {
+	if t, err := filepath.EvalSymlinks(link); err == nil {
 		if rb, err := filepath.EvalSymlinks(bin); err == nil {
 			if rel, err := filepath.Rel(rb, t); err == nil && !strings.HasPrefix(rel, "..") {
 				current = strings.Split(filepath.ToSlash(rel), "/")[0]
@@ -112,10 +118,10 @@ func Builds(bin string) []Item {
 			dirs = append(dirs, filepath.Join(bin, n))
 		}
 	}
-	if devs, err := os.ReadDir(filepath.Join(bin, "dev")); err == nil {
+	if devs, err := os.ReadDir(dev); err == nil {
 		for _, d := range devs {
-			if p := filepath.Join(bin, "dev", d.Name()); d.IsDir() && time.Since(newest(p)) > devMaxAge {
-				dirs = append(dirs, filepath.Join(bin, "dev", d.Name()))
+			if p := filepath.Join(dev, d.Name()); d.IsDir() && time.Since(newest(p)) > devMaxAge {
+				dirs = append(dirs, p)
 			}
 		}
 	}
@@ -230,7 +236,7 @@ func Main(args []string) int {
 		}
 		yes = true
 	}
-	items := Builds(filepath.Join(ghx.Home(), "bin"))
+	items := append(BuildsIn(layout.VersionsDir(), layout.DevDir(), layout.Link()), Builds(layout.LegacyBin())...)
 	if keep, err := agents.SandboxSetting("auto.sandbox_image", agents.DefaultSandboxImage); err != nil {
 		fmt.Fprintln(os.Stderr, "smithy cleanup: skipped images:", err)
 	} else if ls, err := engine("image", "ls", "--format", "{{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}"); err == nil {
