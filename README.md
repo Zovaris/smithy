@@ -148,6 +148,7 @@ examples for one (`smithy help --all` adds the commands the skills call).
 - [Settings](docs/settings.md)
 - [Autonomous mode](docs/autonomous.md)
 - [Harnesses](docs/harnesses.md)
+- [API backend and benchmark](docs/api-backend.md)
 - [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
 GitHub is the only forge today; GitLab and Bitbucket come later.

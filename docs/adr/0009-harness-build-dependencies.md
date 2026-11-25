@@ -49,3 +49,8 @@ One command, two builds from the same source, commands and config:
 - Its license (MIT or Unlicense) ships with the release as `ripgrep-LICENSE.txt`.
 - Without it, `internal/search` falls back to rg on PATH, then `git ls-files`, then a stdlib walker,
   so smithy links no ripgrep code and keeps working when the binary is missing.
+
+## Amendment (2026-11-25): API backend and code mode
+
+The harness build also depends on the provider SDKs for the API backend (ADR 0012) and on
+`fastschema/qjs` with `wazero` for code mode (ADR 0013). Both stay behind `-tags harness`.

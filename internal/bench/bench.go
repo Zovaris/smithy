@@ -1,5 +1,5 @@
 // Package bench is smithy's own benchmark: small fixture repos whose tests are the oracle, run
-// by an agent in a fresh git worktree each, with pass rate, time, tokens and cost recorded.
+// by an agent in a fresh git repo in a temp dir each, with pass rate, time, tokens and cost recorded.
 package bench
 
 import (
@@ -129,7 +129,7 @@ func Oracle(id, dir string) (bool, string) {
 	return err == nil, string(out)
 }
 
-// AgentFunc runs the agent on one task: dir is its worktree, prompt the prompt file, log the
+// AgentFunc runs the agent on one task: dir is its task repo, prompt the prompt file, log the
 // run's log (its usage goes to the log's usage sidecar).
 type AgentFunc func(t Task, dir, prompt, log string) error
 
@@ -140,7 +140,7 @@ type Options struct {
 	Skills  string   // the skills version under test; recorded
 	Tasks   []string // task ids; empty means all
 	Out     string   // where the result JSON goes
-	Keep    bool     // keep the worktrees and logs
+	Keep    bool     // keep the task repos and logs
 	Timeout string   // per-task agent timeout in minutes; empty is the agent default
 }
 
@@ -200,7 +200,7 @@ func slug(s string) string {
 	}, s)
 }
 
-// Run runs every chosen task with agent, each in its own fresh worktree, and saves the result.
+// Run runs every chosen task with agent, each in a fresh git repo in a temp dir, and saves the result.
 func Run(o Options, agent AgentFunc) (Result, error) {
 	ts, err := pick(o.Tasks)
 	if err != nil {

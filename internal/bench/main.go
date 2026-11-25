@@ -21,9 +21,9 @@ const Usage = `usage: smithy bench list
        smithy bench compare [--json] <a> <b>
 
 Runs smithy's own task set: small fixture repos (bugs, features, refactors,
-docs) whose tests are the oracle. Each task gets a fresh git worktree and one
-headless agent run (smithy agent, profile auto); the tests are restored,
-then run. Records pass rate, time, tokens and cost in ~/.smithy/bench/.
+docs) whose tests are the oracle. Each task gets a fresh git repo in a temp
+dir and one headless agent run (smithy agent, profile auto); the tests are
+restored, then run. Records pass rate, time, tokens and cost in ~/.smithy/bench/.
 
 --agent is a CLI smithy drives (claude, codex, …). api:<provider>/<model>
 needs the api backend. --skills is a label for the skills version installed.
