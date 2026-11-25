@@ -30,7 +30,8 @@ every item is ready, merged or blocked, or when `auto.session_hours` passes; wor
    plan-line question; change a value only with `smithy batch set`.
 4. As cards move, `smithy auto report <Ref> <state> [--pr <url>]` (`Ref:` header, or
    `<source>:<Key>` such as `linear:TES-1`): `started` at launch, `completed --pr <url>` when
-   merged or ready, `blocked` with the reason.
+   merged or ready, `blocked` with the reason. With `auto.retry_stronger` on, an issue's first
+   `blocked` prints `auto retry <Ref> on <tier>` instead: it is queued again on the next tier.
 5. Back to step 1.
 
 ## Rules
