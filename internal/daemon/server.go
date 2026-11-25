@@ -299,6 +299,8 @@ func (sv *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/decisions", sv.decide)
 	mux.HandleFunc("GET /v1/decisions/{id...}", sv.decision)
 	mux.HandleFunc("POST /v1/asks", sv.ask)
+	mux.HandleFunc("GET /v1/guard", sv.guardView)
+	mux.HandleFunc("POST /v1/guard/suggested", sv.guardAddSuggested)
 	mux.HandleFunc("GET /v1/sessions", sv.listSessions)
 	mux.HandleFunc("POST /v1/sessions", sv.startSession)
 	mux.HandleFunc("GET /v1/sessions/{id}", sv.getSession)
@@ -400,8 +402,9 @@ func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	parts := strings.Split(strings.TrimPrefix(req.ID, "decide:"), "/")
-	if !strings.HasPrefix(req.ID, "decide:") || len(parts) != 3 || !cardID(parts[0]) || !cardID(parts[1]) || !cardID(parts[2]) {
-		writeJSON(w, 400, map[string]string{"error": "id must be decide:<batch>/<item>/<key>"})
+	guardID := strings.HasPrefix(req.ID, "guard:") && cardID(strings.TrimPrefix(req.ID, "guard:"))
+	if !guardID && (!strings.HasPrefix(req.ID, "decide:") || len(parts) != 3 || !cardID(parts[0]) || !cardID(parts[1]) || !cardID(parts[2])) {
+		writeJSON(w, 400, map[string]string{"error": "id must be decide:<batch>/<item>/<key> or guard:<key>"})
 		return
 	}
 	opts := make([]string, 0, len(req.Options))

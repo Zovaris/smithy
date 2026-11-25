@@ -16,6 +16,7 @@ import (
 	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/guard"
 	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/usage"
 )
@@ -193,6 +194,8 @@ func runAPI(o Options, cli string) int {
 func apiTools(o Options, model, mode string, p Probe) (*tools.Set, error) {
 	extra, _ := SandboxSetting("auto.sandbox_domains", "")
 	s := &tools.Set{Cwd: o.Cwd, Model: model, Allow: AutoTools(o.SmithyBins), Deny: AutoDenied(o.SmithyBins), Hosts: SandboxDomains(extra), ReadOnly: o.ReadOnly}
+	s.Guard = func(cmd string) (bool, string) { return guard.HookGuard().Check(context.Background(), cmd) }
+	s.FetchGuard = func(host string) (bool, string) { return guard.HookGuard().CheckFetch(context.Background(), host) }
 	if v := os.Getenv("HTTPS_PROXY"); v != "" {
 		if u, err := url.Parse(v); err == nil && u.Host != "" {
 			s.Proxy = u

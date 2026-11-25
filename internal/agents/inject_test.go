@@ -252,6 +252,19 @@ func TestRunKit(t *testing.T) {
 	if s := cfg.MCPServers["smithy"]; err != nil || s.Env["SMITHY_MCP_CARD"] != "b1/i1" || !slices.Contains(s.Args, "--readonly") {
 		t.Fatalf("mcp config: %s %v", b, err)
 	}
+	oldGuard := KitGuard
+	t.Cleanup(func() { KitGuard = oldGuard })
+	KitGuard = func(exe string) string {
+		return `{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"` + exe + ` guard hook"}]}]}}`
+	}
+	in, err = RunKit("claude", Options{Log: log}, os.Getenv)
+	if b, _ := os.ReadFile(filepath.Join(log+".kit", "claude-settings.json")); err != nil || !strings.Contains(string(b), "/bin/smithy guard hook") || !slices.Contains(in.Args, "--settings") {
+		t.Fatalf("guard hook not injected: %s %v", b, err)
+	}
+	if in, _ := RunKit("codex", Options{Log: log}, os.Getenv); in != nil && slices.Contains(in.Unsupported, "settings") {
+		t.Fatal("claude-only hook offered to codex")
+	}
+	KitGuard = oldGuard
 	if in, _ := RunKit("claude", Options{Sandbox: "native"}, os.Getenv); in == nil {
 		t.Fatal("native sandbox run lost its kit")
 	}
@@ -293,5 +306,23 @@ func TestRunKitFollowsKitChoice(t *testing.T) {
 	}
 	if !slices.Contains(in.Args, "--plugin-dir") {
 		t.Fatalf("the hush skill is linked in: %v", in.Args)
+	}
+}
+
+func TestRunKitKeepsTheGuardWithMCPOff(t *testing.T) {
+	oldM, oldG := KitMCP, KitGuard
+	t.Cleanup(func() { KitMCP, KitGuard = oldM, oldG })
+	KitMCP = []string{"/bin/smithy", "mcp"}
+	KitGuard = func(string) string { return `{"hooks":{}}` }
+	cfg := filepath.Join(t.TempDir(), "config.json")
+	t.Setenv("SMITHY_CONFIG", cfg)
+	config.Set(cfg, "kit.mcp", "false")
+	in, err := RunKit("claude", Options{Cwd: t.TempDir()}, os.Getenv)
+	if err != nil || in == nil {
+		t.Fatalf("the guard still goes in with kit.mcp false: %v %v", in, err)
+	}
+	defer in.Remove()
+	if !slices.Contains(in.Args, "--settings") || strings.Contains(strings.Join(in.Args, " "), "mcp-config") {
+		t.Fatalf("guard settings without the mcp server: %v", in.Args)
 	}
 }

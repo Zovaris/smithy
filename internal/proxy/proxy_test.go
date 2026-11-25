@@ -278,3 +278,18 @@ func TestDefaultDomainsReachOpenCodeModels(t *testing.T) {
 		t.Error("suffix match without a dot")
 	}
 }
+
+func TestConnectGuard(t *testing.T) {
+	r := newRig(t, nil)
+	var seen []string
+	r.p.Guard = func(_ context.Context, h string) (bool, string) {
+		seen = append(seen, h)
+		return false, "blocked by the fetch guard"
+	}
+	if code, _ := connect(t, r.p, "github.com:443"); code != http.StatusForbidden {
+		t.Fatalf("guard deny ignored: %d", code)
+	}
+	if code, _ := connect(t, r.p, "example.com:443"); code != http.StatusForbidden || len(seen) != 1 {
+		t.Fatalf("guard asked for a host off the allow-list: %v", seen)
+	}
+}
