@@ -14,6 +14,7 @@ import (
 type fix struct {
 	change string
 	apply  func() error
+	grant  bool // widens a permission: never applied by --yes, only on an explicit y
 }
 
 var stdinTTY = func() bool {
@@ -43,6 +44,10 @@ func applyFixes(fixes []fix, yes bool) {
 		return
 	}
 	for _, f := range fixes {
+		if yes && f.grant {
+			fmt.Println("skipped (grants a permission, answer it without --yes): " + f.change)
+			continue
+		}
 		if !yes && !askFix(f.change) {
 			fmt.Println("skipped: " + f.change)
 			continue

@@ -66,11 +66,14 @@ func TestDoctorFixYes(t *testing.T) {
 		t.Errorf("token mode %v", tokenMode())
 	}
 	allow, m := allowList(t, d)
-	if strings.Join(allow, ",") != "Bash(ls:*),Bash(smithy pr merge:*)" || m["model"] != "x" {
-		t.Errorf("settings: %v %v", allow, m)
+	if strings.Join(allow, ",") != "Bash(ls:*)" || m["model"] != "x" {
+		t.Errorf("--yes granted a permission: %v %v", allow, m)
+	}
+	if !strings.Contains(o, "skipped (grants a permission, answer it without --yes): ") {
+		t.Errorf("grant not reported as skipped:\n%s", o)
 	}
 	o, _ = doctor(t, "--fix", "--yes")
-	if strings.Contains(o, "fix   ") {
+	if strings.Contains(o, "fix   remove") || strings.Contains(o, "fix   chmod") {
 		t.Errorf("second run still fixes:\n%s", o)
 	}
 }
