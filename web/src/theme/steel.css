@@ -1,0 +1,49 @@
+/* Steel: smithy's Sephiro theme. Depth from background tiers, no boxes; one ember for running or
+   focused; every signal also carries a glyph so meaning survives 16 colors. */
+[data-sephiro-theme="steel"] {
+  --steel-base: #0e1116;
+  --steel-raised: #131820;
+  --steel-focus: #1a212b;
+  --steel-overlay: #222b37;
+  --steel-border: #2c3746;
+  --steel-ramp-5: #3b4a5e;
+  --steel-dim: #7a879a;
+  --steel-muted: #8593a6;
+  --steel-text: #b4c0ce;
+  --steel-strong: #e6edf5;
+  --steel-ember: #f2762e;
+  --steel-ok: #4cc38a;
+  --steel-wait: #e3b341;
+  --steel-fail: #f47067;
+  --steel-link: #6cb6ff;
+
+  --sph-bg: var(--steel-base);
+  --sph-surface: var(--steel-raised);
+  --sph-surface-elevated: var(--steel-focus);
+  --sph-raised: var(--steel-overlay);
+  --sph-border: var(--steel-border);
+  --sph-border-strong: var(--steel-ramp-5);
+  --sph-text: var(--steel-strong);
+  --sph-text-muted: var(--steel-muted);
+  --sph-accent: var(--steel-ember);
+  --sph-accent-hover: #ff9a5c;
+  --sph-accent-pressed: #d8611d;
+  --sph-accent-strong: #ff9a5c;
+  --sph-accent-soft: color-mix(in srgb, var(--steel-ember) 16%, transparent);
+  --sph-on-accent: var(--steel-base);
+  --sph-success: var(--steel-ok);
+  --sph-success-soft: color-mix(in srgb, var(--steel-ok) 15%, transparent);
+  --sph-warning: var(--steel-wait);
+  --sph-warning-soft: color-mix(in srgb, var(--steel-wait) 15%, transparent);
+  --sph-danger: var(--steel-fail);
+  --sph-danger-soft: color-mix(in srgb, var(--steel-fail) 15%, transparent);
+  --sph-focus: var(--steel-ember);
+  --sph-focus-ring: color-mix(in srgb, var(--steel-ember) 30%, transparent);
+  --sph-font-sans: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sph-font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sph-radius-xs: 0;
+  --sph-radius-sm: 2px;
+  --sph-radius-md: 2px;
+  --sph-shadow-popover: none;
+  color-scheme: dark;
+}
