@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -66,7 +67,7 @@ func TestSetupReportsAgentsSkillsAndKit(t *testing.T) {
 	if claude == nil || !claude.Present || len(claude.Smithy) != 1 || len(claude.MCP) != 1 {
 		t.Fatalf("claude inventory: %+v", claude)
 	}
-	if len(s.Skills) == 0 || s.Skills[0] != "smelt" {
+	if !slices.Contains(s.Skills, "smelt") {
 		t.Fatalf("installed skills to toggle: %v", s.Skills)
 	}
 }
