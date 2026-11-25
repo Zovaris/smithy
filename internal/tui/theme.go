@@ -72,6 +72,9 @@ func newTheme(dark bool, p colorprofile.Profile, unicode bool) theme {
 		t.g = uniGlyphs
 	}
 	t.ramp = []color.Color{c("#0E1116"), c("#131820"), c("#1A212B"), c("#222B37"), c("#2C3746"), c("#3B4A5E")}
+	if p == colorprofile.ANSI256 {
+		t.ramp = []color.Color{c("233"), c("234"), c("235"), c("236"), c("237"), c("239")}
+	}
 	if p <= colorprofile.Ascii {
 		t.plain = true
 		t.accent, t.ok, t.warn, t.err, t.info = nil, nil, nil, nil, nil

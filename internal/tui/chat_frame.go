@@ -167,7 +167,7 @@ func (m chatView) footer(w int) string {
 	dim, key := t.fg(t.dim), t.fg(t.text)
 	hint := func(k, what string) string { return key.Render(k) + dim.Render(" "+what) }
 	p := strings.Repeat(" ", m.pad())
-	left := p + strings.Join([]string{hint("enter", "send"), hint("v", "mode: "+m.mode.String()), hint("tab", "agents"), hint("ctrl+k", "palette"), hint("?", "help")}, "  ")
+	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("v", "mode: "+m.mode.String()), hint("tab", "agents"), hint("ctrl+k", "palette"), hint("?", "help")}
 	var info []string
 	if a := m.agentLabel(); a != "" {
 		info = append(info, a)
@@ -179,6 +179,11 @@ func (m chatView) footer(w int) string {
 		info = append(info, fmt.Sprintf("$%.2f", c))
 	}
 	right := dim.Render(strings.Join(info, " "+t.g.dot+" ")) + p
+	left := p + strings.Join(hints, "  ")
+	for len(hints) > 2 && w-ansi.StringWidth(left)-ansi.StringWidth(right) < 1 {
+		hints = hints[:len(hints)-1]
+		left = p + strings.Join(hints, "  ")
+	}
 	if gap := w - ansi.StringWidth(left) - ansi.StringWidth(right); gap >= 1 {
 		return left + strings.Repeat(" ", gap) + right
 	}
