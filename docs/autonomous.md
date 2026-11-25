@@ -91,6 +91,15 @@ and branch. Issues in `linear.states` under the `linear.*` filters are imported 
 edits are read with an `updatedAt` cursor (no webhooks), and state changes and new PR links are
 pushed back. A board task linked to Linear refuses local edits to the fields Linear owns.
 
+### Tools for the agents (smithy mcp)
+
+In the harness build, `smithy agent` gives every driven CLI a `smithy` MCP server through its
+own per-run config (never your global one): `search` over the working folder, `board_list`,
+`board_show`, `board_claim` and `board_set`, `secret_call` to call an API with a key you bound
+with `smithy auth bind` (the agent never sees the key; writes follow the bind's methods and asks),
+and `ask`, which puts a decision on the run's warden card and waits for your answer from the TUI,
+web or chat. `--readonly` runs get search and board reads only; container runs get none.
+
 ## Notifications
 
 ```

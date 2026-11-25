@@ -335,3 +335,43 @@ func mergeSettings(kit, own string) string {
 	b, _ := json.Marshal(k)
 	return string(b)
 }
+
+// KitMCP is the smithy MCP server command (smithy mcp) the harness build gives every driven CLI;
+// nil in the skills build, which has no smithy mcp.
+var KitMCP []string
+
+// RunKit is the injection for one run: KitMCP as the "smithy" MCP server, told the run's warden
+// card (SMITHY_MCP_CARD) and, for a --readonly run, to expose read-only tools. nil when there is
+// no kit, for a custom AGENT_CMD, or inside a container (the host binary isn't there).
+func RunKit(cli string, o Options, getenv func(string) string) (*Injection, error) {
+	if len(KitMCP) == 0 || cli == "custom" || o.Sandbox == "container" {
+		return nil, nil
+	}
+	args := slices.Clone(KitMCP[1:])
+	if o.ReadOnly {
+		args = append(args, "--readonly")
+	}
+	env := map[string]string{}
+	if batch, id := cardOf(o.Log, o.Cwd); batch != "" {
+		env["SMITHY_MCP_CARD"] = batch + "/" + id
+	}
+	dir := ""
+	if o.Log != "" {
+		dir = o.Log
+		if !filepath.IsAbs(dir) {
+			dir = filepath.Join(o.Cwd, dir)
+		}
+		dir += ".kit"
+	} else {
+		d, err := os.MkdirTemp("", "smithy-kit-")
+		if err != nil {
+			return nil, err
+		}
+		dir = d
+	}
+	in, err := Inject(cli, Kit{MCP: map[string]MCPServer{"smithy": {Command: KitMCP[0], Args: args, Env: env}}}, dir, PoolGetenv(o, getenv))
+	if err != nil {
+		return nil, err
+	}
+	return &in, nil
+}
