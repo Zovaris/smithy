@@ -150,7 +150,7 @@ func SecretDenied() []string {
 	d := []string{"Bash(*auth.json*)", "Bash(*.ssh*)", "Bash(*.config/gh*)", "Bash(*.aws*)", "Bash(*.netrc*)", "Bash(*.git-credentials*)",
 		"Bash(*.smithy/accounts*)", "Bash(*daemon.token*)", "Bash(*auth.key*)",
 		// glob and variable forms the literal rules miss (cat ~/.s*/id_*, $HOME/...); a best effort:
-		// only the native or container sandbox fully keeps secrets out of reach
+		// only the native sandbox fully keeps secrets out of reach
 		"Bash(*~/.*)", "Bash(*$HOME*)", "Bash(*${HOME}*)", "Bash(*.smithy/auth*)", "Bash(*.s*/id_*)", "Bash(*.[*)",
 		"Bash(*id_rsa*)", "Bash(*id_ed25519*)", "Bash(*id_ecdsa*)"}
 	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/auth.key", "~/.smithy/daemon.token", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {

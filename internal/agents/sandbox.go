@@ -120,7 +120,7 @@ func SandboxCheck(mode, cli string, p Probe) error {
 		}
 		return nil
 	case "gemini":
-		return fmt.Errorf("native sandbox can't hold gemini workers to the allowed hosts: Gemini CLI's seatbelt profiles either open every host or need a proxy smithy doesn't ship, and on Linux it only offers docker/podman")
+		return fmt.Errorf("native sandbox can't hold gemini workers to the allowed hosts: Gemini CLI's seatbelt profiles either open every host or need a proxy smithy doesn't ship (use claude, or auto.sandbox off)")
 	case "claude":
 	default:
 		return fmt.Errorf("native sandbox covers claude and codex workers, not %s", cli)
