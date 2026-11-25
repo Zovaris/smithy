@@ -71,6 +71,7 @@ var helpDocs = map[string]helpDoc{
 	"commit":      {groupSkills, []string{"smithy commit style", `smithy commit "fix: handle empty input" main.go`}, []string{"pr"}},
 	"consult":     {groupSkills, []string{`smithy consult "Which cache?" "redis | memory"`}, []string{"decisions", "decide"}},
 	"decide":      {groupSkills, []string{"smithy decide rules --base main", `smithy decide impact "Drop the v1 API?"`}, []string{"consult"}},
+	"guard":       {groupSkills, []string{`smithy guard check "rm -rf /"`, "smithy guard list"}, []string{"agent", "config"}},
 	"decisions":   {groupSkills, []string{"smithy decisions pending", "smithy decisions confirm --all"}, []string{"consult", "report"}},
 	"drift":       {groupSkills, []string{"smithy drift", "smithy drift main"}, []string{"comments", "search"}},
 	"guard-tests": {groupSkills, []string{"smithy guard-tests internal/x/x_test.go"}, []string{"stack"}},

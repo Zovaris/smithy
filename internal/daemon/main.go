@@ -43,6 +43,8 @@ serve a Tailscale-User-Login listed in daemon.allow; anything else gets 401):
   GET  /v1/events?since=<seq>    SSE of every event after seq; resumes with Last-Event-ID
   POST /v1/decisions             {"id","answer"}: the first answer wins (200); later ones get
                                  the recorded outcome (409)
+  GET  /v1/guard                 the command and fetch guard lists and the suggested fetch allowlist
+  POST /v1/guard/suggested       add every suggested host to guard.fetch_allow
   POST /v1/sessions              {"agent","dir","message"}: start a session (agent: a CLI name,
                                  acp:<cli> or api:<provider>/<model>; "" the last used); 201
   GET  /v1/sessions              every session with status working, needs_you, done or failed

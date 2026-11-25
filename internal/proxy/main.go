@@ -14,6 +14,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/guard"
 )
 
 // Usage is the text for `smithy proxy --help`.
@@ -111,6 +112,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 			}
 		}
 		p := &Proxy{Allow: allow, Secrets: auth.Secret, Approve: EventsApprover(timeout, time.Second),
+			Guard: func(ctx context.Context, host string) (bool, string) { return guard.HookGuard().CheckFetch(ctx, host) },
 			Log: func(e Entry) {
 				line := fmt.Sprintf("%s %s %s %s %d", e.Kind, e.Name, e.Method, e.Host, e.Status)
 				fmt.Fprintln(stderr, time.Now().UTC().Format(time.RFC3339), line)

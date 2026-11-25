@@ -64,6 +64,8 @@ Used by the skills
   decide        optional decision model: rule flags and question impact
   decisions     the log of the user's decisions taken without them
   drift         doc-drift report against a base (smithy drift [base])
+  guard         dangerous-command guard: check a command, Claude Code hook, list
+                the rules
   guard-tests   pre-edit hook: blocks test edits in the green phase
   harness       "<harness> <adapter>" for this shell
   mcp           MCP server (stdio) for driven CLIs: board, ask, secret calls,
