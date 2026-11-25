@@ -69,6 +69,8 @@ type Server struct {
 	Route func(Decision, Outcome) error
 	// Plan, when set, replaces AgentPlan for chat intake (tests).
 	Plan func(ctx context.Context, idea string) ([]PlanTask, error)
+	// BenchDir is where bench runs are read from; empty: bench.Dir().
+	BenchDir string
 	// Ctx is the daemon's lifetime (cancelled on shutdown) for background work like planning; nil: Background.
 	Ctx context.Context
 
@@ -274,6 +276,8 @@ func (sv *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/decisions", sv.decide)
 	mux.HandleFunc("GET /v1/decisions/{id...}", sv.decision)
 	mux.HandleFunc("POST /v1/asks", sv.ask)
+	mux.HandleFunc("GET /v1/bench", sv.benchRuns)
+	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1" && !strings.HasPrefix(r.URL.Path, "/v1/") {
 			if !ShellAllowed(r, sv.allow) {
