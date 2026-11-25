@@ -39,6 +39,17 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
 
 - `GET /v1/state`, `GET /v1/events?since=<seq>` (SSE, resumes with `Last-Event-ID`),
   `POST /v1/decisions` (`{"id","answer"}`: the first answer wins; later ones get the outcome, 409).
+- Sessions: `POST /v1/sessions` (`{"agent","dir","message"}`; agent is a CLI name, `acp:<cli>`
+  or `api:<provider>/<model>`, `""` the last used; `dir` an absolute existing folder),
+  `POST /v1/sessions/{id}/messages` (`{"text"}`, queued behind a running turn),
+  `POST /v1/sessions/{id}/stop` and `GET /v1/sessions` (status `working`, `needs_you`, `done`,
+  `failed`). Their events (`session_message`, `session_text`, `session_tool` with args and output,
+  `session_diff`, `session_usage`, `session_status`) stream on `/v1/events` with the session id.
+  An `api:` session runs smithy's loop inside the daemon: a tool call the auto rules refuse becomes
+  the decision `perm:<id>/<n>` (allow/deny) and the session shows `needs_you` until someone
+  answers; the secret rules are never asked. Other agents run `smithy agent` once per turn with
+  the conversation so far in the prompt. A reply in a session's chat thread is its next message.
+  At most 16 live sessions and 8 queued messages each (429 past that).
 - It tails `~/.smithy/events.jsonl` and the proxy's log into its store (once per line, across
   rotation and restarts) and turns them into decisions: a proxy `secret_ask` is `secret:<id>`
   (approve/deny, handed back as `smithy proxy approve|deny` would), a ready item is

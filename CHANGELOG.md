@@ -8,6 +8,14 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- The daemon runs agent sessions: start one with an agent, a folder and a first message, keep talking to it, stop it, and see every session with its status (harness build).
+
+### Details
+
+- `POST /v1/sessions`, `POST /v1/sessions/{id}/messages`, `POST /v1/sessions/{id}/stop` and `GET /v1/sessions`; session events (messages, live text, tool calls with args and output, diffs, usage, status) stream on `/v1/events` with the session id. `api:` sessions run in the daemon and turn a refused tool call into a `perm:<id>/<n>` decision; other agents run `smithy agent` per turn. Chat-thread replies reach the session; sessions left running by a stopped daemon show as failed.
+
 ## v0.22.0 — 2026-11-25
 
 ### Highlights
