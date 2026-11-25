@@ -1,6 +1,6 @@
 # Agent instructions
 
-- Rules for changes live in [CONTRIBUTING.md](CONTRIBUTING.md): Go standard library only (except `internal/tui`: Charm v2 libs; `-tags harness` code: ADR 0009; `web/` is Node, ADR 0010: run `npm run build` there and commit `internal/web/dist`, CI fails when it is stale), edit the
+- Rules for changes live in [CONTRIBUTING.md](CONTRIBUTING.md): Go standard library only (except `internal/tui`: Charm v2 libs; `-tags harness` code: ADR 0009; `web/` is Node, ADR 0010/0011: its build `internal/web/dist/app` is not committed; without it the harness build serves a placeholder), edit the
   launcher in `shared/` then `go run ./tools/sync-shared`, CHANGELOG entry under **Unreleased**.
 - Run `bash tests/run.sh` before pushing; `bash tests/skills.sh` after any skill text edit.
 - Branches come from `smithy names branch`; `main` is protected (PRs with green CI only).

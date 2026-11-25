@@ -6,9 +6,10 @@
   `modernc.org/sqlite`; files that need it carry `//go:build harness`. Inside a
   checkout the launcher builds it from source when a `.go` file changed, so symlinked skills
   always run your working copy (the skills build: run `go build -tags harness ./cmd/smithy` to try harness commands).
-- `web/` is the one Node toolchain (ADR 0010): the web UI (Preact, Vite). After changing it, run
-  `npm run build` in `web/` and commit `internal/web/dist`, which the binary embeds; the CI `web`
-  job (tests, typecheck, size budget) fails when the committed dist is stale.
+- `web/` is the one Node toolchain (ADR 0010): the web UI (Preact, Vite). Run
+  `npm ci && npm run build` in `web/` to embed it in the harness build; the output
+  (`internal/web/dist/app`) is not committed (ADR 0011), and without it the binary serves a
+  placeholder page. The CI `web` job runs tests, typecheck and the size budget.
 - Pull requests run `check` (gofmt, vet, `go test`, every offline test through the binary, a
   build per release target). A `v*` tag runs `release`: it checks the tag matches
   `shared/VERSION`, builds darwin, linux (arm64, amd64) and windows binaries, skills and harness builds each, gzips them,
