@@ -8,6 +8,8 @@ part above `### Details`.
 
 ## Unreleased
 
+- Stored keys are encrypted at rest: `~/.smithy/auth.json` is sealed with AES-GCM under `~/.smithy/auth.key`, which only smithy and its proxy read and every agent sandbox and deny list blocks. An existing plaintext `auth.json` is encrypted on first use without losing keys. No OS keychain, no password prompts.
+
 ## v0.21.0 — 2026-11-25
 
 ### Highlights
