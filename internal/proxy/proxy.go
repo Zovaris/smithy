@@ -51,6 +51,8 @@ type Proxy struct {
 	Dial    func(ctx context.Context, network, addr string) (net.Conn, error)
 	Log     func(Entry)
 	Approve func(context.Context, Ask) bool // an ask secret's write; nil = denied
+	// Guard, when set, decides an allowed tunnel's host (the fetch guard: guard.fetch_block asks).
+	Guard func(ctx context.Context, host string) (bool, string)
 
 	mu      sync.Mutex
 	pending map[string]bool // secrets with an ask waiting: one at a time each
@@ -114,6 +116,13 @@ func (p *Proxy) connect(w http.ResponseWriter, r *http.Request) {
 		}
 		deny()
 		return
+	}
+	if p.Guard != nil {
+		if ok, why := p.Guard(r.Context(), host); !ok {
+			p.log(Entry{Kind: "connect", Host: host, Method: "CONNECT", Status: http.StatusForbidden})
+			http.Error(w, "smithy proxy: "+why, http.StatusForbidden)
+			return
+		}
 	}
 	dial := p.Dial
 	if dial == nil {
