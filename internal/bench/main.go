@@ -136,6 +136,7 @@ func cliAgent(self string, o Options, errw io.Writer) AgentFunc {
 		cmd.Dir = dir
 		cmd.Env = append(os.Environ(), "AGENT_CLI="+o.Agent)
 		cmd.Stdout, cmd.Stderr = io.Discard, io.Discard
+		defer track(cmd)()
 		return cmd.Run()
 	}
 }

@@ -123,6 +123,8 @@ func Oracle(id, dir string) (bool, string) {
 	cmd := exec.CommandContext(ctx, "go", "test", "-count=1", "./...")
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=", "GOTOOLCHAIN=local")
+	cmd.WaitDelay = 2 * time.Second
+	defer track(cmd)()
 	out, err := cmd.CombinedOutput()
 	return err == nil, string(out)
 }
@@ -213,6 +215,7 @@ func Run(o Options, agent AgentFunc) (Result, error) {
 	if !o.Keep {
 		defer os.RemoveAll(work)
 	}
+	defer onInterrupt(work, o.Keep)()
 	for _, t := range ts {
 		tr := runOne(t, filepath.Join(work, t.ID), agent)
 		r.Tasks = append(r.Tasks, tr)

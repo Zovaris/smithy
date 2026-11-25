@@ -7,6 +7,7 @@
 package auth
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -88,6 +89,10 @@ func read() (map[string]entry, bool, error) {
 	if err != nil {
 		return nil, false, err
 	}
+	if len(bytes.TrimSpace(b)) == 0 {
+		// an empty file (a write cut short before fsync) holds no secrets; a .bak next to it is left alone
+		return m, true, nil
+	}
 	p, wasSealed, err := open(b)
 	if err != nil {
 		return nil, false, err
@@ -121,10 +126,30 @@ func save(m map[string]entry) error {
 		tmp.Close()
 		return err
 	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(tmp.Name(), f)
+	if err := os.Rename(tmp.Name(), f); err != nil {
+		return err
+	}
+	return syncDir(filepath.Dir(f))
+}
+
+// syncDir makes a rename in dir durable; Windows can't open a folder for sync, so it is skipped there.
+func syncDir(dir string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	d, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer d.Close()
+	return d.Sync()
 }
 
 func check(svc string) error {

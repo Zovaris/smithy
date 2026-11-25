@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"regexp"
 	"strings"
 	"time"
 
@@ -211,9 +212,30 @@ func Run(ctx context.Context, p Provider, req Request, tools Tools, sink Sink, o
 	return res, ErrMaxTurns
 }
 
+// stream asks p for one reply, retrying 429 and 5xx. Text reaches the sink live; after a retry,
+// text the sink already got is not sent again: a retry's text is held until it succeeds and only
+// what goes past the earlier attempts is sent (a reply that took another turn starts on a new line).
 func stream(ctx context.Context, p Provider, req Request, sink Sink, o Options) (Reply, error) {
+	var sent strings.Builder
 	for n := 0; ; n++ {
-		rep, err := p.Stream(ctx, req, sink.Text)
+		var held strings.Builder
+		onText := func(t string) {
+			if n == 0 {
+				sent.WriteString(t)
+				sink.Text(t)
+				return
+			}
+			held.WriteString(t)
+		}
+		rep, err := p.Stream(ctx, req, onText)
+		if n > 0 && err == nil {
+			h, s := held.String(), sent.String()
+			if rest, ok := strings.CutPrefix(h, s); ok {
+				sink.Text(rest)
+			} else if h != "" {
+				sink.Text("\n" + h)
+			}
+		}
 		if err == nil || !Retryable(err) || n >= o.Retries || ctx.Err() != nil {
 			return rep, err
 		}
@@ -250,7 +272,7 @@ func run(ctx context.Context, tools Tools, c ToolCall, sink Sink) ToolResult {
 		sink.Permission(c, false, why)
 		return r
 	}
-	out, err := tools.Call(ctx, c)
+	out, err := tools.Call(WithSink(ctx, sink), c)
 	if err != nil {
 		r.Output, r.IsError = err.Error(), true
 	} else {
@@ -258,6 +280,20 @@ func run(ctx context.Context, tools Tools, c ToolCall, sink Sink) ToolResult {
 	}
 	sink.Tool(c, r)
 	return r
+}
+
+type sinkKey struct{}
+
+// WithSink carries the loop's sink to a tool, so tools that run inner calls (code mode) report
+// them as events and permission decisions too.
+func WithSink(ctx context.Context, s Sink) context.Context {
+	return context.WithValue(ctx, sinkKey{}, s)
+}
+
+// SinkFrom is the loop's sink in ctx, or nil.
+func SinkFrom(ctx context.Context) Sink {
+	s, _ := ctx.Value(sinkKey{}).(Sink)
+	return s
 }
 
 // Providers smithy knows: the service name `smithy auth set` keeps the key under ("" for ollama,
@@ -287,30 +323,44 @@ func ParseTarget(s string) (provider, model string, err error) {
 
 type price struct{ in, out, read, write float64 }
 
+// prices are list prices in USD per million tokens (input, output, cache read, cache write), from
+// https://docs.anthropic.com/en/docs/about-claude/pricing and https://openai.com/api/pricing/.
 var prices = map[string]map[string]price{
 	"anthropic": {
-		"claude-opus-4-5":  {5, 25, 0.5, 6.25},
-		"claude-opus-4":    {15, 75, 1.5, 18.75},
-		"claude-sonnet-4":  {3, 15, 0.3, 3.75},
-		"claude-haiku-4-5": {1, 5, 0.1, 1.25},
+		"claude-opus-4-5":   {5, 25, 0.5, 6.25},
+		"claude-opus-4-1":   {15, 75, 1.5, 18.75},
+		"claude-opus-4":     {15, 75, 1.5, 18.75},
+		"claude-sonnet-4-5": {3, 15, 0.3, 3.75},
+		"claude-sonnet-4":   {3, 15, 0.3, 3.75},
+		"claude-haiku-4-5":  {1, 5, 0.1, 1.25},
+		"claude-3-5-haiku":  {0.8, 4, 0.08, 1},
 	},
 	"openai": {
-		"gpt-5":      {1.25, 10, 0.125, 0},
-		"gpt-5-mini": {0.25, 2, 0.025, 0},
-		"gpt-5-nano": {0.05, 0.4, 0.005, 0},
-		"gpt-4.1":    {2, 8, 0.5, 0},
-		"gpt-4o":     {2.5, 10, 1.25, 0},
+		"gpt-5":        {1.25, 10, 0.125, 0},
+		"gpt-5-mini":   {0.25, 2, 0.025, 0},
+		"gpt-5-nano":   {0.05, 0.4, 0.005, 0},
+		"gpt-4.1":      {2, 8, 0.5, 0},
+		"gpt-4.1-mini": {0.4, 1.6, 0.1, 0},
+		"gpt-4.1-nano": {0.1, 0.4, 0.025, 0},
+		"gpt-4o":       {2.5, 10, 1.25, 0},
+		"gpt-4o-mini":  {0.15, 0.6, 0.075, 0},
+		"o4-mini":      {1.1, 4.4, 0.275, 0},
 	},
 }
 
-// Cost prices u at the list price of provider's model (USD per million tokens, matched by the
-// longest model-name prefix); nil when the model is not listed.
+// snapshot is what may follow a listed model id: a date (-20250929, -2025-08-07) or -latest.
+var snapshot = regexp.MustCompile(`^-(\d{8}|\d{4}-\d{2}-\d{2}|latest)$`)
+
+// Cost prices u at the list price of provider's model: the id must equal a listed one or be one
+// followed by a snapshot date. nil (unknown cost) for any other model, never a guess.
 func Cost(provider, model string, u usage.Usage) *float64 {
-	best, ok := "", false
-	var p price
-	for pre, pr := range prices[provider] {
-		if strings.HasPrefix(model, pre) && len(pre) >= len(best) {
-			best, p, ok = pre, pr, true
+	p, ok := prices[provider][model]
+	if !ok {
+		for pre, pr := range prices[provider] {
+			if rest, cut := strings.CutPrefix(model, pre); cut && snapshot.MatchString(rest) {
+				p, ok = pr, true
+				break
+			}
 		}
 	}
 	if !ok {

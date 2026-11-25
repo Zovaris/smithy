@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -89,6 +90,14 @@ func runAPI(o Options, cli string) int {
 	if APIProvider == nil {
 		return needsHarness("agent --backend api")
 	}
+	mode, err := SandboxMode()
+	if err == nil && mode == "container" {
+		err = errAPIContainer
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
+		return 1
+	}
 	key := ""
 	if svc := apiloop.Providers[name].Service; svc != "" {
 		if key = auth.Stored(svc); key == "" {
@@ -137,7 +146,14 @@ func runAPI(o Options, cli string) int {
 	}
 	defer cancel()
 	item := wardenItem(o.Log)
-	loopTools := withCodeMode(apiTools(o, model), config.Get("agent.code_mode", "false") == "true")
+	set, err := apiTools(o, model, mode, HostProbe())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
+		out.Close()
+		return 1
+	}
+	defer set.Close()
+	loopTools := withCodeMode(set, config.Get("agent.code_mode", "false") == "true")
 	res, err := apiloop.Run(ctx, p, apiloop.Request{Model: model, Messages: []apiloop.Message{apiloop.UserText(strings.TrimSpace(string(prompt)))}},
 		loopTools, apiSink{out: out, item: item, log: o.Log}, apiloop.Options{Provider: name})
 	fmt.Fprintln(out)
@@ -175,10 +191,26 @@ func runAPI(o Options, cli string) int {
 }
 
 // apiTools is the core tool set under the --profile auto rules: AutoTools allowed, AutoDenied
-// (with SecretDenied) winning, and fetch limited to the sandbox domain allow-list.
-func apiTools(o Options, model string) *tools.Set {
+// (with SecretDenied) winning, and fetch limited to the sandbox domain allow-list. A read-only run
+// gets only the read tools; auto.sandbox native runs its shell commands under the OS sandbox.
+func apiTools(o Options, model, mode string, p Probe) (*tools.Set, error) {
 	extra, _ := SandboxSetting("auto.sandbox_domains", "")
-	return &tools.Set{Cwd: o.Cwd, Model: model, Allow: AutoTools(o.SmithyBins), Deny: AutoDenied(o.SmithyBins), Hosts: SandboxDomains(extra)}
+	s := &tools.Set{Cwd: o.Cwd, Model: model, Allow: AutoTools(o.SmithyBins), Deny: AutoDenied(o.SmithyBins), Hosts: SandboxDomains(extra), ReadOnly: o.ReadOnly}
+	if v := os.Getenv("HTTPS_PROXY"); v != "" {
+		if u, err := url.Parse(v); err == nil && u.Host != "" {
+			s.Proxy = u
+		}
+	}
+	if mode == "native" {
+		paths, err := apiSandboxPaths(o.Cwd)
+		if err != nil {
+			return nil, err
+		}
+		if s.Wrap, err = apiShellSandbox(mode, p, paths); err != nil {
+			return nil, err
+		}
+	}
+	return s, nil
 }
 
 func openLog(o Options) (*os.File, string, error) {

@@ -172,7 +172,7 @@ func TestAgentAPIBackendOffersTheCoreToolsUnderAutoRules(t *testing.T) {
 	for _, s := range fake.got.Tools {
 		names = append(names, s.Name)
 	}
-	for _, s := range apiTools(Options{}, "gpt-5").Specs() {
+	for _, s := range mustAPITools(t, Options{}, "gpt-5").Specs() {
 		names = append(names, s.Name)
 	}
 	got := strings.Join(names, ",")
@@ -181,7 +181,7 @@ func TestAgentAPIBackendOffersTheCoreToolsUnderAutoRules(t *testing.T) {
 			t.Fatalf("tools %s: missing %s", got, want)
 		}
 	}
-	set := apiTools(Options{Cwd: t.TempDir()}, "claude-sonnet-4")
+	set := mustAPITools(t, Options{Cwd: t.TempDir()}, "claude-sonnet-4")
 	if ok, _ := set.Permit(apiloop.ToolCall{Name: "shell", Args: []byte(`{"command":"curl https://x"}`)}); ok {
 		t.Fatal("curl must be denied as under --profile auto")
 	}

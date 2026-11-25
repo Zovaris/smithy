@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/ghx"
@@ -194,8 +195,7 @@ func withLock(file string, f func() error) error {
 		if !os.IsExist(err) {
 			return err
 		}
-		if staleLock(lock) {
-			os.Remove(lock)
+		if staleLock(lock) && takeOver(lock) {
 			continue
 		}
 		if time.Now().After(deadline) {
@@ -208,6 +208,42 @@ func withLock(file string, f func() error) error {
 }
 
 const lockStale = 30 * time.Second
+
+var takeovers atomic.Int64
+
+// takeOver moves a stale lock aside atomically (rename to a name only this call uses), so of two
+// writers that both saw it stale only one gets it. Takeovers are serialised by a second O_EXCL
+// file, so the lock is never missing while another takeover rechecks it; if what it moved turns
+// out to be live (another writer took the lock in between), it puts it back and reports false.
+func takeOver(lock string) bool {
+	guard := lock + ".takeover"
+	g, err := os.OpenFile(guard, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	if err != nil {
+		if fi, serr := os.Stat(guard); serr == nil && time.Since(fi.ModTime()) > lockStale {
+			os.Remove(guard)
+		}
+		return false
+	}
+	g.Close()
+	defer os.Remove(guard)
+	if !staleLock(lock) {
+		return false
+	}
+	aside := fmt.Sprintf("%s.stale.%d.%d", lock, os.Getpid(), takeovers.Add(1))
+	if err := os.Rename(lock, aside); err != nil {
+		return false
+	}
+	if staleLock(aside) {
+		os.Remove(aside)
+		return true
+	}
+	if err := os.Link(aside, lock); err == nil {
+		os.Remove(aside)
+		return false
+	}
+	os.Remove(aside)
+	return false
+}
 
 // staleLock reports whether lock was left by a writer that is gone (its pid is dead) or
 // is older than lockStale.
