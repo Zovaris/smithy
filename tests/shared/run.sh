@@ -225,6 +225,16 @@ t "launcher: installed binary runs silently" '[ "$(env -u SMITHY_BIN SMITHY_HOME
 t "install.sh: no gh + bad checksum refuses" 'LN "$L/nogh-bad" e 1; [ $? -eq 3 ] && grep -q "checksum mismatch" "$L/err" && [ ! -e "$L/home"e/bin/0.0.0/smithy ]'
 t "install.sh: no gh + empty checksums.txt refuses" 'LN "$L/nogh-bad" g empty; [ $? -eq 3 ] && [ ! -e "$L/home"g/bin/0.0.0/smithy ]'
 
+# install.sh kind: harness or skills (non-tty → skills; SMITHY_TTY stands in for /dev/tty)
+mkdir -p "$L/kind"; cp "$L/fakegh" "$L/kind/gh"; printf '#!/bin/sh\nexit 0\n' > "$L/kind/npx"; chmod +x "$L/kind/gh" "$L/kind/npx"
+LK() { h=$1; shift; env -u SMITHY_BIN -u SMITHY_TTY SMITHY_HOME="$L/k$h" TMPDIR="$L/tmp" PATH="$L/kind:$L/sys" "$@" 2>"$L/err"; }
+t "install.sh: non-tty installs the skills build" 'LK a "$L/install.sh" 0.0.0 </dev/null && grep -q "(smithy-[a-z]*-[a-z0-9]*\.gz)" "$L/err" && [ "$(cat "$L/ka/kind")" = skills ]'
+t "install.sh: --harness installs smithy-harness" 'LK b "$L/install.sh" --harness 0.0.0 && grep -q "(smithy-harness-.*\.gz)" "$L/err" && [ "$(cat "$L/kb/kind")" = harness ]'
+t "install.sh: --update keeps the harness kind" 'LK b "$L/install.sh" --update 0.0.0 && grep -q "(smithy-harness-.*\.gz)" "$L/err"'
+t "install.sh: --skills overrides the kept kind" 'LK b "$L/install.sh" --update --skills 0.0.0 && ! grep -q harness "$L/err" && [ "$(cat "$L/kb/kind")" = skills ]'
+t "install.sh: tty answer harness" 'echo harness > "$L/ans"; LK c env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && grep -q "harness or skills" "$L/err" && grep -q "(smithy-harness-" "$L/err"'
+t "install.sh: tty empty answer defaults to skills" ': > "$L/ans"; LK d env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && grep -q "harness or skills" "$L/err" && ! grep -q "(smithy-harness-" "$L/err"'
+t "install.sh: --harness with --skills refused" 'LK e "$L/install.sh" --harness --skills 0.0.0; [ $? -eq 3 ]'
 t "install.sh: rejects a bad version" 'env -u SMITHY_BIN SMITHY_HOME="$L/bad" PATH="$L/sys" "$L/install.sh" "../x" 2>"$L/err"; [ $? -eq 3 ] && grep -q "bad version" "$L/err"'
 # launcher never downloads: no binary → exit 3 naming the install page
 LM() { env -u SMITHY_BIN SMITHY_HOME="$L/empty$1" PATH="$L/curl:$L/sys" "$L/smithy" version 2>"$L/err"; }
