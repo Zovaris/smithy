@@ -8,6 +8,14 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- A failed auto issue gets one more try on a stronger model before it is reported blocked.
+
+### Details
+
+- Added: `auto.retry_stronger` (default `true`): the first `smithy auto report <ref> blocked` for a launched issue requeues it at the head of the queue on the next tier (cheap → mid → strong; unlabeled → strong), prints `auto retry <ref> on <tier>` and records a `retry_stronger` event; a second failure or one on strong is reported blocked.
+
 ## v0.20.0 — 2026-11-25
 
 ### Highlights
