@@ -39,7 +39,7 @@ func sessionTest(t *testing.T, fn func(ctx context.Context, msg string, h []Exch
 	sv, hs := newTest(t, filepath.Join(t.TempDir(), "s.db"))
 	var made []string
 	var mu sync.Mutex
-	sv.Runners = func(agent, dir, sdir string) (Runner, error) {
+	sv.Runners = func(agent, _, dir, sdir string) (Runner, error) {
 		mu.Lock()
 		made = append(made, agent+"@"+dir)
 		mu.Unlock()
@@ -286,7 +286,7 @@ func TestSessionsSurviveRestart(t *testing.T) {
 	st, _ := store.Open(path)
 	sv, _ := New(st, testToken, nil, nil)
 	hold := make(chan struct{})
-	sv.Runners = func(string, string, string) (Runner, error) {
+	sv.Runners = func(string, string, string, string) (Runner, error) {
 		return &fakeRunner{fn: func(ctx context.Context, msg string, h []Exchange, e Emit) (string, error) {
 			if msg == "ask" {
 				e.Ask(ctx, "ok?", []string{"allow", "deny"})

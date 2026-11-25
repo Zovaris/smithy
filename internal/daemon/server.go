@@ -18,6 +18,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/web"
 )
@@ -76,21 +77,27 @@ type Server struct {
 	Runners RunnerFor
 	// Version is the daemon binary's version, reported in State so a client can warn on a mismatch.
 	Version string
+	// Ready, when set, replaces agent detection (tests).
+	Ready func() []agents.Ready
+	// SkillsInstall, when set, replaces running `smithy skills install` (tests).
+	SkillsInstall func(ctx context.Context, harness string) (string, error)
 	// Ctx is the daemon's lifetime (cancelled on shutdown) for background work like planning; nil: Background.
 	Ctx context.Context
 
-	mu        sync.Mutex
-	decisions map[string]*Decision
-	routed    map[string]bool
-	intakes   map[string]*intakePlan
-	planning  atomic.Bool
-	lastSeq   int64
-	wake      chan struct{}
-	sessions  map[string]*live
-	lastAgent string
-	starting  int
-	clients   atomic.Int64 // open event streams
-	seen      atomic.Int64 // unix nanos of the last API request or stream end
+	mu         sync.Mutex
+	decisions  map[string]*Decision
+	routed     map[string]bool
+	intakes    map[string]*intakePlan
+	planning   atomic.Bool
+	installing atomic.Bool
+	lastSeq    int64
+	wake       chan struct{}
+	sessions   map[string]*live
+	lastAgent  string
+	lastModel  string
+	starting   int
+	clients    atomic.Int64 // open event streams
+	seen       atomic.Int64 // unix nanos of the last API request or stream end
 }
 
 // New loads the decisions recorded in st. log may be nil.
@@ -297,6 +304,10 @@ func (sv *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/sessions/{id}", sv.getSession)
 	mux.HandleFunc("POST /v1/sessions/{id}/messages", sv.sendSession)
 	mux.HandleFunc("POST /v1/sessions/{id}/stop", sv.stopSession)
+	mux.HandleFunc("GET /v1/setup", sv.setup)
+	mux.HandleFunc("PUT /v1/setup/default", sv.setDefault)
+	mux.HandleFunc("PUT /v1/setup/kit", sv.setKit)
+	mux.HandleFunc("POST /v1/setup/skills/install", sv.installSkills)
 	mux.HandleFunc("GET /v1/bench", sv.benchRuns)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

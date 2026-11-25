@@ -20,6 +20,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/apiloop"
+	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/store"
@@ -59,6 +60,7 @@ const (
 type Session struct {
 	ID      string       `json:"id"`
 	Agent   string       `json:"agent"`
+	Model   string       `json:"model,omitempty"`
 	Dir     string       `json:"dir"`
 	Title   string       `json:"title"`
 	Status  string       `json:"status"`
@@ -95,7 +97,7 @@ type Runner interface {
 }
 
 // RunnerFor makes the runner for a validated agent in dir; sessionDir is the session's own folder.
-type RunnerFor func(agent, dir, sessionDir string) (Runner, error)
+type RunnerFor func(agent, model, dir, sessionDir string) (Runner, error)
 
 type live struct {
 	s        Session
@@ -167,7 +169,7 @@ func (sv *Server) applySession(e store.Event) {
 		if json.Unmarshal(e.Data, &s) == nil && s.ID != "" {
 			s.Created, s.Updated = e.Time, e.Time
 			sv.sessions[s.ID] = &live{s: s}
-			sv.lastAgent = s.Agent
+			sv.lastAgent, sv.lastModel = s.Agent, s.Model
 		}
 	case KindSessionStatus:
 		var st struct{ Status, Detail string }
@@ -221,9 +223,34 @@ func (sv *Server) setStatus(id, status, detail string) {
 	sv.setStatusLocked(id, status, detail)
 }
 
+// ValidModel reports whether model may reach a CLI's --model flag.
+func ValidModel(model string) error {
+	if model != "" && (!modelChars.MatchString(model) || strings.HasPrefix(model, "-")) {
+		return errors.New("model: letters, digits and ._:/@+- only, not starting with -")
+	}
+	return nil
+}
+
+// Defaults is the agent and model a session starts with when none is named: the last used, else
+// session.agent / session.model from the settings.
+func (sv *Server) Defaults() (agent, model string) {
+	sv.mu.Lock()
+	agent, model = sv.lastAgent, sv.lastModel
+	sv.mu.Unlock()
+	if agent == "" {
+		agent, model = config.Get("session.agent", ""), config.Get("session.model", "")
+	}
+	return agent, model
+}
+
 // StartSession starts a session with agent ("" for the last used, else the default CLI) in dir
 // and sends msg first when it is not empty.
 func (sv *Server) StartSession(agent, dir, msg, by string) (Session, error) {
+	return sv.StartSessionWith(agent, "", dir, msg, by)
+}
+
+// StartSessionWith is StartSession with a model for a CLI agent ("" with agent "": the default's).
+func (sv *Server) StartSessionWith(agent, model, dir, msg, by string) (Session, error) {
 	if len(msg) > MaxMessage {
 		return Session{}, fmt.Errorf("%w: message over %d bytes", errBadRequest, MaxMessage)
 	}
@@ -231,12 +258,20 @@ func (sv *Server) StartSession(agent, dir, msg, by string) (Session, error) {
 	if err != nil {
 		return Session{}, fmt.Errorf("%w: %v", errBadRequest, err)
 	}
-	sv.mu.Lock()
 	if agent == "" {
-		agent = sv.lastAgent
+		da, dm := sv.Defaults()
+		agent = da
+		if model == "" {
+			model = dm
+		}
 	}
-	sv.mu.Unlock()
 	if err := ValidAgent(agent); err != nil {
+		return Session{}, fmt.Errorf("%w: %v", errBadRequest, err)
+	}
+	if strings.HasPrefix(agent, "api:") {
+		model = ""
+	}
+	if err := ValidModel(model); err != nil {
 		return Session{}, fmt.Errorf("%w: %v", errBadRequest, err)
 	}
 	id := newSessionID()
@@ -256,7 +291,7 @@ func (sv *Server) StartSession(agent, dir, msg, by string) (Session, error) {
 	}
 	sv.starting++
 	sv.mu.Unlock()
-	r, err := rf(agent, d, sdir)
+	r, err := rf(agent, model, d, sdir)
 	if err != nil {
 		sv.mu.Lock()
 		sv.starting--
@@ -265,7 +300,7 @@ func (sv *Server) StartSession(agent, dir, msg, by string) (Session, error) {
 		return Session{}, fmt.Errorf("%w: %v", errBadRequest, text.Clean(err.Error()))
 	}
 	now := time.Now().UTC()
-	s := Session{ID: id, Agent: agent, Dir: d, Title: titleOf(msg), Status: StatusDone, Created: now, Updated: now}
+	s := Session{ID: id, Agent: agent, Model: model, Dir: d, Title: titleOf(msg), Status: StatusDone, Created: now, Updated: now}
 	ctx, cancel := context.WithCancel(sv.ctx())
 	l := &live{s: s, runner: r, inbox: make(chan string, MaxQueued), cancel: cancel}
 	sv.mu.Lock()
@@ -277,7 +312,7 @@ func (sv *Server) StartSession(agent, dir, msg, by string) (Session, error) {
 		return Session{}, err
 	}
 	sv.sessions[id] = l
-	sv.lastAgent = agent
+	sv.lastAgent, sv.lastModel = agent, model
 	var qerr error
 	if strings.TrimSpace(msg) != "" {
 		qerr = sv.queueLocked(l, msg, by)
@@ -324,9 +359,9 @@ func (sv *Server) SendSession(id, msg, by string) error {
 		if rf == nil {
 			rf = DefaultRunner
 		}
-		agent, dir := l.s.Agent, l.s.Dir
+		agent, model, dir := l.s.Agent, l.s.Model, l.s.Dir
 		sv.mu.Unlock()
-		r, err := rf(agent, dir, filepath.Join(SessionsDir(), id))
+		r, err := rf(agent, model, dir, filepath.Join(SessionsDir(), id))
 		if err != nil {
 			return fmt.Errorf("%w: %v", errBadRequest, text.Clean(err.Error()))
 		}
@@ -557,6 +592,7 @@ func (sv *Server) startSession(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		Agent   string `json:"agent"`
+		Model   string `json:"model"`
 		Dir     string `json:"dir"`
 		Message string `json:"message"`
 	}
@@ -564,7 +600,7 @@ func (sv *Server) startSession(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "body must be {\"agent\":…,\"dir\":…,\"message\":…}"})
 		return
 	}
-	s, err := sv.StartSession(req.Agent, req.Dir, req.Message, r.Header.Get("X-Smithy-Who"))
+	s, err := sv.StartSessionWith(req.Agent, req.Model, req.Dir, req.Message, r.Header.Get("X-Smithy-Who"))
 	if err != nil && s.ID == "" {
 		sessionErr(w, err)
 		return
@@ -607,13 +643,14 @@ func (sv *Server) stopSession(w http.ResponseWriter, r *http.Request) {
 type SessionList struct {
 	Sessions  []Session `json:"sessions"`
 	LastAgent string    `json:"last_agent"`
+	LastModel string    `json:"last_model,omitempty"`
 }
 
 func (sv *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 	l := SessionList{Sessions: sv.Sessions()}
 	sv.mu.Lock()
-	l.LastAgent = sv.lastAgent
 	sv.mu.Unlock()
+	l.LastAgent, l.LastModel = sv.Defaults()
 	writeJSON(w, 200, l)
 }
 

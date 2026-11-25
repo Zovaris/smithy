@@ -258,3 +258,30 @@ func (c *Client) Sessions(ctx context.Context) (SessionList, error) {
 	err := c.call(ctx, "GET", "/v1/sessions", nil, &l)
 	return l, err
 }
+
+// Setup is GET /v1/setup: detected agents, the default agent/model, the kit and skills/MCP.
+func (c *Client) Setup(ctx context.Context) (Setup, error) {
+	var s Setup
+	err := c.call(ctx, "GET", "/v1/setup", nil, &s)
+	return s, err
+}
+
+// SetDefault is PUT /v1/setup/default: the agent and model new sessions start with.
+func (c *Client) SetDefault(ctx context.Context, agent, model string) error {
+	return c.call(ctx, "PUT", "/v1/setup/default", AgentChoice{Agent: agent, Model: model}, nil)
+}
+
+// SetKit is PUT /v1/setup/kit: what goes into every driven CLI.
+func (c *Client) SetKit(ctx context.Context, k KitChoice) error {
+	if k.Skills == nil {
+		k.Skills = []string{}
+	}
+	return c.call(ctx, "PUT", "/v1/setup/kit", k, nil)
+}
+
+// InstallSkills is POST /v1/setup/skills/install; harness "" is every detected one.
+func (c *Client) InstallSkills(ctx context.Context, harness string) (string, error) {
+	var out struct{ Output string }
+	err := c.call(ctx, "POST", "/v1/setup/skills/install", map[string]string{"harness": harness}, &out)
+	return out.Output, err
+}

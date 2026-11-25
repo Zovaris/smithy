@@ -28,7 +28,7 @@ import (
 // DefaultRunner runs api:<provider>/<model> in the daemon (smithy's own loop, so tool calls,
 // usage and permission requests reach the session live) and every other agent through
 // `smithy agent`, one process per turn.
-func DefaultRunner(agent, dir, sessionDir string) (Runner, error) {
+func DefaultRunner(agent, model, dir, sessionDir string) (Runner, error) {
 	if strings.HasPrefix(agent, "api:") {
 		c, err := agents.NewAPIChat(agent, dir)
 		if err != nil {
@@ -40,7 +40,7 @@ func DefaultRunner(agent, dir, sessionDir string) (Runner, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &cliRunner{exe: exe, agent: agent, dir: dir, sdir: sessionDir}, nil
+	return &cliRunner{exe: exe, agent: agent, model: model, dir: dir, sdir: sessionDir}, nil
 }
 
 type apiRunner struct {
@@ -106,8 +106,8 @@ func (s *apiSink) Permission(apiloop.ToolCall, bool, string) {}
 func (s *apiSink) Usage(u usage.Usage) { s.e.Usage(u) }
 
 type cliRunner struct {
-	exe, agent, dir, sdir string
-	n                     int
+	exe, agent, model, dir, sdir string
+	n                            int
 }
 
 func (r *cliRunner) Close() {}
@@ -158,6 +158,10 @@ func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e 
 	if strings.HasPrefix(r.agent, "acp:") {
 		env = append(env, "AGENT_PROTOCOL=acp")
 	}
+	if r.model != "" {
+		env = append(env, "AGENT_MODEL="+r.model)
+	}
+	env = append(env, "PATH="+agents.CLIPath(os.Getenv("PATH"), os.Getenv))
 	cmd.Env = env
 	var errOut capped
 	errOut.n = 4 << 10
