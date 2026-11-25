@@ -145,8 +145,15 @@ func (sv *Server) IntakeNow(ctx context.Context, idea, by string) error {
 	q := []string{"Plan for: " + text.Clean(clipRunes(idea, 300))}
 	for i, t := range tasks {
 		q = append(q, strconv.Itoa(i+1)+". "+t.Title)
+		if t.Body != "" {
+			b := clipRunes(t.Body, 300)
+			if b != t.Body {
+				b += "…"
+			}
+			q = append(q, "   "+b)
+		}
 	}
-	q = append(q, "Add these "+strconv.Itoa(len(tasks))+" tasks to the board?")
+	q = append(q, "Add these "+strconv.Itoa(len(tasks))+" tasks to the board? They wait with label "+board.IntakeLabel+" until you review them; smithy auto skips them until the label is removed.")
 	return sv.Ask(p.ID, strings.Join(q, "\n"), []string{"yes", "no"})
 }
 
@@ -196,7 +203,7 @@ func (sv *Server) RouteIntake(next func(Decision, Outcome) error) func(Decision,
 				continue
 			}
 			body := strings.TrimSpace(t.Body + "\n\nFrom chat idea (" + text.Clean(p.By) + "): " + text.Clean(p.Idea) + " " + mark)
-			if _, err := bd.Add(board.Task{Title: t.Title, Body: body, Labels: []string{"intake"}}); err != nil {
+			if _, err := bd.Add(board.Task{Title: t.Title, Body: body, Labels: []string{board.IntakeLabel}}); err != nil {
 				return err
 			}
 		}

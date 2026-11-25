@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -119,6 +121,14 @@ func TestPollAndReport(t *testing.T) {
 	is, _ = src.Poll(time.Time{})
 	if len(is) != 1 || is[0].Key != "2" {
 		t.Fatalf("unblocked poll %+v (want %d)", is, waiting)
+	}
+	held, _ := b.Add(Task{Title: "from chat", Labels: []string{"x", IntakeLabel}})
+	if is, _ = src.Poll(time.Time{}); slices.ContainsFunc(is, func(i auto.Issue) bool { return i.Key == strconv.FormatInt(held, 10) }) {
+		t.Fatalf("an unreviewed intake task was offered to auto: %+v", is)
+	}
+	b.Set(held, map[string]string{"labels": "x"})
+	if is, _ = src.Poll(time.Time{}); !slices.ContainsFunc(is, func(i auto.Issue) bool { return i.Key == strconv.FormatInt(held, 10) }) {
+		t.Fatalf("a reviewed intake task is not offered: %+v", is)
 	}
 	if err := src.Report("B-2", "bogus", ""); err == nil {
 		t.Fatal("unknown report state accepted")

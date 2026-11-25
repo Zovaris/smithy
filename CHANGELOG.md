@@ -54,6 +54,7 @@ part above `### Details`.
   the ctrl+k command palette. Each screen is its own chunk.
 - Connector kinds: with no `connect.<name>.kinds` and no user-set `notify.kinds`, a connector now sends the daemon defaults (notify kinds plus `pr_merged` and `ci_red`); before, the `notify.kinds` default silently dropped them. `report` is no longer on by default.
 - `POST /v1/decisions` refuses cross-site requests: the body must be `Content-Type: application/json` (415 otherwise), `Sec-Fetch-Site: cross-site` and an `Origin` whose host is not the request host get 403; the daemon client sends the JSON type.
+- Intake review: the approval message lists each task with its body (first 300 characters, line breaks kept, up to 3500 characters in chat), and the board source of `smithy auto` skips tasks labelled `intake` until someone removes the label after reviewing them.
 
 ## v0.19.0 — 2026-11-24
 

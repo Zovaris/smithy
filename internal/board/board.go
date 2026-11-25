@@ -24,6 +24,10 @@ import (
 	"github.com/Zovaris/smithy/internal/store"
 )
 
+// IntakeLabel marks a task planned from a chat idea: smithy auto skips it until a person reviews
+// it and removes the label.
+const IntakeLabel = "intake"
+
 // States are the task states, in board order.
 var States = []string{"todo", "in_progress", "blocked", "review", "done", "canceled"}
 
@@ -441,7 +445,7 @@ func init() {
 func (*Source) Name() string { return "board" }
 
 // Poll syncs with Linear when board.linear_sync is on (a failed sync is a warning: the local
-// board still works), then returns every ready task; since is ignored because a task becomes
+// board still works), then returns every ready task not held by IntakeLabel; since is ignored because a task becomes
 // ready when another one closes, and the watcher dedupes by key.
 func (s *Source) Poll(time.Time) ([]auto.Issue, error) {
 	if s.lin != nil {
@@ -455,6 +459,9 @@ func (s *Source) Poll(time.Time) ([]auto.Issue, error) {
 	}
 	var out []auto.Issue
 	for _, t := range ts {
+		if slices.Contains(t.Labels, IntakeLabel) {
+			continue
+		}
 		if ok, err := s.b.ready(t); err != nil || !ok {
 			continue
 		}

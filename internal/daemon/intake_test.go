@@ -47,7 +47,7 @@ func TestIntakePostsPlanAndAddsTasksOnlyOnYes(t *testing.T) {
 			d = x
 		}
 	}
-	if d.ID == "" || strings.Join(d.Options, ",") != "yes,no" || !strings.Contains(d.Question, "Parse CSV") || !strings.Contains(d.Question, "export the board") {
+	if d.ID == "" || strings.Join(d.Options, ",") != "yes,no" || !strings.Contains(d.Question, "Parse CSV") || !strings.Contains(d.Question, "export the board") || !strings.Contains(d.Question, "b1") {
 		t.Fatalf("decision %+v", d)
 	}
 	bd := board.New(sv.st)
@@ -55,7 +55,7 @@ func TestIntakePostsPlanAndAddsTasksOnlyOnYes(t *testing.T) {
 		t.Fatalf("tasks before yes: %+v", ts)
 	}
 	n, ok := NoteOf(ev(t, KindAsked, "", d))
-	if !ok || n.Session != "" || n.Kind != "decision" || len(n.Options) != 2 {
+	if !ok || n.Session != "" || n.Kind != "decision" || len(n.Options) != 2 || !strings.Contains(n.Text, "\n2. Export button") || !strings.Contains(n.Text, "b1") {
 		t.Fatalf("note %+v", n)
 	}
 
