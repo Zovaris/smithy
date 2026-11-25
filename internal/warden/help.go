@@ -5,5 +5,5 @@ var (
 	WaitTurnUsage = waitUsage
 	BriefUsage    = briefUsage
 	BatchUsage    = batchUsage
-	DoctorUsage   = "usage: smithy doctor [--quiet]\nChecks everything a warden batch needs, one line per check; --quiet prints problems only.\nExit 1 when a check failed."
+	DoctorUsage   = "usage: smithy doctor [--quiet] [--fix [--yes]]\nChecks everything a warden batch needs, one line per check; --quiet prints problems only.\n--fix lists each fix that changes only your own files (exact change shown) and applies it on y;\n--yes applies all; without a terminal and without --yes it applies none.\nExit 1 when a check failed (the checks run before any fix)."
 )
