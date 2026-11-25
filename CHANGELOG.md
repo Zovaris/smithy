@@ -11,10 +11,12 @@ part above `### Details`.
 ### New
 
 - `smithy bench run --agent <cli>` runs smithy's own 20-task benchmark and records pass rate, time, tokens and cost.
+- `smithy bench compare <a> <b>` shows how one run did against another (pass rate, time, tokens, cost, tasks that regressed or got fixed); the web UI has a Bench screen with the same view.
 
 ### Details
 
 - `internal/bench`: 20 fixture Go repos (bugs, features, refactors, docs) with tests as the oracle and a reference solution each; every task runs in a fresh git repo through `smithy agent --profile auto`, tests are restored before grading, results go to `~/.smithy/bench/<id>.json`. `api:` agents wait for the api backend.
+- `smithy bench runs` lists saved runs; runs are named by id, unique prefix, `latest~N` or file path; `compare --json` gives the machine form. The daemon serves `GET /v1/bench` and `GET /v1/bench/compare?a=&b=` (ids only, no paths) to the web UI's plain Bench screen.
 
 ## v0.21.0 — 2026-11-25
 
