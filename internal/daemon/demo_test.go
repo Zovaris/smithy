@@ -4,6 +4,8 @@ package daemon
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -25,7 +27,9 @@ func (r *demoEmit) Ask(_ context.Context, q string, _ []string) (string, error) 
 }
 
 func TestDemoRunnerShowsToolsAndAsks(t *testing.T) {
-	r, err := DemoRunner("claude", "", t.TempDir(), t.TempDir())
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, demoFile), []byte(demoStub), 0o644)
+	r, err := DemoRunner("claude", "", dir, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,6 +45,9 @@ func TestDemoRunnerShowsToolsAndAsks(t *testing.T) {
 	if e.asked == "" {
 		t.Error("the demo turn never asks a decision")
 	}
+	if b, err := os.ReadFile(filepath.Join(dir, demoFile)); err != nil || string(b) != demoHealth {
+		t.Errorf("the demo edit left no %s in the folder: %v", demoFile, err)
+	}
 	if out == "" {
 		t.Error("empty final answer")
 	}
@@ -50,5 +57,18 @@ func TestDemoFlag(t *testing.T) {
 	f, rest, err := splitFlags([]string{"--demo", "--port", "0"})
 	if err != nil || !f.demo || len(rest) != 0 {
 		t.Fatalf("flags %+v rest %v err %v", f, rest, err)
+	}
+}
+
+func TestDemoRunnerLeavesOtherFilesAlone(t *testing.T) {
+	dir := t.TempDir()
+	mine := "package main\n\nfunc mine() {}\n"
+	os.WriteFile(filepath.Join(dir, demoFile), []byte(mine), 0o644)
+	r, _ := DemoRunner("claude", "", dir, t.TempDir())
+	if _, err := r.Turn(context.Background(), "x", nil, &demoEmit{answer: "commit"}); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, demoFile)); string(b) != mine {
+		t.Errorf("demo overwrote a real %s: %q", demoFile, b)
 	}
 }
