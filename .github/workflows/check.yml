@@ -32,6 +32,16 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        if: matrix.build == 'harness'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the web UI (embedded by the harness build)
+        if: matrix.build == 'harness'
+        working-directory: web
+        run: npm ci && npm run build
       - name: Go tests, skills build (race detector, coverage)
         if: matrix.build == 'skills'
         env:
@@ -73,6 +83,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the web UI (embedded by the harness build)
+        working-directory: web
+        run: npm ci && npm run build
       - name: Build both builds for ${{ matrix.target }}
         run: |
           t='${{ matrix.target }}'
@@ -87,17 +105,13 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Web UI tests, typecheck, build within budget (ADR 0010)
+      - name: Web UI tests, typecheck, build within budget (ADR 0010, 0011)
         working-directory: web
         run: |
           npm ci
           npm test
           npm run typecheck
           npm run build
-      - name: Committed internal/web/dist matches the build
-        run: |
-          git add -N internal/web/dist
-          git diff --exit-code --stat -- internal/web/dist || { echo "internal/web/dist is stale: run npm run build in web/ and commit it"; exit 1; }
   check:
     if: always()
     needs: [lint, test, integration, build, web]

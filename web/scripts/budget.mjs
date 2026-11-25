@@ -5,7 +5,7 @@ import { gzipSync } from "node:zlib";
 import { join } from "node:path";
 
 const BUDGET = 30 * 1024;
-const dist = new URL("../../internal/web/dist/", import.meta.url).pathname;
+const dist = new URL("../../internal/web/dist/app/", import.meta.url).pathname;
 const html = readFileSync(join(dist, "index.html"), "utf8");
 const refs = [...html.matchAll(/(?:src|href)="\/?(assets\/[^"]+\.(?:js|css))"/g)].map((m) => m[1]);
 let total = 0;

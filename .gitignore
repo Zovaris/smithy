@@ -2,3 +2,17 @@
 .smelt/
 node_modules/
 .claude/worktrees/
+# build and test output
+/internal/web/dist/*
+!/internal/web/dist/placeholder.html
+web/dist/
+*.out
+coverage.*
+*.test
+*.prof
+# editor and OS junk
+.idea/
+.vscode/
+*.swp
+*~
+Thumbs.db

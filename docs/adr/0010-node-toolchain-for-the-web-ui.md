@@ -1,6 +1,6 @@
 # 0010 · A Node toolchain for the web UI, in web/ only
 
-- Status: accepted
+- Status: accepted; committing `internal/web/dist` superseded by ADR 0011
 - Date: 2026-11-24
 
 ## Context and Problem Statement

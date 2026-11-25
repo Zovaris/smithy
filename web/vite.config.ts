@@ -11,7 +11,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "../internal/web/dist",
+    outDir: "../internal/web/dist/app",
     emptyOutDir: true,
     target: "es2022",
     cssCodeSplit: true,

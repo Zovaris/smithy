@@ -17,6 +17,8 @@ part above `### Details`.
 
 ### Details
 
+- The built web UI is no longer committed (ADR 0011): `npm run build` in `web/` writes the git-ignored `internal/web/dist/app`; without it the harness build serves a committed placeholder page saying how to build it, so a clean clone builds without Node. CI and the release build the UI first, the release fails if the placeholder would ship, and the stale-dist check is gone. `.gitignore` covers coverage, test and editor output.
+
 - `internal/acp`: a stdlib JSON-RPC client for one ACP prompt turn (initialize, session/new, session/prompt); it offers no fs or terminal capability and refuses those requests.
 - `smithy agent` with `AGENT_PROTOCOL=acp`: `gemini --experimental-acp` or `opencode acp`; message chunks go to the log, completed or failed tool calls and permission answers to `tool` and `permission` events, usage to the sidecar and a `usage` event; read-only runs reject permissions and log a decision; the agent gets 5 s to exit after its turn before its group is killed.
 - `decisions.Add` and `usage.Write` exported for that path.
