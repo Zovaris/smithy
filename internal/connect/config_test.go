@@ -35,8 +35,12 @@ func TestFromConfig(t *testing.T) {
 	if tg.Chat != "-100500" || !tg.Users["6"] || len(tg.Users) != 2 {
 		t.Fatalf("%+v", tg)
 	}
-	if k := Kinds("telegram"); !k["blocked"] || !k["decision"] {
+	if k := Kinds("telegram"); !k["blocked"] || !k["decision"] || !k["pr_merged"] || !k["ci_red"] || k["report"] {
 		t.Fatalf("default kinds %v", k)
+	}
+	config.Set(cfg, "notify.kinds", "blocked")
+	if k := Kinds("telegram"); !k["blocked"] || k["pr_merged"] {
+		t.Fatalf("a set notify.kinds wins over the defaults: %v", k)
 	}
 	config.Set(cfg, "connect.telegram.kinds", "decision")
 	if k := Kinds("telegram"); k["blocked"] || !k["decision"] {

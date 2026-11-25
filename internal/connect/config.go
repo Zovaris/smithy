@@ -31,11 +31,15 @@ func idSet(key string) map[string]bool {
 	return users
 }
 
-// Kinds is the set of kinds connector name sends: connect.<name>.kinds, else notify.kinds.
+// Kinds is the set of kinds connector name sends: connect.<name>.kinds, else a notify.kinds the
+// user set, else DefaultKinds.
 func Kinds(name string) map[string]bool {
 	v := config.Get("connect."+name+".kinds", "")
 	if strings.TrimSpace(v) == "" {
-		v = config.Get("notify.kinds", strings.Join(DefaultKinds(), ","))
+		v = strings.Join(DefaultKinds(), ",")
+		if nv, src, err := config.Effective("notify.kinds"); err == nil && src != "default" {
+			v = nv
+		}
 	}
 	on := map[string]bool{}
 	for _, k := range strings.Split(v, ",") {
@@ -124,7 +128,8 @@ func slackFromConfig() (*Slack, error) {
 // File is the hub's state file.
 func File() string { return filepath.Join(ghx.Home(), "connect.json") }
 
-// DefaultKinds are notify.Kinds plus the kinds only the daemon sends.
+// DefaultKinds are notify.Kinds plus the kinds only the daemon sends; the weekly report is
+// opt-in (add report to connect.<name>.kinds).
 func DefaultKinds() []string {
-	return append(append([]string{}, notify.Kinds...), "pr_merged", "ci_red", "report")
+	return append(append([]string{}, notify.Kinds...), "pr_merged", "ci_red")
 }

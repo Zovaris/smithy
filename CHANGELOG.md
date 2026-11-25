@@ -32,6 +32,7 @@ part above `### Details`.
 
 - `internal/report` and `smithy report week`: the last full week (Monday to Sunday) from the events log; open decisions are items whose latest stage is `needs_decision` or `ready`. Time per harness counts `working` spans of items that reported usage. `smithy daemon` posts it once per week (kind `report`, on by default for connectors) from Monday 09:00 local.
 
+- `internal/report` and `smithy report week`: the last full week (Monday to Sunday) from the events log; open decisions are items whose latest stage is `needs_decision` or `ready`. Time per harness counts `working` spans of items that reported usage. `smithy daemon` posts it once per week (kind `report`, opt-in: add it to `connect.<name>.kinds`) from Monday 09:00 local.
 - `smithy daemon` feeds it from its store (cursor `notes:connect`, no replay of history), answers decisions from button presses through the same path as `/v1/decisions`, records topic replies as `user_input` events (`via: chat`); inbound is off until `connect.telegram.users` lists who may answer, and a button counts only on the message that asked it, and turns off serve's own Telegram flush when a connector is set up.
 
 - Discord connector: a public thread per session in `connect.discord.channel`, button components for decisions (five per row, every press acknowledged), the Gateway (GUILD_MESSAGES and MESSAGE_CONTENT intents) for thread replies and presses, only from `connect.discord.users` in the channel's own server; token only from `smithy auth set discord`, origins fixed in code, mentions off, markdown escaped. It shares the stdlib websocket client in `internal/connect/ws.go` with Slack, which now also rejects masked server frames, oversized or fragmented control frames and stray continuations.
@@ -51,6 +52,7 @@ part above `### Details`.
   with the chat transcript in minimal, expandable and verbose modes (`v`), virtualized for 10k
   messages; decisions answered through `/v1/decisions`; agents; a board by session state; and
   the ctrl+k command palette. Each screen is its own chunk.
+- Connector kinds: with no `connect.<name>.kinds` and no user-set `notify.kinds`, a connector now sends the daemon defaults (notify kinds plus `pr_merged` and `ci_red`); before, the `notify.kinds` default silently dropped them. `report` is no longer on by default.
 
 ## v0.19.0 — 2026-11-24
 
