@@ -8,32 +8,45 @@ part above `### Details`.
 
 ## Unreleased
 
+### Highlights
+
+**A web UI.** In the harness build, `smithy web open` shows your sessions, decisions, agents and board in the browser.
+
+**Answer from chat.** The daemon posts each session in its own Telegram topic, Slack thread or Discord thread, with buttons to answer decisions, and your reply there goes to that session.
+
 ### New
 
-**Answer from Telegram.** In the harness build the daemon posts each session in its own Telegram topic, with buttons to answer a decision, and your reply in a topic goes to that session. It only listens to the Telegram users you list in `connect.telegram.users`.
+- **Ideas from chat:** write `idea: <what you want>` in the main Telegram chat and smithy plans it, then adds the tasks to the board only after you say yes.
 
-**Answer from Discord.** The same works in Discord: each session gets a thread in the channel you set in `connect.discord.channel`, decisions come with buttons, and only the Discord users in `connect.discord.users` are heard.
-**Answer from Slack.** The daemon can also post each session in its own Slack thread, with buttons to answer a decision; your reply in the thread goes to that session. Set `connect.slack.channel`, store both Slack tokens with `smithy auth`, and list who may answer in `connect.slack.users`.
-**Ideas from chat.** Write `idea: <what you want>` in the main Telegram chat: smithy plans it, posts the plan back, and puts the tasks on the board only after you press yes.
-**Weekly report.** `smithy report week` says in plain words what shipped, what failed, the time and known cost per harness, and which decisions still wait on you. In the harness build the daemon posts it to your chat connectors every Monday.
+- **Weekly report:** `smithy report week` says in plain words what shipped, what failed, the time and cost per harness, and which decisions wait on you; the daemon posts it every Monday if you turn on the `report` kind.
+
+- **Who may answer:** the chat connectors only listen to the users you list in `connect.telegram.users`, `connect.slack.users` or `connect.discord.users`.
 
 ### Details
 
 - Chat intake: a main-chat message from a listed user that starts with `idea:` or `/idea` is planned by a read-only `smithy agent` (smelt plan, idea fenced as untrusted data, at most 12 `TASK:` lines kept, 20 min timeout) in the daemon's working directory; the plan is recorded (`intake_plan`) and asked as decision `intake:<id>` (yes/no) in the main chat; yes adds the tasks to the board as todo with label `intake`, no adds nothing.
+
 - `internal/connect`: one notification layer (each enabled connector gets a note once, kinds per connector via `connect.<name>.kinds`), a `Connector` interface (thread, send, update, buttons, receive) and the Telegram connector (forum topics, inline keyboards, `getUpdates` long polling, token only from `smithy auth`).
+
 - Kinds `pr_merged` and `ci_red` are new and on by default for connectors.
+
 - `internal/report` and `smithy report week`: the last full week (Monday to Sunday) from the events log; open decisions are items whose latest stage is `needs_decision` or `ready`. Time per harness counts `working` spans of items that reported usage. `smithy daemon` posts it once per week (kind `report`, on by default for connectors) from Monday 09:00 local.
+
 - `smithy daemon` feeds it from its store (cursor `notes:connect`, no replay of history), answers decisions from button presses through the same path as `/v1/decisions`, records topic replies as `user_input` events (`via: chat`); inbound is off until `connect.telegram.users` lists who may answer, and a button counts only on the message that asked it, and turns off serve's own Telegram flush when a connector is set up.
+
 - Discord connector: a public thread per session in `connect.discord.channel`, button components for decisions (five per row, every press acknowledged), the Gateway (GUILD_MESSAGES and MESSAGE_CONTENT intents) for thread replies and presses, only from `connect.discord.users` in the channel's own server; token only from `smithy auth set discord`, origins fixed in code, mentions off, markdown escaped. It shares the stdlib websocket client in `internal/connect/ws.go` with Slack, which now also rejects masked server frames, oversized or fragmented control frames and stray continuations.
+
 - Slack connector (`internal/connect/slack.go`): Socket Mode over a stdlib websocket client (`ws.go`, only `wss://*.slack.com` URLs), a thread per session rooted at a message naming it, Block Kit buttons for decisions, `chat.update` to show the answer; tokens `slack` (`xoxb-`) and `slack_app` (`xapp-`) only from `smithy auth`; inbound only from `connect.slack.channel` and users in `connect.slack.users`, bots and edited or system messages ignored, every envelope acknowledged.
-### Details
 
 - Web UI shell (harness build): `web/` (Preact, `@zovaris/sephiro` 1.2.0, Vite) with smithy's
   Steel theme, hash routing for sessions, decisions, agents and board (alt+1–4), and an auth
   gate. Built into `internal/web/dist`, embedded with `go:embed`; the daemon serves it at `/`
   (loopback, or `*.ts.net` for a login in `daemon.allow`) with a strict CSP. ADR 0010.
+
 - `smithy web [open]` prints or opens the daemon's web link with the token in the URL fragment.
+
 - CI `web` job: Vitest, typecheck, the 120 KB gzip first-load budget, and a stale-dist check.
+
 - Web UI screens over `/v1/events` (fetch-streamed SSE, resumes after the last seq): sessions
   with the chat transcript in minimal, expandable and verbose modes (`v`), virtualized for 10k
   messages; decisions answered through `/v1/decisions`; agents; a board by session state; and

@@ -548,3 +548,19 @@ func TestAskTimeoutValidated(t *testing.T) {
 		}
 	}
 }
+
+func TestConnectorSettingsKnown(t *testing.T) {
+	want := map[string]bool{"connect.slack.channel": true, "connect.discord.channel": true}
+	for _, c := range []string{"telegram", "slack", "discord"} {
+		want["connect."+c+".users"], want["connect."+c+".kinds"] = true, true
+	}
+	for _, s := range Known {
+		if s.Key == "connect.telegram.users" && !strings.Contains(s.Meaning, "empty = send only") {
+			t.Errorf("connect.telegram.users meaning %q", s.Meaning)
+		}
+		delete(want, s.Key)
+	}
+	for k := range want {
+		t.Errorf("%s not a known setting", k)
+	}
+}
