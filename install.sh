@@ -23,9 +23,12 @@ for a in "$@"; do
   esac
 done
 if [ -n "$update" ]; then
-  command -v npx >/dev/null 2>&1 || { echo "smithy install: --update needs npx (Node) for npx skills update" >&2; exit 3; }
-  echo "smithy install: updating the skills (npx skills update -g)" >&2
-  npx -y skills update -g >&2 || { echo "smithy install: npx skills update failed" >&2; exit 3; }
+  if command -v npx >/dev/null 2>&1; then
+    echo "smithy install: updating the skills (npx skills update -g)" >&2
+    npx -y skills update -g >&2 || { echo "smithy install: npx skills update failed" >&2; exit 3; }
+  else
+    skills_by_bin=1
+  fi
   [ -n "$kind" ] || kind=$(cat "$home/kind" 2>/dev/null || true)
 fi
 if [ -z "$kind" ]; then
@@ -111,10 +114,15 @@ if [ "$os" = windows ]; then cp -f "$home/bin/$version/$exe" "$home/bin/$exe"; e
 echo "$kind" > "$home/kind"
 say "installed v$version ($kind build) to $home/bin/$version/$exe (add $home/bin to PATH to run smithy yourself)"
 tty=${SMITHY_TTY:-/dev/tty}
-if { [ -n "${SMITHY_TTY:-}" ] || [ -t 2 ]; } && { : < "$tty"; } 2>/dev/null; then
+if [ -n "$update" ]; then
+  if [ -n "${skills_by_bin:-}" ]; then
+    say "updating the skills without Node (smithy skills install)"
+    "$home/bin/$exe" skills install >&2 || die "smithy skills install failed"
+  fi
+elif { [ -n "${SMITHY_TTY:-}" ] || [ -t 2 ]; } && { : < "$tty"; } 2>/dev/null; then
   printf 'smithy install: install the skills now (smithy skills install, no Node needed)? [y/N] ' >&2
   ans=; read -r ans < "$tty" || true
   case $ans in y|Y|yes) "$home/bin/$exe" skills install >&2 || die "smithy skills install failed" ;; esac
 else
-  say "install the skills with: $home/bin/$exe skills install (or npx skills add Zovaris/smithy -g)"
+  say "skills build installed; install the skill files with: $home/bin/$exe skills install (or npx skills add Zovaris/smithy -g)"
 fi

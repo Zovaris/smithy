@@ -13,7 +13,7 @@ user downloads it, so a database must not make it heavier or pull cgo into it.
 
 One command, two builds from the same source, commands and config:
 - **skills build** (default): standard library only, except `internal/tui` (Charm v2 libraries
-  and harmonica, already allowed). Harness-only commands (`daemon`, `attach`, `board`) stay
+  and harmonica, already allowed). Harness-only commands (`daemon`, `attach`, `board`, `chat`) stay
   hidden and print how to get the harness build, exit code 2.
 - **harness build** (`go build -tags harness ./cmd/smithy`): harness-only packages carry
   `//go:build harness`. Exception: the daemon's auth and detach helpers stay untagged so the
