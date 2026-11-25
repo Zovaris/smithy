@@ -10,6 +10,7 @@ part above `### Details`.
 
 ### New
 
+- `smithy help` teaches the tool: a short intro, then the commands people run grouped as Start here, Daily, Accounts and secrets and Maintenance (harness-only commands marked "(harness build)" in the skills build); `smithy help --all` adds the commands the skills call. `smithy help <command> [sub]` and `<command> --help` show one layout: summary, usage, examples, see also and exit codes, wrapped to 80 columns, colored only on a terminal without `NO_COLOR`. An unknown command or option suggests the closest one (`did you mean …?`) instead of dumping the list, and a usage mistake prints only that command's usage line.
 - `pool.order` (e.g. `claude,codex`): when every account of one harness is limited, a pool run continues on the next pooled harness, logs the switch as a `pool_fallback` event and goes back once the limit resets.
 
 ### Details
