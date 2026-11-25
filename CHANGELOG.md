@@ -10,6 +10,9 @@ part above `### Details`.
 
 ### New
 
+- `smithy help` teaches the tool: a short intro, then the commands people run grouped as Start here, Daily, Accounts and secrets and Maintenance (harness-only commands marked "(harness build)" in the skills build); `smithy help --all` adds the commands the skills call. `smithy help <command> [sub]` and `<command> --help` show one layout: summary, usage, examples, see also and exit codes, wrapped to 80 columns, colored only on a terminal without `NO_COLOR`. An unknown command or option suggests the closest one (`did you mean …?`) instead of dumping the list, and a usage mistake prints only that command's usage line.
+- A failed auto issue gets one more try on a stronger model before it is reported blocked.
+- `pool.order` (e.g. `claude,codex`): when every account of one harness is limited, a pool run continues on the next pooled harness, logs the switch as a `pool_fallback` event and goes back once the limit resets.
 - smithy now installs where other CLIs do: the command is `~/.local/bin/smithy`, the versions live in `~/.local/share/smithy`. An old `~/.smithy/bin` install moves over by itself and keeps working for one release. If `~/.local/bin` is not on your PATH, install.sh prints the exact line for your shell.
 - `smithy uninstall` (or `uninstall.sh`) removes smithy: it lists everything first, with sizes, and asks. Your keys and plans in `~/.smithy` stay unless you pass `--purge`.
 - Harness build: every agent smithy drives gets a `smithy` MCP server with the board, `ask` (a decision answered from the TUI, web or chat), API calls with `secret:<name>` that never show the key, and fast search.

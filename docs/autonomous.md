@@ -85,6 +85,8 @@ smithy board claim B-1 --by me --ttl 30m
 smithy board set B-1 --state review --pr https://github.com/o/r/pull/7
 ```
 
+Every flag and subcommand: `smithy help board` (or `smithy help board <sub>`).
+
 With `board.linear_sync true`, `smithy board sync` (and every board poll) syncs with Linear by
 field ownership: Linear owns title, body, priority and labels; the board owns state, claims, PRs
 and branch. Issues in `linear.states` under the `linear.*` filters are imported as `todo`; later
