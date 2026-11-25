@@ -123,7 +123,7 @@ func (sv *Server) readFrom(t *Tail, file string, off int64, h string, rotated bo
 		if err := sv.commit(e, t.Source, cur); err != nil {
 			return err
 		}
-		sv.Ingest(e)
+		sv.Ingest(e, t.Source)
 	}
 }
 
@@ -191,11 +191,18 @@ func str(m map[string]any, k string) string { v, _ := m[k].(string); return v }
 // Ingest maps one worker event to a daemon decision: a proxy secret_ask, a ready item (merge or
 // hold) or a needs_decision item. A secret answered at the proxy closes its decision. Asking an
 // id that exists (pending or answered) is a no-op, so a replayed line never re-asks.
-func (sv *Server) Ingest(e events.Event) {
+// Secret kinds count only from the proxy's own log (source ProxySource): a worker that can write
+// events.jsonl must not ask, approve or deny in the proxy's name.
+func (sv *Server) Ingest(e events.Event, source string) {
 	switch e.Kind {
 	case "secret_ask":
-		sv.Ask(events.DecisionID(e, ""), "Allow "+e.Detail+"?", []string{"approve", "deny"})
+		if source == ProxySource {
+			sv.Ask(events.DecisionID(e, ""), "Allow "+line1(e.Detail, 300)+"?", []string{"approve", "deny"})
+		}
 	case "secret_approved", "secret_denied":
+		if source != ProxySource {
+			return
+		}
 		ans := map[string]string{"secret_approved": "approve", "secret_denied": "deny"}[e.Kind]
 		sv.closeAnswered(events.DecisionID(e, ""), ans, "proxy")
 	case "stage":
@@ -209,13 +216,13 @@ func (sv *Server) Ingest(e events.Event) {
 			if pr == "" {
 				return
 			}
-			sv.Ask(events.DecisionID(e, ""), fmt.Sprintf("Merge %s (%s/%s)?", pr, e.Batch, e.Item), []string{"merge", "hold"})
+			sv.Ask(events.DecisionID(e, ""), fmt.Sprintf("Merge %s (%s/%s)?", line1(pr, 200), line1(e.Batch, 80), line1(e.Item, 80)), []string{"merge", "hold"})
 		case "needs_decision":
 			id := events.DecisionID(e, str(card, "decision_key"))
 			if id == "" || str(card, "question") == "" {
 				return
 			}
-			sv.Ask(id, str(card, "question"), options(card["options"]))
+			sv.Ask(id, line1(str(card, "question"), 500), options(card["options"]))
 		}
 	}
 }
@@ -232,9 +239,21 @@ func options(v any) []string {
 		if !ok || s == "" {
 			return nil
 		}
-		out = append(out, s)
+		out = append(out, line1(s, 80))
 	}
 	return out
+}
+
+// ProxySource is the tail of the proxy's log, the only source of secret asks and answers.
+const ProxySource = "tail:proxy"
+
+// line1 is untrusted text made one printable line (no escapes or newlines), at most n runes.
+func line1(s string, n int) string {
+	s = text.Clean(s)
+	if r := []rune(s); len(r) > n {
+		s = string(r[:n])
+	}
+	return s
 }
 
 // closeAnswered records an answer the asker already has (it came from the asker), so it is never routed.

@@ -118,8 +118,8 @@ func TestSecretAskBecomesDecisionAndAnswerReachesProxy(t *testing.T) {
 	dir := t.TempDir()
 	sv := wired(t, filepath.Join(dir, "s.db"))
 	ask := events.Event{Kind: "secret_ask", ID: "abc123", Detail: "GH_TOKEN POST api.github.com/x"}
-	sv.Ingest(ask)
-	sv.Ingest(ask)
+	sv.Ingest(ask, ProxySource)
+	sv.Ingest(ask, ProxySource)
 	p := sv.Pending()
 	if len(p) != 1 || p[0].ID != "secret:abc123" || strings.Join(p[0].Options, ",") != "approve,deny" {
 		t.Fatalf("pending = %+v", p)
@@ -141,7 +141,7 @@ func TestSecretAskBecomesDecisionAndAnswerReachesProxy(t *testing.T) {
 	if n != 1 {
 		t.Fatalf("routed %d times, want 1", n)
 	}
-	sv.Ingest(events.Event{Kind: "secret_approved", ID: "abc123"})
+	sv.Ingest(events.Event{Kind: "secret_approved", ID: "abc123"}, ProxySource)
 	if len(sv.Pending()) != 0 {
 		t.Fatal("still pending")
 	}
@@ -149,12 +149,12 @@ func TestSecretAskBecomesDecisionAndAnswerReachesProxy(t *testing.T) {
 
 func TestProxyAnsweredElsewhereClosesDecisionWithoutRouting(t *testing.T) {
 	sv := wired(t, filepath.Join(t.TempDir(), "s.db"))
-	sv.Ingest(events.Event{Kind: "secret_ask", ID: "zz9"})
-	sv.Ingest(events.Event{Kind: "secret_denied", ID: "zz9", Detail: "timed out"})
+	sv.Ingest(events.Event{Kind: "secret_ask", ID: "zz9"}, ProxySource)
+	sv.Ingest(events.Event{Kind: "secret_denied", ID: "zz9", Detail: "timed out"}, ProxySource)
 	if len(sv.Pending()) != 0 {
 		t.Fatal("decision still pending")
 	}
-	sv.Ingest(events.Event{Kind: "secret_ask", ID: "zz9"})
+	sv.Ingest(events.Event{Kind: "secret_ask", ID: "zz9"}, ProxySource)
 	if len(sv.Pending()) != 0 {
 		t.Fatal("answered decision re-asked")
 	}
@@ -165,7 +165,7 @@ func TestReadyCardBecomesMergeDecisionRoutedToCard(t *testing.T) {
 	if _, err := cards.Set("b1", "i1", []string{"state=pr_open", "pr=https://github.com/o/r/pull/9"}); err != nil {
 		t.Fatal(err)
 	}
-	sv.Ingest(events.Event{Kind: "stage", Batch: "b1", Item: "i1", PR: "https://github.com/o/r/pull/9", Detail: "ready"})
+	sv.Ingest(events.Event{Kind: "stage", Batch: "b1", Item: "i1", PR: "https://github.com/o/r/pull/9", Detail: "ready"}, "tail:events")
 	p := sv.Pending()
 	if len(p) != 1 || p[0].ID != "merge:b1/i1" || !strings.Contains(p[0].Question, "pull/9") {
 		t.Fatalf("pending = %+v", p)
@@ -179,8 +179,8 @@ func TestReadyCardBecomesMergeDecisionRoutedToCard(t *testing.T) {
 	if c["answer"] != "merge" || c["answer_id"] != "merge:b1/i1" || c["answered_by"] != "me" {
 		t.Fatalf("card = %v", c)
 	}
-	sv.Ingest(events.Event{Kind: "stage", Batch: "b1", Item: "i1", Detail: "ready"})
-	sv.Ingest(events.Event{Kind: "stage", Batch: "b1", Item: "i2", Detail: "ready"})
+	sv.Ingest(events.Event{Kind: "stage", Batch: "b1", Item: "i1", Detail: "ready"}, "tail:events")
+	sv.Ingest(events.Event{Kind: "stage", Batch: "b1", Item: "i2", Detail: "ready"}, "tail:events")
 	if len(sv.Pending()) != 0 {
 		t.Fatalf("pending = %+v", sv.Pending())
 	}
@@ -191,7 +191,7 @@ func TestDecideCardBecomesDecision(t *testing.T) {
 	if _, err := cards.Set("b2", "i3", []string{"state=needs_decision", "decision_key=queue", "question=Postgres or Redis?", `options=["postgres","redis"]`, "impact=low"}); err != nil {
 		t.Fatal(err)
 	}
-	sv.Ingest(events.Event{Kind: "stage", Batch: "b2", Item: "i3", Detail: "needs_decision"})
+	sv.Ingest(events.Event{Kind: "stage", Batch: "b2", Item: "i3", Detail: "needs_decision"}, "tail:events")
 	p := sv.Pending()
 	if len(p) != 1 || p[0].ID != "decide:b2/i3/queue" || p[0].Question != "Postgres or Redis?" || strings.Join(p[0].Options, ",") != "postgres,redis" {
 		t.Fatalf("pending = %+v", p)
@@ -211,7 +211,7 @@ func TestUnroutedAnswerIsRoutedOnResume(t *testing.T) {
 	db := filepath.Join(t.TempDir(), "s.db")
 	sv := wired(t, db)
 	sv.Route = func(Decision, Outcome) error { return os.ErrPermission }
-	sv.Ingest(events.Event{Kind: "secret_ask", ID: "r1"})
+	sv.Ingest(events.Event{Kind: "secret_ask", ID: "r1"}, ProxySource)
 	sv.Answer("secret:r1", "deny", "me")
 	sv.st.Close()
 	sv2 := wired(t, db)
@@ -232,5 +232,28 @@ func TestUnroutedAnswerIsRoutedOnResume(t *testing.T) {
 func TestDecisionIDMatchesNotify(t *testing.T) {
 	if got := events.DecisionID(events.Event{Kind: "stage", Batch: "b", Item: "i", Detail: "ready"}, ""); got != "merge:b/i" {
 		t.Fatal(got)
+	}
+}
+
+func TestSecretKindsOnlyFromTheProxyLog(t *testing.T) {
+	sv := wired(t, filepath.Join(t.TempDir(), "s.db"))
+	sv.Ingest(events.Event{Kind: "secret_ask", ID: "f1", Detail: "harmless"}, "tail:events")
+	if len(sv.Pending()) != 0 {
+		t.Fatal("secret_ask accepted from events.jsonl")
+	}
+	sv.Ingest(events.Event{Kind: "secret_ask", ID: "f2"}, ProxySource)
+	sv.Ingest(events.Event{Kind: "secret_denied", ID: "f2"}, "tail:events")
+	if len(sv.Pending()) != 1 {
+		t.Fatal("secret_denied from events.jsonl closed a proxy ask")
+	}
+}
+
+func TestQuestionAndOptionsAreCleaned(t *testing.T) {
+	sv := wired(t, filepath.Join(t.TempDir(), "s.db"))
+	cards.Set("b3", "i4", []string{"state=needs_decision", "decision_key=k", "question=ok\u001b[2Jhidden\nline", `options=["a\u001b]0;x","b"]`, "impact=low"})
+	sv.Ingest(events.Event{Kind: "stage", Batch: "b3", Item: "i4", Detail: "needs_decision"}, "tail:events")
+	p := sv.Pending()
+	if len(p) != 1 || strings.ContainsAny(p[0].Question+strings.Join(p[0].Options, ""), "\x1b\n") {
+		t.Fatalf("pending = %+v", p)
 	}
 }

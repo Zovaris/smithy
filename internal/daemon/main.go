@@ -152,7 +152,7 @@ func foreground(name string, port int, serveArgs []string, view auto.View) int {
 	api.Resume()
 	tctx, stopTails := context.WithCancel(context.Background())
 	defer stopTails()
-	go api.RunTails(tctx, time.Second, &Tail{Path: events.File(), Source: "tail:events"}, &Tail{Path: events.ProxyFile(), Source: "tail:proxy"})
+	go api.RunTails(tctx, time.Second, &Tail{Path: events.File(), Source: "tail:events"}, &Tail{Path: events.ProxyFile(), Source: ProxySource})
 	h := auto.Hooks{
 		Tap: func(l string) { api.Append("log", "", map[string]string{"line": l}) },
 		Started: func(sv *auto.Server) (func(), error) {
