@@ -5,6 +5,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+## v0.18.0 — 2026-11-24
+
 - CI runs lint, tests (one job per build), integration and builds as parallel jobs behind a `check` gate; pull requests build one target per OS, main builds every release target.
 - `smithy tui` header draws the anvil again, shaded in Steel with Bayer dither and ember sparks.
 - Added: `smithy board` (harness build), a built-in tracker in the SQLite store: `add`, `list`, `show`, `set`, `claim` (with expiry) and `sync`. `auto.sources board` lets the watcher read it. With `board.linear_sync true` it syncs with Linear by field ownership: Linear owns title, body, priority and labels, the board owns state, claims and PRs; edits are polled with an `updatedAt` cursor.
