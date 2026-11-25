@@ -27,7 +27,7 @@ import (
 // Usage is the text for `smithy tui --help`.
 const Usage = `usage: smithy tui [--no-anim] [--demo]
 A live dashboard of the autonomous forge. Views: Overview, Agents, Incoming, Needs you,
-Done, Activity, Worktrees, Plans, System. It refreshes every 2 s from local files only (no network).
+Done, Activity, Worktrees, Plans, System, History. It refreshes every 2 s from local files only (no network).
 Keys: tab/shift+tab or 1-9, 0 switch views; up/down (j/k) move inside a view; left/right switch
 panes or cards; enter details or read; esc close; o open; l log; c copy; y copy the action command;
 a accept / x reject a decision (Needs you);
