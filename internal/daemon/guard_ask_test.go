@@ -4,8 +4,11 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/guard"
 )
 
 func TestGuardAskRoundTrip(t *testing.T) {
@@ -29,5 +32,32 @@ func TestGuardAskRoundTrip(t *testing.T) {
 	}
 	if ans, ok, err := a.Outcome(ctx, "guard:ab12cd34"); !ok || ans != "deny" || err != nil {
 		t.Fatalf("%q %v %v", ans, ok, err)
+	}
+}
+
+func TestGuardSettingsAPI(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Chdir(t.TempDir())
+	_, hs := newTest(t, filepath.Join(t.TempDir(), "s.db"))
+	res := do(t, "GET", hs.URL+"/v1/guard", "", auth)
+	var v struct {
+		Enabled   bool `json:"enabled"`
+		Suggested []struct {
+			Host  string `json:"host"`
+			Added bool   `json:"added"`
+		} `json:"suggested"`
+	}
+	json.NewDecoder(res.Body).Decode(&v)
+	res.Body.Close()
+	if res.StatusCode != 200 || !v.Enabled || len(v.Suggested) == 0 || v.Suggested[0].Added {
+		t.Fatalf("%d %+v", res.StatusCode, v)
+	}
+	res = do(t, "POST", hs.URL+"/v1/guard/suggested", "{}", auth)
+	res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("add: %d", res.StatusCode)
+	}
+	if f, _ := guard.LoadFetch(); len(f.Allow) != len(guard.Suggested) {
+		t.Fatalf("allow %v", f.Allow)
 	}
 }
