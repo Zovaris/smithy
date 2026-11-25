@@ -248,11 +248,28 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "Run any command with --help for its usage. Not on PATH? smithy setup path.")
 }
 
+// noArgs runs for bare `smithy`; the harness build opens the chat, the skills build prints usage.
+var noArgs func() int
+
+// bare runs `smithy` with no arguments: the chat when the build has one and both ends are a
+// terminal, else usage with exit 2 (a script never gets a fullscreen UI).
+func bare(open func() int, tty bool) int {
+	if open != nil && tty {
+		return open()
+	}
+	usage(os.Stderr)
+	return 2
+}
+
+func terminal(f *os.File) bool {
+	fi, err := f.Stat()
+	return err == nil && fi.Mode()&os.ModeCharDevice != 0
+}
+
 func main() {
 	warden.BinaryVersion = version
 	if len(os.Args) < 2 {
-		usage(os.Stderr)
-		os.Exit(2)
+		os.Exit(bare(noArgs, terminal(os.Stdin) && terminal(os.Stdout)))
 	}
 	switch os.Args[1] {
 	case "help", "--help", "-h":

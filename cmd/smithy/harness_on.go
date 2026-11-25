@@ -19,5 +19,9 @@ func init() {
 	register("attach", "watch a daemon live: events, decisions, reconnect and resume", tui.AttachUsage, "--", func(args []string) int {
 		return tui.Attach(args)
 	})
+	register("chat", "fullscreen chat over a daemon (also bare smithy)", tui.ChatUsage, "--", func(args []string) int {
+		return tui.Chat(args)
+	})
+	noArgs = func() int { return tui.Chat(nil) }
 	serveMain = daemon.ServeOrAttach
 }

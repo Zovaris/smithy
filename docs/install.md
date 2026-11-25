@@ -35,10 +35,14 @@ To use `smithy` in your own terminal, accept the PATH offer in use-smithy setup.
 ## Harness build
 
 The release also ships `smithy-harness-<os>-<arch>`: the same commands plus `smithy daemon`,
-`smithy attach` and `smithy board` (ADR 0009). `install.sh` installs the skills build; until it
-asks which one you want (v0.19), download the harness asset from the
-[releases](https://github.com/Zovaris/smithy/releases) page or build it with
-`go build -tags harness ./cmd/smithy`.
+`smithy attach`, `smithy board` and `smithy chat` (bare `smithy` opens the chat) (ADR 0009). On a terminal `install.sh` asks "harness or
+skills" (Enter picks skills); `--harness` or `--skills` skips the question, and without a terminal
+it installs the skills build and prints how to install the skill files. `--update` keeps the kind you installed (saved in `~/.smithy/kind`) and updates the skills with `npx skills update`, or with `smithy skills install` when Node is missing. Or build
+it with `go build -tags harness ./cmd/smithy`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --harness
+```
 
 ## GitHub access
 
