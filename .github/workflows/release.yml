@@ -40,7 +40,9 @@ jobs:
         with:
           subject-path: 'dist/smithy-*'
       - name: Release notes from CHANGELOG
-        run: awk -v v="## ${GITHUB_REF_NAME} " 'index($0, v) == 1 {on=1; next} /^## v/ {on=0} on' CHANGELOG.md > notes.md
+        run: |
+          awk -v v="## ${GITHUB_REF_NAME} " 'index($0, v) == 1 {on=1; next} /^## v/ || /^### Details/ {on=0} on' CHANGELOG.md > notes.md
+          printf '\n**Full details:** [CHANGELOG.md](https://github.com/%s/blob/%s/CHANGELOG.md)\n' "$GITHUB_REPOSITORY" "$GITHUB_REF_NAME" >> notes.md
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}

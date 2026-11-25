@@ -10,7 +10,7 @@
   build per release target). A `v*` tag runs `release`: it checks the tag matches
   `shared/VERSION`, builds darwin, linux (arm64, amd64) and windows binaries, skills and harness builds each, gzips them,
   writes `checksums.txt`, attests the build and publishes the GitHub release with the
-  CHANGELOG section as notes.
+  CHANGELOG section's plain notes (everything above `### Details`) as notes.
 - `shared/` holds the launcher (`smithy`, `smithy.cmd`) and `VERSION`; edit them there and run
   `go run ./tools/sync-shared`, which copies them into each skill (each skill installs on its own).
 - `tests/run.sh` runs every offline test (`go test`, skill lint via `tests/skills.sh`, and the
@@ -32,4 +32,5 @@
 - Pull requests follow `.github/pull_request_template.md`.
 
 Commits are atomic and conventional (`smithy commit style` shows the rules); every change lands under
-**Unreleased** in [CHANGELOG.md](CHANGELOG.md) first.
+**Unreleased** in [CHANGELOG.md](CHANGELOG.md) first, as a technical bullet. At release time, write
+the version's plain notes for people above `### Details` (see the top of the CHANGELOG).

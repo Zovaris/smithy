@@ -1,11 +1,36 @@
 # Changelog
 
 One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skill lands under
-**Unreleased** first and moves into a version when it is tagged.
+**Unreleased** first and moves into a version when it is tagged. Each version opens with short,
+plain notes for people (`### Highlights`, `### New`, `### Fixed`): what changed for them, in a
+sentence each. The technical bullets go under `### Details`. The GitHub release shows only the
+part above `### Details`.
 
 ## Unreleased
 
 ## v0.19.0 — 2026-11-24
+
+### Highlights
+
+**A chat for the harness.** Run `smithy` in the harness build and you get a fullscreen chat with your agents. It stays fast even on long sessions, works with the mouse, and keeps anything waiting on you pinned at the top.
+
+**Install without Node.** `smithy skills install` puts the skills in every agent CLI you have. No `npx` needed.
+
+**The installer asks what you want.** `install.sh` asks "harness or skills?" and remembers your answer on `--update`.
+
+### New
+
+- **Chat modes:** press `v` to switch between minimal, expandable and verbose.
+- **Agents and commands:** `tab` shows your agents, `ctrl+k` opens a command palette, and `/` runs commands.
+- **`smithy doctor --fix`:** fixes the problems doctor finds, asking before each one.
+- **`smithy cleanup builds`:** frees space from old smithy versions, images and unused worktrees. It shows what it would delete first.
+
+### Fixed
+
+- `install.sh --update` works without Node.
+- `doctor --fix --yes` never grants permissions without asking you.
+
+### Details
 
 - Added: `smithy doctor --fix` lists each fixable check with its exact change (remove a stale `daemon.json`, `chmod 600` the daemon token, add `Bash(smithy pr merge:*)` to `permissions.allow` in `~/.claude/settings.json`) and applies it on `y`; `--yes` applies all except the permission grant, which needs an explicit `y`, and without a terminal it applies none. It only touches your own files and prints what changed.
 - Added: `smithy cleanup builds` lists old smithy builds in `~/.smithy/bin` (keeps the current one and one previous; per-checkout dev builds after 14 days), stale `smithy-*` container images other than `auto.sandbox_image`, and unlocked worktrees of the current repo with no changes, no untracked and no ignored files, with no commits beyond the base branch, with the space each takes; `--yes` deletes them. Worktrees with uncommitted changes are never touched.
@@ -15,6 +40,23 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - `smithy chat` interaction: wheel scroll and click to focus; a click opens or closes a tool block. `v` (empty input) cycles minimal (a run of tools on one line), expandable (one header per tool) and verbose (every tool open, thinking and turn stats). `tab` opens the agents overlay, `ctrl+k` a command palette (waiting on you, actions, sessions, settings), and `/mode`, `/agents`, `/palette`, `/answer`, `/help`, `/quit` work in the input. Decisions waiting on you stay pinned at the top; an option's key or a click posts the answer to `/v1/decisions`.
 
 ## v0.18.0 — 2026-11-24
+
+### Highlights
+
+**A board and a daemon.** In the harness build, `smithy board` is a built-in tracker that can sync with Linear, and `smithy daemon` runs the autonomous loop behind a local API.
+
+**Attach from a terminal.** `smithy attach` connects a terminal to the daemon, shows live events and lets you answer waiting decisions with the number keys.
+
+### New
+
+- The `smithy tui` dashboard has a History tab (key `0`) with the finished work of the last 30 days.
+- The `smithy tui` dashboard has a new steel look, and a setting keeps its animation still.
+
+### Fixed
+
+- The `smithy tui` header draws the anvil again.
+
+### Details
 
 - CI runs lint, tests (one job per build), integration and builds as parallel jobs behind a `check` gate; pull requests build one target per OS, main builds every release target.
 - `smithy tui` header draws the anvil again, shaded in Steel with Bayer dither and ember sparks.
@@ -28,6 +70,24 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## v0.17.0 — 2026-11-24
 
+### Highlights
+
+**Safer container workers.** `auto.sandbox_network proxy` lets container workers reach only GitHub, the model APIs, package registries and the domains you allow. `smithy auth bind` lets a stored key be sent to one host without the worker ever seeing it.
+
+### New
+
+- Container workers can use the account pool, and each one mounts only its own account.
+- Usage limits are now detected for OpenCode, Gemini CLI and Pi, so a limited account waits for its reset instead of only rotating.
+
+### Fixed
+
+- The proxy restarts when your stored keys change, so a new `smithy auth bind` takes effect.
+- OpenCode workers can fetch their models under the default allow-list.
+- Container workers are refused with host networking, and with harnesses the default image does not include.
+- Stopping `smithy auto serve` in the middle of a cycle no longer leaves a stale heartbeat.
+
+### Details
+
 - Container refuses `auto.sandbox_network host` and, on the default image, harnesses it does not carry (only Claude Code and OpenCode); pool hints and help list every harness; docs match the proxy allow-list and restart rule.
 - Fixed: the proxy sidecar restarts when `auth.json` changes, so a new `smithy auth bind` reaches it (a single-file mount kept the old file after a rewrite); `*.opencode.ai` is in the default allow-list so OpenCode workers can fetch their models.
 - Added: the account pool works with `auto.sandbox container`: a pooled worker mounts only its own account dir and gets its config-dir variable; claude accounts use their own token (`smithy auth set claude:<account>`). Doctor allows the combination when every pooled account can run.
@@ -39,6 +99,14 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## v0.16.3 — 2026-11-23
 
+### New
+
+- The account pool now takes OpenCode, Gemini CLI, Cursor CLI, Pi and DeepSeek Harness accounts, each with its own settings folder.
+- Usage limits are detected for Claude Code and Codex; the other harnesses only rotate between accounts.
+- The README is rewritten to be easier to scan, with a diagram of autonomous mode.
+
+### Details
+
 - Account pool: OpenCode, Gemini CLI, Cursor CLI, Pi and DeepSeek Harness accounts, each with its own config dir (`smithy pool add <name> <harness>`). Usage limits are detected for Claude Code and Codex; the others rotate.
 - README: autonomous mode diagram (`docs/auto.svg`) and the TUI's cost and settings views.
 - README rewritten to be scannable: highlights, short tables, one-line examples. Details live in `docs/install.md`, `docs/harnesses.md` and `docs/autonomous.md`.
@@ -46,9 +114,27 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## v0.16.2 — 2026-11-23
 
+### Fixed
+
+- `smithy config list` and the TUI say that `auto.sandbox_network` is required, and that `bridge` means open network access.
+
+### Details
+
 - Fixed: the `auto.sandbox_network` description in `smithy config list` and the TUI says the setting is required (empty or `none` refuses to start container workers; `bridge` is open egress).
 
 ## v0.16.1 — 2026-11-23
+
+### New
+
+- The sandbox image now includes OpenCode 2.4.0.
+
+### Fixed
+
+- Container workers get the credentials their harness needs, and a worker without one is refused with the fix shown by `smithy doctor`.
+- Container mode refuses to start unless `auto.sandbox_network` is set.
+- With no Docker host set and a dead Docker context, smithy finds the container engine socket on its own.
+
+### Details
 
 - Fixed: `auto.sandbox container` workers get their credentials, scoped to the harness (claude:
   `CLAUDE_CODE_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`; codex: `OPENAI_API_KEY`; opencode: none unless
@@ -68,6 +154,28 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   with `opencode/big-pickle` under Kiri.
 
 ## v0.16.0 — 2026-11-23
+
+### Highlights
+
+**Sandboxed unattended workers.** `auto.sandbox` can run unattended workers in a native or container sandbox, and a worker whose sandbox cannot start is not started.
+
+**An account pool.** `smithy pool` lets `smithy agent` use several of your own Claude Code or Codex accounts, and it moves to the next one when a usage limit is hit and the run can safely be repeated.
+
+### New
+
+- You can change settings in the `smithy tui` System view, and each change shows the old and new value before it is saved.
+- Claude Code runs report token use and cost, shown in the TUI; other CLIs show a dash rather than an estimate.
+- `auto.max_cost_per_day` stops new launches for the rest of the day once reported spend reaches it.
+- Telegram messages are richer, with the item, cost and buttons to open its PR or issue, and `notify.style` picks plain or emoji headers.
+
+### Fixed
+
+- Tests no longer write to your real smithy home or send real Telegram alerts.
+- Under the native sandbox, git reaches GitHub over HTTPS, so sandboxed workers can push.
+- `smithy agent` maps the cheap, mid, strong and judge tiers to your models for that CLI.
+- A warden worker that dies at start no longer hangs `smithy wait batch:`.
+
+### Details
 
 - Added: `notify.style` (`plain`, default, or `emoji`) for Telegram messages.
 - Fixed: tests no longer write to your real `~/.smithy` (test `stage` events reached Telegram as
@@ -147,6 +255,31 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - Added: events `orchestrator_failed`, `cap_reached` (once a day) and `serve_down` in events.jsonl.
 
 ## v0.15.0 — 2026-11-23
+
+### Highlights
+
+**Unattended work from issues.** `smithy auto` takes GitHub issues labeled `auto`, or Linear issues, and works them within the hours window and daily cap, then reports the result on the issue.
+
+**A live dashboard.** `smithy tui` is a live view with tabs for agents, decisions, finished work and more, and it reads only local files.
+
+**Telegram alerts.** `smithy auto serve` sends Telegram messages when a PR is ready, an item is blocked or needs a decision, or the daily cap is reached.
+
+### New
+
+- `smithy auto serve` runs the unattended loop, with `--once` for a single pass and `--max-hours` to stop after a set time.
+- `smithy decisions reject` sends a decision back, so the agent decides again.
+- Press `p` in `smithy tui` to pause automatic intake.
+- `smithy auth set` stores a service's key in a file only you can read, and an environment variable for the same service still wins.
+- `smithy <command> <subcommand> --help` prints only that subcommand's usage.
+
+### Fixed
+
+- A serve run that starts nothing puts its issues back in the queue, at most twice per issue.
+- One misconfigured issue source no longer stops the others.
+- Unattended workers can no longer use curl or wget, or edit hook and settings files.
+- Auto tasks use the issue's own key in their file names and branch names.
+
+### Details
 
 - Added: `smithy worktree add <repo> <branch> <from>` creates a task worktree at its standard
   path; warden uses it, and unattended agents (which can't run `git worktree add`) can too.
@@ -256,6 +389,16 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## v0.14.1 — 2026-11-23
 
+### New
+
+- The skills no longer download smithy itself. Install it once with `install.sh`, and the agent offers to run that for you when it is missing or older than the skills.
+
+### Fixed
+
+- `hush` installs again.
+
+### Details
+
 - Fixed: hush failed to install (unquoted `: ` in its YAML `description`).
 - Changed: the skills never download the smithy binary. Install it once with the new
   `install.sh` (checksum + build attestation, as before); the launcher only runs an installed
@@ -265,12 +408,27 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## v0.14.0 — 2026-11-23
 
-### Added
+### New
+
+- Decisions taken without asking anyone are labeled as taken by the agent itself.
+- `smithy tasks import` splits one task list file into separate task files.
+- `smithy batch init --risky` marks risky items, which then need a security check.
+
+### Fixed
+
+- `smithy wait pr:` says when a PR never got a check run, so "pending" and "no CI" read differently.
+- `smithy consult` escalates only for the hard floor: production, deleting user data, real credentials and moving or charging real money.
+- The launcher no longer installs on a checksum alone; it needs the build attestation unless you allow a checksum-only install.
+- The warden doctor no longer suggests an auto-approve hook for worker launches.
+
+### Details
+
+#### Added
 - `smithy decisions add --by self` (now the default) labels a decision taken without consult.
 - `smithy tasks import <tasks.md>` splits one file of `## NN · Title` sections into task files.
 - `smithy batch init --risky <id,id>` marks risky items (security agent required).
 
-### Fixed
+#### Fixed
 - `smithy wait pr:` names a PR whose head never got a check (`pr <n> no-ci: …`) when the wait ends,
   so "pending" and "CI never ran" read differently; tend ends such a PR with `no-ci <url>`.
 - tend: green by fixing code, never by deleting, skipping or loosening a test or CI step; outside
@@ -327,7 +485,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   tend fixes base red only when small, else reports it; Decisions: the timer is only for a user
   who can answer.
 
-### Security
+#### Security
 - Launcher: without `gh` it no longer installs on the checksum alone; it needs the build
   attestation, or `SMITHY_ALLOW_UNATTESTED=1` to accept checksum-only.
 - warden: doctor no longer suggests a `PermissionRequest` hook that auto-approves worker launches.
@@ -336,6 +494,24 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 - hush: the description no longer says it triggers for every launched agent.
 
 ## v0.13.0 — 2026-11-22
+
+### Highlights
+
+**Decisions with a timeout.** smithy waits up to `ask.timeout` minutes (10 by default) for your answer. Then it asks `smithy consult` for a pick and logs it, and a hard floor such as merging to production, deleting user data, credentials or money is never decided for you.
+
+### New
+
+- `smithy batch init` writes a batch from a task folder, and `smithy batch add` adds one item to it.
+- `smithy brief` renders a worker's brief with every field filled in.
+- `smithy wait batch:` also wakes when a card's PR turns green or red, conflicts, merges or closes.
+- `smithy decisions` lets you confirm or change pending decisions by number.
+
+### Fixed
+
+- `smithy wait` prints `conflict` for a conflicting PR instead of `checks=green`.
+- `smithy verify` reports a conflicting PR as `conflict`, not `red`.
+
+### Details
 
 - **Release audit fixes.** One owner for the ask flow, decision log, model ask and stop list (use-smithy); warden logs decisions with `smithy decisions add --ref`, not `decisions.md`; plain skill names instead of slash examples; doc corrections.
 - **Ask, with a timeout.** The user's decisions (use-smithy's stop list) are asked and waited on
@@ -440,6 +616,18 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## v0.12.0 — 2026-11-22
 
+### New
+
+- Skills load fewer tokens: a normal build reads about 5,500 tokens of skill text instead of about 9,500.
+- `smithy tasks add` defaults new tasks to `Speed: fast`.
+
+### Fixed
+
+- `smithy wait pr:` reports checks as pending when you have pushed a commit that GitHub has not shown yet.
+- `smithy wait-turn` uses the default of 5 workers when the setting is missing, as the docs say.
+
+### Details
+
 - **Full audit fixes.** `warden.max` falls back to 5 in `smithy wait-turn`, matching the
   config default and docs. Skills: use-smithy owns the stop list (smelt points to it; hush keeps a copy since it installs alone),
   impact levels, merge and wait rules live in one place each, VERIFY allows working-tree
@@ -516,6 +704,30 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
   `smithy commit` ends with its error line.
 
 ## v0.11.0 — 2026-11-21
+
+### Highlights
+
+**Small changes skip the process.** A typo, copy edit, config value or one-line fix goes straight to the change and its check, with no skill or agents.
+
+**One review per batch.** Warden's workers build without review agents, and once the items merge, one review wave runs on the combined change.
+
+**Tend watches the whole repo.** Besides PRs, tend reacts to red workflow runs, a moved base branch and new Dependabot alerts.
+
+### New
+
+- `smithy names branch` drops filler words and keeps at most four words.
+- `smithy cleanup` also deletes the merged remote branch.
+- `smelt plan` skips the brainstorm, grill and builder check for a spec you already agreed.
+- `smithy decide` is an optional decision model, off until you set it up.
+
+### Fixed
+
+- `smithy comments` no longer reads a JavaScript regex as a comment.
+- `smithy wait batch:` wakes once per card change, instead of repeatedly.
+- `smithy route` ignores negated words, so "no secrets needed" is not read as a risk.
+- `smithy agent --bg` reports an agent that dies at start instead of printing a process id.
+
+### Details
 
 - **Trial 7 frictions.** `smithy comments` no longer reads a JS regex literal (`/^b\//`) as a
   comment. The combined reviewer answers under `## Spec-check` and `## Standards`; the re-review
@@ -654,6 +866,24 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## v0.10.0 — 2026-11-19
 
+### Highlights
+
+**smithy works without the GitHub CLI.** With a GitHub token, smithy talks to GitHub directly, and with neither `gh` nor a token, `smithy pr create` prints a link to open the pull request yourself.
+
+### New
+
+- `smithy pr merge <pr>` merges a PR by rebase, merge or squash.
+- `smithy doctor` reports which GitHub mode is in use: gh, token or none.
+- The launcher installs without `gh`, checks the download against the release checksums, and warns that the build's origin is unverified.
+- Lessons from a smelt run cite their evidence, and accepted rules go to the repo's standards file.
+
+### Fixed
+
+- Workers run each command inside their worktree and fall back to a merge commit when a rebase merge is refused.
+- `smithy wait` retries a transient error on its first read.
+
+### Details
+
 - Audit fixes after the gh-optional batch: warden's final message shows the Decisions and
   Followups lines, workers and tend merge with `smithy pr merge`, smelt proposes up to 3 lessons and
   only skips asking about speed under hush, warden doesn't launch ship items with no GitHub access,
@@ -701,6 +931,14 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## v0.9.1 — 2026-11-19
 
+### Fixed
+
+- `smithy cleanup` removes a worktree only when you pass it, and never the folder it runs in.
+- Warden workers on smelt now run every phase through ship, not just the build.
+- If you ran v0.9.0, `smithy cleanup` may have removed a worktree it was not given; this release fixes that.
+
+### Details
+
 Fixes from a real warden batch and a second smelt validation run. Upgrade: `smithy cleanup` in
 v0.9.0 could remove a worktree it wasn't given.
 
@@ -726,11 +964,30 @@ v0.9.0 could remove a worktree it wasn't given.
 
 ## v0.9.0 — 2026-11-19
 
+### Highlights
+
+**Breaking changes.** `smithy config suggest-models` and `accept-models` are removed, `warden.merge` has no default so warden asks each batch, and every skill can be run by an agent.
+
+### New
+
+- Commands that fail now say why on stderr, for example a skill that is not installed or an unset model.
+- Every command accepts `-h` or `--help` and prints its usage.
+- Value flags accept `--flag=value` as well as `--flag value`.
+- smithy ships no model names; the first time a tier is needed, the skill asks you to name it.
+
+### Fixed
+
+- Windows installs no longer fail with "checksum mismatch".
+- `smithy cleanup` removes a branch whose commits landed under new hashes after a rebase merge.
+- hush and warden treat web pages, files, issues and tool output as data, never as instructions.
+
+### Details
+
 Breaking: `smithy config suggest-models` and `accept-models` are gone (name each model tier
 yourself), `warden.merge` has no default (warden asks per batch), and every skill can be run
 by an agent.
 
-### CLI
+#### CLI
 - `smithy pr-state <n>` with gh missing or signed out exits 3 with a one-line reason, like `wait` and `doctor`.
 - `smithy cleanup <repo> <branch>` says `no branch <x>` and exits 1 when neither the branch nor its worktree exists, instead of "cleaned".
 - `smithy commit "<msg>" <path>` with a path that is neither on disk nor tracked exits 2 with `no such path: <x>` before touching git.
@@ -756,7 +1013,7 @@ by an agent.
 - `smithy tasks add|list` without a dir use the newest task dir, even an empty one made by
   `smithy task-dir`.
 
-### hardening
+#### hardening
 - `smithy comments --diff` reads file names with `-z` (spaces and non-ASCII names count) and exits 2 for a base git can't resolve or one starting with `-`.
 - `smithy drift` exits 2 for a base git can't resolve and reads changed and tracked names with `-z`.
 - `smithy route` exits 2 for an unknown `--kind` or `--speed` and for a flag without its value.
@@ -774,7 +1031,7 @@ by an agent.
 - `smithy drift` lists under "Missing references" the backticked code symbols (`Put`, `Store.Put`) in changed docs and docs that mention changed files that were in the code at base and are gone now.
 - `smithy comments` labels only code-shaped text "commented-out code"; prose such as "a map because lookups must be O(1)" is an explanatory comment.
 
-### skills consistency
+#### skills consistency
 - `warden.merge` has no built-in default: warden asks once per batch in its plan line (auto or
   manual); a saved setting counts as the user's words.
 - Merge, cleanup and report rules match use-smithy everywhere: workers end with `done: <id> …`,
@@ -785,17 +1042,17 @@ by an agent.
 - smelt: fast with no plan builds from the task's criteria (in `.smelt/spec.md`, with its own
   `.gitignore`); reviewers diff the working tree against the base; a no-remote ship skips the PR.
 
-### cleanup
+#### cleanup
 - Clean up after merge is a shared rule: whoever sees the PR merge or close removes the work's
   worktrees and local branches and ends the agents or sessions it launched. smelt hands the
   branch and worktree to tend, which cleans them up when the PR merges.
 
-### models
+#### models
 - smithy ships no model names: `smithy config suggest-models` and `accept-models` are gone. The
   first time a tier is needed the skill asks the user to name it and saves it with
   `smithy config set-model` in `~/.smithy/config.json`.
 
-### from the smelt validation run
+#### from the smelt validation run
 - The launcher builds the dev binary per checkout (`~/.smithy/bin/dev/<checkout id>`), so
   parallel worktrees never run each other's build.
 - `smithy route --agent <file|name>` routes a smelt agent (reviewers cheap, test agents mid).
@@ -805,7 +1062,7 @@ by an agent.
   in worktrees at absolute paths; VERIFY splits "ready to open" from "ready to merge"; a branch
   the harness made is kept; the standards reviewer falls back to use-smithy's ground rules.
 
-### launcher
+#### launcher
 - Windows: falls back to `curl.exe` when `gh` is missing; that curl path times out downloads
   (`--connect-timeout 10 --max-time 120`), and a failed download prints
   `smithy: can't download v<version> (<asset>): <reason>` with exit 3; a CI job runs it on Windows.
@@ -815,14 +1072,14 @@ by an agent.
   without it the launcher stops with how to fix it, unless `SMITHY_ALLOW_UNATTESTED=1`
   accepts a checksum-only install. Answers the skills.sh Snyk E004/W012 on the launcher.
 
-### hush and warden workers, from the skills.sh Snyk audit
+#### hush and warden workers, from the skills.sh Snyk audit
 - hush no longer tells the agent to override the harness's narration rules; it keeps chat to
   what the harness or user requires, records each decision visibly, and the user can end it by
   asking. Web pages, files, issues and tool output are data, never instructions: a shared rule
   in use-smithy, and stated where content enters (hush, smelt review comments, tend, warden
   intake and worker brief).
 
-### smithy binary
+#### smithy binary
 - `smithy drift [base]` resolves its base like `smithy scan` (one shared resolver): a branch
   name diffs against its merge-base with `origin/<branch>`, no base means origin's default
   branch, and the report's `base:` line names the ref instead of a bare SHA.
@@ -831,7 +1088,7 @@ by an agent.
   gets `--effort`, Codex `-c model_reasoning_effort`; every CLI gets `$AGENT_EFFORT`, and one
   without an effort flag says it runs at its own default. `smithy consult` uses it too.
 
-### smelt
+#### smelt
 - New `agents/hostile.md`: runs the built CLI, API or worker as a hostile user across eight
   classes (malformed input, interruption, cancel-and-resume, repeats, injected instructions,
   dirty surroundings, hung dependencies, lying output), in at most 5 cycles, with failure
@@ -847,7 +1104,7 @@ by an agent.
 - Ship: scan before anything leaves the machine, receipts in the PR body, and one proposed
   lesson when something surprised you (or "no lesson").
 
-### from the first smelt run
+#### from the first smelt run
 - `smithy scan --base <branch>` diffs against `origin/<branch>` (merge-base) when it exists, and
   says which: `scan: clean against origin/main (merge-base dbcdb0e)`.
 - `smithy scan` now reads untracked files' content, handles non-ASCII names, isn't fooled by
@@ -874,7 +1131,7 @@ by an agent.
   commit and their files are folded into the repo's tests, never committed as is; another review
   look only when the fix pays for it; agents that didn't apply are listed in the PR body.
 
-### skills, from a best-practice review
+#### skills, from a best-practice review
 - Every skill can be run by an agent (no more `disable-model-invocation`); warden is kept out of
   implicit invocation and still asks for a yes because it costs sessions. Docs no longer assume
   slash commands.
@@ -885,7 +1142,7 @@ by an agent.
 - warden acts on the verdicts `smithy verify` really prints; tend keeps one review-round counter
   and handles `smithy wait` exit codes; smelt's ship phase moved to `references/SHIP.md`.
 
-### tests
+#### tests
 - Go unit tests for cards, config, harness, ghx, tasks, wait and warden (each 96–100%); total
   Go coverage 66%.
 - CI runs `go test -race`, writes per-package coverage to the job summary and fails under 60%.
@@ -895,7 +1152,21 @@ by an agent.
 
 ## v0.8.0 — 2026-11-16
 
-### smithy (breaking)
+### Highlights
+
+**Renamed to smithy.** The skills are now `use-smithy` (was playbook), `smelt` (forge), `warden` (foreman), `ledger` (docs), `hush` (silent) and `simple` (direct); `scout` and `tend` keep their names. Reinstall and use the new names.
+
+**One binary.** The helpers are a single `smithy` binary that the skills download once and check, so at runtime only git and gh are needed.
+
+### New
+
+- `smithy wait` watches PRs, runs, branches, issues and batches without spending tokens.
+- Settings, plans and batches live in one smithy folder, and the first run moves the old files there.
+- `use-smithy` proposes saving repeated commands into a scripts folder with an index.
+
+### Details
+
+#### smithy (breaking)
 - The repo is now `Zovaris/smithy` (GitHub redirects the old name): install with
   `npx skills add Zovaris/smithy -g`.
 - The collection is now **smithy** and the generic names are gone: playbook → `use-smithy`,
@@ -905,7 +1176,7 @@ by an agent.
   `<repo>/.smithy/config.json`; the first run moves the old `~/.agents/` files
   (`config.sh migrate` by hand). The repo's old `.agents/config.json` is still read until moved.
 
-### smithy binary
+#### smithy binary
 - One Go binary, `smithy`, replaces the shell and Node helpers: `smithy config`, `harness`,
   `names`, `tasks`, `cards` (warden status cards), `wait` and `status`. Same commands, flags,
   output and exit codes as the scripts they replace; the old script tests now run through it.
@@ -926,7 +1197,7 @@ by an agent.
 - CI: `check` on pull requests and main (gofmt, vet, tests, cross builds); `release` on `v*`
   tags (binaries, checksums, provenance attestation, GitHub release from the CHANGELOG).
 
-### waiting
+#### waiting
 - `smithy wait`: one zero-token waiter for `pr:` (checks finished green/red with the failed
   names, merged, closed, conflict, review, comment, push), `run:`, `branch:`, `prs`, `issues:`
   and `batch:` targets, any mix in one call. Already-finished checks return at once; a bad
@@ -934,44 +1205,71 @@ by an agent.
 - tend's and warden's `watch.sh` are presets over it; smelt, warden workers and tend wait on it
   instead of sleep loops.
 
-### naming
+#### naming
 - `names.sh`: branches `<type>/<key>-<slug>` (key: Jira or Linear key, issue number or task
   `NN`) and worktrees `<repo-parent>/worktrees/<repo>-<branch>`, from `git.branch` and
   `git.worktree`. smelt, warden and tend use it; tend no longer depends on a branch prefix.
 
-### tasks
+#### tasks
 - `tasks.js add` creates the next task file; `tasks.js board [--all]` lists every task list and
   warden batch here or on the whole machine; `/warden status all` shows it.
 
-### use-smithy
+#### use-smithy
 - Proposes saving repeated commands and throwaway scripts into `scripts/` with a `SCRIPTS.md`
   index at the end of a task (after scriptify), and checks that index first.
 
 ## v0.7.0 — 2026-11-15
 
-### review against skill-authoring best practices
+### Highlights
+
+**Model choice per task.** smithy picks a cheap, mid or strong model for each task from its risk, difficulty and size, using the models you set for your harness.
+
+### New
+
+- `consult` asks your strong model through the CLI you are already using, instead of a fixed one.
+- A new mid tier sits between cheap and strong.
+- The worker brief carries the silent rules itself, so they hold over a long session.
+
+### Fixed
+
+- Duplicated rules and contradictions between the skills are resolved, and skill descriptions are shorter.
+
+### Details
+
+#### review against skill-authoring best practices
 - Shorter descriptions on every skill (what + when, ~170–290 characters).
 - foreman split from 237 to 114 lines: intake, state, acting and models moved to references; one defaults table with precedence; contradictions on production merges, `max`, tend launch and model rules resolved.
 - forge references no longer chain into each other; duplicated rules and red flags removed; every phase has a done check; one definition of "agent".
 - playbook, docs, scout, tend, silent and direct: overlaps and contradictions resolved (ADR test, inline scout runs, `done:` stays English, docs init creates STANDARDS.md); Claude-only wording removed outside harness notes; golangci-lint example on v2.
 
-### decisions
+#### decisions
 - `consult.sh` moved to `shared/` and ships with forge, foreman and tend. It asks the user's strong model through the CLI of the harness you're in (Claude with no tools; Codex, OpenCode, Gemini, Pi, DeepSeek or Cursor read-only through `agent.sh`) instead of preferring Claude whenever it's installed; `--context <file>` adds a short excerpt. Tested live through OpenCode.
 - forge (`build all`, `/silent`), tend and playbook use the same rule as foreman: low impact decide, medium `consult.sh`, high the user; every decision is logged.
 
-### model routing
+#### model routing
 - `route.js` picks a model tier per task from the task itself (risk, difficulty, size, kind, speed): cheap, mid or strong, mapped to the user's models for the current harness. Nothing is tied to the session's model.
 - `config.sh suggest-models` / `accept-models`: where a harness has stable tier aliases (Claude: haiku, sonnet, opus) the agent proposes them in one line and saves them on a yes; elsewhere it asks for each tier. playbook setup shows the suggestions.
 - New `mid` tier (`config.sh set-model mid <name>`) and `foreman.worker_model` (`route` by default, `session`, or one model name).
 - foreman launches each worker on its routed model and shows tier and model in the plan line; forge's `build all` routes implementers and reviewers the same way.
 
-### foreman and silent
+#### foreman and silent
 - The worker brief carries the silent rules itself, at the top and again before the closing line, and foreman spawns workers with the brief's full text instead of a pointer to the file, so the rules don't fade over a long session.
 - `silent` names the narration it forbids ("Now let me…", "Next I'll…") and says the rule lasts the whole session.
 
 ## v0.6.0 — 2026-11-15
 
-### shared
+### New
+
+- The agent runner works unattended on Claude Code, Codex, OpenCode, Gemini, Cursor, Pi and DeepSeek Harness.
+- The README has a table for each harness: where its skills go, how to start a skill and how workers run.
+
+### Fixed
+
+- A Codex settings variable is no longer mistaken for a harness.
+
+### Details
+
+#### shared
 - `agent.sh` runs workers unattended on every supported CLI, checked against each harness's docs and source: OpenCode `--standalone --auto` (tested live; without `--standalone` it doesn't work in the current folder), Codex with the git dir writable and network on, Gemini `--approval-mode yolo`, Claude `--permission-mode auto`, plus Cursor (`agent -p --force`), Pi (`pi -p`) and DeepSeek Harness (`dsh headless`). `AGENT_CLI` picks one, `AGENT_ARGS` adds flags. Workers get `FOREMAN_HARNESS` and lose the parent's harness variables; output goes through a file so a CLI that leaves a server running can't hang the caller.
 - `harness.sh` detects Pi and DeepSeek Harness and no longer mistakes user settings (`CODEX_HOME`) for a harness; `find-skill.sh` and playbook's setup know every harness's skills folder and global instructions file.
 - Codex: `agents/openai.yaml` keeps forge, foreman, silent and tend user-invoked.
@@ -979,32 +1277,49 @@ by an agent.
 
 ## v0.5.0 — 2026-11-15
 
-### playbook (new)
+### Highlights
+
+**Five new skills.** `playbook` routes work to the right skill, `docs` keeps decision records and the glossary, `scout` answers questions read-only, `tend` keeps open PRs mergeable, and `direct` gives short replies.
+
+### New
+
+- Forge's `build all` gives each task its own implementer, a review and a capped fix loop.
+- `tend watch` adopts new PRs and can queue labeled issues as tasks, without building them.
+- Items that cannot start yet wait in their own session until their prerequisites merge.
+- `commit` detects the repo's commit style (conventional, gitmoji or plain) and checks messages before committing.
+
+### Fixed
+
+- A PR closed without merging marks its item dropped and ends its worker.
+
+### Details
+
+#### playbook (new)
 - Loaded by the agent at the start of software work: lists the installed skills, routes work to them (forge, foreman, docs, scout, tend, silent, direct) and holds the shared rules and red flags.
 - `scripts/setup.sh`: status of installed skills and models, and an opt-in pointer block for the user's `AGENTS.md` / `CLAUDE.md`.
 
-### direct (new)
+#### direct (new)
 - Short, direct replies with no filler or AI tells; `silent` wins while it runs; code, commits, PRs and docs are written normally.
 
-### docs (new)
+#### docs (new)
 - ADRs, glossary, module READMEs, codebase map, doc drift checks, comment policy (API doc comments only) and search over docs and decisions.
 
-### scout (new)
+#### scout (new)
 - Read-only investigation with sources on the user's cheap model; reports recommend, never authorize.
 
-### tend (new)
+#### tend (new)
 - Keeps open PRs mergeable: CI fixes, rebases after sibling merges, review comments; launched by foreman for its batches.
 - Models: routine work on the user's cheap model, code fixes on the strong one; `--model` / `--fix-model` override.
 - `watch [prs|issues|all]`: keeps adopting new PRs (default) and can queue accepted labeled issues as task files for foreman, never building them; `scripts/watch.sh` waits without tokens.
 - A PR it can't get green comes back to foreman as a `blocked` / `needs_decision` card, or to the user as `needs you <url>: <why>`.
 
-### forge
+#### forge
 - `build all`: every task here with one implementer subagent each, per-task review, capped fix loop and a rulings ledger.
 - Verify gate (no claim without fresh evidence) on build, test, review and ship; red-flag tables.
 - Receiving review, a builder check after the spec, a security reviewer, Files and Interfaces in tasks, baseline test run, a three-way close (PR, merge if asked, keep).
 - Delegates `adr`, `init`, context and the ship docs step to the docs skill when installed; fact-finding to scout.
 
-### foreman
+#### foreman
 - Launches every worker in the user's turn; items that can't start yet wait in their own session on `wait-turn.sh` (new `waiting` state) until their prereqs merge and a slot frees. Batches with dependencies stay autonomous in harnesses that can't start sessions from event turns.
 - The watcher wakes only for cards that need the foreman (decisions, stuck, PRs, merged, reported, dropped); `--all` for every change.
 - Workers merge `origin/<base>` before opening the PR and before merging; a refused merge ends as `ready note=merge-blocked` and the foreman merges; work found after a merge becomes a follow-up PR (small) or a task file for the foreman to decide.
@@ -1014,20 +1329,20 @@ by an agent.
 - Models come from the user's choice per harness (`config.sh`), never hard-coded; `consult.sh` uses the strong one.
 - `doctor` checks the companion skills and model settings.
 
-### shared
+#### shared
 - Settings: `config.sh` reads `<repo>/.agents/config.json` then `~/.agents/config.json` then defaults; `config.sh list` shows every setting, its value and source; `set --repo` saves per repo. Known settings: models, `tasks.location/commit/ignore`, `foreman.merge/cleanup/max/mode`, `tend.watch/label`.
 - `task-dir.sh <slug>`: one place that decides where specs and tasks go; asks `tasks.commit` once per repo and, when specs stay out of git, whether to add `.docs/` to `.gitignore` or `.git/info/exclude`.
 - `tasks.js where` also finds `.docs/specs/` (specs kept out of git) and `$FORGE_TASKS_DIRS`; forge reads `tasks.location` / `tasks.commit` (default committed) from the user config.
 - `config.sh` (cheap and strong model per harness in `~/.agents/config.json`), `find-skill.sh --list`; `harness.sh`, `verify.sh` moved to `shared/`.
 - `tests/run.sh` (offline tests, skill lint) in CI, and `scripts/drill.sh` for live pressure tests against an agent CLI.
 
-### forge and foreman
+#### forge and foreman
 - `commit.sh`: detects the repo's commit style (commitlint, history: conventional, gitmoji or plain), checks messages and commits exactly the given paths, one concern per commit.
 - `pr.sh`: finds the PR template and refuses a body that drops its headings; reuses an open PR instead of opening a second one.
 - `cleanup.sh`: removes a finished task's worktree and local branch every time, and refuses to drop unpushed work.
 - Shared scripts live in `shared/` and are copied into each skill by `scripts/sync-shared.sh`; CI checks they stay in sync.
 
-### foreman
+#### foreman
 - Workers turn on their harness's auto-archive when their PR closes, so sessions waiting on a manual merge end on their own.
 - A PR closed without merge marks the item `dropped` and ends its worker.
 - The foreman ends every finished worker before its final message; `blocked` / `failed` ones stay open for inspection.
@@ -1035,21 +1350,30 @@ by an agent.
 
 ## v0.4.0 — 2026-11-15
 
+### New
+
+- `silent` runs a task end to end with no chatter between tool calls, and finishes with one `done:` line.
+- `forge` runs its phases with exit gates, from brainstorm to retro, at three speeds: fast, normal and full.
+- `foreman` runs one or many tasks in parallel, each in its own git worktree, ending in a PR or a report.
+- The skills are not tied to one agent: they run in Claude Code and in any agent CLI.
+
+### Details
+
 First tagged release.
 
-### silent
+#### silent
 - Runs a task end to end with no talk between tool calls; progress only in the harness's to-do list.
 - Ends with one line in English: `done: <where it landed>` (PR, commits, uncommitted changes or an answer); only commits or opens a PR when the task asks.
 - Stops only for what is the user's alone, with `blocked: <why>`.
 
-### forge
+#### forge
 - Phases with exit gates: brainstorm (why, approaches, design) → grill → spec → task list → TDD → test agents → review → ship → retro.
 - Start at any phase (`/forge build`, `/forge test`, `/forge from test`) at three speeds: `fast`, `normal`, `full`.
 - Shared task list (`NN-<slug>.md` with `Status`, `Blocked by`, `PR`) on a board, in the repo or in `~/.agents/plans`, managed by `scripts/tasks.js`; `/forge build next` works it one task at a time.
 - Independent test agents: adversary, regression, property, mutation, E2E; read-only spec-check and standards reviewers.
 - ADRs, glossary and standards docs; optional `guard-tests.sh` pre-edit hook.
 
-### foreman
+#### foreman
 - Runs one or many tasks in parallel: one silent worker and git worktree per task, each to a PR or a report.
 - Takes inline tasks, a task dir, board ids or just an idea (offers to plan it with forge or split it).
 - Workers follow forge (`fast` / `normal` / `full`) or plain mode, reading each skill's `SKILL.md` by path.
