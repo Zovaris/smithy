@@ -31,6 +31,9 @@ const (
 	overlayNone chatOverlay = iota
 	overlayAgents
 	overlayPalette
+	overlaySetup  // first run: every agent ready or missing
+	overlayPicker // ctrl+l, /agent, /model
+	overlaySkills // /skills
 )
 
 // chatTool is the data of a "tool" event: one tool call of a session's turn.
@@ -234,6 +237,9 @@ func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	case "ctrl+k":
 		m.overlay, m.pal = overlayPalette, palette{}
 		return true, nil
+	case "ctrl+l":
+		m.openPicker(overlayPicker)
+		return true, m.loadSetup(false)
 	}
 	if m.input.Value() != "" || len([]rune(msg.Text)) != 1 {
 		return false, nil
@@ -276,6 +282,16 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		m.overlay = overlayAgents
 	case "palette":
 		m.overlay, m.pal = overlayPalette, palette{}
+	case "agent":
+		return m.agentCommand(arg)
+	case "model":
+		return m.modelCommand(arg)
+	case "skills":
+		m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
+		return m, m.loadSetup(false)
+	case "setup":
+		m.openPicker(overlaySetup)
+		return m, m.loadSetup(false)
 	case "answer":
 		if arg == "" {
 			m.system("usage: /answer <text>")
@@ -285,7 +301,7 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 	case "quit":
 		return m, tea.Quit
 	case "help":
-		m.system("/mode [minimal|expandable|verbose] · /agents · /palette · /answer <text> · /quit")
+		m.system("/agent [name] · /model [name] · /skills · /setup · /mode [minimal|expandable|verbose] · /agents · /palette · /answer <text> · /quit")
 	default:
 		m.system("unknown command /" + name)
 	}
@@ -326,6 +342,9 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	k := msg.String()
 	if k == "ctrl+c" {
 		return m, tea.Quit
+	}
+	if m.overlay == overlaySetup || m.overlay == overlayPicker || m.overlay == overlaySkills {
+		return m.setupKey(msg)
 	}
 	if m.overlay == overlayAgents {
 		switch k {
@@ -375,6 +394,11 @@ func (m chatView) palItems() []palItem {
 	cycle := func(m *chatView) tea.Cmd { m.setMode((m.mode + 1) % 3); return nil }
 	agents := func(m *chatView) tea.Cmd { m.overlay = overlayAgents; return nil }
 	all = append(all,
+		palItem{group: "ACTIONS", glyph: t.g.prompt, color: t.muted, label: "Agent and model", hint: m.agentLabel(), key: "ctrl+l", run: func(m *chatView) tea.Cmd { m.openPicker(overlayPicker); return m.loadSetup(false) }},
+		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Skills and MCP", hint: "what goes into every session", key: "/skills", run: func(m *chatView) tea.Cmd {
+			m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
+			return m.loadSetup(false)
+		}},
 		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Verbosity: " + m.mode.String(), hint: "minimal · expandable · verbose", key: "v", run: cycle},
 		palItem{group: "ACTIONS", glyph: t.g.on, color: t.muted, label: "Agents panel", hint: "sessions and waiting items", key: "tab", run: agents},
 		palItem{group: "ACTIONS", glyph: "↓", color: t.muted, label: "Jump to latest", key: "end", run: func(m *chatView) tea.Cmd { m.offset = 0; return nil }},

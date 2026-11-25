@@ -5,6 +5,8 @@
   WAITING ON YOU                                                                                    
   ▸ ? Merge #142 into release/v0.17?  merge · later                                                 
   ACTIONS                                                                                           
+    › Agent and model                                                                       ctrl+l  
+    ≡ Skills and MCP  what goes into every session                                         /skills  
     ≡ Verbosity: minimal  minimal · expandable · verbose                                         v  
     ● Agents panel  sessions and waiting items                                                 tab  
     ↓ Jump to latest                                                                           end  
@@ -16,8 +18,6 @@
   SETTINGS                                                                                          
     · chat.mode  minimal                                                                            
     · daemon  http://127.0.0.1:7477                                                                 
-                                                                                                    
-                                                                                                    
                                                                                                     
                                                                                                     
                                                                                                     

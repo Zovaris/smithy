@@ -80,6 +80,14 @@ type chatView struct {
 	sessions []chatSession
 	// decide posts an answer to /v1/decisions and returns a chatDecidedMsg.
 	decide func(id, answer string) tea.Cmd
+
+	setup     setupAPI      // the daemon's setup endpoints; nil: none
+	setupSt   *daemon.Setup // last GET /v1/setup
+	setupSel  int
+	setupStep setupStep
+	setupNote string // a fix, an error or install output shown in the open overlay
+	modelFor  string
+	modelIn   string
 }
 
 func newChatView(stream <-chan daemon.ClientMsg, url string, th theme) chatView {
@@ -234,6 +242,7 @@ func Chat(args []string) int {
 	m.where = where
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
+	m.setup = c
 	m.decide = func(id, answer string) tea.Cmd {
 		return func() tea.Msg {
 			_, err := c.Decide(ctx, id, answer)
@@ -265,7 +274,7 @@ func (m *chatView) release() {
 	m.held = nil
 }
 
-func (m chatView) Init() tea.Cmd { return tea.Batch(textinput.Blink, m.wait()) }
+func (m chatView) Init() tea.Cmd { return tea.Batch(textinput.Blink, m.wait(), m.loadSetup(true)) }
 
 func (m chatView) wait() tea.Cmd {
 	if m.stream == nil {
@@ -291,6 +300,9 @@ func (m *chatView) push(c chatMsg) {
 }
 
 func (m chatView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if next, cmd, ok := m.setupUpdate(msg); ok {
+		return next, cmd
+	}
 	switch msg := msg.(type) {
 	case daemon.ClientMsg:
 		switch {
@@ -516,6 +528,10 @@ func (m chatView) View() tea.View {
 		vis = m.agentsPanel(w)
 	case overlayPalette:
 		vis = m.palettePanel(w)
+	case overlaySetup, overlayPicker:
+		vis = m.setupPanel(w)
+	case overlaySkills:
+		vis = m.skillsPanel(w)
 	default:
 		vis, _ = m.visible()
 	}
@@ -540,6 +556,9 @@ func (m chatView) footer(w int) string {
 	dim, key := t.fg(t.dim), t.fg(t.text)
 	hint := func(k, what string) string { return key.Render(k) + dim.Render(" "+what) }
 	left := "  " + strings.Join([]string{hint("enter", "send"), hint("v", "mode: "+m.mode.String()), hint("tab", "agents"), hint("ctrl+k", "palette")}, "   ")
+	if a := m.agentLabel(); a != "" {
+		left += "   " + hint("ctrl+l", a)
+	}
 	if m.offset > 0 {
 		left += "   " + t.fg(t.info).Render(fmt.Sprintf("→ %d rows up", m.offset))
 	}
