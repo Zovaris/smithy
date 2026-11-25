@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en" data-sephiro-theme="hearth">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>smithy web · Hearth design</title>
+<link rel="stylesheet" href="../../../web/src/theme/hearth.css">
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:var(--sph-bg);color:var(--sph-text);font:15px/1.6 var(--sph-font-sans);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.mono{font-family:var(--sph-font-mono);font-size:.86em}
+.muted{color:var(--sph-text-muted)}
+.faint{color:var(--hearth-ink-faint)}
+
+/* status: color + glyph, never color alone */
+.st{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;white-space:nowrap}
+.st i{font-style:normal;width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font-size:10px;line-height:1}
+.st.run i{background:var(--sph-accent-soft);color:var(--sph-accent)}
+.st.need i{background:var(--sph-warning-soft);color:var(--sph-warning)}
+.st.done i{background:var(--sph-success-soft);color:var(--sph-success)}
+.st.fail i{background:var(--sph-danger-soft);color:var(--sph-danger)}
+.st.need{color:var(--sph-warning);font-weight:600}
+
+/* app shell: mobile first */
+.app{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr;height:100dvh}
+.side,.rail{display:none}
+.top{display:flex;align-items:center;gap:10px;padding:10px 12px;padding-top:max(10px,env(safe-area-inset-top));border-bottom:1px solid var(--sph-border);background:var(--sph-bg)}
+.top h1{font-size:15px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.icon{width:36px;height:36px;border-radius:var(--sph-radius-sm);display:grid;place-items:center;color:var(--sph-text-muted)}
+.icon:hover{background:var(--sph-raised);color:var(--sph-text)}
+.chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:999px;border:1px solid var(--sph-border);background:var(--sph-surface);font-size:13px;color:var(--sph-text-muted)}
+.chip b{color:var(--sph-text);font-weight:600}
+.chip.add{color:var(--sph-success)}
+.chip .del{color:var(--sph-danger)}
+
+.main{display:flex;flex-direction:column;min-height:0;min-width:0}
+.scroll{flex:1;overflow:auto}
+.conv{max-width:720px;margin:0 auto;padding:20px 16px 24px;display:flex;flex-direction:column;gap:22px}
+.meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
+.you{align-self:flex-end;max-width:85%;background:var(--sph-raised);padding:11px 15px;border-radius:var(--sph-radius-lg) var(--sph-radius-lg) 6px var(--sph-radius-lg)}
+.agent{display:flex;gap:12px}
+.av{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--sph-accent-soft);color:var(--sph-accent);font-size:13px;font-weight:700;margin-top:1px}
+.body{min-width:0;flex:1;display:flex;flex-direction:column;gap:12px}
+.body p{max-width:64ch}
+.who{font-size:13px;font-weight:600}
+.who span{font-weight:400;color:var(--hearth-ink-faint)}
+code{font-family:var(--sph-font-mono);font-size:.86em;background:var(--sph-raised);padding:1px 5px;border-radius:5px}
+
+.tool{border:1px solid var(--sph-border);border-radius:var(--sph-radius-md);background:var(--sph-surface)}
+.tool summary{list-style:none;display:flex;align-items:center;gap:10px;padding:9px 12px;font-size:13.5px;cursor:pointer}
+.tool summary::-webkit-details-marker{display:none}
+.tool summary .k{font-weight:600}
+.tool summary .a{color:var(--sph-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.tool pre{margin:0;padding:10px 14px 12px;border-top:1px solid var(--sph-border);font:12.5px/1.55 var(--sph-font-mono);color:var(--sph-text-muted);overflow:auto}
+.tools{display:flex;flex-direction:column;gap:6px}
+
+.decide{border:1px solid color-mix(in srgb,var(--sph-warning) 45%,var(--sph-border));background:color-mix(in srgb,var(--sph-warning) 6%,var(--sph-surface));border-radius:var(--sph-radius-md);padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.decide h3{font-size:14.5px;font-weight:600}
+.decide pre{font:12.5px/1.5 var(--sph-font-mono);background:var(--sph-raised);padding:8px 10px;border-radius:var(--sph-radius-sm);overflow:auto}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{height:36px;padding:0 14px;border-radius:var(--sph-radius-sm);border:1px solid var(--sph-border-strong);background:var(--sph-surface);font-size:14px;font-weight:500}
+.btn.primary{background:var(--sph-accent);border-color:var(--sph-accent);color:var(--sph-on-accent)}
+.btn.ghost{border-color:transparent;color:var(--sph-text-muted)}
+.typing{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--sph-text-muted)}
+.dots{display:inline-flex;gap:3px}
+.dots b{width:5px;height:5px;border-radius:50%;background:var(--sph-accent);opacity:.35;animation:p 1.2s infinite}
+.dots b:nth-child(2){animation-delay:.15s}.dots b:nth-child(3){animation-delay:.3s}
+@keyframes p{40%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.dots b{animation:none;opacity:.8}}
+
+.composer-wrap{padding:8px 12px max(12px,env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--sph-bg) 30%)}
+.composer{max-width:720px;margin:0 auto;border:1px solid var(--sph-border-strong);background:var(--sph-surface);border-radius:var(--sph-radius-lg);box-shadow:var(--sph-shadow-popover);padding:10px 10px 8px 14px}
+.composer .ph{color:var(--hearth-ink-faint);min-height:24px}
+.composer .row{display:flex;align-items:center;gap:6px;margin-top:6px}
+.composer .row .sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:999px;font-size:13px;color:var(--sph-text-muted)}
+.pill:hover{background:var(--sph-raised)}
+.pill .hide-s{display:none}
+.send{width:34px;height:34px;border-radius:50%;background:var(--sph-accent);color:var(--sph-on-accent);display:grid;place-items:center}
+.stop{width:34px;height:34px;border-radius:50%;background:var(--sph-text);color:var(--sph-bg);display:grid;place-items:center}
+.stop span{width:10px;height:10px;border-radius:2px;background:currentColor}
+
+/* sessions list (sidebar + phone sheet share it) */
+.brand{display:flex;align-items:center;gap:9px;padding:4px 6px 14px;font-weight:650;font-size:15px}
+.brand .mark{width:26px;height:26px;border-radius:8px;background:var(--sph-accent);color:var(--sph-on-accent);display:grid;place-items:center;font-size:13px}
+.newbtn{display:flex;align-items:center;gap:8px;width:100%;height:38px;padding:0 12px;border-radius:var(--sph-radius-sm);border:1px solid var(--sph-border);background:var(--sph-surface);font-weight:500;font-size:14px}
+.newbtn kbd{margin-left:auto;font:11px var(--sph-font-mono);color:var(--hearth-ink-faint)}
+.grp{margin-top:18px}
+.grp h4{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--sph-text-muted);padding:0 8px 6px}
+.grp h4 .on{width:7px;height:7px;border-radius:50%;background:var(--sph-success)}
+.grp h4 .sp{flex:1}
+.sess{display:flex;flex-direction:column;gap:1px;padding:8px 10px;border-radius:var(--sph-radius-sm);font-size:14px}
+.sess:hover{background:var(--sph-raised)}
+.sess.cur{background:var(--sph-surface);box-shadow:0 0 0 1px var(--sph-border)}
+.sess .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.sess .s{display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--hearth-ink-faint)}
+.foot{margin-top:auto;display:flex;align-items:center;gap:6px;padding-top:12px;border-top:1px solid var(--sph-border)}
+
+/* right rail */
+.rail h2{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.rail h2 .sp{flex:1}
+.card{border:1px solid var(--sph-border);border-radius:var(--sph-radius-md);background:var(--sph-surface);overflow:hidden}
+.file{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px;border-top:1px solid var(--sph-border)}
+.file:first-child{border-top:0}
+.file .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--sph-font-mono);font-size:12.5px}
+.file.cur{background:var(--sph-raised)}
+.plus{color:var(--sph-success);font:12px var(--sph-font-mono)}
+.minus{color:var(--sph-danger);font:12px var(--sph-font-mono)}
+.diff{font:12px/1.65 var(--sph-font-mono);border-top:1px solid var(--sph-border)}
+.diff div{padding:0 12px;white-space:pre;overflow:hidden;text-overflow:ellipsis}
+.diff .h{color:var(--hearth-ink-faint);background:var(--sph-raised)}
+.diff .ad{background:var(--hearth-add)}
+.diff .dl{background:var(--hearth-del)}
+.diff .cm{margin:6px 12px;padding:8px 10px;border-radius:var(--sph-radius-sm);background:var(--sph-accent-soft);font-family:var(--sph-font-sans);font-size:12.5px;white-space:normal}
+.qd{display:flex;flex-direction:column;gap:4px;padding:10px 12px;font-size:13px;border-top:1px solid var(--sph-border)}
+.qd:first-child{border-top:0}
+
+/* phone sheet (shown in the sheet screenshot) */
+.scrim{display:none}
+[data-view="sheet"] .scrim{display:block;position:fixed;inset:0;background:rgb(30 20 10 / .32);z-index:5}
+[data-view="sheet"] .side{display:flex;position:fixed;z-index:6;left:0;right:0;bottom:0;max-height:82dvh;border-radius:20px 20px 0 0;padding:8px 14px max(14px,env(safe-area-inset-bottom));box-shadow:var(--sph-shadow-popover)}
+.grab{width:38px;height:5px;border-radius:3px;background:var(--sph-border-strong);margin:2px auto 10px}
+.side{flex-direction:column;background:var(--sph-bg);overflow:auto}
+
+/* empty / new session */
+.hello{max-width:640px;margin:0 auto;padding:12vh 16px 24px;text-align:center;display:flex;flex-direction:column;gap:20px}
+.hello h2{font:400 30px/1.25 var(--sph-font-serif);letter-spacing:-.01em}
+.agents{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.agents .chip i{font-style:normal}
+.sugg{display:grid;grid-template-columns:1fr;gap:8px;text-align:left}
+.sugg button{text-align:left;border:1px solid var(--sph-border);background:var(--sph-surface);border-radius:var(--sph-radius-md);padding:12px 14px;font-size:14px}
+.sugg button span{display:block;font-size:12.5px;color:var(--hearth-ink-faint)}
+[data-view="new"] .conv,[data-view="new"] .meta-bar{display:none}
+.hello{display:none}
+[data-view="new"] .hello{display:flex}
+
+.desk-only{display:none}
+@media (min-width:720px){
+  .sugg{grid-template-columns:1fr 1fr}
+  .pill .hide-s{display:inline}
+}
+@media (min-width:1024px){
+  .app{grid-template-columns:272px minmax(0,1fr);grid-template-rows:1fr}
+  .top{display:none}
+  .side{display:flex;padding:16px 12px;background:var(--sph-raised);border-right:1px solid var(--sph-border);background:color-mix(in srgb,var(--sph-raised) 55%,var(--sph-bg))}
+  .grab{display:none}
+  .desk-only{display:flex}
+  .conv{padding:20px 32px 32px}
+  .meta-bar{display:flex;align-items:center;gap:10px;padding:14px 24px;max-width:none}
+  .meta-bar h1{font-size:15px;font-weight:600}
+}
+@media (min-width:1280px){
+  .app{grid-template-columns:272px minmax(0,1fr) 360px}
+  .rail{display:flex;flex-direction:column;gap:22px;padding:18px 18px;border-left:1px solid var(--sph-border);overflow:auto}
+  .rail-btn{display:none}
+}
+.meta-bar{display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <button class="icon" aria-label="Sessions">☰</button>
+    <h1>Add retry to the webhook sender</h1>
+    <span class="st run" title="working"><i>●</i></span>
+    <button class="chip"><span class="plus">+42</span><span class="minus">−18</span></button>
+  </header>
+
+  <div class="scrim"></div>
+  <aside class="side" aria-label="Sessions">
+    <div class="grab"></div>
+    <div class="brand"><span class="mark">s</span>smithy<span class="sp" style="flex:1"></span><button class="icon" aria-label="Collapse sidebar" style="width:30px;height:30px">⟨</button></div>
+    <button class="newbtn">＋ New session <kbd>⌘ N</kbd></button>
+
+    <div class="grp">
+      <h4><span class="on"></span>This Mac<span class="sp"></span><span class="faint">3</span></h4>
+      <div class="sess cur"><span class="t">Add retry to the webhook sender</span><span class="s"><span class="st run"><i>●</i>working</span>· Claude Code</span></div>
+      <div class="sess"><span class="t">Why does the cache test flake?</span><span class="s"><span class="st need"><i>?</i>needs you</span>· Codex</span></div>
+      <div class="sess"><span class="t">Bump vite to 7.3</span><span class="s"><span class="st done"><i>✓</i>done</span>· 12 min ago</span></div>
+    </div>
+    <div class="grp">
+      <h4><span class="on"></span>home-server<span class="sp"></span><span class="faint">2</span></h4>
+      <div class="sess"><span class="t">Nightly backup script</span><span class="s"><span class="st done"><i>✓</i>done</span>· OpenCode</span></div>
+      <div class="sess"><span class="t">Migrate photos bucket</span><span class="s"><span class="st fail"><i>✕</i>failed</span>· 2 h ago</span></div>
+    </div>
+
+    <div class="foot">
+      <button class="pill">⚙ Settings</button>
+      <span style="flex:1"></span>
+      <button class="icon" aria-label="Toggle theme">◐</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="meta-bar">
+      <h1>Add retry to the webhook sender</h1>
+      <span class="st run"><i>●</i>working</span>
+      <span style="flex:1"></span>
+      <span class="chip">⌥ feat/webhook-retry</span>
+      <button class="chip rail-btn"><span class="plus">+42</span><span class="minus">−18</span></button>
+      <button class="btn ghost">Stop</button>
+    </div>
+
+    <div class="scroll">
+      <section class="hello">
+        <h2>What should we build?</h2>
+        <div class="agents">
+          <span class="chip"><i class="st done"><i>✓</i></i><b>Claude Code</b></span>
+          <span class="chip"><i class="st done"><i>✓</i></i><b>Codex</b></span>
+          <span class="chip"><i class="st done"><i>✓</i></i><b>OpenCode</b></span>
+          <span class="chip"><i class="st need"><i>!</i></i>Gemini · set key</span>
+        </div>
+        <div class="sugg">
+          <button>Fix the failing CI on this branch<span>smelt · fast</span></button>
+          <button>Explain how the daemon starts<span>scout</span></button>
+          <button>Review my open PRs<span>tend</span></button>
+          <button>Run three tasks in parallel<span>warden</span></button>
+        </div>
+      </section>
+
+      <div class="conv">
+        <div class="you">Add retry with backoff to the webhook sender. Three tries, and log each failure.</div>
+
+        <div class="agent">
+          <div class="av">C</div>
+          <div class="body">
+            <div class="who">Claude Code <span>· sonnet · 0.42 $</span></div>
+            <p>The sender lives in <code>internal/notify/webhook.go</code>. It posts once and gives up on any error. I'll wrap the post in a retry loop with jittered backoff and a test that fails twice before succeeding.</p>
+            <div class="tools">
+              <details class="tool"><summary><span class="st done"><i>✓</i></span><span class="k">Read</span><span class="a mono">internal/notify/webhook.go</span><span class="faint">0.2s</span></summary></details>
+              <details class="tool" open><summary><span class="st done"><i>✓</i></span><span class="k">Edit</span><span class="a mono">internal/notify/webhook.go</span><span class="plus">+31</span><span class="minus">−9</span></summary>
+<pre>for attempt := 1; attempt &lt;= 3; attempt++ {
+    if err = post(ctx, url, body); err == nil { return nil }
+    log.Printf("webhook: try %d failed: %v", attempt, err)
+    sleep(ctx, backoff(attempt))
+}</pre></details>
+              <details class="tool"><summary><span class="st run"><i>●</i></span><span class="k">Bash</span><span class="a mono">go test ./internal/notify/...</span><span class="faint">running</span></summary></details>
+            </div>
+          </div>
+        </div>
+
+        <div class="agent">
+          <div class="av">C</div>
+          <div class="body">
+            <div class="decide" role="group" aria-label="Decision">
+              <div class="st need"><i>?</i>Needs you · guard</div>
+              <h3>Run a command that matches the guard?</h3>
+              <pre>git reset --hard origin/main</pre>
+              <p class="muted" style="font-size:13.5px">It matches <code>git reset --hard</code>. Uncommitted changes in this worktree would be lost.</p>
+              <div class="btns"><button class="btn">Run once</button><button class="btn">Always allow</button><button class="btn primary">Deny</button></div>
+            </div>
+            <div class="typing"><span class="dots"><b></b><b></b><b></b></span>Waiting for your answer</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="composer-wrap">
+      <div class="composer">
+        <div class="ph">Reply, or type / for commands, @ for files</div>
+        <div class="row">
+          <button class="pill" aria-label="Attach">＋</button>
+          <button class="pill">◇ <span>Claude Code</span><span class="hide-s faint">· sonnet</span> ▾</button>
+          <button class="pill hide-s-wrap">▱ <span class="hide-s">skills</span></button>
+          <span class="sp"></span>
+          <button class="stop" aria-label="Stop"><span></span></button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="rail" aria-label="Changes and decisions">
+    <section>
+      <h2>Changes<span class="sp"></span><span class="plus">+42</span><span class="minus">−18</span></h2>
+      <div class="card">
+        <div class="file cur"><span class="n">internal/notify/webhook.go</span><span class="plus">+31</span><span class="minus">−9</span></div>
+        <div class="diff">
+          <div class="h">@@ -40,9 +40,14 @@ func Send(ctx …</div>
+          <div class="dl">-   return post(ctx, url, body)</div>
+          <div class="ad">+   for attempt := 1; attempt &lt;= 3; attempt++ {</div>
+          <div class="ad">+       if err = post(ctx, url, body); err == nil {</div>
+          <div class="ad">+           return nil</div>
+          <div class="ad">+       }</div>
+          <div class="cm"><b>You</b> · Use the ctx deadline, not a fixed 3. <span class="faint">Sent with next message</span></div>
+        </div>
+        <div class="file"><span class="n">internal/notify/webhook_test.go</span><span class="plus">+11</span><span class="minus">−0</span></div>
+        <div class="file"><span class="n">CHANGELOG.md</span><span class="plus">+0</span><span class="minus">−9</span></div>
+      </div>
+    </section>
+    <section>
+      <h2>Decisions<span class="sp"></span><span class="st need"><i>?</i>1</span></h2>
+      <div class="card">
+        <div class="qd"><span class="st need"><i>?</i>guard</span><span>Run <code>git reset --hard</code>?</span></div>
+        <div class="qd"><span class="st done"><i>✓</i>answered</span><span class="muted">Use exponential backoff → yes</span></div>
+      </div>
+    </section>
+    <section>
+      <h2>Agents<span class="sp"></span><span class="faint" style="font-weight:400">This Mac</span></h2>
+      <div class="card">
+        <div class="qd"><span><b>Claude Code</b> <span class="faint">· sonnet · this session</span></span></div>
+        <div class="qd"><span><b>Codex</b> <span class="faint">· gpt-5 · cache flake</span></span></div>
+      </div>
+    </section>
+  </aside>
+</div>
+<script>
+const q=new URLSearchParams(location.search);
+if(q.get('mode'))document.documentElement.dataset.mode=q.get('mode');
+if(q.get('view'))document.documentElement.dataset.view=q.get('view');
+</script>
+</body>
+</html>
