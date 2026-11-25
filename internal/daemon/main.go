@@ -164,6 +164,7 @@ func foreground(name string, port int, serveArgs []string, view auto.View) int {
 			Answer: func(id, answer, by string) error { _, err := api.Answer(id, answer, by); return err },
 			Log:    func(l string) { api.Append("log", "", map[string]string{"line": l}) }}
 		go api.RunNotes(tctx, hub, 30*time.Second)
+		go RunReport(tctx, hub, time.Hour)
 		go hub.Run(tctx)
 	}
 	h := auto.Hooks{

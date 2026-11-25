@@ -64,5 +64,5 @@ func File() string { return filepath.Join(ghx.Home(), "connect.json") }
 
 // DefaultKinds are notify.Kinds plus the kinds only the daemon sends.
 func DefaultKinds() []string {
-	return append(append([]string{}, notify.Kinds...), "pr_merged", "ci_red")
+	return append(append([]string{}, notify.Kinds...), "pr_merged", "ci_red", "report")
 }
