@@ -111,6 +111,28 @@ case $asset in *.gz) gunzip -f "$tmp/$asset"; src="$tmp/${asset%.gz}" ;; *) src=
 chmod +x "$src"
 mkdir -p "$home/bin/$version"; mv "$src" "$home/bin/$version/$exe"
 if [ "$os" = windows ]; then cp -f "$home/bin/$version/$exe" "$home/bin/$exe"; else ln -sfn "$home/bin/$version/$exe" "$home/bin/$exe"; fi
+rgx=; [ "$os" = windows ] && rgx=.exe
+rgasset="smithy-rg-$os-$arch${rgx:-.gz}"
+rgok=
+if have_gh; then
+  watch gh release download "v$version" -R "$repo" -p "$rgasset" -D "$tmp" >/dev/null 2>&1 && rgok=1
+else
+  fetch -o "$tmp/$rgasset" "$url/$rgasset" 2>/dev/null && rgok=1
+fi
+if [ -n "$rgok" ] && [ -s "$tmp/$rgasset" ]; then
+  want=$(awk -v a="$rgasset" '$2 == a || $2 == "*"a {print $1}' "$tmp/checksums.txt")
+  got=$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$tmp/$rgasset" || shasum -a 256 "$tmp/$rgasset") | awk '{print $1}')
+  if [ -z "$want" ] || [ "$want" != "$got" ]; then
+    say "ripgrep checksum mismatch, not installed"
+  elif have_gh && gh attestation verify --help >/dev/null 2>&1 && ! watch gh attestation verify "$tmp/$rgasset" -R "$repo" >/dev/null 2>&1; then
+    say "ripgrep has no valid build attestation, not installed"
+  else
+    case $rgasset in *.gz) gunzip -f "$tmp/$rgasset"; rgsrc="$tmp/${rgasset%.gz}" ;; *) rgsrc="$tmp/$rgasset" ;; esac
+    chmod +x "$rgsrc"; mv "$rgsrc" "$home/bin/$version/rg$rgx"
+  fi
+else
+  say "this release ships no ripgrep for $os/$arch; smithy search --code uses git ls-files or rg on PATH"
+fi
 echo "$kind" > "$home/kind"
 say "installed v$version ($kind build) to $home/bin/$version/$exe (add $home/bin to PATH to run smithy yourself)"
 tty=${SMITHY_TTY:-/dev/tty}
