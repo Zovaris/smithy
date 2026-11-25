@@ -3,6 +3,9 @@
 #   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh            # latest
 #   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.14.1   # pinned
 #   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # skills + binary
+#   ... | sh -s -- --harness   # harness build (smithy-harness-*); --skills for the skills build
+# Asks "harness or skills" on a terminal (default skills); without one it installs skills.
+# --update keeps the kind installed before (~/.smithy/kind).
 # Downloads smithy-<os>-<arch> from the GitHub release, checks it against the release's
 # checksums.txt and its build attestation (gh), and puts it in ~/.smithy/bin/<version>/, with
 # ~/.smithy/bin/smithy pointing at it. Without gh (or a gh too old for `gh attestation`) nothing
@@ -11,13 +14,32 @@ set -eu
 repo=Zovaris/smithy
 home=${SMITHY_HOME:-$HOME/.smithy}
 limit=${SMITHY_DOWNLOAD_TIMEOUT:-120}
-if [ "${1:-}" = --update ]; then
-  shift
+update=; kind=; version=
+for a in "$@"; do
+  case $a in
+    --update) update=1 ;;
+    --harness|--skills) [ -z "$kind" ] || [ "$kind" = "${a#--}" ] || { echo "smithy install: pick one of --harness or --skills" >&2; exit 3; }; kind=${a#--} ;;
+    *) version=$a ;;
+  esac
+done
+if [ -n "$update" ]; then
   command -v npx >/dev/null 2>&1 || { echo "smithy install: --update needs npx (Node) for npx skills update" >&2; exit 3; }
   echo "smithy install: updating the skills (npx skills update -g)" >&2
   npx -y skills update -g >&2 || { echo "smithy install: npx skills update failed" >&2; exit 3; }
+  [ -n "$kind" ] || kind=$(cat "$home/kind" 2>/dev/null || true)
 fi
-version=${1:-${SMITHY_VERSION:-}}
+if [ -z "$kind" ]; then
+  tty=${SMITHY_TTY:-/dev/tty}
+  if { [ -n "${SMITHY_TTY:-}" ] || [ -t 2 ]; } && { : < "$tty"; } 2>/dev/null; then
+    printf 'smithy install: harness or skills build? [skills] ' >&2
+    ans=; read -r ans < "$tty" || true
+    case $ans in h|harness) kind=harness ;; ""|s|skills) kind=skills ;; *) echo "smithy install: answer harness or skills" >&2; exit 3 ;; esac
+  else
+    kind=skills
+  fi
+fi
+case $kind in harness|skills) ;; *) kind=skills ;; esac
+version=${version:-${SMITHY_VERSION:-}}
 version=${version#v}
 
 say() { echo "smithy install: $*" >&2; }
@@ -30,7 +52,8 @@ esac
 case "$(uname -m)" in
   arm64|aarch64) arch=arm64 ;; x86_64|amd64) arch=amd64 ;; *) die "unsupported CPU $(uname -m)" ;;
 esac
-if [ "$os" = windows ]; then asset="smithy-windows-amd64.exe"; exe=smithy.exe; else asset="smithy-$os-$arch.gz"; exe=smithy; fi
+pre=smithy; [ "$kind" = harness ] && pre=smithy-harness
+if [ "$os" = windows ]; then asset="$pre-windows-amd64.exe"; exe=smithy.exe; else asset="$pre-$os-$arch.gz"; exe=smithy; fi
 
 case $version in ""|*[!0-9A-Za-z.-]*|.*) [ -z "$version" ] || die "bad version: $version" ;; esac
 
@@ -85,4 +108,13 @@ case $asset in *.gz) gunzip -f "$tmp/$asset"; src="$tmp/${asset%.gz}" ;; *) src=
 chmod +x "$src"
 mkdir -p "$home/bin/$version"; mv "$src" "$home/bin/$version/$exe"
 if [ "$os" = windows ]; then cp -f "$home/bin/$version/$exe" "$home/bin/$exe"; else ln -sfn "$home/bin/$version/$exe" "$home/bin/$exe"; fi
-say "installed v$version to $home/bin/$version/$exe (add $home/bin to PATH to run smithy yourself)"
+echo "$kind" > "$home/kind"
+say "installed v$version ($kind build) to $home/bin/$version/$exe (add $home/bin to PATH to run smithy yourself)"
+tty=${SMITHY_TTY:-/dev/tty}
+if { [ -n "${SMITHY_TTY:-}" ] || [ -t 2 ]; } && { : < "$tty"; } 2>/dev/null; then
+  printf 'smithy install: install the skills now (smithy skills install, no Node needed)? [y/N] ' >&2
+  ans=; read -r ans < "$tty" || true
+  case $ans in y|Y|yes) "$home/bin/$exe" skills install >&2 || die "smithy skills install failed" ;; esac
+else
+  say "install the skills with: $home/bin/$exe skills install (or npx skills add Zovaris/smithy -g)"
+fi
