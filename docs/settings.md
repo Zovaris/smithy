@@ -37,6 +37,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `auto.max_cost_per_day` | | USD of reported agent cost per local day. At or over it `smithy auto serve` starts no new orchestrator until tomorrow and records `cap_reached`; workers already running finish. Only cost a CLI reports counts (Claude Code today); runs with unknown cost (codex, opencode, killed or timed-out runs) count as 0. Empty = no cap. |
 | `auto.hours` | unset (always) | Launch window `HH:MM-HH:MM` in local time (`22:00-07:00` wraps midnight). |
 | `auto.every` | `60` | Seconds between polls of each source. |
+| `auto.retry_stronger` | `true` | `smithy auto report <ref> blocked` on a launched issue puts it back at the head of the queue once, on the next model tier (cheap → mid → strong; unlabeled → strong), instead of reporting it blocked; the retry is a `retry_stronger` event. A second failure, or one already on strong, is reported blocked. |
 | `auto.paused` | `false` | `true` holds `smithy auto take`: nothing launches until it is `false` again (`p` in `smithy tui`). |
 | `daemon.port` | `7477` | Loopback port of `smithy daemon`'s API (harness build). It never listens beyond `127.0.0.1`. |
 | `daemon.allow` | empty | Comma list of Tailscale logins allowed through `tailscale serve` (the `Tailscale-User-Login` header). Empty: only the local token (`~/.smithy/daemon.token`). |
