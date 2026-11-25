@@ -48,6 +48,9 @@ func EnsureKey(home string) error {
 	}
 	defer os.Remove(w.Name())
 	_, err = w.WriteString(hex.EncodeToString(k) + "\n")
+	if err == nil {
+		err = w.Sync()
+	}
 	if cerr := w.Close(); err == nil {
 		err = cerr
 	}
@@ -57,10 +60,13 @@ func EnsureKey(home string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.Link(w.Name(), f); err != nil && !errors.Is(err, os.ErrExist) {
+	if err := os.Link(w.Name(), f); err != nil {
+		if errors.Is(err, os.ErrExist) {
+			return nil
+		}
 		return err
 	}
-	return nil
+	return syncDir(home)
 }
 
 func dataKey() (cipher.AEAD, error) {
