@@ -171,3 +171,44 @@ func (s *Store) Since(after int64) ([]Event, error) {
 }
 
 func now() string { return time.Now().UTC().Format(time.RFC3339Nano) }
+
+// Cursor is the saved position of source (sync_cursors), "" when none.
+func (s *Store) Cursor(source string) (string, error) {
+	var c string
+	err := s.db.QueryRow(`SELECT cursor FROM sync_cursors WHERE source = ?`, source).Scan(&c)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return c, err
+}
+
+// AppendCursor writes e and saves source's cursor in one transaction, so a reader that resumes
+// from the cursor never appends the same input twice. A nil e only saves the cursor.
+func (s *Store) AppendCursor(e *Event, source, cursor string) (int64, error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	var seq int64
+	if e != nil {
+		data := []byte(e.Data)
+		if len(data) == 0 {
+			data = []byte("null")
+		}
+		if !json.Valid(data) {
+			return 0, errors.New("store: event data is not valid JSON")
+		}
+		res, err := tx.Exec(`INSERT INTO events (time, kind, session, data) VALUES (?, ?, ?, ?)`, now(), e.Kind, e.Session, string(data))
+		if err != nil {
+			return 0, err
+		}
+		if seq, err = res.LastInsertId(); err != nil {
+			return 0, err
+		}
+	}
+	if _, err := tx.Exec(`INSERT INTO sync_cursors (source, cursor) VALUES (?, ?) ON CONFLICT(source) DO UPDATE SET cursor = excluded.cursor`, source, cursor); err != nil {
+		return 0, err
+	}
+	return seq, tx.Commit()
+}
