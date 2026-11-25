@@ -1,0 +1,1 @@
+{"kind": "feature", "prompt": "Implement FizzBuzz in fizz.go: for 1..n, Fizz for multiples of 3, Buzz for 5, FizzBuzz for both, else the number."}

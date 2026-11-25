@@ -154,10 +154,14 @@ type ServeOptions struct {
 // selfExe is the smithy binary serve runs `smithy agent` with; tests replace it.
 var selfExe = os.Executable
 
-// DefaultAgent is auto.agent, else the CLI smithy agent would pick ("" when none).
+// DefaultAgent is auto.agent, else the CLI smithy agent would pick ("" when none). An
+// api:<provider>/<model> agent spends the user's key, so it counts only from the user settings.
 func DefaultAgent() string {
-	if a := config.Get("auto.agent", ""); a != "" {
+	if a := config.Get("auto.agent", ""); a != "" && !strings.HasPrefix(a, "api:") {
 		return a
+	}
+	if u, _ := config.UserGet("auto.agent", ""); strings.HasPrefix(u, "api:") {
+		return u
 	}
 	return agents.ResolveCLI(os.Getenv, func(b string) bool { _, err := exec.LookPath(b); return err == nil })
 }

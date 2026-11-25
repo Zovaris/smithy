@@ -16,6 +16,11 @@ func TestSkillsBuildHasNoSQLite(t *testing.T) {
 	if strings.Contains(string(out), "modernc.org/sqlite") || strings.Contains(string(out), "internal/store") {
 		t.Fatal("the skills build links the SQLite store")
 	}
+	for _, sdk := range []string{"anthropic-sdk-go", "openai-go", "google.golang.org/genai", "internal/apiloop/provider"} {
+		if strings.Contains(string(out), sdk) {
+			t.Fatalf("the skills build links %s (harness build only, docs/adr/0012)", sdk)
+		}
+	}
 }
 
 func TestHarnessCommandsInSkillsBuild(t *testing.T) {

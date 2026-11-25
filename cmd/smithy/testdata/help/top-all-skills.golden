@@ -41,6 +41,7 @@ Accounts and secrets
                 remove, clear
 
 Maintenance
+  bench         run smithy's benchmark task set with an agent
   cleanup       remove a finished task's worktree and local branch, or old
                 builds, images and worktrees
   skills        find installed skills (smithy skills --list)
