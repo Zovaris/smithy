@@ -8,6 +8,8 @@ part above `### Details`.
 
 ## Unreleased
 
+## v0.20.0 — 2026-11-25
+
 ### Highlights
 
 **A web UI.** In the harness build, `smithy web open` shows your sessions, decisions, agents and board in the browser.
