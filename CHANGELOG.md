@@ -8,6 +8,10 @@ part above `### Details`.
 
 ## Unreleased
 
+### Details
+
+- `internal/wait`: `TestMainEventsOption` no longer fails when the first poll starts after the test's update; the fake `gh` marks served calls and the test writes the change only after the baseline poll.
+
 ## v0.22.0 — 2026-11-25
 
 ### Highlights
