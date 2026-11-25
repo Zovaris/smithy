@@ -24,6 +24,10 @@ const notesSource = "notes:connect"
 
 func session(id string) string {
 	kind, rest, _ := strings.Cut(id, ":")
+	if kind == "perm" {
+		s, _, _ := strings.Cut(rest, "/")
+		return s
+	}
 	if kind != "merge" && kind != "decide" {
 		return ""
 	}
@@ -98,6 +102,12 @@ func lines(s string, n int) string {
 
 // Input records text from a chat thread as the session's user input.
 func (sv *Server) Input(session, text, by string) error {
+	sv.mu.Lock()
+	_, ok := sv.sessions[session]
+	sv.mu.Unlock()
+	if ok {
+		return sv.SendSession(session, text, by)
+	}
 	_, err := sv.Append(KindInput, session, map[string]string{"text": text, "by": by, "via": "chat"})
 	return err
 }
