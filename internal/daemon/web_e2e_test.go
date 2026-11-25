@@ -43,13 +43,16 @@ func TestWebScreensServed(t *testing.T) {
 		t.Fatalf("no entry script in %q", html)
 	}
 	js := body(hs.URL + "/" + entry[1])
-	for _, screen := range []string{"sessions", "decisions", "agents", "board", "palette"} {
-		m := regexp.MustCompile(`assets/` + screen + `-[A-Za-z0-9_-]+\.js`).FindString(js)
-		if m == "" {
+	// The conversation is the shell itself (first load); every other page and the palette is a
+	// lazy chunk the entry imports.
+	for _, screen := range []string{"decisions", "agents", "board", "bench", "setup", "palette"} {
+		// Vite names a chunk "assets/x-hash.js" in its preload list and "./x-hash.js" in the import.
+		m := regexp.MustCompile(`(?:assets/|\./)(` + screen + `-[A-Za-z0-9_-]+\.js)`).FindStringSubmatch(js)
+		if m == nil {
 			t.Errorf("entry does not import the %s chunk", screen)
 			continue
 		}
-		body(hs.URL + "/" + m)
+		body(hs.URL + "/assets/" + m[1])
 	}
 
 	if err := sv.Ask("d1", "Merge #142 into release/v0.17?", []string{"merge", "later"}); err != nil {
