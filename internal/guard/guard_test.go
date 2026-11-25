@@ -3,10 +3,15 @@ package guard
 import (
 	"bytes"
 	"context"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/config"
 )
 
 func defaults() Rules { return Rules{Enabled: true, Block: Defaults} }
@@ -147,5 +152,100 @@ func TestHookSettings(t *testing.T) {
 	s := HookSettings("/bin/smithy")
 	if !strings.Contains(s, `"PreToolUse"`) || !strings.Contains(s, `'/bin/smithy' guard hook`) {
 		t.Fatal(s)
+	}
+}
+
+func TestAllowCancelsOnlyItsOwnMatch(t *testing.T) {
+	r := defaults()
+	r.Allow = []string{Defaults[4]}
+	if r.Match("git reset --hard") != "" {
+		t.Fatal("remembered pattern should allow its own command")
+	}
+	if r.Match("git reset --hard && rm -rf ~") == "" {
+		t.Fatal("allow for one rule let another rule's match through")
+	}
+	if r.Match(`rm -rf "$HOME"`) == "" || r.Match(`rm -rf '/'`) == "" {
+		t.Fatal("quoted targets not blocked")
+	}
+}
+
+func TestRepoConfigCannotLoosen(t *testing.T) {
+	home, repo := t.TempDir(), t.TempDir()
+	t.Setenv("HOME", home)
+	t.Chdir(repo)
+	if err := exec.Command("git", "init", "-q", repo).Run(); err != nil {
+		t.Skip("no git")
+	}
+	os.MkdirAll(filepath.Join(repo, ".smithy"), 0o755)
+	os.WriteFile(filepath.Join(repo, ".smithy", "config.json"), []byte(`{"guard":{"enabled":"false","allow":"[\".*\"]","fetch_allow":"*","block":"[\"^ls$\"]"}}`), 0o644)
+	if b, _ := exec.Command("git", "-C", repo, "add", ".smithy/config.json").CombinedOutput(); len(b) > 0 {
+		t.Log(string(b))
+	}
+	if config.Get("guard.enabled", "") != "false" {
+		t.Fatal("test setup: repo config not read")
+	}
+	r, err := Load()
+	if len(r.Block) != len(Defaults)+1 {
+		t.Fatalf("repo guard.block not added: %v", r.Block)
+	}
+	if err != nil || !r.Enabled || len(r.Allow) != 0 {
+		t.Fatalf("repo loosened the guard: %+v %v", r, err)
+	}
+	f, _ := LoadFetch()
+	if len(f.Allow) != 0 {
+		t.Fatalf("repo fetch_allow used: %v", f.Allow)
+	}
+}
+
+func TestHookBadEventDenies(t *testing.T) {
+	var out bytes.Buffer
+	if err := Hook(context.Background(), Guard{}, strings.NewReader("{nope"), &out); err == nil || !strings.Contains(out.String(), `"deny"`) {
+		t.Fatalf("%v %s", err, out.String())
+	}
+}
+
+func TestFetchRules(t *testing.T) {
+	f := FetchRules{Enabled: true, Block: []string{"*.evil.com", "paste.example"}, Allow: []string{"ok.evil.com"}}
+	for h, want := range map[string]string{"a.evil.com": "*.evil.com", "evil.com": "", "ok.evil.com": "", "paste.example": "paste.example", "PASTE.example.": "paste.example", "github.com": ""} {
+		if got := f.Match(h); got != want {
+			t.Errorf("%s: %q want %q", h, got, want)
+		}
+	}
+	if (FetchRules{Enabled: true, Block: []string{"*"}}).Match("x.org") != "*" {
+		t.Fatal("* blocks all")
+	}
+}
+
+func TestCheckFetchAsks(t *testing.T) {
+	var saved []string
+	a := &fakeAsker{answer: Always}
+	g := Guard{Connect: func() (Asker, error) { return a, nil }, Poll: time.Millisecond, Wait: 50 * time.Millisecond,
+		LoadFetch:    func() (FetchRules, error) { return FetchRules{Enabled: true, Block: []string{"*.evil.com"}}, nil },
+		RememberHost: func(h string) error { saved = append(saved, h); return nil }}
+	if ok, _ := g.CheckFetch(context.Background(), "github.com"); !ok || len(a.asked) != 0 {
+		t.Fatal("open host asked")
+	}
+	if ok, _ := g.CheckFetch(context.Background(), "x.evil.com"); !ok || len(saved) != 1 || saved[0] != "x.evil.com" || !strings.Contains(a.asked[0], "Fetch from x.evil.com") {
+		t.Fatalf("%v %v", saved, a.asked)
+	}
+	g.Connect = nil
+	if ok, _ := g.CheckFetch(context.Background(), "x.evil.com"); ok {
+		t.Fatal("no daemon must deny")
+	}
+}
+
+func TestAddSuggested(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Chdir(t.TempDir())
+	n, err := AddSuggested()
+	if err != nil || n != len(Suggested) {
+		t.Fatalf("%d %v", n, err)
+	}
+	if n, _ := AddSuggested(); n != 0 {
+		t.Fatalf("re-added %d", n)
+	}
+	f, _ := LoadFetch()
+	if len(f.Allow) != len(Suggested) || !strings.Contains(SuggestedJSON(), `"added":true`) {
+		t.Fatalf("%v", f.Allow)
 	}
 }

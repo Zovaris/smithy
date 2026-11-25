@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -22,7 +23,7 @@ import (
 
 // Defaults is the built-in blocklist; guard.block adds to it.
 var Defaults = []string{
-	`\brm\s+(?:-\S+\s+)*-[a-zA-Z]*[rR][a-zA-Z]*\s+(?:-\S+\s+)*(?:/\*?|~/?\*?|\$\{?HOME\}?/?\*?|\*)(?:\s|$|[;&|])`,
+	`\brm\s+(?:-\S+\s+)*-[a-zA-Z]*[rR][a-zA-Z]*\s+(?:-\S+\s+)*["']?(?:/\*?|~/?\*?|\$\{?HOME\}?/?\*?|\*)["']?(?:\s|$|[;&|])`,
 	`\bgit\s+push\b[^;&|]*\s(?:--force(?:-with-lease)?|-f)\b[^;&|]*[\s:+](?:main|master)(?:\s|$|[;&|])`,
 	`\bgit\s+push\b[^;&|]*[\s:+](?:main|master)\s[^;&|]*(?:--force(?:-with-lease)?|-f)\b`,
 	`\bgit\s+push\b[^;&|]*\s\+(?:\S+:)?(?:main|master)(?:\s|$|[;&|])`,
@@ -70,40 +71,77 @@ func List(v string) ([]string, error) {
 	return kept, nil
 }
 
-// Load reads guard.enabled, guard.block and guard.allow. A bad value is an error; callers fail
-// closed on it (the defaults still block).
+// Enabled is guard.enabled from the user's own config only: a repo's config can't turn it off.
+func Enabled() bool {
+	v, err := config.UserGet("guard.enabled", "true")
+	return err != nil || v != "false"
+}
+
+// Load reads guard.enabled, guard.block and guard.allow. Settings that loosen the guard
+// (enabled, allow) come from the user's config only; a repo's guard.block can only add rules. A
+// bad value is an error; callers fail closed on it (the defaults still block).
 func Load() (Rules, error) {
-	r := Rules{Enabled: config.Get("guard.enabled", "true") != "false", Block: append([]string{}, Defaults...)}
+	r := Rules{Enabled: Enabled(), Block: append([]string{}, Defaults...)}
 	b, err := List(config.Get("guard.block", ""))
 	if err != nil {
 		return r, fmt.Errorf("guard.block: %w", err)
 	}
 	r.Block = append(r.Block, b...)
-	if r.Allow, err = List(config.Get("guard.allow", "")); err != nil {
+	allow, err := config.UserGet("guard.allow", "")
+	if err == nil {
+		r.Allow, err = List(allow)
+	}
+	if err != nil {
 		return r, fmt.Errorf("guard.allow: %w", err)
 	}
 	return r, nil
 }
 
 // Match returns the block pattern cmd matches, or "" when it may run (guard off, allowlisted or
-// no match). An invalid block regex is reported as a match so a typo never opens the gate; an
-// invalid allow regex is skipped.
+// no match). An allow regex cancels only one block match: it must match the command part
+// (between ; & | and newlines) holding that match, so an allowed "git reset --hard" doesn't let
+// "git reset --hard && rm -rf ~" through. An invalid
+// block regex is reported as a match so a typo never opens the gate; an invalid allow regex is
+// skipped.
 func (r Rules) Match(cmd string) string {
 	if !r.Enabled || strings.TrimSpace(cmd) == "" {
 		return ""
 	}
+	var allow []*regexp.Regexp
 	for _, p := range r.Allow {
-		if re, err := regexp.Compile(p); err == nil && re.MatchString(cmd) {
-			return ""
+		if re, err := regexp.Compile(p); err == nil {
+			allow = append(allow, re)
 		}
 	}
 	for _, p := range r.Block {
 		re, err := regexp.Compile(p)
-		if err != nil || re.MatchString(cmd) {
+		if err != nil {
 			return p
+		}
+		for _, m := range re.FindAllStringIndex(cmd, -1) {
+			part := around(cmd, m[0], m[1])
+			if !slices.ContainsFunc(allow, func(a *regexp.Regexp) bool { return a.MatchString(part) }) {
+				return p
+			}
 		}
 	}
 	return ""
+}
+
+// around widens cmd[s:e] to the separators (; & | newline) on either side, trimmed.
+func around(cmd string, s, e int) string {
+	const seps = ";&|\n\r"
+	if i := strings.LastIndexAny(cmd[:s], seps); i >= 0 {
+		s = i + 1
+	} else {
+		s = 0
+	}
+	if i := strings.IndexAny(cmd[e:], seps); i >= 0 {
+		e += i
+	} else {
+		e = len(cmd)
+	}
+	return strings.TrimSpace(cmd[s:e])
 }
 
 // Asker records a question on smithy daemon and reads its answer back from the daemon's record.
@@ -121,6 +159,9 @@ type Guard struct {
 	Wait     time.Duration
 	Remember func(pattern string) error
 	Load     func() (Rules, error)
+	// LoadFetch and RememberHost are the fetch guard's (defaults: LoadFetch, RememberHost).
+	LoadFetch    func() (FetchRules, error)
+	RememberHost func(host string) error
 }
 
 // Check reports whether cmd may run and, when not, why.
@@ -137,7 +178,38 @@ func (g Guard) Check(ctx context.Context, cmd string) (bool, string) {
 	if pat == "" {
 		return true, ""
 	}
-	why := "blocked by the dangerous-command guard (" + pat + ")"
+	rem := g.Remember
+	if rem == nil {
+		rem = Remember
+	}
+	return g.ask(ctx, "blocked by the dangerous-command guard ("+pat+")", "Run this command? "+oneLine(cmd, 300), func() error { return rem(pat) })
+}
+
+// CheckFetch reports whether a fetch to host may go out: open unless guard.fetch_block matches
+// (and guard.fetch_allow doesn't), then it asks like Check; "always" adds the host to
+// guard.fetch_allow.
+func (g Guard) CheckFetch(ctx context.Context, host string) (bool, string) {
+	load := g.LoadFetch
+	if load == nil {
+		load = LoadFetch
+	}
+	f, err := load()
+	if err != nil {
+		f.Allow = nil
+	}
+	pat := f.Match(host)
+	if pat == "" {
+		return true, ""
+	}
+	rem := g.RememberHost
+	if rem == nil {
+		rem = RememberHost
+	}
+	host = strings.ToLower(strings.TrimSuffix(host, "."))
+	return g.ask(ctx, "blocked by the fetch guard ("+pat+")", "Fetch from "+oneLine(host, 253)+"?", func() error { return rem(host) })
+}
+
+func (g Guard) ask(ctx context.Context, why, q string, always func() error) (bool, string) {
 	if g.Connect == nil {
 		return false, why + "; no smithy daemon to ask the user"
 	}
@@ -148,7 +220,6 @@ func (g Guard) Check(ctx context.Context, cmd string) (bool, string) {
 	b := make([]byte, 4)
 	rand.Read(b)
 	id := "guard:" + hex.EncodeToString(b)
-	q := "Run this command? " + oneLine(cmd, 300)
 	if err := a.Ask(ctx, id, q, []string{Once, Always, Deny}); err != nil {
 		return false, why + "; the daemon refused the question (" + err.Error() + ")"
 	}
@@ -173,11 +244,9 @@ func (g Guard) Check(ctx context.Context, cmd string) (bool, string) {
 			case Once:
 				return true, ""
 			case Always:
-				rem := g.Remember
-				if rem == nil {
-					rem = Remember
+				if err := always(); err != nil {
+					fmt.Fprintln(os.Stderr, "smithy guard: could not save the allow rule:", err)
 				}
-				rem(pat)
 				return true, ""
 			}
 			return false, why + "; the user denied it"
@@ -203,14 +272,18 @@ func AskTimeout() time.Duration {
 }
 
 // Remember appends pattern to the user's guard.allow.
-func Remember(pattern string) error {
+func Remember(pattern string) error { return appendList("guard.allow", pattern, List) }
+
+// appendList adds v to the user's JSON-list setting key, once.
+func appendList(key, v string, parse func(string) ([]string, error)) error {
+	pattern := v
 	file := config.UserFile()
 	return config.WithLock(file+".guard", func() error {
-		cur, err := config.UserGet("guard.allow", "")
+		cur, err := config.UserGet(key, "")
 		if err != nil {
 			return err
 		}
-		l, err := List(cur)
+		l, err := parse(cur)
 		if err != nil {
 			return err
 		}
@@ -220,7 +293,7 @@ func Remember(pattern string) error {
 			}
 		}
 		b, _ := json.Marshal(append(l, pattern))
-		return config.Set(file, "guard.allow", string(b))
+		return config.Set(file, key, string(b))
 	})
 }
 
@@ -241,24 +314,31 @@ func Hook(ctx context.Context, g Guard, in io.Reader, out io.Writer) error {
 			Command string `json:"command"`
 		} `json:"tool_input"`
 	}
-	if err := json.NewDecoder(io.LimitReader(in, 1<<20)).Decode(&ev); err != nil {
-		return errors.New("guard hook: bad PreToolUse event: " + err.Error())
+	ok, why := false, "smithy guard: unreadable PreToolUse event"
+	err := json.NewDecoder(io.LimitReader(in, 1<<20)).Decode(&ev)
+	if err == nil {
+		if ev.Tool != "Bash" {
+			return nil
+		}
+		ok, why = g.Check(ctx, ev.Input.Command)
 	}
-	if ev.Tool != "Bash" {
-		return nil
-	}
-	ok, why := g.Check(ctx, ev.Input.Command)
 	if ok {
 		return nil
 	}
-	return json.NewEncoder(out).Encode(map[string]any{"hookSpecificOutput": map[string]string{
-		"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": why}})
+	if e := json.NewEncoder(out).Encode(map[string]any{"hookSpecificOutput": map[string]string{
+		"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": why}}); e != nil {
+		return e
+	}
+	if err != nil {
+		return errors.New("guard hook: bad PreToolUse event: " + err.Error())
+	}
+	return nil
 }
 
 // HookSettings is the Claude Code settings JSON that runs `<exe> guard hook` before every Bash
 // call; "" when the guard is off.
 func HookSettings(exe string) string {
-	if config.Get("guard.enabled", "true") == "false" || exe == "" {
+	if !Enabled() || exe == "" {
 		return ""
 	}
 	secs := 600
@@ -277,13 +357,19 @@ func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''
 // Usage is the text for `smithy guard --help`.
 const Usage = `usage: smithy guard check "<command>"   prints the block pattern it matches (exit 1) or nothing (exit 0)
        smithy guard hook                  Claude Code PreToolUse hook (event JSON on stdin)
-       smithy guard list                  the effective blocklist and allowlist
+       smithy guard list                  the effective blocklists and allowlists
+       smithy guard fetch-check <host>    prints the fetch_block glob it matches (exit 1) or nothing
+       smithy guard suggest [--add|--json] the suggested fetch allowlist; --add puts it in guard.fetch_allow
 The dangerous-command guard (on by default) checks every shell command an agent runs: the API
 loop's shell tool, and Claude Code through this PreToolUse hook. A match asks the user through
 smithy daemon (TUI, web, chat): run once, always allow this pattern (added to guard.allow), or
 deny; no daemon or no answer within ask.timeout denies. Nothing else asks.
 Settings: guard.enabled (default true), guard.block (regexes added to the defaults), guard.allow
-(regexes that skip the check); both a JSON list or one regex per line.`
+(regexes that skip the check); both a JSON list or one regex per line. Fetch (the API loop's
+fetch tool and the egress proxy) is open by default, HTTPS only: guard.fetch_block domain globs
+(*.example.com) ask the same way, guard.fetch_allow globs skip it ("always" adds the host).
+Loosening settings (guard.enabled, guard.allow, guard.fetch_allow) are read from your user
+config only, never a repo's.`
 
 // Main runs smithy guard.
 func Main(args []string) int {
@@ -319,6 +405,52 @@ func Main(args []string) int {
 		}
 		for _, p := range r.Allow {
 			fmt.Println("allow:", p)
+		}
+		f, err := LoadFetch()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "smithy guard:", err)
+			return 1
+		}
+		for _, p := range f.Block {
+			fmt.Println("fetch_block:", p)
+		}
+		for _, p := range f.Allow {
+			fmt.Println("fetch_allow:", p)
+		}
+		return 0
+	case "fetch-check":
+		if len(args) != 2 {
+			fmt.Fprintln(os.Stderr, Usage)
+			return 2
+		}
+		f, err := LoadFetch()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "smithy guard:", err)
+			f.Allow = nil
+		}
+		if p := f.Match(args[1]); p != "" {
+			fmt.Println(p)
+			return 1
+		}
+		return 0
+	case "suggest":
+		switch {
+		case len(args) == 1:
+			for _, h := range Suggested {
+				fmt.Println(h)
+			}
+		case len(args) == 2 && args[1] == "--json":
+			fmt.Println(SuggestedJSON())
+		case len(args) == 2 && args[1] == "--add":
+			n, err := AddSuggested()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "smithy guard:", err)
+				return 1
+			}
+			fmt.Printf("added %d hosts to guard.fetch_allow\n", n)
+		default:
+			fmt.Fprintln(os.Stderr, Usage)
+			return 2
 		}
 		return 0
 	case "hook":
