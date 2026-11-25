@@ -1,0 +1,1 @@
+{"kind": "bug", "prompt": "Max in max.go panics on an empty slice. It must return 0, false then."}

@@ -40,6 +40,7 @@ var helpDocs = map[string]helpDoc{
 	"attach":  {groupDaily, []string{"smithy attach"}, []string{"daemon", "chat"}},
 	"web":     {groupDaily, []string{"smithy web", "smithy web open"}, []string{"daemon"}},
 	"board":   {groupDaily, []string{`smithy board add "Fix login" --priority 1`, "smithy board list --state todo", "smithy board show B-1"}, []string{"auto", "tasks"}},
+	"bench":   {groupMaint, []string{"smithy bench list", "smithy bench run --agent claude --skills v0.22.0", "smithy bench run --agent codex --task bug-sum-last"}, []string{"agent", "receipt"}},
 	"report":  {groupDaily, []string{"smithy report week"}, []string{"tui", "decisions"}},
 	"tui":     {groupDaily, []string{"smithy tui", "smithy tui --no-anim"}, []string{"auto", "report"}},
 	"auto":    {groupDaily, []string{"smithy auto serve", "smithy auto status", "smithy auto poll --source github"}, []string{"config", "tui", "notify"}},
