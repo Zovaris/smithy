@@ -11,7 +11,7 @@
   `npm ci && npm run build` in `web/` to embed it in the harness build; the output
   (`internal/web/dist/app`) is not committed (ADR 0011), and without it the binary serves a
   placeholder page. The CI `web` job runs tests, typecheck and the size budget.
-- Pull requests run `check` (gofmt, vet, `go test`, every offline test through the binary, a
+- Pull requests run `check` (gofmt, vet, golangci-lint, `bun check` and Oxlint on `web/`, `go test`, every offline test through the binary, a
   build per release target). A `v*` tag runs `release`: it checks the tag matches
   `shared/VERSION`, builds darwin, linux (arm64, amd64) and windows binaries, skills and harness builds each, gzips them,
   writes `checksums.txt`, attests the build and publishes the GitHub release with the
