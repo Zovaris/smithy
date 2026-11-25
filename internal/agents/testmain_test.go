@@ -8,6 +8,10 @@ import (
 // TestMain clears the variables the host agent session sets (harness markers and agent/consult
 // overrides) so results do not depend on whether the tests run inside Claude, Codex or a plain shell.
 func TestMain(m *testing.M) {
+	if os.Getenv("SMITHY_TEST_FAKE_ACP") == "1" {
+		fakeACP()
+		os.Exit(0)
+	}
 	if os.Getenv("SMITHY_TEST_AGENT_MAIN") == "1" && len(os.Args) > 1 && os.Args[1] == "agent" {
 		os.Exit(AgentMain(os.Args[2:]))
 	}

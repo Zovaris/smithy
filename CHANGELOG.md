@@ -13,6 +13,13 @@ part above `### Details`.
 - smithy now installs where other CLIs do: the command is `~/.local/bin/smithy`, the versions live in `~/.local/share/smithy`. An old `~/.smithy/bin` install moves over by itself and keeps working for one release. If `~/.local/bin` is not on your PATH, install.sh prints the exact line for your shell.
 - `smithy uninstall` (or `uninstall.sh`) removes smithy: it lists everything first, with sizes, and asks. Your keys and plans in `~/.smithy` stay unless you pass `--purge`.
 - Harness build: every agent smithy drives gets a `smithy` MCP server with the board, `ask` (a decision answered from the TUI, web or chat), API calls with `secret:<name>` that never show the key, and fast search.
+- **ACP agents:** `AGENT_PROTOCOL=acp` runs Gemini CLI, OpenCode or any agent that speaks the Agent Client Protocol, with its tool calls, usage and permission requests in smithy's events and decisions.
+
+### Details
+
+- `internal/acp`: a stdlib JSON-RPC client for one ACP prompt turn (initialize, session/new, session/prompt); it offers no fs or terminal capability and refuses those requests.
+- `smithy agent` with `AGENT_PROTOCOL=acp`: `gemini --experimental-acp` or `opencode acp`; message chunks go to the log, completed or failed tool calls and permission answers to `tool` and `permission` events, usage to the sidecar and a `usage` event; read-only runs reject permissions and log a decision; the agent gets 5 s to exit after its turn before its group is killed.
+- `decisions.Add` and `usage.Write` exported for that path.
 - A failed auto issue gets one more try on a stronger model before it is reported blocked.
 - `pool.order` (e.g. `claude,codex`): when every account of one harness is limited, a pool run continues on the next pooled harness, logs the switch as a `pool_fallback` event and goes back once the limit resets.
 - **PR outcomes.** What happened to each auto PR (merged, changes requested, closed) shows in the weekly report and in History.
