@@ -16,12 +16,10 @@
                                                            ✗  TES-9                        failed   
                                                               TES-9              ████████████████   
                                                               failed                                
-                                                                                                    
-                                                           Waiting on you  1                        
      › Add usage-limit detection for Pi (TK-6).                                                     
-                                                           ?  Merge #142 into release/v0.17?  me…   
+                                                           Waiting on you  1                        
      Pi prints its limit errors from packages/ai/src/err                                            
-     of a failed run.                                                                               
+     of a failed run.                                      ?  Merge #142 into release/v0.17?  me…   
                                                                                                     
      ✓  Read · Grep · Edit detect.go +6 −1 · Bash go tes                                            
                                                                                                     
@@ -29,4 +27,6 @@
                                                                                                     
                                                                                                     
      › Ask, or / for commands                                                                       
-   enter send  v mode: minimal  tab agents  ctrl+k palet   enter open   s stop   n new session  …   
+                                                                                                    
+                                                                                                    
+   enter send  shift+enter newline  v mode: minimal  tab   enter open   s stop   n new session  …   

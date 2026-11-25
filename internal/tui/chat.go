@@ -130,12 +130,13 @@ func newChatView(stream <-chan daemon.ClientMsg, url string, th theme) chatView 
 }
 
 // newComposer is the input pinned at the bottom: a textarea on the raised tier behind the
-// ember ›, growing to six rows; enter sends, shift+enter or alt+enter breaks the line.
+// ember ›, three rows tall, growing to ten then scrolling; enter sends, shift+enter, alt+enter
+// or ctrl+j breaks the line.
 func newComposer(th theme) textarea.Model {
 	in := textarea.New()
 	in.ShowLineNumbers = false
 	in.Placeholder = "Ask, or / for commands"
-	in.DynamicHeight, in.MinHeight, in.MaxHeight = true, 1, 6
+	in.DynamicHeight, in.MinHeight, in.MaxHeight, in.MaxContentHeight = true, 3, 10, 1<<20
 	in.KeyMap.InsertNewline.SetKeys("shift+enter", "alt+enter", "ctrl+j")
 	in.SetPromptFunc(2, func(i textarea.PromptInfo) string {
 		st := lipgloss.NewStyle()
@@ -161,7 +162,7 @@ func newComposer(th theme) textarea.Model {
 		}
 	}
 	in.SetStyles(st)
-	in.SetHeight(1)
+	in.SetHeight(3)
 	in.Focus()
 	return in
 }

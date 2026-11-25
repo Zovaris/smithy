@@ -174,3 +174,13 @@ func TestGoldenProfiles(t *testing.T) {
 		}
 	}
 }
+
+func TestSteelRampStaysGreyIn256Colors(t *testing.T) {
+	th := newTheme(true, colorprofile.ANSI256, true)
+	for i, c := range th.ramp {
+		ic, ok := c.(ansi.IndexedColor)
+		if !ok || ic < 232 {
+			t.Fatalf("ramp[%d] = %#v, want a 256-color grey (232-255)", i, c)
+		}
+	}
+}

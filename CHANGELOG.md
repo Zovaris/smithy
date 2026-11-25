@@ -10,6 +10,8 @@ part above `### Details`.
 
 ### Details
 
+- tui: the chat composer is three rows tall by default, grows with its text up to ten rows then scrolls, and shrinks back after sending; shift+enter, alt+enter or ctrl+j break the line (footer hint), pasted newlines are kept, and the footer drops its last hints before the agent and cost when narrow.
+- tui: in 256-color terminals the steel dither ramp uses the grey indices 233–239 instead of downsampled hex, so the header no longer turns navy.
 - daemon: claude sessions run with `--output-format stream-json --verbose`; each tool call (name, args, output, error, time) becomes a `session_tool` event and the result line gives the reply and usage, instead of raw JSON as text. `ToolEvent` gains `took`.
 - tui: chat rebuilt on the Claude Design canvas (Steel tiers, anvil header that moves only while a session works, decision strip with ember button, minimal / expandable / verbose blocks, agents side panel, floating ctrl+k palette). The composer is a textarea; `/` opens a filterable popup with every command and its description, `@` completes files, `?` opens help. The first message starts a session on the last used agent (`POST /v1/sessions`), later ones go to it; session messages, tools, diffs and cost render per session, tab switches between them. New commands: /new, /sessions, /stop, /connect, /web, /remote, /log. Daemon events (daemon_up, poll errors) go to a status line and /log, never the transcript; esc clears the input instead of quitting. Screenshots at 160x48 and 100x30 in `docs/design/tui-v023/`.
 - web: Temper design for approval (Sephiro theme `web/src/theme/temper.css`, light/dark, mock and screenshots in `docs/design/web-v023/`).
