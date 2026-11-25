@@ -14,6 +14,33 @@ import (
 	"github.com/Zovaris/smithy/internal/store"
 )
 
+func TestClientAskAndReadDecision(t *testing.T) {
+	sv, hs := newTest(t, filepath.Join(t.TempDir(), "s.db"))
+	c := &Client{Base: hs.URL, Token: testToken}
+	ctx := context.Background()
+	if err := c.Ask(ctx, "secret:x", "q", nil); err == nil {
+		t.Fatal("ask accepted a non-decide id")
+	}
+	id := "decide:b/i/mcp-1"
+	if err := c.Ask(ctx, id, "Which db?", []string{"sqlite", "postgres"}); err != nil {
+		t.Fatal(err)
+	}
+	d, err := c.Decision(ctx, id)
+	if err != nil || d.Question != "Which db?" || d.Outcome != nil {
+		t.Fatalf("decision %+v %v", d, err)
+	}
+	if _, err := sv.Answer(id, "postgres", "me"); err != nil {
+		t.Fatal(err)
+	}
+	d, err = c.Decision(ctx, id)
+	if err != nil || d.Outcome == nil || d.Outcome.Answer != "postgres" {
+		t.Fatalf("decision %+v %v", d, err)
+	}
+	if _, err := c.Decision(ctx, "decide:b/i/none"); err == nil {
+		t.Fatal("unknown decision found")
+	}
+}
+
 // restartable serves one store on a fixed address and can be stopped and started again,
 // like a daemon restart.
 type restartable struct {

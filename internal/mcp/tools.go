@@ -183,11 +183,18 @@ func SecretTool(p *proxy.Proxy) Tool {
 
 var cardPart = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
+// Asker records a decision on smithy daemon and reads its outcome back from the daemon's own record.
+type Asker interface {
+	Ask(ctx context.Context, id, question string, options []string) error
+	Outcome(ctx context.Context, id string) (answer string, answered bool, err error)
+}
+
 // AskTool asks the user a question through the warden card <batch>/<item> (card is
-// "batch/item"): the card goes to needs_decision, smithy daemon routes it to the TUI, web and
-// chat, and the answer lands back on the card. It waits, polling every poll, until the answer
-// or ctx ends.
-func AskTool(card string, poll time.Duration) Tool {
+// "batch/item"): the decision is recorded on smithy daemon (connect returns it, or an error when
+// none runs, and then ask refuses), which routes it to the TUI, web and chat; the card shows it as
+// needs_decision. The answer is read only from the daemon, never from the card, which the worker
+// can write. It waits, polling every poll, until the answer or ctx ends.
+func AskTool(card string, poll time.Duration, connect func() (Asker, error)) Tool {
 	var one sync.Mutex
 	return Tool{Name: "ask", Description: "Ask the user a decision and wait for the answer (TUI, web or chat). Only for real decisions: give the options and their trade-offs.",
 		Schema: Object(map[string]any{"question": Str("one question"), "options": List("up to 6 short options"),
@@ -209,6 +216,13 @@ func AskTool(card string, poll time.Duration) Tool {
 			if err != nil {
 				return "", err
 			}
+			if connect == nil {
+				return "", errors.New("ask needs smithy daemon running (it carries the answer); decide by the task's rules and say so in your report")
+			}
+			asker, err := connect()
+			if err != nil {
+				return "", errors.New("ask needs smithy daemon running (" + err.Error() + "); decide by the task's rules and say so in your report")
+			}
 			if !one.TryLock() {
 				return "", errors.New("another question is already waiting for the user; wait for its answer")
 			}
@@ -221,19 +235,19 @@ func AskTool(card string, poll time.Duration) Tool {
 			if len(opts) > 0 {
 				pairs = append(pairs, "options="+js(opts))
 			}
+			want := "decide:" + batch + "/" + item + "/" + key
+			if err := asker.Ask(ctx, want, q, opts); err != nil {
+				return "", errors.New("ask: the daemon refused the question (" + err.Error() + "); decide by the task's rules and say so in your report")
+			}
 			if _, err := cards.Set(batch, item, pairs); err != nil {
 				return "", err
 			}
 			ctx, cancel := context.WithTimeout(ctx, time.Duration(mins)*time.Minute)
 			defer cancel()
-			want := "decide:" + batch + "/" + item + "/" + key
-			file := filepath.Join(cards.Home(), batch, item+".json")
 			t := time.NewTicker(poll)
 			defer t.Stop()
 			for {
-				var c map[string]any
-				if b, err := os.ReadFile(file); err == nil && json.Unmarshal(b, &c) == nil && c["answer_id"] == want {
-					ans, _ := c["answer"].(string)
+				if ans, ok, err := asker.Outcome(ctx, want); err == nil && ok {
 					cards.Set(batch, item, []string{"state=working", "decision_key="})
 					return text.Clean(ans), nil
 				}
