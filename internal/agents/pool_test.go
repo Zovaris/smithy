@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/pool"
 )
 
@@ -198,5 +200,33 @@ func TestAgentPoolRecordsAccountOnTheCard(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(filepath.Join(wh, "b1", "01-x.json")); !strings.Contains(string(b), `"account": "work"`) {
 		t.Fatalf("card = %s", b)
+	}
+}
+
+func TestAcquirePoolFallsBackAcrossHarnessesAndLogsTheSwitch(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("SMITHY_HOME", d)
+	t.Setenv("SMITHY_EVENTS", "")
+	if err := config.Set(config.UserFile(), "pool.order", "claude,codex"); err != nil {
+		t.Fatal(err)
+	}
+	_, _ = pool.Add("c1", "claude", filepath.Join(d, "c1"))
+	_, _ = pool.Add("x1", "codex", filepath.Join(d, "x1"))
+	_ = pool.MarkLimited("c1", time.Now().Add(time.Hour))
+	var o Options
+	if a, rc := acquire("pool", &o); rc != 0 || a.Name != "x1" {
+		t.Fatalf("acquire = %s rc %d, want the codex fallback", a.Name, rc)
+	}
+	es, _ := events.Read(time.Time{}, 0)
+	found := false
+	for _, e := range es {
+		found = found || (e.Kind == "pool_fallback" && e.Account == "x1" && strings.Contains(e.Detail, "claude") && strings.Contains(e.Detail, "codex"))
+	}
+	if !found {
+		t.Fatalf("no pool_fallback event in %+v", es)
+	}
+	_ = pool.Clear("c1")
+	if a, _ := acquire("pool", &o); a.Name != "c1" {
+		t.Fatalf("acquire = %s, want back on claude after the reset", a.Name)
 	}
 }
