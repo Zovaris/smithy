@@ -10,6 +10,11 @@ part above `### Details`.
 
 ### New
 
+- **PR outcomes.** What happened to each auto PR (merged, changes requested, closed) shows in the weekly report and in History.
+
+### Details
+
+- `smithy auto serve` checks the PRs of launched items each cycle and records an `outcome` event per change; `smithy report week` lists them under "Auto PR outcomes" and the TUI History view shows them as results.
 - Harness build: every agent smithy drives gets a `smithy` MCP server with the board, `ask` (a decision answered from the TUI, web or chat), API calls with `secret:<name>` that never show the key, and fast search.
 - A failed auto issue gets one more try on a stronger model before it is reported blocked.
 - `pool.order` (e.g. `claude,codex`): when every account of one harness is limited, a pool run continues on the next pooled harness, logs the switch as a `pool_fallback` event and goes back once the limit resets.

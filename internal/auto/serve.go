@@ -412,6 +412,7 @@ func (sv *Server) Cycle() time.Duration {
 			sv.logf("serve: poll: %v", err)
 		}
 	}
+	sv.recordOutcomes()
 	sv.hb.LastCycle = now()
 	sv.adopt()
 	switch {
@@ -482,6 +483,20 @@ func (sv *Server) Cycle() time.Duration {
 		go sv.note.Flush(now())
 	}
 	return time.Duration(s.Every) * time.Second
+}
+
+// recordOutcomes appends an "outcome" event for each auto PR merged, closed or sent back with
+// changes requested since the last cycle, over the last 30 days of events.
+func (sv *Server) recordOutcomes() {
+	es, err := events.Read(now().AddDate(0, 0, -30), 0)
+	if err != nil {
+		sv.logf("serve: outcomes: %v", err)
+		return
+	}
+	for _, e := range Outcomes(es, prOutcome) {
+		sv.logf("outcome %s/%s %s %s", e.Batch, e.Item, e.Detail, e.PR)
+		events.Append(e)
+	}
 }
 
 // overCap reports whether today's reported spend is at or over auto.max_cost_per_day; it logs
