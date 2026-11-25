@@ -127,16 +127,24 @@ if [ -d "$home/bin" ] && [ ! -L "$home/bin" ]; then
     case $n in dev|"*") continue ;; esac
     [ -d "$d" ] && [ ! -L "$d" ] || continue
     mkdir -p "$vdir"
-    if [ -e "$vdir/$n" ]; then rm -rf "$d"; else mv "$d" "$vdir/$n"; fi
-    ln -sfn "$vdir/$n" "$d"; legacy=1
+    # never delete: a version already at the target keeps both copies (the old one stays put)
+    if [ ! -e "$vdir/$n" ]; then mv "$d" "$vdir/$n" && ln -sfn "$vdir/$n" "$d"; fi
+    legacy=1
   done
-  [ -d "$home/bin/dev" ] && [ ! -L "$home/bin/dev" ] && { mkdir -p "$data"; rm -rf "$data/dev"; mv "$home/bin/dev" "$data/dev"; legacy=1; }
+  if [ -d "$home/bin/dev" ] && [ ! -L "$home/bin/dev" ]; then
+    mkdir -p "$data/dev"
+    for d in "$home"/bin/dev/*/; do
+      d=${d%/}; [ -d "$d" ] || continue
+      [ -e "$data/dev/${d##*/}" ] || mv "$d" "$data/dev/${d##*/}"
+    done
+    rmdir "$home/bin/dev" 2>/dev/null || true; legacy=1
+  fi
   [ -e "$home/bin/$exe" ] || [ -L "$home/bin/$exe" ] && legacy=1
 fi
 mkdir -p "$vdir/$version" "$bindir"; mv "$src" "$vdir/$version/$exe"
 if [ "$os" = windows ]; then cp -f "$vdir/$version/$exe" "$bindir/$exe"; else ln -sfn "$vdir/$version/$exe" "$bindir/$exe"; fi
 if [ -n "$legacy" ]; then
-  rm -rf "$home/bin/$version"; ln -sfn "$vdir/$version" "$home/bin/$version"
+  { [ -L "$home/bin/$version" ] || [ ! -e "$home/bin/$version" ]; } && { rm -f "$home/bin/$version"; ln -sfn "$vdir/$version" "$home/bin/$version"; }
   if [ "$os" = windows ]; then cp -f "$vdir/$version/$exe" "$home/bin/$exe"; else rm -f "$home/bin/$exe"; ln -s "$bindir/$exe" "$home/bin/$exe"; fi
   say "moved the old install from $home/bin to $vdir; $home/bin keeps links to it for one release, so older skills and PATH entries keep working"
 fi
