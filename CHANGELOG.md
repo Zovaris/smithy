@@ -11,6 +11,7 @@ part above `### Details`.
 ### New
 
 - `pool.order` (e.g. `claude,codex`): when every account of one harness is limited, a pool run continues on the next pooled harness, logs the switch as a `pool_fallback` event and goes back once the limit resets.
+
 ### Details
 
 - `smithy search --code [--regex] "<query>"` searches the whole repo (ignored, hidden and binary files skipped) through the new `internal/search`: the ripgrep shipped next to the binary, rg on PATH, `git ls-files` in a repo or a stdlib walk, with caps on matches, line length (220) and bytes (64 KB); `SMITHY_RG=<path>|off` overrides. Docs search is unchanged.
