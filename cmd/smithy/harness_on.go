@@ -23,7 +23,7 @@ func init() {
 	tui.Version, daemon.Version = version, version
 	agents.APIProvider = provider.New
 	agents.CodeMode = func(t apiloop.Tools) apiloop.Tools { return codemode.Wrap(t, codemode.Limits{}) }
-	register("daemon", harnessSummary["daemon"], daemon.Usage, "--bg --port= --idle-exit= --agent= --once --max-hours=", func(args []string) int {
+	register("daemon", harnessSummary["daemon"], daemon.Usage, "--bg --port= --idle-exit= --demo --agent= --once --max-hours=", func(args []string) int {
 		return daemon.Main(args, tui.RunServeView)
 	})
 	register("stop", harnessSummary["stop"], daemon.StopUsage, "", func([]string) int {

@@ -16,3 +16,4 @@ coverage.*
 *.swp
 *~
 Thumbs.db
+/demo/out/

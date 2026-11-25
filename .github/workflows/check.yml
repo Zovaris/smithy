@@ -114,9 +114,39 @@ jobs:
           npm test
           npm run typecheck
           npm run build
+  demo:
+    # Records the v0.23 demo (demo/run.sh): the TUI tape and the web screenshots, kept as an artifact.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the web UI and install chromium
+        working-directory: web
+        run: npm ci && npm run build && npx playwright install --with-deps chromium
+      - name: Install vhs
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          go install github.com/charmbracelet/vhs@v0.9.0
+          curl -fsSL -o /tmp/ttyd https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.x86_64
+          sudo install -m 755 /tmp/ttyd /usr/local/bin/ttyd
+      - name: Record the demo
+        run: PATH="$(go env GOPATH)/bin:$PATH" demo/run.sh "$RUNNER_TEMP/demo"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: demo
+          path: ${{ runner.temp }}/demo
+          if-no-files-found: error
   check:
     if: always()
-    needs: [lint, test, integration, build, web]
+    needs: [lint, test, integration, build, web, demo]
     runs-on: ubuntu-latest
     steps:
       - name: Every check job passed

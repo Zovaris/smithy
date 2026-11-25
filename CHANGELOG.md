@@ -8,8 +8,13 @@ part above `### Details`.
 
 ## Unreleased
 
+### Highlights
+
+- See it run: the [demo](https://github.com/Zovaris/smithy/blob/main/docs/demo.md) walks first run, a session, tool calls, a decision and the web on a phone.
+
 ### Details
 
+- demo: `smithy daemon --demo` runs every session on a scripted agent (read, edit, test run, one decision; no CLI or key). `demo/run.sh` records the TUI with VHS (`demo/tui.tape`) and the web with Playwright (`web/scripts/demo-shots.mjs`, `DEMO_CHROME` for an installed browser) on a throwaway home; the CI `demo` job uploads the tape and screenshots as the `demo` artifact. `docs/demo.md` shows the flow.
 - tui: the chat composer is three rows tall by default, grows with its text up to ten rows then scrolls, and shrinks back after sending; shift+enter, alt+enter or ctrl+j break the line (footer hint), pasted newlines are kept, and the footer drops its last hints before the agent and cost when narrow.
 - tui: in 256-color terminals the steel dither ramp uses the grey indices 233–239 instead of downsampled hex, so the header no longer turns navy.
 - daemon: claude sessions run with `--output-format stream-json --verbose`; each tool call (name, args, output, error, time) becomes a `session_tool` event and the result line gives the reply and usage, instead of raw JSON as text. `ToolEvent` gains `took`.
