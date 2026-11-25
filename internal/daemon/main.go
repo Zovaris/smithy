@@ -38,6 +38,8 @@ serve a Tailscale-User-Login listed in daemon.allow; anything else gets 401):
   GET  /v1/events?since=<seq>    SSE of every event after seq; resumes with Last-Event-ID
   POST /v1/decisions             {"id","answer"}: the first answer wins (200); later ones get
                                  the recorded outcome (409)
+Worker events (events.jsonl, the proxy log) are tailed into the store; proxy secret asks,
+ready items and needs_decision items become decisions whose answers go back to the asker.
 Stop a --bg daemon with: kill <pid> (smithy auto status or daemon.json show it).`
 
 type flags struct {
@@ -146,8 +148,11 @@ func foreground(name string, port int, serveArgs []string, view auto.View) int {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", name, err)
 		return 1
 	}
-	events.Tap = func(e events.Event) { api.Append("event", "", e) }
-	defer func() { events.Tap = nil }()
+	api.Route = RouteBack
+	api.Resume()
+	tctx, stopTails := context.WithCancel(context.Background())
+	defer stopTails()
+	go api.RunTails(tctx, time.Second, &Tail{Path: events.File(), Source: "tail:events"}, &Tail{Path: events.ProxyFile(), Source: "tail:proxy"})
 	h := auto.Hooks{
 		Tap: func(l string) { api.Append("log", "", map[string]string{"line": l}) },
 		Started: func(sv *auto.Server) (func(), error) {

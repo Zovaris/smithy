@@ -20,6 +20,8 @@ import (
 const (
 	KindAsked    = "decision_asked"
 	KindAnswered = "decision_answered"
+	// KindRouted records that an answer reached its asker (or came from it), so it is never sent twice.
+	KindRouted = "decision_routed"
 )
 
 // Decision is a question waiting on (or answered by) someone.
@@ -58,9 +60,12 @@ type Server struct {
 	started time.Time
 	// ServeState, when set, fills State.Serve (the auto loop's heartbeat).
 	ServeState func() any
+	// Route, when set, sends a won answer back to its asker (RouteBack); an error leaves it for Resume.
+	Route func(Decision, Outcome) error
 
 	mu        sync.Mutex
 	decisions map[string]*Decision
+	routed    map[string]bool
 	lastSeq   int64
 	wake      chan struct{}
 }
@@ -71,7 +76,7 @@ func New(st *store.Store, token string, allow []string, log func(string)) (*Serv
 		return nil, errors.New("daemon: empty token")
 	}
 	sv := &Server{st: st, token: token, allow: allow, log: log, started: time.Now(),
-		decisions: map[string]*Decision{}, wake: make(chan struct{})}
+		decisions: map[string]*Decision{}, routed: map[string]bool{}, wake: make(chan struct{})}
 	evs, err := st.Since(0)
 	if err != nil {
 		return nil, err
@@ -100,6 +105,11 @@ func (sv *Server) apply(e store.Event) {
 				o.Won = false
 				d.Outcome = &o
 			}
+		}
+	case KindRouted:
+		var r struct{ ID string }
+		if json.Unmarshal(e.Data, &r) == nil {
+			sv.routed[r.ID] = true
 		}
 	}
 }
@@ -145,9 +155,22 @@ func (sv *Server) Ask(id, question string, options []string) error {
 }
 
 // Answer records the first answer to id. Later answers get the recorded outcome with Won false.
+// A won answer goes back to its asker through Route.
 func (sv *Server) Answer(id, answer, by string) (Outcome, error) {
 	sv.mu.Lock()
-	defer sv.mu.Unlock()
+	o, err := sv.answerLocked(id, answer, by)
+	var d Decision
+	if err == nil && o.Won {
+		d = *sv.decisions[id]
+	}
+	sv.mu.Unlock()
+	if err == nil && o.Won {
+		sv.route(d, o)
+	}
+	return o, err
+}
+
+func (sv *Server) answerLocked(id, answer, by string) (Outcome, error) {
 	d := sv.decisions[id]
 	if d == nil {
 		return Outcome{}, errNotFound
@@ -167,6 +190,48 @@ func (sv *Server) Answer(id, answer, by string) (Outcome, error) {
 	d.Outcome = &o
 	o.Won = true
 	return o, nil
+}
+
+// route sends one answer back through Route and records it; a failure is retried by Resume.
+func (sv *Server) route(d Decision, o Outcome) {
+	if sv.Route == nil {
+		return
+	}
+	if err := sv.Route(d, o); err != nil {
+		if sv.log != nil {
+			sv.log("route " + d.ID + ": " + err.Error())
+		}
+		return
+	}
+	sv.mu.Lock()
+	defer sv.mu.Unlock()
+	sv.markRoutedLocked(d.ID)
+}
+
+func (sv *Server) markRoutedLocked(id string) {
+	if sv.routed[id] {
+		return
+	}
+	if _, err := sv.appendLocked(KindRouted, "", map[string]string{"id": id}); err == nil {
+		sv.routed[id] = true
+	}
+}
+
+// Resume routes every answered decision whose answer never reached its asker (a crash or a
+// failed Route between the answer and the hand-back).
+func (sv *Server) Resume() error {
+	sv.mu.Lock()
+	var todo []Decision
+	for id, d := range sv.decisions {
+		if d.Outcome != nil && !sv.routed[id] && routable(id) {
+			todo = append(todo, *d)
+		}
+	}
+	sv.mu.Unlock()
+	for _, d := range todo {
+		sv.route(d, *d.Outcome)
+	}
+	return nil
 }
 
 // Pending lists unanswered decisions, oldest first.
