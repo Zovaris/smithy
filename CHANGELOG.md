@@ -5,6 +5,8 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- `install.sh` asks "harness or skills" on a terminal (default skills), takes `--harness` / `--skills`, installs skills without a terminal, and `--update` keeps the installed kind.
+
 ## v0.18.0 — 2026-11-24
 
 - CI runs lint, tests (one job per build), integration and builds as parallel jobs behind a `check` gate; pull requests build one target per OS, main builds every release target.
