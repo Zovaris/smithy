@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -80,6 +81,29 @@ func TestYesRemovesOnlyListed(t *testing.T) {
 	b, _ := os.ReadFile(f.rc)
 	if string(b) != "alias a=b\n\nalias c=d\n" {
 		t.Fatalf("rc: %q", b)
+	}
+}
+
+func TestCopiedBinaryRemovedOnlyWhenItIsSmithys(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows removes Programs\\smithy as a folder")
+	}
+	f := setup(t)
+	link := filepath.Join(f.bin, "smithy")
+	os.Remove(link)
+	os.WriteFile(link, []byte("bin"), 0o755) // a copy of versions/0.21.0/smithy
+	var out bytes.Buffer
+	Run([]string{"--yes"}, strings.NewReader(""), false, &out, "")
+	if exists(link) {
+		t.Fatalf("copied smithy binary left behind:\n%s", out.String())
+	}
+	f = setup(t)
+	os.Remove(link)
+	os.WriteFile(link, []byte("someone else's smithy"), 0o755)
+	out.Reset()
+	Run([]string{"--yes"}, strings.NewReader(""), false, &out, "")
+	if !exists(link) {
+		t.Fatalf("removed a binary smithy did not install:\n%s", out.String())
 	}
 }
 

@@ -35,7 +35,18 @@ echo "smithy uninstall: would remove" >&2
 [ -d "$data" ] && add "$data"
 if [ -L "$bindir/smithy" ]; then
   t=$(readlink "$bindir/smithy"); inside "$t" && add "$bindir/smithy"
+elif [ -f "$bindir/smithy" ]; then
+  # a copy, not a link: smithy's own only when it matches an installed version byte for byte
+  for v in "$data"/versions/*/smithy; do
+    [ -f "$v" ] && cmp -s "$v" "$bindir/smithy" && { add "$bindir/smithy"; break; }
+  done
 fi
+# Windows (Git Bash): install.sh copies smithy.exe into %LOCALAPPDATA%\Programs\smithy, a folder of its own
+case $(uname -s 2>/dev/null) in MINGW*|MSYS*|CYGWIN*)
+  lad=${LOCALAPPDATA:-$HOME/AppData/Local}; command -v cygpath >/dev/null 2>&1 && lad=$(cygpath -u "$lad")
+  [ -d "$lad/smithy/versions" ] && add "$lad/smithy"
+  [ -f "$lad/Programs/smithy/smithy.exe" ] && add "$lad/Programs/smithy" ;;
+esac
 [ -d "$home/bin" ] || [ -L "$home/bin" ] && add "$home/bin"
 skills=
 if [ -f "$home/installed-skills" ]; then

@@ -269,6 +269,11 @@ t "uninstall.sh: --yes removes what it listed, keeps ~/.smithy" 'U y --yes && [ 
 t "uninstall.sh: never touches what it did not install" '[ -d "$L/Iy/.claude/skills/mine" ] && [ -e "$L/Iy/.local/bin/other" ] && [ -e "$L/Iy/.smithy/auth.json" ]'
 t "uninstall.sh: --purge without a terminal needs --confirm-purge" 'U m --yes --purge && [ -e "$L/Im/.smithy/auth.json" ] && [ ! -e "$L/Im/.smithy/bin" ] && grep -q "confirm-purge" "$L/err"'
 t "uninstall.sh: tty purge asks twice and names the contents" 'printf "y\n" > "$L/ans"; U m --purge </dev/null; printf "purge\n" > "$L/ans"; env -u XDG_DATA_HOME -u XDG_BIN_HOME HOME="$L/Im" SMITHY_HOME="$L/Im/.smithy" SMITHY_TTY="$L/ans" PATH="$L/sys" sh "$L/uninstall.sh" --yes --purge 2>"$L/err"; grep -q "holds: .*auth.json" "$L/err" && [ ! -e "$L/Im/.smithy" ] && [ -d "$L/Im/.claude/skills/mine" ]'
+mkdir -p "$L/Ic/.local/share/smithy/versions/0.0.0" "$L/Ic/.local/bin" "$L/Id/.local/share/smithy/versions/0.0.0" "$L/Id/.local/bin"
+for h in c d; do echo bin > "$L/I$h/.local/share/smithy/versions/0.0.0/smithy"; done
+echo bin > "$L/Ic/.local/bin/smithy"; echo other > "$L/Id/.local/bin/smithy"
+t "uninstall.sh: removes a copied smithy binary" 'U c --yes && [ ! -e "$L/Ic/.local/bin/smithy" ]'
+t "uninstall.sh: keeps a binary smithy did not install" 'U d --yes && [ -e "$L/Id/.local/bin/smithy" ]'
 t "install.sh: a fresh smithy home gets the marker" '[ -e "$L/Ia/.smithy/.smithy-home" ]'
 mkdir -p "$L/Iq/.smithy/my-project"; echo mine > "$L/Iq/.smithy/notes.txt"; touch "$L/Iq/.smithy/auth.json"
 t "uninstall.sh: --purge refuses a folder that is not smithy's" 'U q --yes --purge --confirm-purge; [ -e "$L/Iq/.smithy/notes.txt" ] && grep -q "refusing to purge .*notes.txt" "$L/err"'

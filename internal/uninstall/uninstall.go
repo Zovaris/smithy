@@ -4,6 +4,7 @@ package uninstall
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -90,6 +91,25 @@ func ownHome(dir string) (bool, string) {
 	return true, ""
 }
 
+// copiedFrom reports whether bin is a regular file byte-identical to an installed version under data.
+func copiedFrom(bin, data string) bool {
+	fi, err := os.Lstat(bin)
+	if err != nil || !fi.Mode().IsRegular() {
+		return false
+	}
+	mine, err := os.ReadFile(bin)
+	if err != nil {
+		return false
+	}
+	vs, _ := filepath.Glob(filepath.Join(data, "versions", "*", filepath.Base(bin)))
+	for _, v := range vs {
+		if b, err := os.ReadFile(v); err == nil && bytes.Equal(b, mine) {
+			return true
+		}
+	}
+	return false
+}
+
 // Engine runs the container engine; tests replace it.
 var Engine = func(e string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -133,6 +153,8 @@ func Gather(purge bool, engine string) Plan {
 		}
 	} else if fi, err := os.Stat(layout.BinDir()); runtime.GOOS == "windows" && err == nil && fi.IsDir() && filepath.Base(layout.BinDir()) == "smithy" {
 		p.Paths = append(p.Paths, layout.BinDir()) // Windows: %LOCALAPPDATA%\Programs\smithy is ours
+	} else if copiedFrom(layout.Link(), data) {
+		p.Paths = append(p.Paths, layout.Link()) // a copy (not a link) of one of smithy's installed versions
 	}
 	if _, err := os.Lstat(legacy); err == nil {
 		p.Paths = append(p.Paths, legacy)
