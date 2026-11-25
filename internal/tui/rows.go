@@ -717,10 +717,13 @@ func (m Model) doneJobs(es []events.Event, cards bool) []*job {
 			} else if e.Detail != "" {
 				titles[k] = e.Detail
 			}
-		case e.Kind == "merged" || (e.Kind == "stage" && (e.Detail == "ready" || e.Detail == "blocked" || e.Detail == "dropped" || e.Detail == "failed")):
+		case e.Kind == "merged" || e.Kind == "outcome" || (e.Kind == "stage" && (e.Detail == "ready" || e.Detail == "blocked" || e.Detail == "dropped" || e.Detail == "failed")):
 			res := map[string]string{"merged": "merged", "ready": "ready", "blocked": "blocked", "failed": "blocked", "dropped": "closed"}[e.Detail]
-			if e.Kind == "merged" {
+			switch {
+			case e.Kind == "merged":
 				res = "merged"
+			case e.Kind == "outcome":
+				res = strings.ReplaceAll(e.Detail, "_", " ")
 			}
 			j, ok := jobs[k]
 			if !ok {
@@ -829,7 +832,7 @@ func (m Model) jobRow(j *job) row {
 	if !j.start.IsZero() && j.end.After(j.start) {
 		took = dur(j.end.Sub(j.start))
 	}
-	c := map[string]color.Color{"merged": t.ok, "ready": t.accent, "closed": t.muted, "blocked": t.err}[j.result]
+	c := map[string]color.Color{"merged": t.ok, "ready": t.accent, "closed": t.muted, "blocked": t.err, "changes requested": t.warn}[j.result]
 	issue := or(j.issue)
 	if issue == "-" {
 		issue = j.item

@@ -106,6 +106,14 @@ func Main(args []string) int {
 			fmt.Fprintln(os.Stderr, "smithy auto:", errText(openErr))
 			return openCode(openErr)
 		}
+		if pos[1] == "blocked" && s.RetryStronger {
+			if model, ok, err := Retry(pos[0]); err != nil {
+				fmt.Fprintln(os.Stderr, "smithy auto: retry:", Clean(err.Error()))
+			} else if ok {
+				fmt.Println("auto retry", pos[0], "on", model)
+				return 0
+			}
+		}
 		if err := Report(srcs, pos[0], pos[1], flags["--pr"]); err != nil {
 			fmt.Fprintln(os.Stderr, "smithy auto:", Clean(err.Error()))
 			if openErr != nil {

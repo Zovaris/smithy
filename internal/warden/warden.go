@@ -20,6 +20,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/harness"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 type plan struct {
@@ -306,6 +307,14 @@ func Doctor(args []string) int {
 	} else if BinaryVersion != "dev" {
 		r.ok("binary v" + BinaryVersion)
 	}
+	if exe, err := os.Executable(); err == nil {
+		r.ok("smithy at " + exe)
+	}
+	if layout.OnPath(layout.BinDir()) {
+		r.ok(layout.BinDir() + " is on PATH")
+	} else {
+		r.ok(layout.BinDir() + " is not on PATH (optional: smithy setup path add; the skills run smithy without it)")
+	}
 	if have("git") {
 		r.ok("git found")
 	} else {
@@ -531,6 +540,9 @@ func sandboxDoctor(r *report, p agents.Probe) {
 		r.warn("sandbox native with codex: workers have no network, so git push and gh fail inside them", "push and open PRs through smithy outside the worker, or use auto.sandbox container")
 	default:
 		r.ok("sandbox: native (claude, hosts " + strings.Join(agents.SandboxDomains(userSetting("auto.sandbox_domains", "")), ",") + ")")
+	}
+	if cli != "" && mode != "container" && !agents.SecretGuarded(cli) {
+		r.ok("guard: " + agents.Kind(cli) + " " + agents.UnguardedNote)
 	}
 }
 

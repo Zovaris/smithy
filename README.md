@@ -54,7 +54,8 @@ Then, in your agent:
 3. **Hand over several tasks** (or `/warden <tasks>`): you get one worker and one PR for each.
 
 Requires git. [`gh`](https://cli.github.com) is recommended; without it, smithy falls back to
-`GH_TOKEN` or prints a compare URL. More options: [docs/install.md](docs/install.md).
+`GH_TOKEN` or prints a compare URL. The binary lands in `~/.local/bin/smithy`; `smithy uninstall`
+removes it again. More options: [docs/install.md](docs/install.md).
 
 ### For agents
 

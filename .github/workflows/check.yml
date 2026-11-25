@@ -141,7 +141,9 @@ jobs:
           echo %tag:~1%> "%RUNNER_TEMP%\l\VERSION"
           set "SMITHY_HOME=%RUNNER_TEMP%\home"
           call "%RUNNER_TEMP%\l\smithy.cmd" version || exit /b 1
+          if not exist "%LOCALAPPDATA%\Programs\smithy\smithy.exe" ( echo install.sh did not create the smithy command & exit /b 1 )
           set "SMITHY_HOME=%RUNNER_TEMP%\empty"
+          set "LOCALAPPDATA=%RUNNER_TEMP%\empty"
           call "%RUNNER_TEMP%\l\smithy.cmd" version 2> "%RUNNER_TEMP%\err.txt"
           if not errorlevel 3 ( type "%RUNNER_TEMP%\err.txt" & exit /b 1 )
           findstr /c:"is not installed" "%RUNNER_TEMP%\err.txt" || exit /b 1

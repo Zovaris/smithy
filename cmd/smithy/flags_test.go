@@ -36,7 +36,7 @@ func TestUsageFlagsAccepted(t *testing.T) {
 // foreign flags belong to other commands or tools a usage text mentions, keyed "<cmd> <flag>".
 var foreign = map[string]bool{
 	"agent --approval-mode": true, "agent --approval-policy": true, "agent --auto": true,
-	"agent --force": true, "agent --permission-mode": true, "agent --sandbox": true,
+	"agent --experimental-acp": true, "agent --force": true, "agent --permission-mode": true, "agent --sandbox": true,
 	"agent --standalone": true, "agent --tools": true,
 	"changed --mutate": true, "route --repo": true, "status --all": true,
 	"task-dir --repo": true, "version --version": true,

@@ -166,3 +166,21 @@ func TestBuildsDevAgeFromBinaryNotFolder(t *testing.T) {
 		t.Fatalf("got %q, want only the stale dev build", got)
 	}
 }
+
+func TestBuildsInStandardLayout(t *testing.T) {
+	data := t.TempDir()
+	vers, dev, link := filepath.Join(data, "versions"), filepath.Join(data, "dev"), filepath.Join(t.TempDir(), "smithy")
+	for _, v := range []string{"0.19.0", "0.20.0", "0.21.0"} {
+		mkbin(t, vers, v, 1)
+	}
+	mkbin(t, dev, "old", 1)
+	old := time.Now().Add(-30 * 24 * time.Hour)
+	os.Chtimes(filepath.Join(dev, "old", "smithy"), old, old)
+	os.Chtimes(filepath.Join(dev, "old"), old, old)
+	if err := os.Symlink(filepath.Join(vers, "0.19.0", "smithy"), link); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(paths(BuildsIn(vers, dev, link)), ","); got != "0.20.0,old" {
+		t.Fatalf("got %q, want 0.20.0,old (keep the linked 0.19.0 and newest 0.21.0)", got)
+	}
+}
