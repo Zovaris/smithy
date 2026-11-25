@@ -8,6 +8,15 @@ part above `### Details`.
 
 ## Unreleased
 
+### Details
+
+- Web UI shell (harness build): `web/` (Preact, `@zovaris/sephiro` 1.2.0, Vite) with smithy's
+  Steel theme, hash routing for sessions, decisions, agents and board (alt+1–4), and an auth
+  gate. Built into `internal/web/dist`, embedded with `go:embed`; the daemon serves it at `/`
+  (loopback, or `*.ts.net` for a login in `daemon.allow`) with a strict CSP. ADR 0010.
+- `smithy web [open]` prints or opens the daemon's web link with the token in the URL fragment.
+- CI `web` job: Vitest, typecheck, the 120 KB gzip first-load budget, and a stale-dist check.
+
 ## v0.19.0 — 2026-11-24
 
 ### Highlights
