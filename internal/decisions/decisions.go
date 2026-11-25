@@ -3,6 +3,7 @@
 package decisions
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -155,6 +156,33 @@ func refMatches(line, prefix string) bool {
 }
 
 // Main runs `smithy decisions`.
+type usageError struct{ error }
+
+// Add appends one pending entry to the log: question → choice, why, who took it (self, consult or
+// timeout) and an optional ref.
+func Add(question, choice, why, by, ref string) error {
+	if by != "consult" && by != "timeout" && by != "self" {
+		return usageError{fmt.Errorf("--by must be consult, timeout or self, got %q", by)}
+	}
+	fields := []string{time.Now().Format("2006-01-02"), "by " + by}
+	var vals [4]string
+	for i, kv := range [][2]string{{"question", question}, {"choice", choice}, {"--why", why}, {"--ref", ref}} {
+		v, err := clean(kv[0], kv[1])
+		if err != nil {
+			return usageError{err}
+		}
+		if v == "" && i < 3 {
+			return usageError{errors.New(kv[0] + " is empty")}
+		}
+		vals[i] = v
+	}
+	fields = append(fields, vals[0]+arw+vals[1], "why: "+vals[2])
+	if vals[3] != "" {
+		fields = append(fields, "ref: "+vals[3])
+	}
+	return update(func(l []string) ([]string, error) { return append(l, open+strings.Join(fields, sep)), nil })
+}
+
 func Main(args []string) int {
 	var pos []string
 	why, by, ref, all := "", "self", "", false
@@ -203,27 +231,11 @@ func Main(args []string) int {
 		if len(pos) != 3 {
 			return bad(`add needs "<question>" "<choice>" --why "<reason>"`)
 		}
-		if by != "consult" && by != "timeout" && by != "self" {
-			return bad(fmt.Sprintf("--by must be consult, timeout or self, got %q", by))
-		}
-		fields := []string{time.Now().Format("2006-01-02"), "by " + by}
-		var vals [4]string
-		for i, kv := range [][2]string{{"question", pos[1]}, {"choice", pos[2]}, {"--why", why}, {"--ref", ref}} {
-			v, err := clean(kv[0], kv[1])
-			if err != nil {
+		if err := Add(pos[1], pos[2], why, by, ref); err != nil {
+			var u usageError
+			if errors.As(err, &u) {
 				return bad(err.Error())
 			}
-			if v == "" && i < 3 {
-				return bad(kv[0] + " is empty")
-			}
-			vals[i] = v
-		}
-		fields = append(fields, vals[0]+arw+vals[1], "why: "+vals[2])
-		if vals[3] != "" {
-			fields = append(fields, "ref: "+vals[3])
-		}
-		err := update(func(l []string) ([]string, error) { return append(l, open+strings.Join(fields, sep)), nil })
-		if err != nil {
 			return fail(err)
 		}
 		fmt.Println("recorded in", File())

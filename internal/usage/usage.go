@@ -144,6 +144,15 @@ func Finish(log string) (Usage, bool) {
 	return Usage{}, false
 }
 
+// Write saves u as log's sidecar (for CLIs whose usage smithy collects itself, such as ACP agents).
+func Write(log string, u Usage) error {
+	j, err := json.Marshal(u)
+	if err != nil {
+		return err
+	}
+	return writeAtomic(Sidecar(log), append(j, '\n'))
+}
+
 // Read loads a log's sidecar; ok is false when there is none.
 func Read(log string) (Usage, bool) {
 	var u Usage

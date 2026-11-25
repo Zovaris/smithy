@@ -10,6 +10,15 @@ part above `### Details`.
 
 ### New
 
+- **ACP agents:** `AGENT_PROTOCOL=acp` runs Gemini CLI, OpenCode or any agent that speaks the Agent Client Protocol, with its tool calls, usage and permission requests in smithy's events and decisions.
+
+### Details
+
+- `internal/acp`: a stdlib JSON-RPC client for one ACP prompt turn (initialize, session/new, session/prompt); it offers no fs or terminal capability and refuses those requests.
+- `smithy agent` with `AGENT_PROTOCOL=acp`: `gemini --experimental-acp` or `opencode acp`; message chunks go to the log, completed or failed tool calls and permission answers to `tool` and `permission` events, usage to the sidecar and a `usage` event; read-only runs reject permissions and log a decision; the agent gets 5 s to exit after its turn before its group is killed.
+- `decisions.Add` and `usage.Write` exported for that path.
+- A failed auto issue gets one more try on a stronger model before it is reported blocked.
+- `pool.order` (e.g. `claude,codex`): when every account of one harness is limited, a pool run continues on the next pooled harness, logs the switch as a `pool_fallback` event and goes back once the limit resets.
 - **PR outcomes.** What happened to each auto PR (merged, changes requested, closed) shows in the weekly report and in History.
 
 ### Details

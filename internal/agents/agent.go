@@ -41,6 +41,11 @@ Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list be
   cursor      agent -p --force (Cursor CLI)
   pi          pi -p (--tools read when read-only)
   dsh         dsh headless --approval-policy never (DeepSeek Harness; model from its profile)
+AGENT_PROTOCOL=acp drives the CLI over the Agent Client Protocol instead: gemini --experimental-acp,
+  opencode acp, or an AGENT_CMD that speaks ACP. The prompt goes over the protocol; the answer goes
+  to the log; finished tool calls and permission answers become events (tool, permission); usage
+  goes to <log>.usage.json and a usage event. smithy allows each permission request, and rejects
+  it on a read-only run with an entry in the decisions log.
 --profile auto (smithy auto serve's orchestrator; never a full bypass): claude runs with
   permission mode dontAsk and an allowed-tools list limited to Read, Edit, Write, Glob, Grep and Bash for
   git, gh, go/npm test and smithy; codex keeps --sandbox workspace-write with approval_policy never;
@@ -236,6 +241,7 @@ type Spec struct {
 	Argv        []string
 	PromptStdin bool
 	Harness     string
+	ACP         bool
 }
 
 // Efforts are the reasoning efforts smithy passes on, lowest first; MaxEffort is the cap.
@@ -319,13 +325,20 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		kit = o.Inject.Args
 	}
 	cli = Kind(cli)
+	switch p := getenv("AGENT_PROTOCOL"); p {
+	case "", "cli":
+	case "acp":
+		return buildACP(cli, o, path, extra, getenv)
+	default:
+		return Spec{}, fmt.Errorf("smithy agent: AGENT_PROTOCOL=%s: want cli or acp", p)
+	}
 	switch cli {
 	case "custom":
 		h := getenv("WARDEN_HARNESS")
 		if h == "" {
 			h = "unknown"
 		}
-		return Spec{[]string{"bash", "-c", getenv("AGENT_CMD")}, true, h}, nil
+		return Spec{Argv: []string{"bash", "-c", getenv("AGENT_CMD")}, PromptStdin: true, Harness: h}, nil
 	case "claude":
 		perm := getenv("AGENT_PERMISSION_MODE")
 		if perm == "" {
@@ -383,7 +396,7 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 			a = append(a, "--effort", o.Effort)
 		}
 		a = append(append(a, kit...), extra...)
-		return Spec{withPath(a, path), true, "claude-cli"}, nil
+		return Spec{Argv: withPath(a, path), PromptStdin: true, Harness: "claude-cli"}, nil
 	case "codex":
 		a = []string{"codex", "exec"}
 		if o.ReadOnly {
@@ -441,7 +454,35 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 	default:
 		return Spec{}, ErrNoCLI
 	}
-	return Spec{withPath(a, path), stdin, cli}, nil
+	return Spec{Argv: withPath(a, path), PromptStdin: stdin, Harness: cli}, nil
+}
+
+// ACPCLIs are the CLIs smithy can drive over the Agent Client Protocol, with their ACP command.
+var ACPCLIs = map[string][]string{"gemini": {"gemini", "--experimental-acp"}, "opencode": {"opencode", "acp"}}
+
+func buildACP(cli string, o Options, path string, extra []string, getenv func(string) string) (Spec, error) {
+	if cli == "custom" {
+		h := getenv("WARDEN_HARNESS")
+		if h == "" {
+			h = "unknown"
+		}
+		return Spec{Argv: []string{"bash", "-c", getenv("AGENT_CMD")}, Harness: h, ACP: true}, nil
+	}
+	base, ok := ACPCLIs[cli]
+	if !ok {
+		return Spec{}, fmt.Errorf("smithy agent: %s does not speak ACP (AGENT_PROTOCOL=acp drives gemini, opencode or an AGENT_CMD that does)", cli)
+	}
+	a := slices.Clone(base)
+	if cli == "gemini" {
+		if o.ReadOnly {
+			a = append(a, "--approval-mode", "plan")
+		}
+		if o.Model != "" {
+			a = append(a, "-m", o.Model)
+		}
+	}
+	a = append(a, extra...)
+	return Spec{Argv: withPath(a, path), Harness: cli, ACP: true}, nil
 }
 
 func hasArg(a []string, flag string) bool {
@@ -659,7 +700,7 @@ func Run(o Options) int {
 		}
 	}
 	prompt := ""
-	if cli != "custom" {
+	{
 		b, err := os.ReadFile(pf)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -780,7 +821,7 @@ func Run(o Options) int {
 	cmd.Dir, cmd.Env = o.Cwd, env
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, out, out
 	if o.Bg {
-		if o.Timeout > 0 || asJSON || ph != "" {
+		if o.Timeout > 0 || asJSON || ph != "" || s.ACP {
 			if cmd, err = supervisor(o, out.Name()); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return 1
@@ -809,7 +850,12 @@ func Run(o Options) int {
 		fmt.Println(strconv.Itoa(cmd.Process.Pid), log)
 		return 0
 	}
-	rc := wait(cmd, o.Timeout, out)
+	var rc int
+	if s.ACP {
+		rc = runACP(cmd, o, prompt, out)
+	} else {
+		rc = wait(cmd, o.Timeout, out)
+	}
 	out.Close()
 	hit := acct.Name != "" && limited(acct, out.Name(), Kind(cli), rc)
 	if asJSON {
@@ -853,6 +899,10 @@ func lastLine(file string) string {
 }
 
 func wait(cmd *exec.Cmd, timeout time.Duration, out *os.File) int {
+	return waitUntil(cmd, timeout, out, nil)
+}
+
+func waitUntil(cmd *exec.Cmd, timeout time.Duration, out *os.File, ended <-chan struct{}) int {
 	ownGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -869,12 +919,16 @@ func wait(cmd *exec.Cmd, timeout time.Duration, out *os.File) int {
 		defer t.Stop()
 		expired = t.C
 	}
-	timedOut := false
+	timedOut, stopped := false, false
+	var grace <-chan time.Time
 	for {
 		select {
 		case err := <-done:
 			if timedOut {
 				return 124
+			}
+			if stopped {
+				return 0
 			}
 			if err != nil {
 				return exitCode(err)
@@ -882,6 +936,11 @@ func wait(cmd *exec.Cmd, timeout time.Duration, out *os.File) int {
 			return 0
 		case s := <-sig:
 			forward(cmd, s)
+		case <-ended:
+			ended, grace = nil, time.After(acpGrace)
+		case <-grace:
+			stopped = true
+			forward(cmd, syscall.SIGKILL)
 		case <-expired:
 			timedOut = true
 			forward(cmd, syscall.SIGKILL)
