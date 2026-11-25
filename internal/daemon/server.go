@@ -374,8 +374,9 @@ func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	parts := strings.Split(strings.TrimPrefix(req.ID, "decide:"), "/")
-	if !strings.HasPrefix(req.ID, "decide:") || len(parts) != 3 || !cardID(parts[0]) || !cardID(parts[1]) || !cardID(parts[2]) {
-		writeJSON(w, 400, map[string]string{"error": "id must be decide:<batch>/<item>/<key>"})
+	guardID := strings.HasPrefix(req.ID, "guard:") && cardID(strings.TrimPrefix(req.ID, "guard:"))
+	if !guardID && (!strings.HasPrefix(req.ID, "decide:") || len(parts) != 3 || !cardID(parts[0]) || !cardID(parts[1]) || !cardID(parts[2])) {
+		writeJSON(w, 400, map[string]string{"error": "id must be decide:<batch>/<item>/<key> or guard:<key>"})
 		return
 	}
 	opts := make([]string, 0, len(req.Options))
