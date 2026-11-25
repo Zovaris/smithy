@@ -106,9 +106,7 @@ func runACP(cmd *exec.Cmd, o Options, prompt string, out *os.File) int {
 	go func() {
 		r, err := acp.Run(outR, inW, acp.Session{Cwd: o.Cwd, Prompt: prompt}, sink)
 		inW.Close()
-		if err == nil {
-			close(ended)
-		}
+		close(ended) // on a protocol error too, so the child is stopped after the grace
 		done <- result{r, err}
 	}()
 	rc := waitUntil(cmd, o.Timeout, out, ended)
