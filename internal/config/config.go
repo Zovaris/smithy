@@ -70,7 +70,7 @@ var Known = []Setting{
 	{"auto.sandbox_domains", "", "smithy agent", "comma list of extra hosts a worker may reach: native (github.com, api.github.com, api.anthropic.com, api.linear.app always) or the container egress proxy (GitHub, model APIs and package registries always)"},
 	{"auto.sandbox_image", "smithy-sandbox:latest", "smithy agent", "container image for auto.sandbox container (build it from sandbox/Dockerfile)"},
 	{"auto.sandbox_network", "", "smithy agent", "docker/podman --network for auto.sandbox container; required: empty or none refuses to start workers (no network for the API or push); proxy = internal network whose only exit is the smithy-proxy sidecar (allow-list, secrets via smithy auth bind); bridge = open egress with no domain allow-list"},
-	{"auto.sandbox_proxy_binary", "", "smithy agent", "absolute path of the linux smithy binary the smithy-proxy sidecar runs; empty = this binary on linux, else ~/.smithy/bin/smithy-linux-<arch>"},
+	{"auto.sandbox_proxy_binary", "", "smithy agent", "absolute path of the linux smithy binary the smithy-proxy sidecar runs; empty = this binary on linux, else ~/.local/share/smithy/smithy-linux-<arch> ($XDG_DATA_HOME), or the legacy ~/.smithy/bin/smithy-linux-<arch> if only it exists"},
 	{"auto.sandbox_memory", "4g", "smithy agent", "docker/podman --memory for auto.sandbox container"},
 	{"auto.sandbox_weaker_net", "true", "smithy agent", "macOS native sandbox: enableWeakerNetworkIsolation so gh and other Go CLIs can verify TLS (opens the system TLS trust service to the worker); false turns it off and gh then fails inside workers"},
 	{"auto.merge", "manual", "tend auto", "merge mode for auto batches (production stays the user's, always)"},

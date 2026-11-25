@@ -44,6 +44,8 @@ part above `### Details`.
 
 - Install layout (`internal/layout`): versions in `$XDG_DATA_HOME/smithy/versions/<v>` (default `~/.local/share`), dev builds in `.../smithy/dev`, the command at `$XDG_BIN_HOME/smithy` (default `~/.local/bin`); Windows `%LOCALAPPDATA%\smithy\versions` and `%LOCALAPPDATA%\Programs\smithy`. `install.sh` migrates `~/.smithy/bin/<v>` (leaving links there), offers the PATH line on a terminal (default no) and records the file in `~/.smithy/path-added`. The launchers (`shared/smithy`, `smithy.cmd`) look in the new layout first, then the old one; `smithy setup path add`, `smithy cleanup builds` and `smithy doctor` follow.
 
+- `auto.sandbox_proxy_binary` unset now defaults to `~/.local/share/smithy/smithy-linux-<arch>` (`$XDG_DATA_HOME`), falling back to the legacy `~/.smithy/bin/smithy-linux-<arch>` when only that one exists.
+
 - `smithy uninstall [--yes] [--purge [--confirm-purge]]` and `uninstall.sh`: remove only what smithy installed. `smithy skills install` now records the skill folders it writes in `~/.smithy/installed-skills`, so uninstall never touches other skills.
 
 - `smithy auto serve` checks the PRs of launched items each cycle and records an `outcome` event per change; `smithy report week` lists them under "Auto PR outcomes" and the TUI History view shows them as results.
