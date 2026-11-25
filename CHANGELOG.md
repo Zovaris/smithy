@@ -8,15 +8,18 @@ part above `### Details`.
 
 ## Unreleased
 
+- Stored keys are encrypted at rest: `~/.smithy/auth.json` is sealed with AES-GCM under `~/.smithy/auth.key`, which only smithy and its proxy read and every agent sandbox and deny list blocks. An existing plaintext `auth.json` is encrypted on first use without losing keys. No OS keychain, no password prompts.
 - `smithy agent --backend api --model <provider>/<model>` (and `auto.agent api:<provider>/<model>`, harness build) runs smithy's own agent loop (`internal/apiloop`) on the key from `smithy auth set <provider>`: Anthropic, OpenAI (Responses API), Gemini, and OpenRouter, DeepSeek or Ollama through openai-go's Chat Completions. Streaming text to the log, tool, permission and usage events like the CLI paths, prompt caching on Anthropic, retries with backoff on 429/5xx, cost from list prices or the provider's reported cost (ADR 0012).
 ### New
 
 - `smithy bench run --agent <cli>` runs smithy's own 20-task benchmark and records pass rate, time, tokens and cost.
+- `smithy bench compare <a> <b>` shows how one run did against another (pass rate, time, tokens, cost, tasks that regressed or got fixed); the web UI has a Bench screen with the same view.
 
 ### Details
 
 - `internal/apiloop/tools`: the API loop's core tool set: read (numbered lines, offset/limit paging, 2000 lines / 50 KB cap), write, exact-match edit, apply_patch for OpenAI models, shell (timeout, output over 50 KB saved to a file), glob and grep (`internal/search`, 100 results), fetch (https, `auto.sandbox_domains` hosts and redirects only). Every call passes the `--profile auto` rules (AutoTools allowed, AutoDenied and SecretDenied first, symlinks resolved, shell lists and pipelines checked part by part, substitutions refused); a refused call becomes a decision.
 - `internal/bench`: 20 fixture Go repos (bugs, features, refactors, docs) with tests as the oracle and a reference solution each; every task runs in a fresh git repo through `smithy agent --profile auto`, tests are restored before grading, results go to `~/.smithy/bench/<id>.json`. `api:` agents wait for the api backend.
+- `smithy bench runs` lists saved runs; runs are named by id, unique prefix, `latest~N` or file path; `compare --json` gives the machine form. The daemon serves `GET /v1/bench` and `GET /v1/bench/compare?a=&b=` (ids only, no paths) to the web UI's plain Bench screen.
 
 ## v0.21.0 — 2026-11-25
 

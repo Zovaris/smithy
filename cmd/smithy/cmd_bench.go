@@ -7,4 +7,6 @@ func init() {
 		"--agent= --model= --skills= --task= --timeout= --keep", bench.Main)
 	registerSub("bench", "run", "--agent= --model= --skills= --task= --timeout= --keep")
 	registerSub("bench", "list", "")
+	registerSub("bench", "runs", "")
+	registerSub("bench", "compare", "--json")
 }
