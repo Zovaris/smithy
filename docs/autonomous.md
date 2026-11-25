@@ -131,7 +131,10 @@ machine, with a fine-grained, repo-scoped GitHub token and a test or least-privi
 
   Only Claude Code and OpenCode can deny reads of `~/.smithy/auth.json` and the other secret
   files. Codex, gemini, pi, cursor and dsh have no per-path read deny, so outside `container`
-  they can read them; `smithy doctor` says so for the configured CLI.
+  they can read them; `smithy doctor` says so for the configured CLI. Even for Claude Code and
+  OpenCode the shell deny rules match command text (globs such as `~/.s*`, `$HOME` and key file
+  names included), so a command that builds the path another way can slip past: only the `native`
+  or `container` sandbox fully keeps secrets out of reach.
 
   None of these removes the risk. Nothing stops Codex or the others sending data out, so
   least-privilege tokens matter most there.
