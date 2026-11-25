@@ -12,6 +12,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/Zovaris/smithy/internal/auth"
+	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/usage"
@@ -20,6 +21,17 @@ import (
 // APIProvider builds a provider for `smithy agent --backend api`; the harness build sets it
 // (internal/apiloop/provider), the skills build leaves it nil.
 var APIProvider func(name, key, baseURL string) (apiloop.Provider, error)
+
+// CodeMode adds run_code (a sandboxed JS program over the tools) to the loop's tools; the harness
+// build sets it. withCodeMode applies it only when agent.code_mode is on and there are tools.
+var CodeMode func(apiloop.Tools) apiloop.Tools
+
+func withCodeMode(tools apiloop.Tools, on bool) apiloop.Tools {
+	if tools == nil || !on || CodeMode == nil {
+		return tools
+	}
+	return CodeMode(tools)
+}
 
 // APITarget is the "<provider>/<model>" an API run uses: --model under --backend api, or
 // AGENT_CLI (auto.agent) api:<provider>/<model>. ok is false for a CLI run.
@@ -124,8 +136,10 @@ func runAPI(o Options, cli string) int {
 	}
 	defer cancel()
 	item := wardenItem(o.Log)
+	var tools apiloop.Tools
+	tools = withCodeMode(tools, config.Get("agent.code_mode", "false") == "true")
 	res, err := apiloop.Run(ctx, p, apiloop.Request{Model: model, Messages: []apiloop.Message{apiloop.UserText(strings.TrimSpace(string(prompt)))}},
-		nil, apiSink{out: out, item: item, log: o.Log}, apiloop.Options{Provider: name})
+		tools, apiSink{out: out, item: item, log: o.Log}, apiloop.Options{Provider: name})
 	fmt.Fprintln(out)
 	rc := 0
 	switch {
