@@ -31,6 +31,23 @@ func fixture() []events.Event {
 	}
 }
 
+func TestWeekListsAutoPROutcomes(t *testing.T) {
+	es := append(fixture(),
+		events.Event{T: at(9, 9), Kind: "outcome", Batch: "a", Item: "00", PR: "https://x/pr/0", Detail: "closed"},
+		events.Event{T: at(17, 9), Kind: "outcome", Batch: "a", Item: "01", PR: "https://x/pr/7", Detail: "changes_requested"},
+		events.Event{T: at(18, 9), Kind: "outcome", Batch: "a", Item: "02", PR: "https://x/pr/8", Detail: "closed"})
+	r := Week(es, at(23, 9))
+	if len(r.Outcomes) != 2 || r.Outcomes[0].Detail != "changes_requested" || r.Outcomes[1].Detail != "closed" {
+		t.Fatalf("outcomes = %+v", r.Outcomes)
+	}
+	txt := r.Text()
+	for _, want := range []string{"Auto PR outcomes: 2", "a/01 https://x/pr/7 (changes requested)", "a/02 https://x/pr/8 (closed)"} {
+		if !strings.Contains(txt, want) {
+			t.Fatalf("text misses %q:\n%s", want, txt)
+		}
+	}
+}
+
 func TestWeekCountsShippedFailedOpenAndSpend(t *testing.T) {
 	r := Week(fixture(), at(23, 9))
 	if len(r.Shipped) != 1 || r.Shipped[0].PR != "https://x/pr/2" {

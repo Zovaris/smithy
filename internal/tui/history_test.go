@@ -55,3 +55,32 @@ func TestHistory(t *testing.T) {
 		t.Fatalf("History view does not render:\n%s", out)
 	}
 }
+
+func TestHistoryShowsAutoPROutcomes(t *testing.T) {
+	utc(t)
+	day := func(d int, h int) time.Time {
+		return fixedNow.AddDate(0, 0, -d).Truncate(24 * time.Hour).Add(time.Duration(h) * time.Hour)
+	}
+	es := []events.Event{
+		{T: day(3, 9), Kind: "launched", Source: "github", ID: "#5", Batch: "a", Item: "01", Detail: "Sent back"},
+		{T: day(3, 10), Kind: "stage", Batch: "a", Item: "01", PR: "https://github.com/o/r/pull/5", Detail: "pr_open"},
+		{T: day(3, 11), Kind: "outcome", Batch: "a", Item: "01", PR: "https://github.com/o/r/pull/5", Detail: "changes_requested"},
+		{T: day(2, 9), Kind: "launched", Source: "github", ID: "#6", Batch: "a", Item: "02", Detail: "Turned down"},
+		{T: day(2, 11), Kind: "outcome", Batch: "a", Item: "02", PR: "https://github.com/o/r/pull/6", Detail: "closed"},
+	}
+	m := newTest(160, 48, func(now time.Time) Snapshot { return Snapshot{At: now, History: es} })
+	var got []string
+	for _, r := range m.rows(vHistory) {
+		var cs []string
+		for _, c := range r.cells {
+			cs = append(cs, c.s)
+		}
+		got = append(got, strings.Join(cs, "|"))
+	}
+	all := strings.Join(got, "\n")
+	for _, want := range []string{"#5|Sent back|#5|changes requested", "#6|Turned down|#6|closed"} {
+		if !strings.Contains(all, want) {
+			t.Errorf("History lacks %q:\n%s", want, all)
+		}
+	}
+}
