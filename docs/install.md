@@ -20,7 +20,11 @@ curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh
 ```
 
 [`install.sh`](../install.sh) downloads the binary for your platform from the GitHub release into
-`~/.smithy/bin/<version>/`. It verifies two things before installing:
+`~/.local/share/smithy/versions/<version>/` (`$XDG_DATA_HOME`) and links `~/.local/bin/smithy`
+(`$XDG_BIN_HOME`) to it; on Windows `%LOCALAPPDATA%\smithy\versions\<version>\` and
+`%LOCALAPPDATA%\Programs\smithy\smithy.exe`. Keys, the db, config and plans stay in `~/.smithy`.
+An install from before v0.21 in `~/.smithy/bin` moves there; `~/.smithy/bin` keeps links to it for
+one release, so older skills and PATH entries keep working. It verifies two things before installing:
 
 - **Checksum:** a mismatch always refuses.
 - **GitHub build attestation:** this needs `gh`. Without `gh`, nothing is installed unless you set
@@ -29,8 +33,24 @@ curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh
 Each skill ships a small launcher that runs the binary and never downloads anything. If the
 installed version doesn't match the skills, the agent asks whether to run `install.sh` for you.
 
-To use `smithy` in your own terminal, accept the PATH offer in use-smithy setup. On Windows, add
-`%USERPROFILE%\.smithy\bin` to your user PATH.
+If `~/.local/bin` is not on your PATH, `install.sh` prints the exact line for your shell (zsh, bash
+or fish) and, on a terminal, offers to add it (default no); use-smithy setup offers the same. On
+Windows, add `%LOCALAPPDATA%\Programs\smithy` to your user PATH. `smithy doctor` shows where smithy
+runs from and whether `~/.local/bin` is on PATH.
+
+## Uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/uninstall.sh | sh   # or: smithy uninstall
+```
+
+It lists everything it would remove, with sizes, then asks (without a terminal it needs `--yes`):
+the installed versions and the `smithy` command (plus the old `~/.smithy/bin`), the skill folders
+`smithy skills install` wrote (only those), a running daemon, `smithy-*` container images, the
+`smithy-internal`/`smithy-egress` networks, and the PATH line install.sh or setup added.
+`~/.smithy` stays unless you pass `--purge`, and then only after you type `purge` (without a
+terminal: `--purge --confirm-purge`). Skills installed with `npx skills` are removed with
+`npx skills remove`.
 
 ## Harness build
 

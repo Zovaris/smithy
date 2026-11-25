@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/Zovaris/smithy/internal/cleanup"
 	"github.com/Zovaris/smithy/internal/gitx"
+	"github.com/Zovaris/smithy/internal/uninstall"
 )
 
 func init() {
@@ -12,6 +13,7 @@ func init() {
 	registerSub("pr", "create", "--base= --title= --body-file= --draft")
 	registerSub("pr", "merge", "--rebase --merge --squash")
 	register("cleanup", "remove a finished task's worktree and local branch, or old builds, images and worktrees", gitx.CleanupUsage+"\n"+cleanup.Usage, "--force --drop-holdout --yes", cleanupMain)
+	register("uninstall", "remove smithy: binaries, the skills it installed, daemon, images, PATH line (lists first)", uninstall.Usage, "--yes -y --purge --confirm-purge", uninstall.Main)
 	register("verify", "proof for a worker's PR claim", gitx.VerifyUsage, "", gitx.VerifyMain)
 	register("pr-state", "compact JSON state of one PR (tend)", gitx.PRStateUsage, "--from", gitx.PRStateMain)
 }

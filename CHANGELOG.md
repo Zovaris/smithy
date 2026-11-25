@@ -10,6 +10,9 @@ part above `### Details`.
 
 ### New
 
+- smithy now installs where other CLIs do: the command is `~/.local/bin/smithy`, the versions live in `~/.local/share/smithy`. An old `~/.smithy/bin` install moves over by itself and keeps working for one release. If `~/.local/bin` is not on your PATH, install.sh prints the exact line for your shell.
+- `smithy uninstall` (or `uninstall.sh`) removes smithy: it lists everything first, with sizes, and asks. Your keys and plans in `~/.smithy` stay unless you pass `--purge`.
+- Harness build: every agent smithy drives gets a `smithy` MCP server with the board, `ask` (a decision answered from the TUI, web or chat), API calls with `secret:<name>` that never show the key, and fast search.
 - **ACP agents:** `AGENT_PROTOCOL=acp` runs Gemini CLI, OpenCode or any agent that speaks the Agent Client Protocol, with its tool calls, usage and permission requests in smithy's events and decisions.
 
 ### Details
@@ -23,6 +26,8 @@ part above `### Details`.
 
 ### Details
 
+- Install layout (`internal/layout`): versions in `$XDG_DATA_HOME/smithy/versions/<v>` (default `~/.local/share`), dev builds in `.../smithy/dev`, the command at `$XDG_BIN_HOME/smithy` (default `~/.local/bin`); Windows `%LOCALAPPDATA%\smithy\versions` and `%LOCALAPPDATA%\Programs\smithy`. `install.sh` migrates `~/.smithy/bin/<v>` (leaving links there), offers the PATH line on a terminal (default no) and records the file in `~/.smithy/path-added`. The launchers (`shared/smithy`, `smithy.cmd`) look in the new layout first, then the old one; `smithy setup path add`, `smithy cleanup builds` and `smithy doctor` follow.
+- `smithy uninstall [--yes] [--purge [--confirm-purge]]` and `uninstall.sh`: remove only what smithy installed. `smithy skills install` now records the skill folders it writes in `~/.smithy/installed-skills`, so uninstall never touches other skills.
 - `smithy auto serve` checks the PRs of launched items each cycle and records an `outcome` event per change; `smithy report week` lists them under "Auto PR outcomes" and the TUI History view shows them as results.
 - Harness build: every agent smithy drives gets a `smithy` MCP server with the board, `ask` (a decision answered from the TUI, web or chat), API calls with `secret:<name>` that never show the key, and fast search.
 - A failed auto issue gets one more try on a stronger model before it is reported blocked.

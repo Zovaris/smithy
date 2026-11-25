@@ -3,42 +3,47 @@
 # features or other runtime. It never downloads anything. Order:
 #   1. $SMITHY_BIN, when set (your own build);
 #   2. a source checkout of the skills repo with Go installed: builds it once into
-#      ~/.smithy/bin/dev/<checkout id> (one per checkout or worktree) and rebuilds when a .go
-#      file changes (development);
-#   3. ~/.smithy/bin/<VERSION>/smithy, put there by the repo's install.sh (README: Install);
-#   4. ~/.smithy/bin/smithy (another version), with a one-line notice to install <VERSION>.
+#      ~/.local/share/smithy/dev/<checkout id> (one per checkout or worktree) and rebuilds when a
+#      .go file changes (development);
+#   3. ~/.local/share/smithy/versions/<VERSION>/smithy ($XDG_DATA_HOME), put there by the repo's
+#      install.sh (README: Install), else the pre-0.21 ~/.smithy/bin/<VERSION>/smithy;
+#   4. ~/.local/bin/smithy ($XDG_BIN_HOME) or ~/.smithy/bin/smithy (another version), with a
+#      one-line notice to install <VERSION>.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd -P)
 export SMITHY_SKILL_DIR="$here"
 [ -n "${SMITHY_BIN:-}" ] && exec "$SMITHY_BIN" "$@"
 home=${SMITHY_HOME:-$HOME/.smithy}
+case ${XDG_DATA_HOME:-} in /*) data=$XDG_DATA_HOME/smithy ;; *) data=$HOME/.local/share/smithy ;; esac
+case ${XDG_BIN_HOME:-} in /*) cmd=$XDG_BIN_HOME/smithy ;; *) cmd=$HOME/.local/bin/smithy ;; esac
 repo=Zovaris/smithy
 version=$(cat "$here/VERSION" 2>/dev/null || echo dev)
 
-link() { ln -sfn "$1" "$home/bin/smithy" 2>/dev/null || true; }
+# link points the smithy command on PATH at $1 when install.sh made it a link.
+link() { [ ! -L "$cmd" ] || ln -sfn "$1" "$cmd" 2>/dev/null || true; }
 
 # Development: the skill folder is inside a checkout of the repo (skills/<name>/scripts or shared).
 for root in "$here/../../.." "$here/.."; do
   if [ -f "$root/go.mod" ] && grep -q "^module github.com/$repo\$" "$root/go.mod" && command -v go >/dev/null 2>&1; then
     root=$(cd "$root" && pwd -P); key=$(printf %s "$root" | cksum | cut -d ' ' -f 1)
-    bin="$home/bin/dev/$key/smithy"
+    bin="$data/dev/$key/smithy"
     if [ ! -x "$bin" ] || [ -n "$(find "$root/cmd" "$root/internal" "$root/go.mod" -newer "$bin" -print 2>/dev/null | head -n 1)" ]; then
-      mkdir -p "$home/bin/dev/$key"
+      mkdir -p "$data/dev/$key"
       (cd "$root" && go build -trimpath -ldflags "-s -w -X main.version=dev" -o "$bin" ./cmd/smithy) >&2
     fi
     link "$bin"; exec "$bin" "$@"
   fi
 done
 
-bin="$home/bin/$version/smithy"
-[ -x "$bin" ] || [ ! -x "$bin.exe" ] || bin="$bin.exe"  # Git Bash on Windows
-if [ ! -x "$bin" ]; then
-  if [ -x "$home/bin/smithy" ]; then
-    echo "smithy: v$version is not installed; using $home/bin/smithy. Ask the user whether to install v$version now: curl -fsSL https://raw.githubusercontent.com/$repo/main/install.sh | sh -s $version" >&2
-    exec "$home/bin/smithy" "$@"
+for bin in "$data/versions/$version/smithy" "$home/bin/$version/smithy"; do
+  [ -x "$bin" ] || [ ! -x "$bin.exe" ] || bin="$bin.exe"  # Git Bash on Windows
+  [ -x "$bin" ] && { link "$bin"; exec "$bin" "$@"; }
+done
+for other in "$cmd" "$home/bin/smithy"; do
+  if [ -x "$other" ]; then
+    echo "smithy: v$version is not installed; using $other. Ask the user whether to install v$version now: curl -fsSL https://raw.githubusercontent.com/$repo/main/install.sh | sh -s $version" >&2
+    exec "$other" "$@"
   fi
-  echo "smithy: the smithy binary v$version is not installed; the smithy skills need it. Ask the user whether you install it or they do: curl -fsSL https://raw.githubusercontent.com/$repo/main/install.sh | sh -s $version" >&2
-  exit 3
-fi
-link "$bin"
-exec "$bin" "$@"
+done
+echo "smithy: the smithy binary v$version is not installed; the smithy skills need it. Ask the user whether you install it or they do: curl -fsSL https://raw.githubusercontent.com/$repo/main/install.sh | sh -s $version" >&2
+exit 3

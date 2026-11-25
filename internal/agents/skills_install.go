@@ -16,6 +16,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // SkillsArchive is the release asset holding every skill folder of this repo.
@@ -63,6 +65,24 @@ type SkillsInstall struct {
 	Getenv    func(string) string
 	Harnesses []string
 	Out       io.Writer
+	// Manifest, when set, gets each skill folder written (one per line) so uninstall removes only those.
+	Manifest string
+}
+
+func recordLine(file, line string) {
+	b, _ := os.ReadFile(file)
+	for _, l := range strings.Split(string(b), "\n") {
+		if l == line {
+			return
+		}
+	}
+	if os.MkdirAll(filepath.Dir(file), 0o755) != nil {
+		return
+	}
+	if f, err := os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600); err == nil {
+		fmt.Fprintln(f, line)
+		f.Close()
+	}
 }
 
 // InstallSkills downloads the release skills archive, checks it against the release's
@@ -112,6 +132,9 @@ func InstallSkills(o SkillsInstall) error {
 			}
 			if err := replaceDir(src, dst); err != nil {
 				return err
+			}
+			if o.Manifest != "" {
+				recordLine(o.Manifest, dst)
 			}
 		}
 		fmt.Fprintf(o.Out, "installed skills into %s\n", d)
@@ -301,6 +324,7 @@ func skillsInstallMain(args []string) int {
 		Getenv:    os.Getenv,
 		Harnesses: hs,
 		Out:       os.Stdout,
+		Manifest:  layout.SkillsManifest(),
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "smithy skills install:", err)

@@ -20,6 +20,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/harness"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 type plan struct {
@@ -305,6 +306,14 @@ func Doctor(args []string) int {
 		r.bad("binary v"+BinaryVersion+" does not match skills v"+sv, "ask the user, then: "+InstallCmd(sv))
 	} else if BinaryVersion != "dev" {
 		r.ok("binary v" + BinaryVersion)
+	}
+	if exe, err := os.Executable(); err == nil {
+		r.ok("smithy at " + exe)
+	}
+	if layout.OnPath(layout.BinDir()) {
+		r.ok(layout.BinDir() + " is on PATH")
+	} else {
+		r.ok(layout.BinDir() + " is not on PATH (optional: smithy setup path add; the skills run smithy without it)")
 	}
 	if have("git") {
 		r.ok("git found")
