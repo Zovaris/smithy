@@ -58,10 +58,7 @@ func (a *restAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func dc(t *testing.T, a *restAPI) *Discord {
 	srv := httptest.NewServer(a)
 	t.Cleanup(srv.Close)
-	old := DiscordAPI
-	DiscordAPI = srv.URL
-	t.Cleanup(func() { DiscordAPI = old })
-	return &Discord{Token: dTok, Channel: "500", Users: map[string]bool{"5": true}}
+	return &Discord{API: srv.URL, Token: dTok, Channel: "500", Users: map[string]bool{"5": true}}
 }
 
 func TestDiscordThreadSendUpdate(t *testing.T) {
@@ -184,9 +181,7 @@ func TestDiscordReceive(t *testing.T) {
 	g := &gateway{evs: make(chan string, 8)}
 	srv := httptest.NewServer(g)
 	t.Cleanup(srv.Close)
-	old := DiscordGateway
-	DiscordGateway = "ws" + strings.TrimPrefix(srv.URL, "http") + "/?v=10"
-	t.Cleanup(func() { DiscordGateway = old })
+	d.Gateway = "ws" + strings.TrimPrefix(srv.URL, "http") + "/?v=10"
 	for _, e := range []string{
 		`{"op":0,"s":1,"t":"MESSAGE_CREATE","d":{"channel_id":"700","guild_id":"42","author":{"id":"5"},"content":"go on"}}`,
 		`{"op":0,"s":2,"t":"MESSAGE_CREATE","d":{"channel_id":"700","guild_id":"42","author":{"id":"6"},"content":"stranger"}}`,
@@ -209,9 +204,17 @@ func TestDiscordReceive(t *testing.T) {
 	if len(got) != 2 || got[0] != (Inbound{Thread: "700", Text: "go on", By: "5"}) || got[1] != (Inbound{Button: "h:0", Ref: "700/900", By: "5"}) {
 		t.Fatalf("%+v", got)
 	}
-	g.mu.Lock()
-	ident := g.sent[0]
-	g.mu.Unlock()
+	ident := ""
+	for i := 0; i < 100 && ident == ""; i++ {
+		g.mu.Lock()
+		if len(g.sent) > 0 {
+			ident = g.sent[0]
+		}
+		g.mu.Unlock()
+		if ident == "" {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
 	if !strings.Contains(ident, `"op":2`) || !strings.Contains(ident, dTok) {
 		t.Fatalf("identify %q", ident)
 	}

@@ -38,7 +38,9 @@ var (
 // count, in threads of Channel's guild: with Users empty it only sends.
 type Discord struct {
 	Token, Channel string
-	Users          map[string]bool
+	// API and Gateway override DiscordAPI and DiscordGateway (tests only).
+	API, Gateway string
+	Users        map[string]bool
 	// Poll is how long Receive waits for events (default 25 s).
 	Poll   time.Duration
 	Client *http.Client
@@ -82,7 +84,11 @@ func (d *Discord) call(ctx context.Context, method, path string, body, out any) 
 		b, _ := json.Marshal(body)
 		rd = bytes.NewReader(b)
 	}
-	req, err := http.NewRequestWithContext(ctx, method, DiscordAPI+path, rd)
+	base := d.API
+	if base == "" {
+		base = DiscordAPI
+	}
+	req, err := http.NewRequestWithContext(ctx, method, base+path, rd)
 	if err != nil {
 		return errors.New("discord: bad request")
 	}
@@ -264,7 +270,11 @@ func (d *Discord) connect(ctx context.Context) (*dgw, error) {
 		d.guild = ch.Guild
 		d.mu.Unlock()
 	}
-	gu, err := url.Parse(DiscordGateway)
+	gwURL := d.Gateway
+	if gwURL == "" {
+		gwURL = DiscordGateway
+	}
+	gu, err := url.Parse(gwURL)
 	if err != nil || (gu.Scheme != "wss" && gu.Scheme != "ws") || gu.Host == "" {
 		return nil, errors.New("discord gateway: bad url")
 	}
