@@ -22,6 +22,7 @@ import (
 type Setup struct {
 	Agents    []agents.Ready            `json:"agents"`
 	Default   AgentChoice               `json:"default"`
+	Chosen    bool                      `json:"chosen"` // false on first run: no agent picked or used yet
 	Kit       KitChoice                 `json:"kit"`
 	Skills    []string                  `json:"skills"` // installed skills the kit can link in
 	Harnesses []agents.HarnessInventory `json:"harnesses"`
@@ -70,6 +71,7 @@ func installedSkills() []string {
 func (sv *Server) setup(w http.ResponseWriter, r *http.Request) {
 	s := Setup{Agents: sv.ready(), Skills: installedSkills(), Harnesses: agents.Inventory(home(), os.Getenv)}
 	s.Default.Agent, s.Default.Model = sv.Defaults()
+	s.Chosen = s.Default.Agent != ""
 	if s.Default.Agent == "" {
 		if i := slices.IndexFunc(s.Agents, func(a agents.Ready) bool { return a.Ready && a.Kind == "cli" }); i >= 0 {
 			s.Default.Agent = s.Agents[i].Name

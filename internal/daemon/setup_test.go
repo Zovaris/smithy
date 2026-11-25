@@ -51,7 +51,7 @@ func TestSetupReportsAgentsSkillsAndKit(t *testing.T) {
 	if len(s.Agents) != 2 || s.Agents[0].Name != "claude" || !s.Agents[0].Ready || s.Agents[1].Fix == "" {
 		t.Fatalf("agents: %+v", s.Agents)
 	}
-	if s.Default.Agent != "claude" {
+	if s.Default.Agent != "claude" || s.Chosen {
 		t.Fatalf("with nothing chosen yet the default is the first ready agent: %+v", s.Default)
 	}
 	if !s.Kit.MCP || len(s.Kit.Skills) != 0 {
@@ -79,7 +79,7 @@ func TestSetupDefaultIsSavedAndUsed(t *testing.T) {
 	if v, _ := config.UserGet("session.agent", ""); v != "codex" {
 		t.Fatalf("session.agent saved: %q", v)
 	}
-	if s := getSetup(t, url); s.Default.Agent != "codex" || s.Default.Model != "gpt-5" {
+	if s := getSetup(t, url); s.Default.Agent != "codex" || s.Default.Model != "gpt-5" || !s.Chosen {
 		t.Fatalf("default: %+v", s.Default)
 	}
 	code, m := post(t, url+"/v1/sessions", `{"dir":"`+home+`"}`)
