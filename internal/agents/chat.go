@@ -33,9 +33,6 @@ func NewAPIChat(target, cwd string) (*APIChat, error) {
 		return nil, errors.New("the api backend needs the harness build")
 	}
 	mode, err := SandboxMode()
-	if err == nil && mode == "container" {
-		err = errAPIContainer
-	}
 	if err != nil {
 		return nil, fmt.Errorf("auto.sandbox: %v (fails closed)", err)
 	}
