@@ -257,3 +257,18 @@ func TestSecretRootsAndCaseAndDanglingLinks(t *testing.T) {
 		t.Error("secret env reached the shell")
 	}
 }
+
+func TestPermitShellAsksGuard(t *testing.T) {
+	s, _ := newSet(t)
+	var seen []string
+	s.Guard = func(cmd string) (bool, string) { seen = append(seen, cmd); return cmd != "ls", "guarded" }
+	if ok, _ := s.Permit(call("shell", map[string]any{"command": "ls"})); ok {
+		t.Fatal("guard verdict ignored")
+	}
+	if ok, why := s.Permit(call("shell", map[string]any{"command": "echo $(x)"})); ok || why == "guarded" {
+		t.Fatal("guard ran before the rules")
+	}
+	if len(seen) != 1 {
+		t.Fatalf("guard saw %v", seen)
+	}
+}

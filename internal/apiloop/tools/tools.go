@@ -56,6 +56,8 @@ type Set struct {
 	ReadOnly bool
 	// Wrap, when set, turns a shell argv into one run under the OS sandbox (auto.sandbox native).
 	Wrap func(argv []string) []string
+	// Guard, when set, decides a shell command the rules allowed (the dangerous-command guard).
+	Guard func(cmd string) (bool, string)
 	// Proxy is the egress proxy fetch dials through; without one fetch refuses private addresses.
 	Proxy *url.URL
 
@@ -189,7 +191,10 @@ func (s *Set) Permit(c apiloop.ToolCall) (bool, string) {
 		}
 		return s.permitPath("Read", a.Path)
 	case "shell":
-		return s.permitShell(a.Command)
+		if ok, why := s.permitShell(a.Command); !ok || s.Guard == nil {
+			return ok, why
+		}
+		return s.Guard(a.Command)
 	case "fetch":
 		u, err := url.Parse(a.URL)
 		if err != nil || u.Scheme != "https" || u.Host == "" {
