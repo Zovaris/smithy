@@ -43,6 +43,9 @@ func (c *Client) req(ctx context.Context, method, path string, body []byte) (*ht
 	if err != nil {
 		return nil, err
 	}
+	if body != nil {
+		r.Header.Set("Content-Type", "application/json")
+	}
 	if c.Token != "" {
 		r.Header.Set("Authorization", "Bearer "+c.Token)
 	}
