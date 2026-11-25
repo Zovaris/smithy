@@ -7,6 +7,6 @@ func pidAlive(pid int) bool {
 	if err != nil {
 		return false
 	}
-	p.Release()
+	_ = p.Release()
 	return true
 }

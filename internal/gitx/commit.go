@@ -1,6 +1,7 @@
 package gitx
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -94,7 +95,7 @@ func Check(msg, style string) error {
 		}
 	case "gitmoji":
 		if !hasEmoji(subject) {
-			return fmt.Errorf("gitmoji style: start with an emoji or :code:")
+			return errors.New("gitmoji style: start with an emoji or a :code: shortcode")
 		}
 	}
 	return nil

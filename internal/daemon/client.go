@@ -224,7 +224,7 @@ func (c *Client) call(ctx context.Context, method, path string, body, out any) e
 	defer res.Body.Close()
 	if res.StatusCode/100 != 2 {
 		var e struct{ Error string }
-		json.NewDecoder(io.LimitReader(res.Body, 4<<10)).Decode(&e)
+		_ = json.NewDecoder(io.LimitReader(res.Body, 4<<10)).Decode(&e)
 		if e.Error != "" {
 			return fmt.Errorf("daemon %s: %s", path, e.Error)
 		}

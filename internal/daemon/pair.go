@@ -181,7 +181,7 @@ func (p *Pairing) edit(f func([]Device) ([]Device, error)) error {
 		if err := os.WriteFile(tmp, append(b, '\n'), 0o600); err != nil {
 			return err
 		}
-		os.Chmod(tmp, 0o600)
+		_ = os.Chmod(tmp, 0o600)
 		return os.Rename(tmp, p.File)
 	})
 }

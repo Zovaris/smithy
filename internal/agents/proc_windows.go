@@ -25,6 +25,6 @@ func ownGroup(cmd *exec.Cmd) {}
 
 func forward(cmd *exec.Cmd, s os.Signal) {
 	if cmd.Process != nil {
-		cmd.Process.Kill()
+		_ = cmd.Process.Kill()
 	}
 }

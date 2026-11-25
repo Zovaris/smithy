@@ -46,7 +46,7 @@ func flatDetail(s string) string {
 	return s
 }
 
-func (s acpSink) Text(t string) { io.WriteString(s.out, t) }
+func (s acpSink) Text(t string) { _, _ = io.WriteString(s.out, t) }
 
 func (s acpSink) Tool(t acp.Tool) {
 	if t.Status == "completed" || t.Status == "failed" {

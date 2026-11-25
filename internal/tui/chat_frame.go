@@ -544,7 +544,7 @@ func fill(st lipgloss.Style, w int, s string) string {
 	s = ansi.Truncate(s, w, "")
 	pad := strings.Repeat(" ", max(w-ansi.StringWidth(s), 0))
 	c := st.GetBackground()
-	if _, none := c.(lipgloss.NoColor); none || c == nil {
+	if _, none := c.(lipgloss.NoColor); none {
 		return s + pad
 	}
 	r, g, b, _ := c.RGBA()

@@ -251,7 +251,7 @@ func Retry(ref string) (model string, ok bool, err error) {
 		return nil
 	})
 	if ok {
-		events.Append(ev)
+		_ = events.Append(ev)
 	}
 	return model, ok, err
 }
@@ -593,13 +593,13 @@ func Poll(s Settings, srcs []Source, warn io.Writer) ([]Queued, error) {
 		return nil, err
 	}
 	for _, f := range got {
-		events.Append(events.Event{T: f.at, Kind: "poll", Source: f.name, Detail: fmt.Sprintf("%d issues", len(f.issues))})
+		_ = events.Append(events.Event{T: f.at, Kind: "poll", Source: f.name, Detail: fmt.Sprintf("%d issues", len(f.issues))})
 	}
 	for _, e := range skipped {
-		events.Append(e)
+		_ = events.Append(e)
 	}
 	for _, q := range queued {
-		events.Append(events.Event{T: q.QueuedAt, Kind: "queued", Source: q.Source, ID: q.ID, PR: q.URL, Detail: q.Title})
+		_ = events.Append(events.Event{T: q.QueuedAt, Kind: "queued", Source: q.Source, ID: q.ID, PR: q.URL, Detail: q.Title})
 	}
 	if len(errs) > 0 {
 		return queued, errors.Join(errs...)
@@ -676,7 +676,7 @@ func Take(s Settings, max int, mkdir func(slug string) (string, error)) (TakeRes
 		}
 		st.Launched[day(t)] = append(st.Launched[day(t)], launched...)
 		for _, l := range launched {
-			events.Append(events.Event{T: t, Kind: "launched", Batch: l.Batch, Item: l.Item, Source: l.Source, ID: l.ID, PR: l.URL, Detail: l.Title})
+			_ = events.Append(events.Event{T: t, Kind: "launched", Batch: l.Batch, Item: l.Item, Source: l.Source, ID: l.ID, PR: l.URL, Detail: l.Title})
 		}
 		st.Queue = append([]Queued{}, st.Queue[n:]...)
 		tasks.Load(dir)
@@ -752,7 +752,7 @@ func Report(srcs []Source, ref, state, pr string) error {
 		if s.Name() == name {
 			err := s.Report(id, state, pr)
 			if err == nil {
-				events.Append(events.Event{Kind: "report", Source: name, ID: id, PR: pr, Detail: state})
+				_ = events.Append(events.Event{Kind: "report", Source: name, ID: id, PR: pr, Detail: state})
 			}
 			return err
 		}

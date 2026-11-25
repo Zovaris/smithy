@@ -265,7 +265,7 @@ func replaceDir(src, dst string) error {
 	}
 	if err := os.Rename(tmp, dst); err != nil {
 		if old != "" {
-			os.Rename(old, dst)
+			_ = os.Rename(old, dst)
 		}
 		os.RemoveAll(tmp)
 		return err

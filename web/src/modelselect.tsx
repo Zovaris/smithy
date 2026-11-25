@@ -44,9 +44,17 @@ export function ModelSelect({ agent, value, onChange, id = "model", label }: { a
   };
   const shown = value || (agent.kind === "api" ? "" : "agent default");
   const key = (e: KeyboardEvent) => {
-    if (e.key === "ArrowDown") (e.preventDefault(), setOpen(true), setSel(Math.min(sel + 1, rows.length - 1)));
-    else if (e.key === "ArrowUp") (e.preventDefault(), setSel(Math.max(sel - 1, 0)));
-    else if (e.key === "Enter" && open) (e.preventDefault(), pick(sel));
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true);
+      setSel(Math.min(sel + 1, rows.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSel(Math.max(sel - 1, 0));
+    } else if (e.key === "Enter" && open) {
+      e.preventDefault();
+      pick(sel);
+    }
     else if (e.key === "Escape") setOpen(false);
   };
 

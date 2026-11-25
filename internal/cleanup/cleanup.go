@@ -207,7 +207,7 @@ func Main(args []string) int {
 		}
 		items = append(items, Worktrees(repo, base, cwd)...)
 		if yes {
-			defer gitIn(repo, "worktree", "prune")
+			defer func() { _, _ = gitIn(repo, "worktree", "prune") }()
 		}
 	}
 	if len(items) == 0 {

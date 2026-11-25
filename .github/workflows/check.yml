@@ -21,6 +21,10 @@ jobs:
           go vet -tags harness ./...
       - name: Launcher syntax
         run: sh -n shared/smithy
+      - name: golangci-lint (both builds, config in .golangci.yml)
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.15.0
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -107,12 +111,17 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Web UI tests, typecheck, build within budget (ADR 0010, 0011)
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - name: Web UI tests, typecheck, lint, build within budget (ADR 0010, 0011)
         working-directory: web
         run: |
           npm ci
           npm test
           npm run typecheck
+          bun check
+          npm run lint
           npm run build
   demo:
     # Records the v0.23 demo (demo/run.sh): the TUI tape and the web screenshots, kept as an artifact.

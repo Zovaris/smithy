@@ -15,7 +15,7 @@ func (sv *Server) guardView(w http.ResponseWriter, r *http.Request) {
 	rules, _ := guard.Load()
 	fetch, _ := guard.LoadFetch()
 	var sug []map[string]any
-	json.Unmarshal([]byte(guard.SuggestedJSON()), &sug)
+	_ = json.Unmarshal([]byte(guard.SuggestedJSON()), &sug)
 	writeJSON(w, 200, map[string]any{"enabled": rules.Enabled, "block": rules.Block, "allow": rules.Allow,
 		"fetch_block": fetch.Block, "fetch_allow": fetch.Allow, "suggested": sug})
 }

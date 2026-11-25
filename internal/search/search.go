@@ -206,7 +206,7 @@ func gitFiles(root string) ([]string, error) {
 
 func walkFiles(root string) []string {
 	var files []string
-	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
@@ -293,7 +293,7 @@ func runRg(c *collector) error {
 		path = filepath.ToSlash(strings.TrimPrefix(path, "."+string(filepath.Separator)))
 		if !c.add(Match{Path: strings.TrimPrefix(path, "./"), Line: n, Text: line}) {
 			stopped = true
-			cmd.Process.Kill()
+			_ = cmd.Process.Kill()
 			break
 		}
 	}

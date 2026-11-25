@@ -19,7 +19,10 @@ export default function Bench() {
   useEffect(() => {
     api("/v1/bench").then((r) => (r.ok ? r.json() : [])).then((rs: Run[]) => {
       setRuns(rs);
-      if (rs.length > 1) (setA(rs[1].id), setB(rs[0].id));
+      if (rs.length > 1) {
+        setA(rs[1].id);
+        setB(rs[0].id);
+      }
     });
   }, []);
   useEffect(() => {

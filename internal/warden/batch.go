@@ -371,7 +371,7 @@ func finished(batch, id string) bool {
 		return false
 	}
 	var c struct{ State string }
-	json.Unmarshal(raw, &c)
+	_ = json.Unmarshal(raw, &c)
 	return c.State == "merged" || c.State == "dropped" || c.State == "reported"
 }
 
@@ -390,7 +390,7 @@ func writeBatch(dir string, bt map[string]any) error {
 		return err
 	}
 	tmp.Close()
-	os.Chmod(tmp.Name(), 0o644)
+	_ = os.Chmod(tmp.Name(), 0o644)
 	return os.Rename(tmp.Name(), filepath.Join(dir, "batch.json"))
 }
 

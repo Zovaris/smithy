@@ -50,7 +50,7 @@ func EventsApprover(timeout, poll time.Duration) func(context.Context, Ask) bool
 			}
 			select {
 			case <-ctx.Done():
-				events.AppendProxy(events.Event{Kind: "secret_denied", ID: id, Detail: "timed out"})
+				_ = events.AppendProxy(events.Event{Kind: "secret_denied", ID: id, Detail: "timed out"})
 				return false
 			case <-t.C:
 			}
@@ -117,7 +117,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 				line := fmt.Sprintf("%s %s %s %s %d", e.Kind, e.Name, e.Method, e.Host, e.Status)
 				fmt.Fprintln(stderr, time.Now().UTC().Format(time.RFC3339), line)
 				if e.Status >= 400 {
-					events.AppendProxy(events.Event{Kind: "proxy_denied", Detail: line})
+					_ = events.AppendProxy(events.Event{Kind: "proxy_denied", Detail: line})
 				}
 			}}
 		fmt.Fprintf(stderr, "smithy proxy: listening on %s, %d allowed hosts\n", addr, len(allow))

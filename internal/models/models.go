@@ -273,7 +273,7 @@ func Get(ctx context.Context, d Deps, agent string, refresh bool) List {
 	if b, err := json.Marshal(l); err == nil && os.MkdirAll(d.Dir, 0o700) == nil {
 		tmp := cacheFile(d, agent) + ".tmp"
 		if os.WriteFile(tmp, b, 0o600) == nil {
-			os.Rename(tmp, cacheFile(d, agent))
+			_ = os.Rename(tmp, cacheFile(d, agent))
 		}
 	}
 	return l

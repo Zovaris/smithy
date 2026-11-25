@@ -10,8 +10,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-type webOpenedMsg struct{ err error }
-
 // openWeb opens the web UI, signed in with the daemon token, in the default browser.
 func (m chatView) openWeb() (chatView, tea.Cmd) {
 	if m.webURL == "" {

@@ -93,8 +93,8 @@ func probeACP(ctx context.Context, argv []string) (acp.ModelList, error) {
 	}
 	defer func() {
 		in.Close()
-		cmd.Process.Kill()
-		cmd.Wait()
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
 	}()
 	type res struct {
 		l   acp.ModelList
@@ -145,6 +145,6 @@ func claudeModel() string {
 	var s struct {
 		Model string `json:"model"`
 	}
-	json.Unmarshal(b, &s)
+	_ = json.Unmarshal(b, &s)
 	return s.Model
 }

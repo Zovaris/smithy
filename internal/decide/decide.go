@@ -109,11 +109,11 @@ func recordResult(err error) string {
 	}
 	n++
 	if n < maxFails {
-		os.WriteFile(failFile(), []byte(strconv.Itoa(n)), 0o600)
+		_ = os.WriteFile(failFile(), []byte(strconv.Itoa(n)), 0o600)
 		return ""
 	}
 	if e := config.Set(config.UserFile(), "decide.enabled", "false"); e != nil {
-		os.WriteFile(failFile(), []byte(strconv.Itoa(n)), 0o600)
+		_ = os.WriteFile(failFile(), []byte(strconv.Itoa(n)), 0o600)
 		return "smithy decide: could not disable itself: " + e.Error()
 	}
 	os.Remove(failFile())
@@ -298,7 +298,7 @@ func logAnswer(kind, subject string, p map[string]float64, verdict string) {
 	defer f.Close()
 	b, _ := json.Marshal(map[string]any{"time": time.Now().UTC().Format(time.RFC3339), "kind": kind,
 		"subject": subject, "p": p, "verdict": verdict})
-	f.Write(append(b, '\n'))
+	_, _ = f.Write(append(b, '\n'))
 }
 
 // Main runs smithy decide.

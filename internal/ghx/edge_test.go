@@ -179,7 +179,7 @@ func TestEdgeGHTokenPrecedence(t *testing.T) {
 
 func TestEdgeEndpointsHostEdge(t *testing.T) {
 	noGH(t)
-	for host, want := range map[string]string{"GitHub.com": "https://api.github.com", "github.com.": "https://api.github.com", " github.com ": "https://api.github.com"} {
+	for host, want := range map[string]string{"GitHub.com": "https://api.github.com", "github.com.": "https://api.github.com", " github.com ": "https://api.github.com"} { //nolint:gocritic // mapKey: the padded host is the case under test
 		t.Setenv("GH_HOST", host)
 		rest, _, _, err := endpoints()
 		if err == nil && rest != want {

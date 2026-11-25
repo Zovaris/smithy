@@ -439,8 +439,7 @@ func TestListWatcherEmptyBaseline(t *testing.T) {
 		t.Fatalf("baseline: %v", got)
 	}
 	e.put(t, "issues.json", `[{"number":1,"url":"i1","updatedAt":"t1"}]`)
-	if got, _ := w.poll(); len(got) == 0 {
-	}
+	_, _ = w.poll()
 }
 
 func writeCard(t *testing.T, batch, id, body string) {
