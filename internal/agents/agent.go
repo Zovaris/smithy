@@ -107,6 +107,10 @@ type Options struct {
 // unattended orchestrator get the same allow-list.
 const ProfileEnv = "SMITHY_AGENT_PROFILE"
 
+// WorkerEnv names a warden worker's item (<batch>/<item>); commands only the orchestrator or the
+// user may run (smithy auto report) refuse when it is set.
+const WorkerEnv = "SMITHY_WARDEN_ITEM"
+
 // AutoTools are the only tools a claude session under --profile auto may use; everything else
 // is denied (permission mode dontAsk), so an unattended run never asks and never bypasses.
 // smithy itself is allowed only by the absolute paths in Options.SmithyBins.
@@ -562,7 +566,7 @@ func withPath(a []string, path string) []string {
 // Env is the worker's environment: base without the parent harness's variables, with
 // WARDEN_HARNESS and the AGENT_* run variables set.
 func Env(base []string, s Spec, o Options) []string {
-	drop := map[string]bool{ProfileEnv: true, SandboxRoleEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
+	drop := map[string]bool{ProfileEnv: true, SandboxRoleEnv: true, WorkerEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
 	if len(o.PoolEnv) > 0 {
 		for _, k := range PoolDropEnv {
 			drop[k] = true
@@ -589,6 +593,9 @@ func Env(base []string, s Spec, o Options) []string {
 		env = append(env, ProfileEnv+"="+o.Profile)
 	}
 	env = append(env, o.PoolEnv...)
+	if batch, id := cardOf(o.Log, o.Cwd); batch != "" {
+		env = append(env, WorkerEnv+"="+batch+"/"+id)
+	}
 	if o.Inject != nil {
 		env = append(env, o.Inject.Env...)
 	}

@@ -101,6 +101,11 @@ func Main(args []string) int {
 		if len(pos) != 2 {
 			break
 		}
+		// workers never report: a worker writing blocked would queue itself on a stronger model
+		if item := os.Getenv("SMITHY_WARDEN_ITEM"); item != "" {
+			fmt.Fprintln(os.Stderr, "smithy auto: report refused: warden workers ("+Clean(item)+") don't report issues; set your card's state and the orchestrator reports")
+			return 2
+		}
 		srcs, openErr := s.Open("")
 		if len(srcs) == 0 {
 			fmt.Fprintln(os.Stderr, "smithy auto:", errText(openErr))

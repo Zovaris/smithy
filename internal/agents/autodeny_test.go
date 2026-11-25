@@ -47,6 +47,19 @@ func TestSecretDeniedCatchesGlobAndVariableForms(t *testing.T) {
 	}
 }
 
+func TestEnvMarksWardenWorkers(t *testing.T) {
+	wh := t.TempDir()
+	t.Setenv("WARDEN_HOME", wh)
+	env := strings.Join(Env(nil, Spec{Harness: "claude"}, Options{Log: filepath.Join(wh, "b1", "i1.log")}), "\n")
+	if !strings.Contains(env, "SMITHY_WARDEN_ITEM=b1/i1") {
+		t.Fatalf("worker env lacks its item: %s", env)
+	}
+	env = strings.Join(Env([]string{"SMITHY_WARDEN_ITEM=x/y"}, Spec{Harness: "claude"}, Options{Log: "/elsewhere/orch.log"}), "\n")
+	if strings.Contains(env, "SMITHY_WARDEN_ITEM") {
+		t.Fatalf("non-worker run marked as a worker: %s", env)
+	}
+}
+
 func TestNativeSettingsDenyDaemonToken(t *testing.T) {
 	s := NativeSettings(SandboxPaths{Cwd: "/w/r", Home: "/h", SmithyHome: "/h/.smithy", Warden: "/h/.smithy/warden"}, nil, "linux", false)
 	if !strings.Contains(s, `"denyRead":["/h/.smithy/auth.json","/h/.smithy/daemon.token"`) {
