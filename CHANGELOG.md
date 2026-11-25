@@ -8,6 +8,10 @@ part above `### Details`.
 
 ## Unreleased
 
+### Details
+
+- Injection kit (`agents.Inject`): per run, smithy can give a driven CLI MCP servers, skills, an appended system prompt and settings without touching the user's global config. Claude gets `--mcp-config`/`--strict-mcp-config`, `--plugin-dir`, `--append-system-prompt` and `--settings` (merged with smithy's own note and sandbox settings); codex a `CODEX_HOME` under the run dir with a `smithy` profile (auth linked from the user's home); opencode `OPENCODE_CONFIG_DIR`; gemini a settings file through `GEMINI_CLI_SYSTEM_SETTINGS_PATH`; pi `--skill` and `--append-system-prompt`. Pieces a CLI can't take are returned as unsupported.
+
 ## v0.20.0 — 2026-11-25
 
 ### Highlights
