@@ -28,9 +28,9 @@ const Usage = `usage: smithy auth set <service> < keyfile | list | remove <servi
        smithy auth bind <service> <host> [METHODS] [--header <name>] [--prefix <scheme>] | ask <service> on|off
 Source API keys in ~/.smithy/auth.json (mode 0600, encrypted with ~/.smithy/auth.key). set reads the key from stdin only, never
 from arguments; in a terminal it prompts with echo off. The env var named by <service>.key_env (e.g. LINEAR_API_KEY) wins when set.
-bind lets the egress proxy (auto.sandbox_network proxy) send the key to host for METHODS (comma
+bind lets the egress proxy (smithy proxy serve, smithy mcp's secret tool) send the key to host for METHODS (comma
 list, default GET,HEAD) in --header (default Authorization) as "<prefix> <key>"; bind again to add
-a host. A container worker calls http://smithy-proxy:8877/s/<service>/<path> and never sees the key.
+a host. A worker calls http://127.0.0.1:8877/s/<service>/<path> (or the secret tool) and never sees the key.
 ask on holds the other write methods until you run smithy proxy approve <id> (denied after a timeout).`
 
 type entry struct {

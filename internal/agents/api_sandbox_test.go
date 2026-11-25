@@ -57,7 +57,7 @@ func TestAPIContainerSandboxRefused(t *testing.T) {
 	if _, _, rc, _ := apiRun(t, fake, "--backend", "api", "--model", "anthropic/claude-sonnet-4"); rc != 1 || fake.got.Model != "" {
 		t.Fatalf("container mode: rc=%d, loop ran=%v", rc, fake.got.Model != "")
 	}
-	if _, err := apiShellSandbox("container", HostProbe(), SandboxPaths{}); !errors.Is(err, errAPIContainer) {
+	if _, err := apiShellSandbox("container", HostProbe(), SandboxPaths{}); !errors.Is(err, ErrContainerRemoved) {
 		t.Fatalf("err %v", err)
 	}
 }

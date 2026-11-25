@@ -372,7 +372,7 @@ func TestRequeueSkipsStartedBatch(t *testing.T) {
 // issue back and records orchestrator_failed (Telegram and the TUI read events).
 func TestServeSandboxUnavailableLaunchesNothing(t *testing.T) {
 	_, dir := serveSetup(t)
-	sandboxReady = func(string) error { return errors.New("auto.sandbox: no docker or podman on PATH") }
+	sandboxReady = func(string) error { return errors.New("auto.sandbox: sandbox-exec missing") }
 	t.Cleanup(func() { sandboxReady = defaultSandboxReady })
 	var logs []string
 	newTestServer(t, &logs).Cycle()
@@ -382,7 +382,7 @@ func TestServeSandboxUnavailableLaunchesNothing(t *testing.T) {
 	if st, _ := Load(); len(st.Queue) != 1 {
 		t.Errorf("issue not requeued: %+v", st)
 	}
-	if !strings.Contains(strings.Join(logs, "\n"), "no docker or podman") {
+	if !strings.Contains(strings.Join(logs, "\n"), "sandbox-exec missing") {
 		t.Errorf("logs = %q", logs)
 	}
 	es, _ := events.Read(time.Time{}, 0)

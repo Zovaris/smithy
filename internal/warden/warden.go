@@ -505,12 +505,12 @@ func firstLine(s string) string {
 	return l
 }
 
-// sandboxDoctor reports auto.sandbox: off says so, native and container check what they need
-// here (sandbox-exec on macOS, bwrap and socat on Linux, docker or podman) for the auto.agent CLI.
+// sandboxDoctor reports auto.sandbox: off says so, native checks what it needs here
+// (sandbox-exec on macOS, bwrap and socat on Linux) for the auto.agent CLI.
 func sandboxDoctor(r *report, p agents.Probe) {
 	mode, err := agents.SandboxMode()
 	if err != nil {
-		r.bad(err.Error(), "smithy config set auto.sandbox <off|native|container>")
+		r.bad(err.Error(), "smithy config set auto.sandbox <off|native>")
 		return
 	}
 	cli := config.Get("auto.agent", "")
@@ -519,29 +519,16 @@ func sandboxDoctor(r *report, p agents.Probe) {
 	}
 	switch err := agents.SandboxCheckAgent(mode, cli, p); {
 	case mode == "off":
-		r.ok("sandbox: off (unattended workers rely on the allow-list; smithy config set auto.sandbox native|container)")
+		r.ok("sandbox: off (unattended workers rely on the allow-list; smithy config set auto.sandbox native)")
 	case err != nil:
 		r.bad("sandbox "+mode+": "+err.Error()+"; unattended workers will not start", "fix it, or smithy config set auto.sandbox off")
-	case mode == "container":
-		e, net := agents.ContainerEngine(p), userSetting("auto.sandbox_network", "")
-		_, sock := agents.DockerHost(e, p)
-		if sock == "" {
-			sock = "engine default"
-		}
-		r.ok("sandbox: container (" + e + ", socket " + sock + ", image " + userSetting("auto.sandbox_image", agents.DefaultSandboxImage) + ", network " + net + ")")
-		switch net {
-		case "bridge", "host":
-			r.warn("sandbox container: network "+net+" is open egress with no domain allow-list (native has one)", "smithy config set auto.sandbox_network proxy")
-		case "proxy":
-			r.ok("sandbox container: egress proxy " + agents.ProxyName + " on " + agents.ProxyNetwork + ", hosts " + strings.Join(agents.ProxyDomains(userSetting("auto.sandbox_domains", "")), ","))
-		}
 	case agents.Kind(cli) == "codex":
 		r.ok("sandbox: native (codex workspace-write, network off)")
-		r.warn("sandbox native with codex: workers have no network, so git push and gh fail inside them", "push and open PRs through smithy outside the worker, or use auto.sandbox container")
+		r.warn("sandbox native with codex: workers have no network, so git push and gh fail inside them", "push and open PRs through smithy outside the worker")
 	default:
 		r.ok("sandbox: native (claude, hosts " + strings.Join(agents.SandboxDomains(userSetting("auto.sandbox_domains", "")), ",") + ")")
 	}
-	if cli != "" && mode != "container" && !agents.SecretGuarded(cli) {
+	if cli != "" && !agents.SecretGuarded(cli) {
 		r.ok("guard: " + agents.Kind(cli) + " " + agents.UnguardedNote)
 	}
 }

@@ -71,8 +71,8 @@ Used by the skills
   names         branch and worktree names
   pr            pull requests that follow the repo's PR template
   pr-state      compact JSON state of one PR (tend)
-  proxy         egress proxy for container workers (auto.sandbox_network proxy):
-                serve, approve, deny
+  proxy         egress proxy with bound secrets, run natively: serve, approve,
+                deny
   route         pick the model tier for a task
   stack         the repo's test tooling as key: value lines
   task-dir      resolve and create the task dir for a plan slug

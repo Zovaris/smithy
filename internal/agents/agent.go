@@ -57,7 +57,7 @@ AGENT_PROTOCOL=acp drives the CLI over the Agent Client Protocol instead: gemini
   opencode gets the same allow-list as OPENCODE_PERMISSION rules (also with --readonly: no edits,
   secret reads denied); the other CLIs keep their own headless mode above. Only claude and opencode
   can deny reads of ~/.smithy/auth.json and the other secrets: codex, gemini, pi, cursor and dsh
-  can read them unless auto.sandbox is container.
+  can read them.
 Effort: --effort, else $AGENT_EFFORT, else the agent.effort setting (default medium). Anything
 above medium is capped at medium. Passed as --effort (claude) or -c model_reasoning_effort
 (codex), and as $AGENT_EFFORT to every CLI; the others keep their own default and say so.
@@ -98,10 +98,9 @@ type Options struct {
 	Backend    string   // "api": smithy's own loop on the user's key (apiloop) instead of an agent CLI
 	SmithyBins []string // absolute paths of the smithy binary and launcher, allowed under --profile auto
 	AddDirs    []string // directories outside the working dir the agent may use (--add-dir), set under --profile auto
-	// Sandbox is auto.sandbox for this run (off, native, container); SandboxSettings the claude
+	// Sandbox is auto.sandbox for this run (off, native); SandboxSettings the claude
 	// --settings JSON under native.
 	Sandbox, SandboxSettings string
-	Proxy                    bool       // container worker behind the egress proxy (auto.sandbox_network proxy)
 	PoolEnv                  []string   // the pool account's config-dir variable (smithy pool), added to the worker's env
 	Account                  string     // the pool account this run uses
 	poolSkip                 []string   // accounts already tried (limited) in this run
@@ -151,7 +150,7 @@ func SecretDenied() []string {
 	d := []string{"Bash(*auth.json*)", "Bash(*.ssh*)", "Bash(*.config/gh*)", "Bash(*.aws*)", "Bash(*.netrc*)", "Bash(*.git-credentials*)",
 		"Bash(*.smithy/accounts*)", "Bash(*daemon.token*)", "Bash(*auth.key*)",
 		// glob and variable forms the literal rules miss (cat ~/.s*/id_*, $HOME/...); a best effort:
-		// only the native or container sandbox fully keeps secrets out of reach
+		// only the native sandbox fully keeps secrets out of reach
 		"Bash(*~/.*)", "Bash(*$HOME*)", "Bash(*${HOME}*)", "Bash(*.smithy/auth*)", "Bash(*.s*/id_*)", "Bash(*.[*)",
 		"Bash(*id_rsa*)", "Bash(*id_ed25519*)", "Bash(*id_ecdsa*)"}
 	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/auth.key", "~/.smithy/daemon.token", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
@@ -390,12 +389,6 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		kit, kitSettings := takeArg(kit, "--settings")
 		if o.Profile == "auto" && !o.ReadOnly {
 			tools, denied, note := AutoTools(o.SmithyBins), AutoDenied(o.SmithyBins), AutoNote
-			if o.Proxy {
-				// egress is the proxy's allow-list, so curl may reach the proxy's secret endpoint
-				tools = append(tools, "Bash(curl "+ProxyURL+"/s/*)")
-				denied = slices.DeleteFunc(denied, func(d string) bool { return d == "Bash(curl *)" })
-				note += " " + ProxyNote
-			}
 			a = append(append(a, "--allowedTools"), tools...)
 			a = append(append(a, "--disallowedTools"), denied...)
 			if kitPrompt != "" {
@@ -725,7 +718,7 @@ func Run(o Options) int {
 		}
 		o.Sandbox = mode
 	}
-	if (Kind(cli) == "codex" && !o.ReadOnly) || o.Sandbox == "native" || o.Sandbox == "container" {
+	if (Kind(cli) == "codex" && !o.ReadOnly) || o.Sandbox == "native" {
 		gitDir, _ = ghx.Run("git", "-C", o.Cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	}
 	gocache := ""
@@ -744,13 +737,6 @@ func Run(o Options) int {
 			return 1
 		}
 		prompt = strings.TrimRight(string(b), "\n")
-	}
-	if o.Sandbox == "container" {
-		n, _ := SandboxSetting("auto.sandbox_network", "")
-		o.Proxy = n == "proxy"
-	}
-	if o.Proxy && cli != "custom" && Kind(cli) != "claude" {
-		prompt += "\n\n" + ProxyNote
 	}
 	if cli != "custom" && !EffortFlags[Kind(cli)] {
 		fmt.Fprintf(os.Stderr, "smithy agent: %s has no effort flag; it runs at its own default (AGENT_EFFORT=%s is set)\n", cli, o.Effort)
@@ -781,41 +767,6 @@ func Run(o Options) int {
 	}
 	if o.Sandbox == "native" {
 		env = append(env, NativeGitEnv(env)...)
-	}
-	if o.Sandbox == "container" {
-		var acct pool.Account
-		if o.Account != "" {
-			if acct, err = pool.Find(o.Account); err != nil {
-				fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
-				return 1
-			}
-		}
-		box, err := container(o.Cwd, gitDir, acct)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
-			return 1
-		}
-		hp := HostProbe()
-		if set, _ := DockerHost(box.Engine, hp); set != "" {
-			env = append(env, "DOCKER_HOST="+set)
-		}
-		creds := ContainerCreds(Kind(cli), o.Model)
-		if acct.Dir != "" {
-			creds = PoolContainerCreds(acct)
-		}
-		env = ContainerSecrets(env, creds, hp.Secret)
-		if o.Proxy {
-			if err := startProxy(&box, env, hp); err != nil {
-				fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox_network proxy: %v; worker not started (fails closed)\n", err)
-				return 1
-			}
-			env = ProxyEnv(env)
-		}
-		var names []string
-		env, names = ContainerEnv(env)
-		box.Env = append(box.Env, names...)
-		s.Argv[0] = filepath.Base(s.Argv[0]) // a host path means nothing inside the image
-		s.Argv = box.Argv(s.Argv)
 	}
 	if fi, err := os.Stat(o.Cwd); err != nil || !fi.IsDir() {
 		fmt.Fprintf(os.Stderr, "smithy agent: cd: %s: No such file or directory\n", o.Cwd)
