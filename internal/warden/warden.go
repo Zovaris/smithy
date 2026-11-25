@@ -180,6 +180,11 @@ func WaitTurn(args []string) int {
 
 type report struct {
 	quiet, failed bool
+	fixes         []fix
+}
+
+func (r *report) offer(change string, apply func() error) {
+	r.fixes = append(r.fixes, fix{change, apply})
 }
 
 func (r *report) ok(msg string) {
@@ -270,9 +275,25 @@ func githubMode(r *report) {
 	}
 }
 
-// Doctor runs `smithy doctor [--quiet]`: one line per check, exit 1 when something failed.
+// Doctor runs `smithy doctor [--quiet] [--fix [--yes]]`: one line per check, exit 1 when
+// something failed. --fix then offers the fixable ones that touch only the user's own files.
 func Doctor(args []string) int {
-	r := &report{quiet: len(args) > 0 && args[0] == "--quiet"}
+	r := &report{}
+	fixing, yes := false, false
+	for _, a := range args {
+		switch a {
+		case "--quiet":
+			r.quiet = true
+		case "--fix":
+			fixing = true
+		case "--yes":
+			yes = true
+		case "":
+		default:
+			fmt.Fprintln(os.Stderr, DoctorUsage)
+			return 2
+		}
+	}
 	if !r.quiet {
 		fmt.Println("warden doctor")
 	}
@@ -387,6 +408,10 @@ func Doctor(args []string) int {
 		if allowed != "" {
 			r.ok("gh pr merge allowed (" + allowed + ")")
 		} else {
+			if user := claudeFiles()[0]; settingsFixable(user) {
+				const rule = "Bash(smithy pr merge:*)"
+				r.offer(`add "`+rule+`" to permissions.allow in `+user, func() error { return addAllowRule(user, rule) })
+			}
 			r.warn("gh pr merge not in the allow list (auto merges may stop at ready)", `add "Bash(smithy pr merge:*)" (or "Bash(gh pr merge:*)") to permissions.allow in ~/.claude/settings.json, or use merge manual`)
 		}
 	}
@@ -418,6 +443,9 @@ func Doctor(args []string) int {
 		r.ok("agent instructions for workers: " + found)
 	} else {
 		r.warn("no AGENTS.md / CLAUDE.md here or in a parent folder", "optional: workers follow smelt and the brief")
+	}
+	if fixing {
+		applyFixes(r.fixes, yes)
 	}
 	if r.failed {
 		fmt.Println("not ready")
