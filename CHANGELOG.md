@@ -5,6 +5,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 ## Unreleased
 
+- Added: `smithy doctor --fix` lists each fixable check with its exact change (remove a stale `daemon.json`, `chmod 600` the daemon token, add `Bash(smithy pr merge:*)` to `permissions.allow` in `~/.claude/settings.json`) and applies it on `y`; `--yes` applies all, and without a terminal it applies none. It only touches your own files and prints what changed.
 - Added: `smithy cleanup builds` (TK-26) lists old smithy builds in `~/.smithy/bin` (keeps the current one and one previous; per-checkout dev builds after 14 days), stale `smithy-*` container images other than `auto.sandbox_image`, and unlocked worktrees with no changes or ignored files of the current repo with no commits beyond the base branch, with the space each takes; `--yes` deletes them. Worktrees with uncommitted changes are never touched.
 - `install.sh` asks "harness or skills" on a terminal (default skills), takes `--harness` / `--skills`, installs skills without a terminal, and `--update` keeps the installed kind.
 - Added: `smithy skills install [--harness <name>...]` installs the skills without Node: it downloads the release's `smithy-skills.tar.gz`, checks it against `checksums.txt` and copies the skills into each detected harness's skills folder (symlinked skills are left alone). The release publishes the archive; `install.sh` offers it after installing the binary (a hint without a terminal); `npx skills add` still works.
