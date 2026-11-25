@@ -13,7 +13,9 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"os"
 	"os/exec"
@@ -21,9 +23,12 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/apiloop"
+	"github.com/Zovaris/smithy/internal/proc"
 	"github.com/Zovaris/smithy/internal/proxy"
 	"github.com/Zovaris/smithy/internal/search"
 )
@@ -47,7 +52,43 @@ type Set struct {
 	Allow, Deny      []string
 	Hosts            []string
 	Client           *http.Client
+	// ReadOnly offers only read, glob and grep, and Permit refuses every other tool.
+	ReadOnly bool
+	// Wrap, when set, turns a shell argv into one run under the OS sandbox (auto.sandbox native).
+	Wrap func(argv []string) []string
+	// Proxy is the egress proxy fetch dials through; without one fetch refuses private addresses.
+	Proxy *url.URL
+
+	mu  sync.Mutex
+	tmp string
 }
+
+// Close removes the run's overflow files.
+func (s *Set) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.tmp == "" {
+		return nil
+	}
+	err := os.RemoveAll(s.tmp)
+	s.tmp = ""
+	return err
+}
+
+func (s *Set) tempDir() (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.tmp == "" {
+		d, err := os.MkdirTemp("", "smithy-run-")
+		if err != nil {
+			return "", err
+		}
+		s.tmp = d
+	}
+	return s.tmp, nil
+}
+
+var readOnlyTools = map[string]bool{"read": true, "glob": true, "grep": true}
 
 func schema(props string, required ...string) json.RawMessage {
 	r, _ := json.Marshal(required)
@@ -75,6 +116,15 @@ func (s *Set) Specs() []apiloop.ToolSpec {
 	if openAIModel(s.Model) {
 		sp = append(sp, apiloop.ToolSpec{Name: "apply_patch", Description: "Apply a patch in the *** Begin Patch / *** Update File / *** Add File / *** Delete File / *** End Patch format.",
 			Schema: schema(`"patch":{"type":"string"}`, "patch")})
+	}
+	if s.ReadOnly {
+		ro := sp[:0]
+		for _, t := range sp {
+			if readOnlyTools[t.Name] {
+				ro = append(ro, t)
+			}
+		}
+		sp = ro
 	}
 	return sp
 }
@@ -112,6 +162,9 @@ func (s *Set) Permit(c apiloop.ToolCall) (bool, string) {
 	a, err := parse(c)
 	if err != nil {
 		return false, err.Error()
+	}
+	if s.ReadOnly && !readOnlyTools[c.Name] {
+		return false, c.Name + " is not allowed in a read-only run"
 	}
 	switch c.Name {
 	case "read":
@@ -361,8 +414,24 @@ func (s *Set) Call(ctx context.Context, c apiloop.ToolCall) (string, error) {
 	return "", errors.New("unknown tool " + c.Name)
 }
 
+// maxReadFile caps how much of one file read takes in, so a huge file can't exhaust memory.
+const maxReadFile = 64 << 20
+
 func (s *Set) read(a args) (string, error) {
-	b, err := os.ReadFile(s.abs(a.Path))
+	p := s.abs(a.Path)
+	fi, err := os.Stat(p)
+	if err != nil {
+		return "", err
+	}
+	if !fi.Mode().IsRegular() {
+		return "", fmt.Errorf("%s is not a regular file", a.Path)
+	}
+	f, err := os.Open(p)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	b, err := io.ReadAll(io.LimitReader(f, maxReadFile))
 	if err != nil {
 		return "", err
 	}
@@ -436,17 +505,20 @@ func (s *Set) shell(ctx context.Context, a args) (string, error) {
 	}
 	ctx, cancel := context.WithTimeout(ctx, d)
 	defer cancel()
-	var cmd *exec.Cmd
+	argv := []string{"sh", "-c", a.Command}
 	if runtime.GOOS == "windows" {
-		cmd = exec.CommandContext(ctx, "cmd", "/C", a.Command)
-	} else {
-		cmd = exec.CommandContext(ctx, "sh", "-c", a.Command)
+		argv = []string{"cmd", "/C", a.Command}
 	}
+	if s.Wrap != nil {
+		argv = s.Wrap(argv)
+	}
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = s.Cwd
 	cmd.Env = scrubEnv(os.Environ())
 	cmd.WaitDelay = 2 * time.Second
+	proc.Tree(cmd)
 	out, err := cmd.CombinedOutput()
-	text, oerr := overflow(out)
+	text, oerr := s.overflow(out)
 	if oerr != nil {
 		return "", oerr
 	}
@@ -473,12 +545,17 @@ func scrubEnv(env []string) []string {
 	return out
 }
 
-// overflow keeps output under MaxBytes inline, saving the whole of longer output to a file.
-func overflow(out []byte) (string, error) {
+// overflow keeps output under MaxBytes inline, saving the whole of longer output to a file in
+// the run's temp dir (removed by Close).
+func (s *Set) overflow(out []byte) (string, error) {
 	if len(out) <= MaxBytes {
 		return string(out), nil
 	}
-	f, err := os.CreateTemp("", "smithy-shell-*.log")
+	dir, err := s.tempDir()
+	if err != nil {
+		return "", err
+	}
+	f, err := os.CreateTemp(dir, "shell-*.log")
 	if err != nil {
 		return "", err
 	}
@@ -550,8 +627,38 @@ func (s *Set) grep(a args) (string, error) {
 	return out.String(), nil
 }
 
+// transport dials through s.Proxy when set; otherwise it checks every address it connects to,
+// after DNS, so an allowed name can't resolve to a loopback, private or link-local address.
+func (s *Set) transport() *http.Transport {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	if s.Proxy != nil {
+		t.Proxy = http.ProxyURL(s.Proxy)
+		return t
+	}
+	t.Proxy = nil
+	d := &net.Dialer{Timeout: 30 * time.Second, Control: func(_, address string, _ syscall.RawConn) error {
+		host, _, err := net.SplitHostPort(address)
+		if err != nil {
+			return err
+		}
+		if ip, err := netip.ParseAddr(host); err != nil || !publicIP(ip) {
+			return fmt.Errorf("fetch refuses %s: not a public address", host)
+		}
+		return nil
+	}}
+	t.DialContext = d.DialContext
+	return t
+}
+
+func publicIP(ip netip.Addr) bool {
+	ip = ip.Unmap()
+	return ip.IsValid() && !ip.IsLoopback() && !ip.IsPrivate() && !ip.IsLinkLocalUnicast() && !ip.IsLinkLocalMulticast() &&
+		!ip.IsUnspecified() && !ip.IsMulticast() && !ip.IsInterfaceLocalMulticast() &&
+		!netip.MustParsePrefix("100.64.0.0/10").Contains(ip)
+}
+
 func (s *Set) fetch(ctx context.Context, raw string) (string, error) {
-	c := http.Client{Timeout: 30 * time.Second}
+	c := http.Client{Timeout: 30 * time.Second, Transport: s.transport()}
 	if s.Client != nil {
 		c = *s.Client
 	}
