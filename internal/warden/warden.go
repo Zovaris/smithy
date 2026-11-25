@@ -184,7 +184,11 @@ type report struct {
 }
 
 func (r *report) offer(change string, apply func() error) {
-	r.fixes = append(r.fixes, fix{change, apply})
+	r.fixes = append(r.fixes, fix{change: change, apply: apply})
+}
+
+func (r *report) offerGrant(change string, apply func() error) {
+	r.fixes = append(r.fixes, fix{change: change, apply: apply, grant: true})
 }
 
 func (r *report) ok(msg string) {
@@ -410,7 +414,7 @@ func Doctor(args []string) int {
 		} else {
 			if user := claudeFiles()[0]; settingsFixable(user) {
 				const rule = "Bash(smithy pr merge:*)"
-				r.offer(`add "`+rule+`" to permissions.allow in `+user, func() error { return addAllowRule(user, rule) })
+				r.offerGrant(`add "`+rule+`" to permissions.allow in `+user, func() error { return addAllowRule(user, rule) })
 			}
 			r.warn("gh pr merge not in the allow list (auto merges may stop at ready)", `add "Bash(smithy pr merge:*)" (or "Bash(gh pr merge:*)") to permissions.allow in ~/.claude/settings.json, or use merge manual`)
 		}

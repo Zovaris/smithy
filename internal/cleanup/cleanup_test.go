@@ -33,6 +33,7 @@ func TestBuildsKeepsCurrentAndOnePrevious(t *testing.T) {
 		mkbin(t, bin, v, 10)
 	}
 	old := time.Now().Add(-30 * 24 * time.Hour)
+	os.Chtimes(filepath.Join(bin, "dev", "old", "smithy"), old, old)
 	os.Chtimes(filepath.Join(bin, "dev", "old"), old, old)
 	if err := os.WriteFile(filepath.Join(bin, "smithy-linux-arm64"), []byte("x"), 0o755); err != nil {
 		t.Fatal(err)
@@ -140,5 +141,28 @@ func TestMainDryRunDeletesNothingYesDeletes(t *testing.T) {
 	}
 	if code := Main([]string{"--bogus"}); code != 2 {
 		t.Fatalf("bad flag exit %d", code)
+	}
+}
+
+func TestBuildsDevAgeFromBinaryNotFolder(t *testing.T) {
+	bin := t.TempDir()
+	old := time.Now().Add(-30 * 24 * time.Hour)
+	for _, k := range []string{"stale", "inuse"} {
+		d := filepath.Join(bin, "dev", k)
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		f := filepath.Join(d, "smithy")
+		if err := os.WriteFile(f, []byte("x"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if k == "stale" {
+			_ = os.Chtimes(f, old, old)
+		}
+		_ = os.Chtimes(d, old, old)
+	}
+	got := strings.Join(paths(Builds(bin)), ",")
+	if !strings.Contains(got, "stale") || strings.Contains(got, "inuse") {
+		t.Fatalf("got %q, want only the stale dev build", got)
 	}
 }

@@ -114,7 +114,7 @@ func Builds(bin string) []Item {
 	}
 	if devs, err := os.ReadDir(filepath.Join(bin, "dev")); err == nil {
 		for _, d := range devs {
-			if i, err := d.Info(); err == nil && d.IsDir() && time.Since(i.ModTime()) > devMaxAge {
+			if p := filepath.Join(bin, "dev", d.Name()); d.IsDir() && time.Since(newest(p)) > devMaxAge {
 				dirs = append(dirs, filepath.Join(bin, "dev", d.Name()))
 			}
 		}
@@ -294,4 +294,20 @@ func Main(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// newest is the latest modification time of dir and the files directly in it, so a dev build
+// rebuilt in place (or its folder touched) counts as fresh.
+func newest(dir string) time.Time {
+	var t time.Time
+	if fi, err := os.Stat(dir); err == nil {
+		t = fi.ModTime()
+	}
+	es, _ := os.ReadDir(dir)
+	for _, e := range es {
+		if i, err := e.Info(); err == nil && i.ModTime().After(t) {
+			t = i.ModTime()
+		}
+	}
+	return t
 }
