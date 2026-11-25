@@ -35,7 +35,11 @@ Telegram notifications, sent by smithy auto serve from events.jsonl. Setup:
   smithy auth set telegram            (the bot token from @BotFather, on stdin)
   smithy config set notify.telegram.chat <chat id>
   smithy config set notify.kinds pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited
-test sends one test message (--all: one sample of every kind); status shows the token (masked), chat, kinds, last send and last error.`
+test sends one test message (--all: one sample of every kind); status shows the token (masked), chat, kinds, last send and last error.
+Harness build: smithy daemon sends instead, through its chat connectors: notify.telegram.chat is then
+the numeric id of a supergroup with topics on (one topic per session); decision buttons answer the
+decision, a reply in a session's topic goes to that session. connect.telegram.kinds narrows what
+it sends; connect.telegram.users (Telegram user ids) is who it hears, and unset it hears nobody.`
 
 // Kinds are every notification kind, in the default notify.kinds order.
 var Kinds = []string{"pr_ready", "blocked", "stuck", "decision", "orchestrator_failed", "serve_down", "cap_reached", "limited"}
@@ -737,4 +741,16 @@ func renderPlain(it item) (string, []button) {
 	}
 	_, kb := renderButtons(it)
 	return strings.Join(lines, "\n"), kb
+}
+
+// Alert is one event's notification, for other senders (the daemon's connectors).
+type Alert struct{ Kind, Label, Key, PR, Reason, Dedupe string }
+
+// Classify maps one event to an alert, or ok false (the same rules Flush uses).
+func Classify(e events.Event) (Alert, bool) {
+	it, ok := classify(e)
+	if !ok {
+		return Alert{}, false
+	}
+	return Alert{Kind: it.kind, Label: plainTitle[it.kind], Key: it.key, PR: webURL(it.pr), Reason: it.reason, Dedupe: it.dedupe}, true
 }

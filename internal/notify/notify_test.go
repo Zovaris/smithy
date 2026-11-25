@@ -360,3 +360,13 @@ func TestRenderPlainDefault(t *testing.T) {
 		t.Fatalf("plain style: %s %v", msg, kb)
 	}
 }
+
+func TestClassifyExported(t *testing.T) {
+	a, ok := Classify(events.Event{Kind: "stage", Batch: "b", Item: "i", Detail: "failed", PR: "javascript:x"})
+	if !ok || a.Kind != "blocked" || a.Label != "Blocked" || a.PR != "" || a.Dedupe == "" {
+		t.Fatalf("%+v %v", a, ok)
+	}
+	if _, ok := Classify(events.Event{Kind: "usage"}); ok {
+		t.Fatal("usage is no alert")
+	}
+}

@@ -719,3 +719,7 @@ func isTerminal(f *os.File) bool {
 	fi, err := f.Stat()
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
+
+// StopNotify turns off serve's own Telegram alerts (the daemon's notification layer sends them);
+// call it before Run.
+func (sv *Server) StopNotify() { sv.note = nil }
