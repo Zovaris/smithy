@@ -3,7 +3,7 @@ import { lazy, Suspense } from "preact/compat";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import "./theme/temper.css";
 import "./app.css";
-import { api, initAuth } from "./auth";
+import { api, currentServer, initAuth } from "./auth";
 import { Composer } from "./composer";
 import { Conversation } from "./conversation";
 import { parse, totals, withComments, type Comment } from "./diff";
@@ -11,6 +11,7 @@ import { Anvil, I } from "./icons";
 import { sendMessage, start, stopSession, useLive } from "./live";
 import { NewSession } from "./newsession";
 import { Agents, Changes, Decisions } from "./rail";
+import { Servers, useServers } from "./servers";
 import { go, href, PAGES, type Page, useView } from "./router";
 import { agentName, ago, open, sessions as list, type Sess } from "./store";
 import { initTheme, toggleTheme, current } from "./theme";
@@ -52,12 +53,14 @@ function Gate({ auth }: { auth: Auth }) {
   );
 }
 
-const HOST = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "[::1]" ? "This machine" : location.hostname;
+const MACHINE = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "[::1]" ? "This machine" : location.hostname;
+const host = () => currentServer() || MACHINE;
 
 function Sidebar({ ss, cur, pending, conn, sheet, onClose, onPalette, onCollapse }: {
   ss: Sess[]; cur: string; pending: number; conn: string; sheet: boolean; onClose: () => void; onPalette: () => void; onCollapse: () => void;
 }) {
   const [mode, setMode] = useState(current);
+  const servers = useServers();
   return (
     <aside class={"side" + (sheet ? " sheet" : "")} aria-label="Sessions" onClick={(e) => (e.target as HTMLElement).closest("a") && onClose()}>
       <div class="grab" />
@@ -67,7 +70,7 @@ function Sidebar({ ss, cur, pending, conn, sheet, onClose, onPalette, onCollapse
       </div>
       <a class="newbtn" href="#/new" aria-current={cur === "new" ? "page" : undefined}><I n="plus" />New session<kbd>⌥N</kbd></a>
       <div class="grp">
-        <h4><I n="server" sm />{HOST}<span class="sp" /><span class="mono">{ss.length}</span></h4>
+        <h4><I n="server" sm />{host()}<span class="sp" /><span class="mono">{ss.length}</span></h4>
         {!ss.length && <p class="muted-empty">No sessions yet.</p>}
         {ss.map((s) => (
           <a class="sess" href={href({ name: "session", id: s.id })} aria-current={cur === s.id ? "page" : undefined}>
@@ -76,6 +79,7 @@ function Sidebar({ ss, cur, pending, conn, sheet, onClose, onPalette, onCollapse
           </a>
         ))}
       </div>
+      <Servers rows={servers} />
       <nav class="nav" aria-label="Pages">
         {PAGES.map((p) => (
           <a href={"#/" + p.id} aria-current={cur === p.id ? "page" : undefined} aria-keyshortcuts={"Alt+" + p.key}>
@@ -159,7 +163,7 @@ function App() {
     <>
       <Changes diff={diff} comments={mine} onComment={(c) => setNotes({ ...notes, [sid]: [...mine, c] })} onDrop={(c) => setNotes({ ...notes, [sid]: mine.filter((x) => x !== c) })} />
       <Decisions list={l.store.decisions.filter((d) => d.session === s.id || (!d.session && d.answer == null))} sessions={l.store.sessions} />
-      <Agents sessions={ss} host={HOST} />
+      <Agents sessions={ss} host={host()} />
     </>
   );
   const delta = (cls: string) =>
@@ -170,7 +174,7 @@ function App() {
     );
 
   let center;
-  if (v.name === "new") center = <NewSession setup={l.setup} recent={ss} host={HOST} onAction={onAction} />;
+  if (v.name === "new") center = <NewSession setup={l.setup} recent={ss} host={host()} onAction={onAction} />;
   else if (v.name === "session")
     center = s ? (
       <>

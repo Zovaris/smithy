@@ -129,6 +129,9 @@ code { font-family: var(--sph-font-mono); font-size: 12.5px; background: var(--t
 .sess + .sess { margin-top: 2px; }
 .sess:hover { background: var(--t-raised); }
 .sess[aria-current="page"] { background: var(--t-card); box-shadow: 0 0 0 1px var(--t-line); }
+button.sess { width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+button.sess:disabled { opacity: .5; cursor: default; }
+.sess.srv .t { color: var(--t-text-2); }
 .sess .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .sess .s { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--t-text-3); min-width: 0; }
 .sess .s span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
