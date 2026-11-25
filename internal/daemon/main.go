@@ -29,7 +29,7 @@ import (
 )
 
 // Usage is the text for `smithy daemon --help`.
-const Usage = `usage: smithy daemon [--bg] [--port <n>] [--idle-exit <d>] [--agent <cli>] [--once] [--max-hours <n>]
+const Usage = `usage: smithy daemon [--bg] [--port <n>] [--idle-exit <d>] [--demo] [--agent <cli>] [--once] [--max-hours <n>]
 Runs the auto loop (the one smithy auto serve ran) and a local API on 127.0.0.1:<daemon.port>
 (default 7477), writing every event to ~/.smithy/smithy.db. In a terminal it shows the serve view
 (Esc, q or Ctrl+C asks to stop); stopping leaves the orchestrator and its workers running. This
@@ -38,6 +38,7 @@ foreground form is for hosts (systemd, a server); on a laptop bare smithy starts
                after daemon.idle_exit (default 30m) with no clients and no running work
   --idle-exit  exit after this long idle (a duration like 30m; 0 never, the foreground default)
   --port       listen port (default: daemon.port); the address is always loopback
+  --demo       every session runs a scripted agent (tool calls, one decision): no CLI or key needed
   --agent, --once, --max-hours   as smithy auto serve
 API (every request needs "Authorization: Bearer <~/.smithy/daemon.token>", or through tailscale
 serve a Tailscale-User-Login listed in daemon.allow; anything else gets 401):
@@ -66,6 +67,8 @@ type flags struct {
 	idle time.Duration
 	// idleSet is true when --idle-exit was given.
 	idleSet bool
+	// demo runs every session on DemoRunner.
+	demo bool
 }
 
 // Version is this binary's version, reported in GET /v1/state.
@@ -78,6 +81,8 @@ func splitFlags(args []string) (flags, []string, error) {
 		switch a := args[i]; a {
 		case "--bg":
 			f.bg = true
+		case "--demo":
+			f.demo = true
 		case "--port":
 			if i+1 >= len(args) {
 				return f, nil, errors.New("--port needs a value")
@@ -146,7 +151,11 @@ func Main(args []string, view auto.View) int {
 				return 2
 			}
 		}
-		i, err := StartBackground(f.port, idle, rest)
+		bgArgs := rest
+		if f.demo {
+			bgArgs = append([]string{"--demo"}, rest...)
+		}
+		i, err := StartBackground(f.port, idle, bgArgs)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "smithy daemon:", err)
 			return 1
@@ -154,7 +163,7 @@ func Main(args []string, view auto.View) int {
 		fmt.Println(i.PID, i.URL())
 		return 0
 	}
-	return foreground(runOpts{name: "smithy daemon", port: f.port, args: rest, view: view, idle: f.idle, writeInfo: true})
+	return foreground(runOpts{name: "smithy daemon", port: f.port, args: rest, view: view, idle: f.idle, writeInfo: true, demo: f.demo})
 }
 
 // ConfigIdle is daemon.idle_exit (default 30m).
@@ -210,6 +219,7 @@ type runOpts struct {
 	// writeInfo publishes ~/.smithy/daemon.json so bare smithy, chat and web find this daemon.
 	writeInfo bool
 	ready     func(Info)
+	demo      bool
 }
 
 func foreground(o runOpts) int {
@@ -231,6 +241,9 @@ func foreground(o runOpts) int {
 		return 1
 	}
 	api.Version = Version
+	if o.demo {
+		api.Runners = DemoRunner
+	}
 	api.Pair = &Pairing{File: DevicesFile()}
 	api.Servers = func() ([]RemoteServer, error) {
 		l, err := remote.Load(remote.File())
