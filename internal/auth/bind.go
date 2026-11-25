@@ -89,7 +89,7 @@ func SetAsk(svc string, on bool) error {
 
 func update(svc string, f func(*entry)) error {
 	return config.WithLock(File(), func() error {
-		m, err := load()
+		m, _, err := read()
 		if err != nil {
 			return err
 		}

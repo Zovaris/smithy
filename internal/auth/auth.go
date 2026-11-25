@@ -1,7 +1,9 @@
 // Package auth keeps source API keys in $SMITHY_HOME/auth.json (mode 0600, outside any repo),
-// keyed by service name: {"linear": {"key": "..."}}. The env var named by <service>.key_env
-// wins when it is set. A full key is never printed. Mode 0600 keeps other users out, not other
-// processes running as you (agents included), so store a test or least-privilege key.
+// keyed by service name: {"linear": {"key": "..."}}, sealed with AES-GCM under auth.key, which
+// only smithy and its proxy read and every agent sandbox denies. A plaintext auth.json from an
+// older smithy is sealed on first read. The env var named by <service>.key_env wins when it is
+// set. A full key is never printed. A process running as you outside a sandbox can still read
+// both files, so store a test or least-privilege key.
 package auth
 
 import (
@@ -23,7 +25,7 @@ import (
 // Usage is the text for `smithy auth --help`.
 const Usage = `usage: smithy auth set <service> < keyfile | list | remove <service>
        smithy auth bind <service> <host> [METHODS] [--header <name>] [--prefix <scheme>] | ask <service> on|off
-Source API keys in ~/.smithy/auth.json (mode 0600). set reads the key from stdin only, never
+Source API keys in ~/.smithy/auth.json (mode 0600, encrypted with ~/.smithy/auth.key). set reads the key from stdin only, never
 from arguments; in a terminal it prompts with echo off. The env var named by <service>.key_env (e.g. LINEAR_API_KEY) wins when set.
 bind lets the egress proxy (auto.sandbox_network proxy) send the key to host for METHODS (comma
 list, default GET,HEAD) in --header (default Authorization) as "<prefix> <key>"; bind again to add
@@ -52,27 +54,48 @@ func EnvVar(svc string) string {
 	return config.Get(svc+".key_env", strings.ToUpper(svc)+"_API_KEY")
 }
 
+// load reads the auth file and seals a plaintext one from an older smithy, under the write lock.
+// Callers already holding the lock use read.
 func load() (map[string]entry, error) {
+	m, sealed, err := read()
+	if err != nil || sealed || len(m) == 0 {
+		return m, err
+	}
+	// a read-only mount (the proxy sidecar) can't be sealed and keeps reading the plaintext
+	_ = config.WithLock(File(), func() error {
+		if m2, sealed, err := read(); err == nil && !sealed && len(m2) > 0 {
+			return save(m2)
+		}
+		return nil
+	})
+	return m, nil
+}
+
+func read() (map[string]entry, bool, error) {
 	m := map[string]entry{}
 	f := File()
 	fi, err := os.Stat(f)
 	if os.IsNotExist(err) {
-		return m, nil
+		return m, true, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if runtime.GOOS != "windows" && fi.Mode().Perm()&0o077 != 0 {
-		return nil, fmt.Errorf("%s is readable by others; not reading it (chmod 600 %s)", f, f)
+		return nil, false, fmt.Errorf("%s is readable by others; not reading it (chmod 600 %s)", f, f)
 	}
 	b, err := os.ReadFile(f)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	if err := json.Unmarshal(b, &m); err != nil {
-		return nil, fmt.Errorf("%s: not valid JSON", f)
+	p, wasSealed, err := open(b)
+	if err != nil {
+		return nil, false, err
 	}
-	return m, nil
+	if err := json.Unmarshal(p, &m); err != nil {
+		return nil, false, fmt.Errorf("%s: not valid JSON", f)
+	}
+	return m, wasSealed, nil
 }
 
 func save(m map[string]entry) error {
@@ -80,7 +103,11 @@ func save(m map[string]entry) error {
 	if err := os.MkdirAll(filepath.Dir(f), 0o700); err != nil {
 		return err
 	}
-	b, _ := json.MarshalIndent(m, "", "  ")
+	plain, _ := json.Marshal(m)
+	b, err := seal(plain)
+	if err != nil {
+		return err
+	}
 	tmp, err := os.CreateTemp(filepath.Dir(f), "auth.*.tmp")
 	if err != nil {
 		return err
@@ -159,7 +186,7 @@ func Set(svc, key string) error {
 		return err
 	}
 	return config.WithLock(File(), func() error {
-		m, err := load()
+		m, _, err := read()
 		if err != nil {
 			return err
 		}
@@ -177,7 +204,7 @@ func Remove(svc string) (bool, error) {
 	}
 	found := false
 	err := config.WithLock(File(), func() error {
-		m, err := load()
+		m, _, err := read()
 		if err != nil {
 			return err
 		}
