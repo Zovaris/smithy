@@ -7,6 +7,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 
 - `install.sh` asks "harness or skills" on a terminal (default skills), takes `--harness` / `--skills`, installs skills without a terminal, and `--update` keeps the installed kind.
 - Added: `smithy skills install [--harness <name>...]` installs the skills without Node: it downloads the release's `smithy-skills.tar.gz`, checks it against `checksums.txt` and copies the skills into each detected harness's skills folder (symlinked skills are left alone). The release publishes the archive; `install.sh` offers it after installing the binary (a hint without a terminal); `npx skills add` still works.
+- Added: `smithy chat [url]` (harness build; bare `smithy` opens it): a fullscreen chat over a local or remote daemon with the input pinned at the bottom. Events stream from `/v1/events` and resume after the last seq on reconnect. The transcript is virtualized: only visible rows are wrapped and drawn, and a benchmark test keeps a frame of a 10k-message session under 5 ms.
 
 ## v0.18.0 — 2026-11-24
 
