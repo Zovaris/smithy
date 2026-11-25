@@ -10,6 +10,7 @@ part above `### Details`.
 
 - Stored keys are encrypted at rest: `~/.smithy/auth.json` is sealed with AES-GCM under `~/.smithy/auth.key`, which only smithy and its proxy read and every agent sandbox and deny list blocks. An existing plaintext `auth.json` is encrypted on first use without losing keys. No OS keychain, no password prompts.
 - `smithy agent --backend api --model <provider>/<model>` (and `auto.agent api:<provider>/<model>`, harness build) runs smithy's own agent loop (`internal/apiloop`) on the key from `smithy auth set <provider>`: Anthropic, OpenAI (Responses API), Gemini, and OpenRouter, DeepSeek or Ollama through openai-go's Chat Completions. Streaming text to the log, tool, permission and usage events like the CLI paths, prompt caching on Anthropic, retries with backoff on 429/5xx, cost from list prices or the provider's reported cost (ADR 0012).
+- Code mode (harness build, off by default: `agent.code_mode`): the API loop can offer `run_code`, one JavaScript program that calls the loop's tools through typed `tools.<name>(args)` bindings, each call still permission-checked. It runs in QuickJS compiled to WebAssembly (fastschema/qjs, no cgo) with a 64 MB memory cap, a 30 s time cap and no files or network (ADR 0013).
 ### New
 
 - `smithy bench run --agent <cli>` runs smithy's own 20-task benchmark and records pass rate, time, tokens and cost.
