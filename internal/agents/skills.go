@@ -12,7 +12,11 @@ const skillsUsage = `Finds installed skills, so a skill or a worker can read ano
 User-invoked skills can't be called by an agent as a slash command, but any agent in any
 harness can read the file.
   smithy skills <name>     absolute path of <name>/SKILL.md; exit 1 when not installed
-  smithy skills --list     ` + "`<name> <path>`" + ` for every skill of this repo that is installed`
+  smithy skills --list     ` + "`<name> <path>`" + ` for every skill of this repo that is installed
+  smithy skills install [--harness <name>...]
+                           download this release's skills (checksum-checked) into each detected
+                           harness's skills folder, or only the named ones; no Node needed.
+                           Harnesses: claude, codex, opencode, gemini, cursor, pi, dsh`
 
 // Known are the skills of this repo, in the order --list prints them.
 var Known = []string{"use-smithy", "smelt", "warden", "ledger", "scout", "tend", "hush", "simple"}
@@ -78,6 +82,8 @@ func SkillsMain(args []string) int {
 		a = args[0]
 	}
 	switch a {
+	case "install":
+		return skillsInstallMain(args[1:])
 	case "--list":
 		for _, s := range Known {
 			if p, ok := FindSkill(s); ok {

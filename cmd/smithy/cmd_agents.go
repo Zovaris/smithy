@@ -15,7 +15,7 @@ func init() {
 	register("route", "pick the model tier for a task", agents.RouteUsage,
 		"--text= --file= --kind= --agent= --speed= --domain= --board= --batch --json", agents.RouteMain)
 	register("skills", "find installed skills (smithy skills --list)", agents.SkillsUsage,
-		"--list", agents.SkillsMain)
+		"--list install --harness=", func(a []string) int { agents.BinaryVersion = version; return agents.SkillsMain(a) })
 	register("setup", "use-smithy setup: installed skills, settings, instructions block", agents.SetupUsage,
 		"", agents.SetupMain)
 }
