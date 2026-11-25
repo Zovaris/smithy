@@ -20,6 +20,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/fastschema/qjs"
+	"github.com/tetratelabs/wazero/experimental"
 )
 
 // ToolName is the tool the model calls with its program.
@@ -84,7 +85,7 @@ func (w *wrapped) Call(ctx context.Context, c apiloop.ToolCall) (string, error) 
 
 func describe(specs []apiloop.ToolSpec) string {
 	var b strings.Builder
-	b.WriteString("Run a short JavaScript program instead of many tool calls. No filesystem, network, imports or timers; " +
+	b.WriteString("Run a short JavaScript program instead of many tool calls. No filesystem, network or timers; " +
 		"console.log is captured. Calls are synchronous and return parsed JSON (or the text); a failed call throws. " +
 		"The last expression is the result. Available:\n")
 	for _, s := range specs {
@@ -183,8 +184,6 @@ const prelude = `(() => {
 })();`
 
 func (w *wrapped) exec(ctx context.Context, code string) (out string, err error) {
-	ctx, stop := context.WithCancelCause(ctx)
-	defer stop(nil)
 	ctx, cancel := context.WithTimeoutCause(ctx, w.lim.Time, errTime)
 	defer cancel()
 	jail, err := os.MkdirTemp("", "smithy-codemode-")
@@ -198,7 +197,7 @@ func (w *wrapped) exec(ctx context.Context, code string) (out string, err error)
 	var logs bytes.Buffer
 	rt, err := qjs.New(qjs.Option{
 		CWD:                jail,
-		Context:            ctx,
+		Context:            experimental.WithMemoryAllocator(ctx, capAlloc(2*w.lim.Memory)),
 		CloseOnContextDone: true,
 		MemoryLimit:        w.lim.Memory,
 		Stdout:             &capped{b: &logs},
@@ -216,11 +215,12 @@ func (w *wrapped) exec(ctx context.Context, code string) (out string, err error)
 			rt.Close()
 		}()
 	}()
-	go watch(ctx, rt.Mem(), uint32(min(2*w.lim.Memory, 1<<31)), stop)
 	jc := rt.Context()
 	names := []string{}
+	offered := map[string]bool{}
 	for _, s := range w.inner.Specs() {
 		names = append(names, s.Name)
+		offered[s.Name] = true
 	}
 	nb, _ := json.Marshal(names)
 	jc.Global().SetPropertyStr("__smithy_names", jc.NewString(string(nb)))
@@ -230,6 +230,9 @@ func (w *wrapped) exec(ctx context.Context, code string) (out string, err error)
 			return nil, errors.New("tool call needs a name and arguments")
 		}
 		c := apiloop.ToolCall{Name: args[0].String(), Args: json.RawMessage(args[1].String())}
+		if !offered[c.Name] {
+			return nil, fmt.Errorf("unknown tool %q", c.Name)
+		}
 		if ok, why := w.inner.Permit(c); !ok {
 			return nil, fmt.Errorf("permission denied for %s: %s", c.Name, why)
 		}
@@ -270,28 +273,36 @@ func (w *wrapped) exec(ctx context.Context, code string) (out string, err error)
 	return res, nil
 }
 
-var (
-	errTime   = errors.New("time limit reached")
-	errMemory = errors.New("memory limit reached")
-)
+var errTime = errors.New("time limit reached")
 
-// watch stops the run when the WebAssembly memory outgrows max: QuickJS's own limit misses
-// ArrayBuffer storage, so this is the cap that holds.
-func watch(ctx context.Context, m *qjs.Mem, max uint32, stop context.CancelCauseFunc) {
-	t := time.NewTicker(5 * time.Millisecond)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			if m.Size() > max {
-				stop(errMemory)
-				return
-			}
-		}
-	}
+// capAlloc backs the WebAssembly memory and refuses to grow it past max bytes: QuickJS's own
+// limit misses ArrayBuffer storage, so this is the cap that holds. A refused grow is an
+// out-of-memory error inside the program.
+type capAlloc int
+
+func (c capAlloc) Allocate(capacity, max uint64) experimental.LinearMemory {
+	return &linear{buf: make([]byte, 0, capacity), max: min(max, uint64(c))}
 }
+
+type linear struct {
+	buf []byte
+	max uint64
+}
+
+func (l *linear) Reallocate(size uint64) []byte {
+	if size > l.max {
+		return nil
+	}
+	if size > uint64(cap(l.buf)) {
+		nb := make([]byte, size, size+size/4)
+		copy(nb, l.buf)
+		l.buf = nb
+	}
+	l.buf = l.buf[:size]
+	return l.buf
+}
+
+func (l *linear) Free() { l.buf = nil }
 
 func limitErr(ctx context.Context, err error) error {
 	if c := context.Cause(ctx); c != nil {

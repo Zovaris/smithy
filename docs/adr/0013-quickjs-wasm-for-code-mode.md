@@ -20,11 +20,11 @@ behind `//go:build harness`; a test fails if the skills build links it.
 - `codemode.Wrap(tools, limits)` adds one tool, `run_code`, whose description lists a typed
   `tools.<name>(args)` binding per loop tool (from each JSON schema). The program's only way out is
   one host function that runs `Permit` then `Call` on the wrapped tools.
-- Caps: QuickJS's heap limit plus a watchdog on the WebAssembly memory (the heap limit misses
-  ArrayBuffer storage), 64 MB by default; 30 s through a context that closes the module.
+- Caps: QuickJS's heap limit plus a wazero memory allocator that refuses to grow the WebAssembly
+  memory past twice that (the heap limit misses ArrayBuffer storage), 64 MB by default; 30 s through a context that closes the module.
 - No filesystem or network: WASI has no sockets; the library mounts a host folder as `/`, so each
   run gets a fresh empty read-only temp dir, removed afterwards. Timers, `std`, `os` and `fetch`
-  globals are deleted.
+  globals are deleted, and the host function rejects tool names the program was not offered.
 - Off by default (`agent.code_mode`); turned on only if `smithy bench` shows token savings on
   real MCP servers.
 
@@ -32,4 +32,5 @@ behind `//go:build harness`; a test fails if the skills build links it.
 
 - Good: a real JS engine with no cgo and a WebAssembly memory boundary around it.
 - Bad: a young library (v0.0.x) and a ~1 MB WASM blob in the harness build; `qjs:std` stays
-  importable inside the sandbox, so the empty read-only mount is what keeps it harmless.
+  importable inside the sandbox, so the empty read-only mount is what keeps it harmless (tests guard both). The QuickJS WASM blob
+  is prebuilt inside the module (pinned in `go.sum`); review it on every version bump.
