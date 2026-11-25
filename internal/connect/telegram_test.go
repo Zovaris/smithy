@@ -90,6 +90,36 @@ func TestTelegramWaitsOutRetryAfter(t *testing.T) {
 	}
 }
 
+func TestSlackAndDiscordWaitOutRetryAfter(t *testing.T) {
+	for _, name := range []string{"slack", "discord"} {
+		n := 0
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if n++; n == 1 {
+				if name == "slack" {
+					w.Header().Set("Retry-After", "1")
+					w.WriteHeader(429)
+					w.Write([]byte(`{"ok":false,"error":"ratelimited"}`))
+				} else {
+					w.WriteHeader(429)
+					w.Write([]byte(`{"message":"You are being rate limited.","retry_after":1.0,"global":false}`))
+				}
+				return
+			}
+			w.Write([]byte(`{"ok":true,"ts":"1.2","id":"900"}`))
+		}))
+		var c Connector = &Slack{Base: srv.URL, Token: "xoxb-1-x", Channel: "C123456"}
+		if name == "discord" {
+			c = &Discord{API: srv.URL, Token: "x", Channel: "500"}
+		}
+		start := time.Now()
+		_, err := c.Send(context.Background(), "", Note{Kind: "blocked", Title: "x"}, nil)
+		srv.Close()
+		if err != nil || n != 2 || time.Since(start) < time.Second {
+			t.Errorf("%s: 429 not waited out: err %v calls %d after %v", name, err, n, time.Since(start))
+		}
+	}
+}
+
 func TestTelegramThreadSendUpdate(t *testing.T) {
 	api := &botAPI{}
 	c := tg(t, api)

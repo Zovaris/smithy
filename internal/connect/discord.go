@@ -75,6 +75,15 @@ func (d *Discord) poll() time.Duration {
 }
 
 func (d *Discord) call(ctx context.Context, method, path string, body, out any) error {
+	for try := 0; ; try++ {
+		wait, err := d.call1(ctx, method, path, body, out)
+		if wait == 0 || !rateLimited(ctx, wait, try) {
+			return err
+		}
+	}
+}
+
+func (d *Discord) call1(ctx context.Context, method, path string, body, out any) (time.Duration, error) {
 	cl := d.Client
 	if cl == nil {
 		cl = &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -90,7 +99,7 @@ func (d *Discord) call(ctx context.Context, method, path string, body, out any) 
 	}
 	req, err := http.NewRequestWithContext(ctx, method, base+path, rd)
 	if err != nil {
-		return errors.New("discord: bad request")
+		return 0, errors.New("discord: bad request")
 	}
 	req.Header.Set("Authorization", "Bot "+d.Token)
 	req.Header.Set("User-Agent", "DiscordBot (https://github.com/Zovaris/smithy, 1)")
@@ -103,21 +112,26 @@ func (d *Discord) call(ctx context.Context, method, path string, body, out any) 
 		if errors.As(err, &ue) {
 			err = ue.Err
 		}
-		return fmt.Errorf("discord %s: %s", routeOf(path), d.scrub(err.Error()))
+		return 0, fmt.Errorf("discord %s: %s", routeOf(path), d.scrub(err.Error()))
 	}
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode/100 != 2 {
 		var r struct {
-			Message string `json:"message"`
+			Message    string  `json:"message"`
+			RetryAfter float64 `json:"retry_after"`
 		}
 		_ = json.Unmarshal(b, &r)
-		return fmt.Errorf("discord %s %s: HTTP %d %s", method, routeOf(path), resp.StatusCode, d.scrub(r.Message))
+		var wait time.Duration
+		if resp.StatusCode == http.StatusTooManyRequests {
+			wait = max(time.Duration(r.RetryAfter*float64(time.Second)), time.Second)
+		}
+		return wait, fmt.Errorf("discord %s %s: HTTP %d %s", method, routeOf(path), resp.StatusCode, d.scrub(r.Message))
 	}
 	if out != nil && len(b) > 0 {
-		return json.Unmarshal(b, out)
+		return 0, json.Unmarshal(b, out)
 	}
-	return nil
+	return 0, nil
 }
 
 // routeOf keeps a path's shape for errors without ids or interaction tokens.
