@@ -17,6 +17,10 @@ part above `### Details`.
 - `smithy chat`/bare `smithy` auto-start the daemon (`daemon.StartBackground`) and show "background, smithy stop ends it" in the footer; `--standalone` runs `daemon.Standalone` in-process on a free port without `daemon.json`.
 - New `daemon.idle_exit` (default `30m`): a `--bg` daemon exits with no open event streams, no API requests, no orchestrator session and no planning for that long; `smithy daemon --idle-exit <d>`.
 - New `smithy stop` (SIGTERM, waits 10s). `GET /v1/state` reports `version`; the chat warns on a mismatch, below the replayed history.
+- API-backend costs now come from OpenRouter's public price list, refreshed daily and kept for offline use, so new models are priced without a smithy release.
+
+### Details
+- `apiloop.Cost` reads `https://openrouter.ai/api/v1/models` (cached at `~/.smithy/cache/model-prices.json`, refetched after 24h, last good cache kept when offline or the answer is bad) instead of the hand-kept table; an unlisted model still has no cost, never a guess.
 
 ## v0.22.0 — 2026-11-25
 

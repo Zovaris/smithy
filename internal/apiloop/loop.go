@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
-	"regexp"
 	"strings"
 	"time"
 
@@ -319,53 +318,4 @@ func ParseTarget(s string) (provider, model string, err error) {
 		return "", "", fmt.Errorf("api backend: unknown provider %q (known: anthropic, openai, gemini, openrouter, deepseek, ollama)", provider)
 	}
 	return provider, model, nil
-}
-
-type price struct{ in, out, read, write float64 }
-
-// prices are list prices in USD per million tokens (input, output, cache read, cache write), from
-// https://docs.anthropic.com/en/docs/about-claude/pricing and https://openai.com/api/pricing/.
-var prices = map[string]map[string]price{
-	"anthropic": {
-		"claude-opus-4-5":   {5, 25, 0.5, 6.25},
-		"claude-opus-4-1":   {15, 75, 1.5, 18.75},
-		"claude-opus-4":     {15, 75, 1.5, 18.75},
-		"claude-sonnet-4-5": {3, 15, 0.3, 3.75},
-		"claude-sonnet-4":   {3, 15, 0.3, 3.75},
-		"claude-haiku-4-5":  {1, 5, 0.1, 1.25},
-		"claude-3-5-haiku":  {0.8, 4, 0.08, 1},
-	},
-	"openai": {
-		"gpt-5":        {1.25, 10, 0.125, 0},
-		"gpt-5-mini":   {0.25, 2, 0.025, 0},
-		"gpt-5-nano":   {0.05, 0.4, 0.005, 0},
-		"gpt-4.1":      {2, 8, 0.5, 0},
-		"gpt-4.1-mini": {0.4, 1.6, 0.1, 0},
-		"gpt-4.1-nano": {0.1, 0.4, 0.025, 0},
-		"gpt-4o":       {2.5, 10, 1.25, 0},
-		"gpt-4o-mini":  {0.15, 0.6, 0.075, 0},
-		"o4-mini":      {1.1, 4.4, 0.275, 0},
-	},
-}
-
-// snapshot is what may follow a listed model id: a date (-20250929, -2025-08-07) or -latest.
-var snapshot = regexp.MustCompile(`^-(\d{8}|\d{4}-\d{2}-\d{2}|latest)$`)
-
-// Cost prices u at the list price of provider's model: the id must equal a listed one or be one
-// followed by a snapshot date. nil (unknown cost) for any other model, never a guess.
-func Cost(provider, model string, u usage.Usage) *float64 {
-	p, ok := prices[provider][model]
-	if !ok {
-		for pre, pr := range prices[provider] {
-			if rest, cut := strings.CutPrefix(model, pre); cut && snapshot.MatchString(rest) {
-				p, ok = pr, true
-				break
-			}
-		}
-	}
-	if !ok {
-		return nil
-	}
-	c := (float64(u.Input)*p.in + float64(u.Output)*p.out + float64(u.CacheRead)*p.read + float64(u.CacheWrite)*p.write) / 1e6
-	return &c
 }
