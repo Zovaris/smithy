@@ -52,7 +52,8 @@ Timeout: --timeout, else the agent.timeout setting (minutes, default 90; 0 = non
 passes, the agent's whole process group is killed (Unix; on Windows only the agent process), "timed out after Nm" goes to the log and
 smithy agent exits 124; --bg runs are watched by a detached smithy that does the same.
 Pool (smithy pool, off until an account is added): a run of a pooled harness (AGENT_CLI=pool: any)
-uses the least recently used account that is not limited, through its harness's config-dir env var;
+uses the least recently used account that is not limited, through its harness's config-dir env var
+(AGENT_CLI=pool: harnesses in pool.order first, falling back down it, logged as pool_fallback);
 a usage-limit result marks it limited; a read-only or untouched run reruns once on the next one,
 any other exits 75 with its warden card blocked (relaunch in the same worktree).
 Extra flags for the chosen CLI: $AGENT_ARGS. Workers get WARDEN_HARNESS set to the CLI and the

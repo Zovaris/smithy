@@ -295,3 +295,41 @@ func TestDetectOpenCodeGeminiPi(t *testing.T) {
 		}
 	}
 }
+
+func TestAcquireInFollowsHarnessOrderAndGoesBackAfterReset(t *testing.T) {
+	d := home(t)
+	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
+	for _, a := range [][2]string{{"c1", "claude"}, {"x1", "codex"}} {
+		if _, err := Add(a[0], a[1], filepath.Join(d, a[0])); err != nil {
+			t.Fatal(err)
+		}
+	}
+	order := []string{"claude", "codex"}
+	for i := 0; i < 2; i++ {
+		if a, _ := AcquireIn("pool", order, now.Add(time.Duration(i)*time.Minute)); a.Name != "c1" {
+			t.Fatalf("run %d picked %s, want claude first", i, a.Name)
+		}
+	}
+	_ = MarkLimited("c1", now.Add(time.Hour))
+	if a, _ := AcquireIn("pool", order, now.Add(5*time.Minute)); a.Name != "x1" {
+		t.Fatalf("picked %s, want the codex fallback", a.Name)
+	}
+	if a, _ := AcquireIn("pool", order, now.Add(2*time.Hour)); a.Name != "c1" {
+		t.Fatalf("picked %s, want claude again after its reset", a.Name)
+	}
+	if a, _ := AcquireIn("pool", []string{"codex"}, now.Add(3*time.Hour)); a.Name != "x1" {
+		t.Fatalf("picked %s, want codex when it leads the order", a.Name)
+	}
+}
+
+func TestPreferredIsTheFirstOrderedHarnessWithAnAccount(t *testing.T) {
+	d := home(t)
+	_, _ = Add("x1", "codex", filepath.Join(d, "x1"))
+	_, _ = Add("c1", "claude", filepath.Join(d, "c1"))
+	if h := Preferred([]string{"gemini", "claude", "codex"}); h != "claude" {
+		t.Fatalf("preferred = %q", h)
+	}
+	if h := Preferred(nil); h != "" {
+		t.Fatalf("preferred with no order = %q", h)
+	}
+}

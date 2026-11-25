@@ -190,7 +190,12 @@ smithy pool add main <harness>       # ~/.smithy/accounts/main
 smithy pool login main               # sign in once, then exit
 smithy pool list                     # status, reset time, runs and cost today
 smithy config set auto.agent pool    # optional: the orchestrator may use any pooled harness
+smithy config set pool.order claude,codex  # optional: harness order for a pool run
 ```
+
+With `pool.order` set, a pool run stays on the first listed harness that has a free account. When
+every account of that harness is limited, it falls back to the next one (logged as a
+`pool_fallback` event) and goes back once the limit resets.
 
 When every account is limited, `smithy agent` exits 75 and serve waits for the earliest reset,
 then notifies you on Telegram if it is set up.
