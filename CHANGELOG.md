@@ -8,6 +8,10 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- `pool.order` (e.g. `claude,codex`): when every account of one harness is limited, a pool run continues on the next pooled harness, logs the switch as a `pool_fallback` event and goes back once the limit resets.
+
 ## v0.20.0 — 2026-11-25
 
 ### Highlights
