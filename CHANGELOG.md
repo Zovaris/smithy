@@ -11,6 +11,7 @@ part above `### Details`.
 ### Details
 
 - web: Temper design for approval (Sephiro theme `web/src/theme/temper.css`, light/dark, mock and screenshots in `docs/design/web-v023/`).
+- web: rebuilt on Temper. Sessions sidebar with status per session, centered conversation (markdown, folded tool calls, inline decisions with ↵ for the safe answer), one composer with `/` commands and skills, right rail with Changes (diff, line comments sent with the next message), Decisions and Agents; new-session page picks folder, agent and model and starts from a skill. Phone: one column, sessions and changes as bottom sheets, composer pinned. Light/dark follows the system with a toggle. Talks to `/v1/sessions`, `/v1/decisions`, `/v1/guard`; old `#/sessions?s=` links still open. Screenshots of every flow at 1440 and 390 px in `docs/design/web-v023/built/`.
 ### Highlights
 
 **One sandbox: the OS one.** The Docker/podman container sandbox is gone. `auto.sandbox` is `off` (default) or `native` (Seatbelt on macOS, bubblewrap on Linux) for Claude Code, Codex and the API backend's shell.

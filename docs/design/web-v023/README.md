@@ -28,3 +28,17 @@ changes right, one composer with `/`, needs-you status loud.
 | Desktop 1440 | ![](desktop-light.png) | ![](desktop-dark.png) |
 | New session | ![](new-light.png) | ![](new-dark.png) |
 | Phone 390 | ![](phone-light.png) | ![](phone-dark.png) |
+
+## Built (v0.23)
+
+Screenshots of the built web driving a real Claude Code session on a local daemon, every flow at
+1440 and 390 px, light and dark, in [`built/`](built/): `01` settings (first run), `02` new
+session, `03` `/` commands, `04` guard decision in a working session, `05` changes sheet (phone),
+`06` done with a diff comment, `07` sessions sheet (phone), `08` decisions, agents, board, `09`
+command palette. The fonts fall back to the system UI fonts: the page's CSP loads nothing from
+other origins and Geist is not bundled.
+
+| | Light | Dark |
+|---|---|---|
+| Desktop | ![](built/04-session-guard-decision-desktop-light.png) | ![](built/06-session-done-diff-comment-desktop-dark.png) |
+| Phone | ![](built/04-session-guard-decision-phone-light.png) | ![](built/05-changes-sheet-phone-dark.png) |
