@@ -52,7 +52,7 @@ func fakeAgent(t *testing.T, in io.Reader, out io.Writer, got chan<- map[string]
 			}
 			send(map[string]any{"jsonrpc": "2.0", "id": 100, "method": "session/request_permission", "params": map[string]any{
 				"sessionId": "s1",
-				"toolCall":  map[string]any{"toolCallId": "t1", "title": "Run go test"},
+				"toolCall":  map[string]any{"toolCallId": "t1", "title": "Run go test", "rawInput": map[string]any{"command": "go test ./...", "file_path": "/work/a.go"}, "locations": []any{map[string]any{"path": "/work/b.go"}}},
 				"options": []any{
 					map[string]any{"optionId": "yes", "name": "Allow", "kind": "allow_once"},
 					map[string]any{"optionId": "no", "name": "Reject", "kind": "reject_once"},
@@ -142,7 +142,7 @@ func TestRunMapsUpdatesToTextToolsAndUsage(t *testing.T) {
 	if outcome["outcome"] != "selected" || outcome["optionId"] != "yes" {
 		t.Fatalf("permission answer = %v", outcome)
 	}
-	if len(s.perms) != 1 || s.perms[0].Title != "Run go test" {
+	if len(s.perms) != 1 || s.perms[0].Title != "Run go test" || s.perms[0].Kind != "execute" || s.perms[0].Command != "go test ./..." || strings.Join(s.perms[0].Paths, ",") != "/work/b.go,/work/a.go" {
 		t.Fatalf("perms = %+v", s.perms)
 	}
 }

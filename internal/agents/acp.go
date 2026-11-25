@@ -28,6 +28,9 @@ type acpSink struct {
 	allow bool
 	log   string
 	item  events.Event // batch and item of a warden log, copied onto each event
+	auto  bool         // --profile auto: each request goes through autoPermit
+	cwd   string
+	bins  []string
 }
 
 func (s acpSink) event(kind, detail string) {
@@ -52,11 +55,18 @@ func (s acpSink) Tool(t acp.Tool) {
 }
 
 func (s acpSink) Permit(p acp.Permission) string {
-	id := acp.Choose(p.Options, s.allow)
+	allow, why := s.allow, "read-only run: smithy refuses every ACP tool permission"
+	if allow && s.auto {
+		var reason string
+		if allow, reason = autoPermit(p, s.cwd, s.bins); !allow {
+			why = "--profile auto: " + reason
+		}
+	}
+	id := acp.Choose(p.Options, allow)
 	verdict := "allowed"
-	if !s.allow {
+	if !allow {
 		verdict = "rejected"
-		_ = addDecision("let the agent run "+p.Title+"?", verdict, "read-only run: smithy refuses every ACP tool permission", s.log)
+		_ = addDecision("let the agent run "+p.Title+"?", verdict, why, s.log)
 	}
 	s.event("permission", p.Title+": "+verdict)
 	return id
@@ -86,7 +96,7 @@ func runACP(cmd *exec.Cmd, o Options, prompt string, out *os.File) int {
 	defer outR.Close()
 	cmd.Stdin, cmd.Stdout = inR, outW
 	item := wardenItem(o.Log)
-	sink := acpSink{out: out, allow: !o.ReadOnly, log: o.Log, item: item}
+	sink := acpSink{out: out, allow: !o.ReadOnly, log: o.Log, item: item, auto: o.Profile == "auto", cwd: o.Cwd, bins: o.SmithyBins}
 	type result struct {
 		r   acp.Result
 		err error

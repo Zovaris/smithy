@@ -41,6 +41,9 @@ type Permission struct {
 	Tool    string
 	Title   string
 	Options []Option
+	Kind    string   // the tool kind (read, edit, execute, fetch, ...), "" when the agent never said
+	Command string   // rawInput.command of an execute tool, joined when it came as a list
+	Paths   []string // the tool's locations and rawInput file paths
 }
 
 // Sink receives what the agent reports. Permit returns the chosen option id, "" to cancel.
@@ -207,8 +210,13 @@ func (c *client) request(m message) error {
 	}
 	var p struct {
 		ToolCall struct {
-			ID    string `json:"toolCallId"`
-			Title string `json:"title"`
+			ID        string          `json:"toolCallId"`
+			Title     string          `json:"title"`
+			Kind      string          `json:"kind"`
+			RawInput  json.RawMessage `json:"rawInput"`
+			Locations []struct {
+				Path string `json:"path"`
+			} `json:"locations"`
 		} `json:"toolCall"`
 		Options []Option `json:"options"`
 	}
@@ -217,8 +225,36 @@ func (c *client) request(m message) error {
 	if title == "" {
 		title = c.tools[p.ToolCall.ID].Title
 	}
+	perm := Permission{Tool: p.ToolCall.ID, Title: title, Options: p.Options, Kind: p.ToolCall.Kind}
+	if perm.Kind == "" {
+		perm.Kind = c.tools[p.ToolCall.ID].Kind
+	}
+	for _, l := range p.ToolCall.Locations {
+		if l.Path != "" {
+			perm.Paths = append(perm.Paths, l.Path)
+		}
+	}
+	var raw map[string]any
+	_ = json.Unmarshal(p.ToolCall.RawInput, &raw)
+	switch v := raw["command"].(type) {
+	case string:
+		perm.Command = v
+	case []any:
+		var parts []string
+		for _, x := range v {
+			if s, ok := x.(string); ok {
+				parts = append(parts, s)
+			}
+		}
+		perm.Command = strings.Join(parts, " ")
+	}
+	for _, k := range []string{"file_path", "filePath", "path", "abs_path"} {
+		if v, ok := raw[k].(string); ok && v != "" {
+			perm.Paths = append(perm.Paths, v)
+		}
+	}
 	outcome := map[string]string{"outcome": "cancelled"}
-	if id := c.sink.Permit(Permission{Tool: p.ToolCall.ID, Title: title, Options: p.Options}); id != "" {
+	if id := c.sink.Permit(perm); id != "" {
 		outcome = map[string]string{"outcome": "selected", "optionId": id}
 	}
 	r, _ := json.Marshal(map[string]any{"outcome": outcome})
