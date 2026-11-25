@@ -187,7 +187,8 @@ func TestPermitFollowsAutoRules(t *testing.T) {
 		{call("edit", map[string]any{"path": "sub/../.git/hooks/post-merge", "old": "a", "new": "b"}), false},
 		{call("apply_patch", map[string]any{"patch": "*** Begin Patch\n*** Add File: .git/hooks/x\n+a\n*** End Patch"}), false},
 		{call("glob", map[string]any{"pattern": "*"}), true},
-		{call("fetch", map[string]any{"url": "https://evil.example/x"}), false},
+		{call("fetch", map[string]any{"url": "https://evil.example/x"}), true},
+		{call("fetch", map[string]any{"url": "http://evil.example/x"}), false},
 		{call("nope", map[string]any{}), false},
 	}
 	for _, c := range cases {
@@ -212,7 +213,11 @@ func TestFetchAllowedHost(t *testing.T) {
 	defer srv.Close()
 	s, _ := newSet(t)
 	s.Hosts = []string{"example.test"}
+	s.Wrap = func(a []string) []string { return a }
 	s.Client = srv.Client()
+	if ok, _ := s.Permit(call("fetch", map[string]any{"url": "https://other.test/x"})); ok {
+		t.Fatal("sandboxed fetch left the egress allow-list")
+	}
 	if ok, why := s.Permit(call("fetch", map[string]any{"url": "https://example.test/x"})); !ok {
 		t.Fatalf("allowed host refused: %s", why)
 	}
@@ -270,5 +275,20 @@ func TestPermitShellAsksGuard(t *testing.T) {
 	}
 	if len(seen) != 1 {
 		t.Fatalf("guard saw %v", seen)
+	}
+}
+
+func TestFetchOpenWithGuard(t *testing.T) {
+	s, _ := newSet(t)
+	var asked []string
+	s.FetchGuard = func(h string) (bool, string) { asked = append(asked, h); return h != "evil.example", "fetch guard" }
+	if ok, why := s.Permit(call("fetch", map[string]any{"url": "https://docs.example/x"})); !ok {
+		t.Fatalf("open fetch refused: %s", why)
+	}
+	if ok, why := s.Permit(call("fetch", map[string]any{"url": "https://evil.example/x"})); ok || why != "fetch guard" {
+		t.Fatalf("guard verdict ignored: %v %s", ok, why)
+	}
+	if ok, _ := s.Permit(call("fetch", map[string]any{"url": "http://docs.example/x"})); ok || len(asked) != 2 {
+		t.Fatalf("http reached the guard: %v", asked)
 	}
 }
