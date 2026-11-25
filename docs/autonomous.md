@@ -83,6 +83,10 @@ smithy config set notify.telegram.chat <id>
 smithy notify test
 ```
 
+For the harness build's Telegram connector the chat must be a supergroup with topics on and the
+bot an admin with the Manage Topics right; a bot that is not an admin needs privacy mode off
+(BotFather `/setprivacy`) to hear topic replies and `idea:` messages.
+
 ## Security
 
 Issue text can carry injected instructions. Run unattended mode under a dedicated OS user or
