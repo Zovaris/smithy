@@ -51,7 +51,7 @@ func (sv *Server) WatchIdle(ctx context.Context, limit, tick time.Duration, busy
 			return
 		case <-t.C:
 		}
-		if sv.clients.Load() > 0 || sv.planning.Load() || busy() {
+		if sv.clients.Load() > 0 || sv.planning.Load() || sv.SessionsWorking() || busy() {
 			sv.touch()
 			continue
 		}

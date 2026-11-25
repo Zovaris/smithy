@@ -572,3 +572,27 @@ func TestSessionToolOutputRedacted(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkingSessionKeepsDaemonUp(t *testing.T) {
+	hold := make(chan struct{})
+	defer close(hold)
+	sv, _, _ := sessionTest(t, func(ctx context.Context, msg string, h []Exchange, e Emit) (string, error) {
+		select {
+		case <-hold:
+		case <-ctx.Done():
+		}
+		return "", nil
+	})
+	if sv.SessionsWorking() {
+		t.Fatal("working with no sessions")
+	}
+	s, _ := sv.StartSession("claude", t.TempDir(), "go", "me")
+	if !sv.SessionsWorking() {
+		t.Error("a running turn does not count as work")
+	}
+	sv.StopSession(s.ID)
+	waitStatus(t, sv, s.ID, StatusDone)
+	if sv.SessionsWorking() {
+		t.Error("a stopped session still counts as work")
+	}
+}

@@ -631,3 +631,10 @@ func (sv *Server) getSession(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, s)
 }
+
+// SessionsWorking reports whether any session has a turn running or waits on a person.
+func (sv *Server) SessionsWorking() bool {
+	sv.mu.Lock()
+	defer sv.mu.Unlock()
+	return sv.liveCountLocked() > 0
+}
