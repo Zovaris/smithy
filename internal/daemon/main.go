@@ -19,9 +19,11 @@ import (
 
 	"github.com/Zovaris/smithy/internal/auto"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/connect"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/store"
+	"github.com/Zovaris/smithy/internal/text"
 )
 
 // Usage is the text for `smithy daemon --help`.
@@ -148,14 +150,30 @@ func foreground(name string, port int, serveArgs []string, view auto.View) int {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", name, err)
 		return 1
 	}
-	api.Route = RouteBack
+	api.Route = api.RouteIntake(RouteBack)
 	api.Resume()
 	tctx, stopTails := context.WithCancel(context.Background())
 	defer stopTails()
+	api.Ctx = tctx
 	go api.RunTails(tctx, time.Second, &Tail{Path: events.File(), Source: "tail:events"}, &Tail{Path: events.ProxyFile(), Source: ProxySource})
+	conns, cerr := connect.FromConfig()
+	if cerr != nil {
+		fmt.Fprintf(os.Stderr, "%s: chat connectors: %s\n", name, text.Clean(cerr.Error()))
+	}
+	if len(conns) > 0 {
+		hub := &connect.Hub{Conns: conns, File: connect.File(), Kinds: connect.Kinds, Input: api.Input, Intake: api.Intake,
+			Answer: func(id, answer, by string) error { _, err := api.Answer(id, answer, by); return err },
+			Log:    func(l string) { api.Append("log", "", map[string]string{"line": l}) }}
+		go api.RunNotes(tctx, hub, 30*time.Second)
+		go RunReport(tctx, hub, time.Hour)
+		go hub.Run(tctx)
+	}
 	h := auto.Hooks{
 		Tap: func(l string) { api.Append("log", "", map[string]string{"line": l}) },
 		Started: func(sv *auto.Server) (func(), error) {
+			if len(conns) > 0 {
+				sv.StopNotify()
+			}
 			ln, err := Listen(port)
 			if err != nil {
 				return nil, fmt.Errorf("listen on 127.0.0.1:%d: %w", port, err)

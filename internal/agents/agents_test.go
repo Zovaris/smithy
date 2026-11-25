@@ -7,12 +7,24 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 )
 
 func env(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
+
+func TestReadOnlyClaudeCannotReadSecrets(t *testing.T) {
+	s, err := Build("claude", Options{ReadOnly: true}, "P", nil, "", env(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	i := slices.Index(s.Argv, "--disallowedTools")
+	if i < 0 || !slices.Contains(s.Argv[i:], "Read(~/.smithy/auth.json)") || !slices.Contains(s.Argv[i:], "Bash(*auth.json*)") {
+		t.Fatalf("read-only claude may read the auth file: %q", s.Argv)
+	}
+}
 
 func TestBuild(t *testing.T) {
 	none := env(nil)
@@ -26,7 +38,7 @@ func TestBuild(t *testing.T) {
 		h     string
 	}{
 		{"claude", Options{Model: "opus"}, []string{"--x"}, "", []string{"claude", "-p", "--output-format", "json", "--permission-mode", "auto", "--model", "opus", "--x"}, true, "claude-cli"},
-		{"claude", Options{ReadOnly: true}, nil, "", []string{"claude", "-p", "--output-format", "json", "--permission-mode", "plan"}, true, "claude-cli"},
+		{"claude", Options{ReadOnly: true}, nil, "", append([]string{"claude", "-p", "--output-format", "json", "--permission-mode", "plan", "--disallowedTools"}, SecretDenied()...), true, "claude-cli"},
 		{"codex", Options{}, nil, "/r/.git", []string{"codex", "exec", "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=true", "--add-dir", "/r/.git", "-"}, true, "codex"},
 		{"codex", Options{ReadOnly: true, Model: "m"}, nil, "", []string{"codex", "exec", "--sandbox", "read-only", "-m", "m", "-"}, true, "codex"},
 		{"opencode", Options{}, nil, "", []string{"opencode", "run", "--standalone", "--archived", "--auto", "P"}, false, "opencode"},

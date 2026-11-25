@@ -3,18 +3,23 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/store"
+	"github.com/Zovaris/smithy/internal/web"
 )
 
 const (
@@ -62,10 +67,16 @@ type Server struct {
 	ServeState func() any
 	// Route, when set, sends a won answer back to its asker (RouteBack); an error leaves it for Resume.
 	Route func(Decision, Outcome) error
+	// Plan, when set, replaces AgentPlan for chat intake (tests).
+	Plan func(ctx context.Context, idea string) ([]PlanTask, error)
+	// Ctx is the daemon's lifetime (cancelled on shutdown) for background work like planning; nil: Background.
+	Ctx context.Context
 
 	mu        sync.Mutex
 	decisions map[string]*Decision
 	routed    map[string]bool
+	intakes   map[string]*intakePlan
+	planning  atomic.Bool
 	lastSeq   int64
 	wake      chan struct{}
 }
@@ -76,7 +87,7 @@ func New(st *store.Store, token string, allow []string, log func(string)) (*Serv
 		return nil, errors.New("daemon: empty token")
 	}
 	sv := &Server{st: st, token: token, allow: allow, log: log, started: time.Now(),
-		decisions: map[string]*Decision{}, routed: map[string]bool{}, wake: make(chan struct{})}
+		decisions: map[string]*Decision{}, routed: map[string]bool{}, intakes: map[string]*intakePlan{}, wake: make(chan struct{})}
 	evs, err := st.Since(0)
 	if err != nil {
 		return nil, err
@@ -106,6 +117,8 @@ func (sv *Server) apply(e store.Event) {
 				d.Outcome = &o
 			}
 		}
+	case KindIntake:
+		sv.applyIntake(e.Data)
 	case KindRouted:
 		var r struct{ ID string }
 		if json.Unmarshal(e.Data, &r) == nil {
@@ -260,6 +273,14 @@ func (sv *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/events", sv.events)
 	mux.HandleFunc("POST /v1/decisions", sv.decide)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1" && !strings.HasPrefix(r.URL.Path, "/v1/") {
+			if !ShellAllowed(r, sv.allow) {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			web.Handler().ServeHTTP(w, r)
+			return
+		}
 		who, ok := Authorize(r, sv.token, sv.allow)
 		if !ok {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="smithy"`)
@@ -288,7 +309,29 @@ func (sv *Server) state(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, st)
 }
 
+// sameOrigin refuses a request a browser could forge from another site: the body must be JSON
+// (not a simple form or text post), the fetch not cross-site and any Origin the daemon's own host.
+func sameOrigin(r *http.Request) (int, string) {
+	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
+		return 415, "Content-Type must be application/json"
+	}
+	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+		return 403, "cross-site request"
+	}
+	if o := r.Header.Get("Origin"); o != "" {
+		u, err := url.Parse(o)
+		if err != nil || !strings.EqualFold(u.Host, r.Host) {
+			return 403, "foreign origin"
+		}
+	}
+	return 0, ""
+}
+
 func (sv *Server) decide(w http.ResponseWriter, r *http.Request) {
+	if code, msg := sameOrigin(r); code != 0 {
+		writeJSON(w, code, map[string]string{"error": msg})
+		return
+	}
 	var req struct {
 		ID     string `json:"id"`
 		Answer string `json:"answer"`

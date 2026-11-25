@@ -56,6 +56,22 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   url sends no token (`daemon.allow` decides).
 - `smithy doctor` reports whether it runs, a stale `daemon.json`, and a token readable by others.
 
+### Chat, intake, report and web UI
+
+- Connectors: with Telegram (`notify.telegram.chat`), Slack (`connect.slack.channel`) or Discord
+  (`connect.discord.channel`) set up, the daemon gives each session its own topic or thread,
+  posts decisions with one button per option, and records a reply in that thread as the
+  session's input. It only listens to the users in `connect.<name>.users`; unset, it only sends.
+  Setup per chat app: [settings](settings.md).
+- `idea:` intake: write `idea: <what you want>` in the main Telegram chat and smithy plans it and
+  posts the plan back. Nothing runs without your yes; on yes the tasks land on the board with the
+  `intake` label and wait there for your review.
+- Weekly report: `smithy report week` prints what shipped, what failed, time and cost per harness
+  and the decisions still waiting. The daemon posts it on Mondays only when you add the `report`
+  kind to a connector's kinds.
+- `smithy web [open]` prints (or opens) the link to the web UI the daemon serves: sessions,
+  decisions, agents and the board in the browser.
+
 ## Built-in tracker (harness build)
 
 `smithy board` keeps tasks in `~/.smithy/smithy.db`; `auto.sources board` makes the watcher
@@ -82,6 +98,10 @@ smithy auth set telegram                       # bot token
 smithy config set notify.telegram.chat <id>
 smithy notify test
 ```
+
+For the harness build's Telegram connector the chat must be a supergroup with topics on and the
+bot an admin with the Manage Topics right; a bot that is not an admin needs privacy mode off
+(BotFather `/setprivacy`) to hear topic replies and `idea:` messages.
 
 ## Security
 

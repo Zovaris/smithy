@@ -8,6 +8,76 @@ part above `### Details`.
 
 ## Unreleased
 
+### Highlights
+
+**A web UI.** In the harness build, `smithy web open` shows your sessions, decisions, agents and board in the browser.
+
+**Answer from chat.** The daemon posts each session in its own Telegram topic, Slack thread or Discord thread, with buttons to answer decisions, and your reply there goes to that session.
+
+### New
+
+- **Ideas from chat:** write `idea: <what you want>` in the main Telegram chat and smithy plans it, then adds the tasks to the board only after you say yes.
+
+- **Weekly report:** `smithy report week` says in plain words what shipped, what failed, the time and cost per harness, and which decisions wait on you; the daemon posts it every Monday if you turn on the `report` kind.
+
+- **Who may answer:** the chat connectors only listen to the users you list in `connect.telegram.users`, `connect.slack.users` or `connect.discord.users`.
+
+### Details
+
+- Chat intake: a main-chat message from a listed user that starts with `idea:` or `/idea` is planned by a read-only `smithy agent` (smelt plan, idea fenced as untrusted data, at most 12 `TASK:` lines kept, 20 min timeout) in the daemon's working directory; the plan is recorded (`intake_plan`) and asked as decision `intake:<id>` (yes/no) in the main chat; yes adds the tasks to the board as todo with label `intake`, no adds nothing.
+
+- `internal/connect`: one notification layer (each enabled connector gets a note once, kinds per connector via `connect.<name>.kinds`), a `Connector` interface (thread, send, update, buttons, receive) and the Telegram connector (forum topics, inline keyboards, `getUpdates` long polling, token only from `smithy auth`).
+
+- Kinds `pr_merged` and `ci_red` are new and on by default for connectors.
+
+- `internal/report` and `smithy report week`: the last full week (Monday to Sunday) from the events log; open decisions are items whose latest stage is `needs_decision` or `ready`. Time per harness counts `working` spans of items that reported usage. `smithy daemon` posts it once per week (kind `report`, opt-in: add it to `connect.<name>.kinds`) from Monday 09:00 local.
+
+- `smithy daemon` feeds it from its store (cursor `notes:connect`, no replay of history), answers decisions from button presses through the same path as `/v1/decisions`, records topic replies as `user_input` events (`via: chat`); inbound is off until `connect.telegram.users` lists who may answer, and a button counts only on the message that asked it, and turns off serve's own Telegram flush when a connector is set up.
+
+- Discord connector: a public thread per session in `connect.discord.channel`, button components for decisions (five per row, every press acknowledged), the Gateway (GUILD_MESSAGES and MESSAGE_CONTENT intents) for thread replies and presses, only from `connect.discord.users` in the channel's own server; token only from `smithy auth set discord`, origins fixed in code, mentions off, markdown escaped. It shares the stdlib websocket client in `internal/connect/ws.go` with Slack, which now also rejects masked server frames, oversized or fragmented control frames and stray continuations.
+
+- Slack connector (`internal/connect/slack.go`): Socket Mode over a stdlib websocket client (`ws.go`, only `wss://*.slack.com` URLs), a thread per session rooted at a message naming it, Block Kit buttons for decisions, `chat.update` to show the answer; tokens `slack` (`xoxb-`) and `slack_app` (`xapp-`) only from `smithy auth`; inbound only from `connect.slack.channel` and users in `connect.slack.users`, bots and edited or system messages ignored, every envelope acknowledged.
+
+- Web UI shell (harness build): `web/` (Preact, `@zovaris/sephiro` 1.2.0, Vite) with smithy's
+  Steel theme, hash routing for sessions, decisions, agents and board (alt+1–4), and an auth
+  gate. Built into `internal/web/dist`, embedded with `go:embed`; the daemon serves it at `/`
+  (loopback, or `*.ts.net` for a login in `daemon.allow`) with a strict CSP. ADR 0010.
+
+- `smithy web [open]` prints or opens the daemon's web link with the token in the URL fragment.
+
+- CI `web` job: Vitest, typecheck, the 30 KB gzip first-load budget, and a stale-dist check.
+
+- Web UI screens over `/v1/events` (fetch-streamed SSE, resumes after the last seq): sessions
+  with the chat transcript in minimal, expandable and verbose modes (`v`), virtualized for 10k
+  messages; decisions answered through `/v1/decisions`; agents; a board by session state; and
+  the ctrl+k command palette. Each screen is its own chunk.
+
+- Connector kinds: with no `connect.<name>.kinds` and no user-set `notify.kinds`, a connector now sends the daemon defaults (notify kinds plus `pr_merged` and `ci_red`); before, the `notify.kinds` default silently dropped them. `report` is no longer on by default.
+
+- `POST /v1/decisions` refuses cross-site requests: the body must be `Content-Type: application/json` (415 otherwise), `Sec-Fetch-Site: cross-site` and an `Origin` whose host is not the request host get 403; the daemon client sends the JSON type.
+
+- Intake review: the approval message lists each task with its body (first 300 characters, line breaks kept, up to 3500 characters in chat), and the board source of `smithy auto` skips tasks labelled `intake` until someone removes the label after reviewing them.
+
+- Every `--readonly` claude run (the intake planner among them) carries the same secret deny rules as `--profile auto` (`agents.SecretDenied`: `Read` and shell access to `~/.smithy/auth.json`, pool accounts, ssh, gh, aws, netrc).
+
+- The secret scan (`smithy proof`, `proof.Redact`) also knows Telegram and Discord bot tokens and Slack app tokens (`xapp-`); `proof.Secret` names the rule a string matches.
+
+- Chat intake drops a plan whose task title or body matches a secret scan rule (`proof.Secret`), and logs only the rule name.
+
+- The events log masks secret-looking strings in `detail` before writing (`proof.Redact`), and the weekly report clips an orchestrator error to 80 characters and redacts its whole text.
+
+- Connector sends that fail are queued in `connect.json` (at most 256, oldest dropped with a log line) and retried by the hub with backoff (5 s doubling to 10 min) until they land, so a chat outage no longer loses decision prompts after the notes cursor moves on.
+
+- Telegram: the `getUpdates` offset is kept in `~/.smithy/telegram.offset` so a restarted daemon does not reprocess presses and replies.
+
+- Connectors honour HTTP 429: Telegram `parameters.retry_after`, Slack `Retry-After` and Discord `retry_after` are waited out (at most a minute, three tries) before the send fails into the retry queue.
+
+- The intake planner runs under the daemon context (stopped on shutdown) and keeps at most 1 MiB of its stdout and 4 KiB of stderr.
+
+- Discord Gateway: a full 64-event buffer now makes the reader wait up to 10 s for `Receive` before dropping an event, and a drop is logged through the hub instead of happening silently.
+
+- `smithy doctor` warns when `daemon.allow` is set: the daemon trusts `Tailscale-User-Login` on `*.ts.net` requests, so it trusts any local user on this machine; the setting description says so.
+
 ## v0.19.0 — 2026-11-24
 
 ### Highlights

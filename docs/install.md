@@ -35,7 +35,7 @@ To use `smithy` in your own terminal, accept the PATH offer in use-smithy setup.
 ## Harness build
 
 The release also ships `smithy-harness-<os>-<arch>`: the same commands plus `smithy daemon`,
-`smithy attach`, `smithy board` and `smithy chat` (bare `smithy` opens the chat) (ADR 0009). On a terminal `install.sh` asks "harness or
+`smithy attach`, `smithy board`, `smithy chat` and `smithy web` (bare `smithy` opens the chat) (ADR 0009). On a terminal `install.sh` asks "harness or
 skills" (Enter picks skills); `--harness` or `--skills` skips the question, and without a terminal
 it installs the skills build and prints how to install the skill files. `--update` keeps the kind you installed (saved in `~/.smithy/kind`) and updates the skills with `npx skills update`, or with `smithy skills install` when Node is missing. Or build
 it with `go build -tags harness ./cmd/smithy`.

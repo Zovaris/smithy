@@ -122,6 +122,19 @@ func AutoTools(smithy []string) []string {
 	return t
 }
 
+// SecretDenied keeps a claude session away from the secrets on disk (smithy's auth.json with
+// source and bot tokens, pool accounts, ssh, gh, aws, netrc), through Read and shell readers.
+// --profile auto and every --readonly claude run carry it.
+func SecretDenied() []string {
+	// shell readers must not reach the secrets the Read rules protect; pool accounts hold other accounts' logins
+	d := []string{"Bash(*auth.json*)", "Bash(*.ssh*)", "Bash(*.config/gh*)", "Bash(*.aws*)", "Bash(*.netrc*)", "Bash(*.git-credentials*)",
+		"Bash(*.smithy/accounts*)"}
+	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
+		d = append(d, "Read("+f+")")
+	}
+	return d
+}
+
 // AutoDenied always wins over AutoTools (Claude Code checks deny rules first): config and
 // credential commands, network fetchers, secrets on disk and files that run code later.
 func AutoDenied(smithy []string) []string {
@@ -132,19 +145,13 @@ func AutoDenied(smithy []string) []string {
 		"Bash(git push * http*)", "Bash(git push * git@*)", "Bash(git push * ssh*)", "Bash(git push * file*)", "Bash(git checkout * -- /*)",
 		// every shell redirect and tee: workers write files with Edit/Write, never through the shell
 		"Bash(*>*)", "Bash(* | tee *)", "Bash(*|tee *)",
-		// shell readers must not reach the secrets the Read rules protect
-		"Bash(*auth.json*)", "Bash(*.ssh*)", "Bash(*.config/gh*)", "Bash(*.aws*)", "Bash(*.netrc*)", "Bash(*.git-credentials*)",
-		"Bash(find * -exec*)", "Bash(find * -delete*)", "Bash(sed -n *w *)",
-		// pool accounts (smithy pool) hold other accounts' logins
-		"Bash(*.smithy/accounts*)", "Bash(smithy pool *)"}
+		"Bash(find * -exec*)", "Bash(find * -delete*)", "Bash(sed -n *w *)", "Bash(smithy pool *)"}
 	for _, b := range smithy {
 		if filepath.IsAbs(b) {
 			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config set *)", "Bash("+b+" config set-model *)", "Bash("+b+" pool *)")
 		}
 	}
-	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
-		d = append(d, "Read("+f+")")
-	}
+	d = append(d, SecretDenied()...)
 	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.smithy/accounts/**", "~/.smithy/pool.json", "~/.smithy/pool-state.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
 		"~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile", "~/.zshenv", "~/.claude/**",
 		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json"} {
@@ -339,6 +346,9 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 			for _, d := range o.AddDirs {
 				a = append(a, "--add-dir", d)
 			}
+		}
+		if o.ReadOnly {
+			a = append(append(a, "--disallowedTools"), SecretDenied()...)
 		}
 		if o.Sandbox == "native" {
 			a = append(a, "--settings", o.SandboxSettings)

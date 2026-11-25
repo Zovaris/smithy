@@ -15,6 +15,8 @@ import (
 	"github.com/Zovaris/smithy/internal/store"
 )
 
+// wired builds a server that routes answers back through the events files; a test that reads
+// them sets its own SMITHY_HOME first so no other test's lines are counted.
 func wired(t *testing.T, db string) *Server {
 	t.Helper()
 	st, err := store.Open(db)
@@ -115,6 +117,7 @@ func TestTailFollowsRotation(t *testing.T) {
 }
 
 func TestSecretAskBecomesDecisionAndAnswerReachesProxy(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
 	dir := t.TempDir()
 	sv := wired(t, filepath.Join(dir, "s.db"))
 	ask := events.Event{Kind: "secret_ask", ID: "abc123", Detail: "GH_TOKEN POST api.github.com/x"}
@@ -208,6 +211,7 @@ func TestDecideCardBecomesDecision(t *testing.T) {
 }
 
 func TestUnroutedAnswerIsRoutedOnResume(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
 	db := filepath.Join(t.TempDir(), "s.db")
 	sv := wired(t, db)
 	sv.Route = func(Decision, Outcome) error { return os.ErrPermission }
