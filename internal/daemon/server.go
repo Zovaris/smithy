@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/store"
+	"github.com/Zovaris/smithy/internal/web"
 )
 
 const (
@@ -260,6 +261,14 @@ func (sv *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/events", sv.events)
 	mux.HandleFunc("POST /v1/decisions", sv.decide)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1" && !strings.HasPrefix(r.URL.Path, "/v1/") {
+			if !ShellAllowed(r, sv.allow) {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+			web.Handler().ServeHTTP(w, r)
+			return
+		}
 		who, ok := Authorize(r, sv.token, sv.allow)
 		if !ok {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="smithy"`)

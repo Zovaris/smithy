@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -85,17 +86,9 @@ func AllowList(s string) []string {
 // (as tailscale serve forwards it) whose Tailscale login is in allow; any other Host is refused,
 // so a DNS-rebound page cannot use the API. It returns who asked: "local" for the token, else the login.
 func Authorize(r *http.Request, token string, allow []string) (string, bool) {
-	host := strings.ToLower(r.Host)
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-	host = strings.Trim(host, "[]")
-	loopback := host == "localhost"
-	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
-		loopback = true
-	}
+	loopback, tailnet := hostKind(r)
 	if !loopback {
-		if !strings.HasSuffix(strings.TrimSuffix(host, "."), ".ts.net") {
+		if !tailnet {
 			return "", false
 		}
 		token = ""
@@ -106,8 +99,28 @@ func Authorize(r *http.Request, token string, allow []string) (string, bool) {
 			return "local", true
 		}
 	}
+	if loopback {
+		return "", false
+	}
+	return allowedLogin(r, allow)
+}
+
+func hostKind(r *http.Request) (loopback, tailnet bool) {
+	host := strings.ToLower(r.Host)
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	loopback = host == "localhost"
+	if ip := net.ParseIP(host); ip != nil && ip.IsLoopback() {
+		loopback = true
+	}
+	return loopback, !loopback && strings.HasSuffix(strings.TrimSuffix(host, "."), ".ts.net")
+}
+
+func allowedLogin(r *http.Request, allow []string) (string, bool) {
 	login := strings.ToLower(strings.TrimSpace(r.Header.Get(LoginHeader)))
-	if login == "" || loopback {
+	if login == "" {
 		return "", false
 	}
 	for _, a := range allow {
@@ -116,6 +129,21 @@ func Authorize(r *http.Request, token string, allow []string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// ShellAllowed gates the web shell's static files: any loopback Host (the page itself holds no
+// secret; its API calls carry the token from the URL fragment), or a *.ts.net Host with an allowed
+// login. Any other Host is refused, as in Authorize, so a DNS-rebound page gets nothing.
+func ShellAllowed(r *http.Request, allow []string) bool {
+	loopback, tailnet := hostKind(r)
+	if loopback {
+		return true
+	}
+	if !tailnet {
+		return false
+	}
+	_, ok := allowedLogin(r, allow)
+	return ok
 }
 
 // CheckLoopback refuses any listen address that is not a loopback IP or localhost.
@@ -161,6 +189,9 @@ type Info struct {
 
 // URL is the daemon's base URL.
 func (i Info) URL() string { return "http://" + i.Addr }
+
+// WebURL is the web shell's URL with the token in the fragment, which browsers never send.
+func (i Info) WebURL(token string) string { return i.URL() + "/#token=" + url.QueryEscape(token) }
 
 // ReadInfo reads daemon.json; nil when there is none.
 func ReadInfo() (*Info, error) {

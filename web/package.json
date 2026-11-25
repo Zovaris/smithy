@@ -1,0 +1,21 @@
+{
+  "name": "smithy-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build && node scripts/budget.mjs",
+    "budget": "node scripts/budget.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@zovaris/sephiro": "1.2.0",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "2.10.6",
+    "typescript": "5.9.3",
+    "vite": "7.3.8",
+    "vitest": "3.2.7"
+  }
+}
