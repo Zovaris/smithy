@@ -6,6 +6,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 ## Unreleased
 
 - Added: `smithy cleanup builds` (TK-26) lists old smithy builds in `~/.smithy/bin` (keeps the current one and one previous; per-checkout dev builds after 14 days), stale `smithy-*` container images other than `auto.sandbox_image`, and unlocked worktrees with no changes or ignored files of the current repo with no commits beyond the base branch, with the space each takes; `--yes` deletes them. Worktrees with uncommitted changes are never touched.
+- `install.sh` asks "harness or skills" on a terminal (default skills), takes `--harness` / `--skills`, installs skills without a terminal, and `--update` keeps the installed kind.
 
 ## v0.18.0 — 2026-11-24
 
