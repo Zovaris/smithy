@@ -15,7 +15,18 @@ import (
 var (
 	botTokenRe = regexp.MustCompile(`^[0-9]+:[A-Za-z0-9_-]+$`)
 	chatIDRe   = regexp.MustCompile(`^-?[0-9]+$`)
+	discordRe  = regexp.MustCompile(`^[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{20,}$`)
 )
+
+func users(key string) map[string]bool {
+	on := map[string]bool{}
+	for _, u := range strings.Split(config.Get(key, ""), ",") {
+		if u = strings.TrimSpace(u); u != "" {
+			on[u] = true
+		}
+	}
+	return on
+}
 
 // Kinds is the set of kinds connector name sends: connect.<name>.kinds, else notify.kinds.
 func Kinds(name string) map[string]bool {
@@ -48,15 +59,31 @@ func FromConfig() ([]Connector, error) {
 	case !chatIDRe.MatchString(chat):
 		err = errors.New("telegram: notify.telegram.chat must be the numeric id of a supergroup with topics")
 	default:
-		users := map[string]bool{}
-		for _, u := range strings.Split(config.Get("connect.telegram.users", ""), ",") {
-			if u = strings.TrimSpace(u); u != "" {
-				users[u] = true
-			}
-		}
-		cs = append(cs, &Telegram{Token: tok, Chat: chat, Users: users})
+		cs = append(cs, &Telegram{Token: tok, Chat: chat, Users: users("connect.telegram.users")})
 	}
-	return cs, err
+	dc, derr := discordFromConfig()
+	if dc != nil {
+		cs = append(cs, dc)
+	}
+	return cs, errors.Join(err, derr)
+}
+
+func discordFromConfig() (Connector, error) {
+	tok, _, err := auth.Get("discord")
+	ch := strings.TrimSpace(config.Get("connect.discord.channel", ""))
+	switch {
+	case err != nil:
+		return nil, err
+	case tok == "" && ch == "":
+		return nil, nil
+	case tok == "":
+		return nil, errors.New("discord: no bot token (smithy auth set discord)")
+	case !discordRe.MatchString(strings.TrimPrefix(tok, "Bot ")):
+		return nil, errors.New("discord: the stored token is not a bot token")
+	case !snowflakeRe.MatchString(ch):
+		return nil, errors.New("discord: connect.discord.channel must be the numeric id of a server text channel")
+	}
+	return &Discord{Token: strings.TrimPrefix(tok, "Bot "), Channel: ch, Users: users("connect.discord.users")}, nil
 }
 
 // File is the hub's state file.
