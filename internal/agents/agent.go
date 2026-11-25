@@ -162,6 +162,16 @@ func AutoDenied(smithy []string) []string {
 			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config set *)", "Bash("+b+" config set-model *)", "Bash("+b+" pool *)")
 		}
 	}
+	// approvals and answers come only from the user's channels, never from a worker
+	for _, b := range append([]string{"smithy"}, smithy...) {
+		if b != "smithy" && !filepath.IsAbs(b) {
+			continue
+		}
+		d = append(d, "Bash("+b+" proxy approve *)", "Bash("+b+" proxy deny *)")
+		for _, c := range []string{"chat", "attach", "web", "tui"} {
+			d = append(d, "Bash("+b+" "+c+")", "Bash("+b+" "+c+" *)")
+		}
+	}
 	d = append(d, SecretDenied()...)
 	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.smithy/accounts/**", "~/.smithy/pool.json", "~/.smithy/pool-state.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
 		"~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile", "~/.zshenv", "~/.claude/**",
