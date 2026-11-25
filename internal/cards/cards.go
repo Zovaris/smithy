@@ -264,10 +264,10 @@ func set(file, id string, pairs []string) (map[string]any, error) {
 		if ns == "merged" {
 			kind = "merged"
 		}
-		events.Append(events.Event{Kind: kind, Batch: batch, Item: id, PR: s(cur, "pr"), Detail: ns})
+		_ = events.Append(events.Event{Kind: kind, Batch: batch, Item: id, PR: s(cur, "pr"), Detail: ns})
 	}
 	if nc := s(cur, "ci"); nc != "" && nc != prevCI {
-		events.Append(events.Event{Kind: "ci", Batch: batch, Item: id, PR: s(cur, "pr"), Detail: nc})
+		_ = events.Append(events.Event{Kind: "ci", Batch: batch, Item: id, PR: s(cur, "pr"), Detail: nc})
 	}
 	return cur, nil
 }

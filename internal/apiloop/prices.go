@@ -133,7 +133,7 @@ func loadPrices() map[string]price {
 			if os.MkdirAll(filepath.Dir(path), 0o700) == nil {
 				tmp := path + ".tmp"
 				if os.WriteFile(tmp, b, 0o600) == nil {
-					os.Rename(tmp, path)
+					_ = os.Rename(tmp, path)
 				}
 			}
 		}

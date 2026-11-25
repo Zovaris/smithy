@@ -188,7 +188,7 @@ func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e 
 		if fi, err := f.Stat(); err != nil || fi.Size() < off {
 			return
 		}
-		f.Seek(off, io.SeekStart)
+		_, _ = f.Seek(off, io.SeekStart)
 		b, _ := io.ReadAll(io.LimitReader(f, 1<<20))
 		if i := bytes.LastIndexByte(b, '\n'); !all {
 			b = b[:i+1]
@@ -216,11 +216,11 @@ loop:
 		case werr = <-done:
 			break loop
 		case <-ctx.Done():
-			cmd.Process.Signal(syscall.SIGTERM)
+			_ = cmd.Process.Signal(syscall.SIGTERM)
 			select {
 			case werr = <-done:
 			case <-time.After(stopGrace):
-				proc.Kill(cmd)
+				_ = proc.Kill(cmd)
 				werr = <-done
 			}
 			break loop
@@ -237,7 +237,7 @@ loop:
 	var out capped
 	out.n = MaxPlanOutput
 	if f, err := os.Open(log); err == nil {
-		io.Copy(&out, f)
+		_, _ = io.Copy(&out, f)
 		f.Close()
 	}
 	reply := out.b.String()
@@ -290,6 +290,6 @@ func (sv *Server) emitDiff(id, dir string) {
 	}
 	l.lastDiff = key
 	d := map[string]any{"stat": stat, "patch": clipBytes(patch, MaxDiff), "truncated": len(patch) > MaxDiff}
-	sv.appendLocked(KindSessionDiff, id, d)
+	_, _ = sv.appendLocked(KindSessionDiff, id, d)
 	sv.mu.Unlock()
 }

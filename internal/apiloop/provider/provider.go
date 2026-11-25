@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -134,7 +135,7 @@ func statusErr(err error) error {
 type anthropicP struct{ c anthropic.Client }
 
 func (p anthropicP) Stream(ctx context.Context, r apiloop.Request, onText func(string)) (apiloop.Reply, error) {
-	params := anthropic.MessageNewParams{Model: anthropic.Model(r.Model), MaxTokens: maxTokens(r)}
+	params := anthropic.MessageNewParams{Model: r.Model, MaxTokens: maxTokens(r)}
 	if r.System != "" {
 		params.System = []anthropic.TextBlockParam{{Text: r.System, CacheControl: anthropic.NewCacheControlEphemeralParam()}}
 	}
@@ -203,7 +204,7 @@ func (p anthropicP) Stream(ctx context.Context, r apiloop.Request, onText func(s
 		case anthropic.TextBlock:
 			rep.Parts = append(rep.Parts, apiloop.Part{Text: v.Text})
 		case anthropic.ToolUseBlock:
-			rep.Parts = append(rep.Parts, apiloop.Part{ToolCall: &apiloop.ToolCall{ID: v.ID, Name: v.Name, Args: json.RawMessage(v.Input)}})
+			rep.Parts = append(rep.Parts, apiloop.Part{ToolCall: &apiloop.ToolCall{ID: v.ID, Name: v.Name, Args: v.Input}})
 		}
 	}
 	switch msg.StopReason {
@@ -220,7 +221,7 @@ func (p anthropicP) Stream(ctx context.Context, r apiloop.Request, onText func(s
 type responsesP struct{ c openai.Client }
 
 func (p responsesP) Stream(ctx context.Context, r apiloop.Request, onText func(string)) (apiloop.Reply, error) {
-	params := responses.ResponseNewParams{Model: shared.ResponsesModel(r.Model), MaxOutputTokens: openai.Int(maxTokens(r)), Store: openai.Bool(false)}
+	params := responses.ResponseNewParams{Model: r.Model, MaxOutputTokens: openai.Int(maxTokens(r)), Store: openai.Bool(false)}
 	if r.System != "" {
 		params.Instructions = openai.String(r.System)
 	}
@@ -295,7 +296,7 @@ type chatP struct {
 }
 
 func (p chatP) Stream(ctx context.Context, r apiloop.Request, onText func(string)) (apiloop.Reply, error) {
-	params := openai.ChatCompletionNewParams{Model: shared.ChatModel(r.Model), MaxTokens: openai.Int(maxTokens(r)),
+	params := openai.ChatCompletionNewParams{Model: r.Model, MaxTokens: openai.Int(maxTokens(r)),
 		StreamOptions: openai.ChatCompletionStreamOptionsParam{IncludeUsage: openai.Bool(true)}}
 	if p.reportCost {
 		params.SetExtraFields(map[string]any{"usage": map[string]any{"include": true}})
@@ -377,7 +378,7 @@ func (p chatP) Stream(ctx context.Context, r apiloop.Request, onText func(string
 type geminiP struct{ c *genai.Client }
 
 func (p geminiP) Stream(ctx context.Context, r apiloop.Request, onText func(string)) (apiloop.Reply, error) {
-	cfg := &genai.GenerateContentConfig{MaxOutputTokens: int32(maxTokens(r))}
+	cfg := &genai.GenerateContentConfig{MaxOutputTokens: int32(min(maxTokens(r), math.MaxInt32))} //nolint:gosec // clamped to int32 on this line
 	if r.System != "" {
 		cfg.SystemInstruction = genai.NewContentFromText(r.System, genai.RoleUser)
 	}

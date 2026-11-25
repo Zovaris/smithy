@@ -105,7 +105,6 @@ type live struct {
 	runner   Runner
 	inbox    chan string
 	cancel   context.CancelFunc
-	turn     context.CancelFunc
 	history  []Exchange
 	asks     int
 	stopped  bool
@@ -198,7 +197,7 @@ func (sv *Server) applySession(e store.Event) {
 func (sv *Server) failOrphans() {
 	for id, d := range sv.decisions {
 		if strings.HasPrefix(id, "perm:") && d.Outcome == nil {
-			sv.answerLocked(id, "deny", "smithy")
+			_, _ = sv.answerLocked(id, "deny", "smithy")
 		}
 	}
 	for id, l := range sv.sessions {
@@ -484,7 +483,7 @@ type emitter struct {
 
 func (e *emitter) Text(t string) {
 	if t != "" {
-		e.sv.Append(KindSessionText, e.id, map[string]string{"text": proof.Redact(t)})
+		_, _ = e.sv.Append(KindSessionText, e.id, map[string]string{"text": proof.Redact(t)})
 	}
 }
 
@@ -495,7 +494,7 @@ func (e *emitter) Tool(t ToolEvent) {
 		t.Args, _ = json.Marshal(clipBytes(string(t.Args), MaxToolField))
 	}
 	t.Output = clipBytes(t.Output, MaxToolField)
-	e.sv.Append(KindSessionTool, e.id, t)
+	_, _ = e.sv.Append(KindSessionTool, e.id, t)
 }
 
 func (e *emitter) Usage(u usage.Usage) {
@@ -649,8 +648,6 @@ type SessionList struct {
 
 func (sv *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 	l := SessionList{Sessions: sv.Sessions()}
-	sv.mu.Lock()
-	sv.mu.Unlock()
 	l.LastAgent, l.LastModel = sv.Defaults()
 	writeJSON(w, 200, l)
 }

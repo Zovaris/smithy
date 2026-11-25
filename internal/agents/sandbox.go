@@ -366,7 +366,7 @@ func NativeGitEnv(env []string) []string {
 	n := 0
 	for _, kv := range env {
 		if v, ok := strings.CutPrefix(kv, "GIT_CONFIG_COUNT="); ok {
-			fmt.Sscan(v, &n)
+			_, _ = fmt.Sscan(v, &n)
 		}
 	}
 	pairs := [][2]string{

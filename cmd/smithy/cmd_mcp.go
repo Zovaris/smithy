@@ -68,7 +68,7 @@ func init() {
 			p := &proxy.Proxy{Secrets: auth.Secret, Approve: proxy.EventsApprover(5*time.Minute, time.Second),
 				Log: func(e proxy.Entry) {
 					if e.Status >= 400 {
-						events.AppendProxy(events.Event{Kind: "proxy_denied", Detail: fmt.Sprintf("%s %s %s %s %d", e.Kind, e.Name, e.Method, e.Host, e.Status)})
+						_ = events.AppendProxy(events.Event{Kind: "proxy_denied", Detail: fmt.Sprintf("%s %s %s %s %d", e.Kind, e.Name, e.Method, e.Host, e.Status)})
 					}
 				}}
 			tools = append(tools, mcp.SecretTool(p), mcp.AskTool(card, 2*time.Second, func() (mcp.Asker, error) {

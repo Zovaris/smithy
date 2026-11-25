@@ -420,7 +420,7 @@ func writeJSON(file string, m map[string]any) error {
 		return err
 	}
 	if fi, err := os.Stat(file); err == nil {
-		f.Chmod(fi.Mode().Perm())
+		_ = f.Chmod(fi.Mode().Perm())
 	}
 	if _, err := f.Write(append(b, '\n')); err != nil {
 		f.Close()

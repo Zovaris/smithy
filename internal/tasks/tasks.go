@@ -261,7 +261,7 @@ func Set(file string, pairs []string) (Task, error) {
 		}
 		val := strings.TrimSpace(p[i+1:])
 		if key == "Status" && !contains(Statuses, val) {
-			return Task{}, fmt.Errorf("Status must be one of %s", strings.Join(Statuses, ", "))
+			return Task{}, fmt.Errorf("Status must be one of %s", strings.Join(Statuses, ", ")) //nolint:staticcheck // ST1005: "Status" is the task-file field name
 		}
 		end := h + 1
 		for end < len(lines) && hdr.MatchString(lines[end]) {

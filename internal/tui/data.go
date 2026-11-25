@@ -475,7 +475,7 @@ func worktrees(batches []Batch, now time.Time) []Worktree {
 		if fi, err := os.Stat(w.Path); err == nil {
 			w.Age = now.Sub(fi.ModTime())
 			if out, err := exec.Command("git", "-C", w.Path, "rev-list", "--left-right", "--count", "@{upstream}...HEAD").Output(); err == nil {
-				fmt.Sscan(string(out), &w.Behind, &w.Ahead)
+				_, _ = fmt.Sscan(string(out), &w.Behind, &w.Ahead)
 			}
 			if out, err := exec.Command("git", "-C", w.Path, "status", "--short").Output(); err == nil {
 				lines := strings.Split(strings.TrimRight(string(out), "\n"), "\n")

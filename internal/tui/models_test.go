@@ -53,7 +53,7 @@ func TestModelListFromTheAgent(t *testing.T) {
 	if len(f.asked) != 1 || f.asked[0] != "claude" {
 		t.Fatalf("asked %v", f.asked)
 	}
-	m = sendKey(typeIn(m, "beam"), ckey("enter"))
+	sendKey(typeIn(m, "beam"), ckey("enter"))
 	if f.set[len(f.set)-1] != "claude|opencode/beam-free" {
 		t.Fatalf("filter then enter picks the match: %v", f.set)
 	}
@@ -73,7 +73,7 @@ func TestModelListDefaultRowAndOther(t *testing.T) {
 	if !strings.Contains(screen(m), "Other") {
 		t.Fatalf("no match offers Other:\n%s", screen(m))
 	}
-	m = sendKey(m, ckey("enter"))
+	sendKey(m, ckey("enter"))
 	if f.set[len(f.set)-1] != "claude|my-own-model" {
 		t.Fatalf("Other uses the typed name: %v", f.set)
 	}
@@ -83,7 +83,7 @@ func TestModelListRefresh(t *testing.T) {
 	f, m := modelsScene()
 	m2, cmd := m.modelCommand("")
 	m = run(m2.(chatView), cmd)
-	m = sendKey(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
+	sendKey(m, tea.KeyPressMsg{Code: 'r', Mod: tea.ModCtrl})
 	if f.refresh != 1 {
 		t.Fatalf("ctrl+r refreshes: %d", f.refresh)
 	}

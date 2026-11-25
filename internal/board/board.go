@@ -101,9 +101,9 @@ func scan(r interface{ Scan(...any) error }) (Task, error) {
 		&exp, &created, &updated, &t.LinearID, &t.LinearKey); err != nil {
 		return t, err
 	}
-	json.Unmarshal([]byte(labels), &t.Labels)
-	json.Unmarshal([]byte(blocked), &t.BlockedBy)
-	json.Unmarshal([]byte(prs), &t.PRs)
+	_ = json.Unmarshal([]byte(labels), &t.Labels)
+	_ = json.Unmarshal([]byte(blocked), &t.BlockedBy)
+	_ = json.Unmarshal([]byte(prs), &t.PRs)
 	t.ClaimExpires, _ = time.Parse(time.RFC3339Nano, exp)
 	t.Created, _ = time.Parse(time.RFC3339Nano, created)
 	t.Updated, _ = time.Parse(time.RFC3339Nano, updated)
@@ -273,7 +273,7 @@ func (b *Board) ready(t Task) (bool, error) {
 // to the matching Linear state type and attaches new PR urls. Progress lines go to log.
 func (b *Board) Sync(lin *linear.Source, log io.Writer) error {
 	var cursor string
-	b.db.QueryRow(`SELECT cursor FROM sync_cursors WHERE source='linear'`).Scan(&cursor)
+	_ = b.db.QueryRow(`SELECT cursor FROM sync_cursors WHERE source='linear'`).Scan(&cursor)
 	changes, next, err := lin.Changes(cursor)
 	if err != nil {
 		return err
@@ -307,7 +307,7 @@ func (b *Board) pull(lin *linear.Source, c linear.Change, log io.Writer) error {
 		if err != nil {
 			return err
 		}
-		defer tx.Rollback()
+		defer func() { _ = tx.Rollback() }()
 		res, err := tx.Exec(`INSERT INTO tasks (title, body, priority, labels, created_at, updated_at, linear_id, linear_updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			c.Title, c.Body, c.Priority, js(c.Labels), n, n, c.ID, c.UpdatedAt)
 		if err != nil {
@@ -369,8 +369,8 @@ func (b *Board) push(lin *linear.Source, log io.Writer) error {
 			}
 		}
 		var have, pushed []string
-		json.Unmarshal([]byte(r.prs), &have)
-		json.Unmarshal([]byte(r.pPRs), &pushed)
+		_ = json.Unmarshal([]byte(r.prs), &have)
+		_ = json.Unmarshal([]byte(r.pPRs), &pushed)
 		for _, u := range have {
 			if slices.Contains(pushed, u) {
 				continue

@@ -77,7 +77,7 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, out io.Writer) error {
 		b, _ := json.Marshal(m)
 		mu.Lock()
 		defer mu.Unlock()
-		out.Write(append(b, '\n'))
+		_, _ = out.Write(append(b, '\n'))
 	}
 	sc := bufio.NewScanner(in)
 	sc.Buffer(make([]byte, 64<<10), MaxRequest)
@@ -99,7 +99,7 @@ func (s *Server) Serve(ctx context.Context, in io.Reader, out io.Writer) error {
 			var p struct {
 				ProtocolVersion string `json:"protocolVersion"`
 			}
-			json.Unmarshal(r.Params, &p)
+			_ = json.Unmarshal(r.Params, &p)
 			v := ProtocolVersion
 			if slices.Contains(versions, p.ProtocolVersion) {
 				v = p.ProtocolVersion

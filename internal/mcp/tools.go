@@ -248,12 +248,12 @@ func AskTool(card string, poll time.Duration, connect func() (Asker, error)) Too
 			defer t.Stop()
 			for {
 				if ans, ok, err := asker.Outcome(ctx, want); err == nil && ok {
-					cards.Set(batch, item, []string{"state=working", "decision_key="})
+					_, _ = cards.Set(batch, item, []string{"state=working", "decision_key="})
 					return text.Clean(ans), nil
 				}
 				select {
 				case <-ctx.Done():
-					cards.Set(batch, item, []string{"state=working", "decision_key="})
+					_, _ = cards.Set(batch, item, []string{"state=working", "decision_key="})
 					return "", errors.New("no answer after " + strconv.Itoa(mins) + " minutes; the question stays on the card: decide by the task's rules and say so in your report")
 				case <-t.C:
 				}

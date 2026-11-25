@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/ghx"
-	_ "modernc.org/sqlite"
+	_ "modernc.org/sqlite" // registers the sqlite driver for database/sql
 )
 
 // Event is one row of the events log. Seq and Time are set by Append.
@@ -102,7 +102,7 @@ func (s *Store) migrate() error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	if _, err := tx.Exec(`CREATE TABLE IF NOT EXISTS migrations (version INTEGER PRIMARY KEY, applied TEXT NOT NULL)`); err != nil {
 		return err
 	}
@@ -189,7 +189,7 @@ func (s *Store) AppendCursor(e *Event, source, cursor string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	var seq int64
 	if e != nil {
 		data := []byte(e.Data)

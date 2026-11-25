@@ -197,7 +197,7 @@ func (sv *Server) Ingest(e events.Event, source string) {
 	switch e.Kind {
 	case "secret_ask":
 		if source == ProxySource {
-			sv.Ask(events.DecisionID(e, ""), "Allow "+line1(e.Detail, 300)+"?", []string{"approve", "deny"})
+			_ = sv.Ask(events.DecisionID(e, ""), "Allow "+line1(e.Detail, 300)+"?", []string{"approve", "deny"})
 		}
 	case "secret_approved", "secret_denied":
 		if source != ProxySource {
@@ -216,13 +216,13 @@ func (sv *Server) Ingest(e events.Event, source string) {
 			if pr == "" {
 				return
 			}
-			sv.Ask(events.DecisionID(e, ""), fmt.Sprintf("Merge %s (%s/%s)?", line1(pr, 200), line1(e.Batch, 80), line1(e.Item, 80)), []string{"merge", "hold"})
+			_ = sv.Ask(events.DecisionID(e, ""), fmt.Sprintf("Merge %s (%s/%s)?", line1(pr, 200), line1(e.Batch, 80), line1(e.Item, 80)), []string{"merge", "hold"})
 		case "needs_decision":
 			id := events.DecisionID(e, str(card, "decision_key"))
 			if id == "" || str(card, "question") == "" {
 				return
 			}
-			sv.Ask(id, line1(str(card, "question"), 500), options(card["options"]))
+			_ = sv.Ask(id, line1(str(card, "question"), 500), options(card["options"]))
 		}
 	}
 }

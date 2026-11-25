@@ -117,9 +117,7 @@ func (m Model) render() string {
 		lipgloss.NewLayer(m.tabbar(w)).Y(tabY),
 		lipgloss.NewLayer(m.footer(w)).Y(footY),
 	}
-	for _, l := range m.body() {
-		layers = append(layers, l)
-	}
+	layers = append(layers, m.body()...)
 	if m.toast != "" {
 		t := m.th
 		box := m.panelStyle(t.accent).Render(t.fg(t.text).Render(m.toast))

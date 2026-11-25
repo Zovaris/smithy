@@ -323,7 +323,7 @@ func (d Discoverer) Discover(ctx context.Context) ([]Found, error) {
 	}
 	if err := os.MkdirAll(filepath.Dir(d.Cache), 0o700); err == nil {
 		b, _ := json.Marshal(cacheFile{At: time.Now(), Found: out})
-		os.WriteFile(d.Cache, b, 0o600)
+		_ = os.WriteFile(d.Cache, b, 0o600)
 	}
 	return out, nil
 }
@@ -482,7 +482,7 @@ func Pair(ctx context.Context, base, code, name string) (string, error) {
 		Token string `json:"token"`
 		Error string `json:"error"`
 	}
-	json.NewDecoder(http.MaxBytesReader(nil, res.Body, 1<<16)).Decode(&out)
+	_ = json.NewDecoder(http.MaxBytesReader(nil, res.Body, 1<<16)).Decode(&out)
 	if res.StatusCode != 200 || out.Token == "" {
 		if out.Error == "" {
 			out.Error = res.Status

@@ -31,6 +31,6 @@ func ownGroup(cmd *exec.Cmd) {
 
 func forward(cmd *exec.Cmd, s os.Signal) {
 	if n, ok := s.(syscall.Signal); ok && cmd.Process != nil {
-		syscall.Kill(-cmd.Process.Pid, n)
+		_ = syscall.Kill(-cmd.Process.Pid, n)
 	}
 }

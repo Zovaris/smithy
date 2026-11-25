@@ -42,7 +42,7 @@ func readHidden(tty *os.File, svc string, stderr io.Writer) (string, error) {
 		go func() {
 			select {
 			case <-sig:
-				stty(tty, "echo")
+				_ = stty(tty, "echo")
 				fmt.Fprintln(stderr)
 				os.Exit(130)
 			case <-done:
@@ -51,7 +51,7 @@ func readHidden(tty *os.File, svc string, stderr io.Writer) (string, error) {
 		defer func() {
 			signal.Stop(sig)
 			close(done)
-			stty(tty, "echo")
+			_ = stty(tty, "echo")
 		}()
 	}
 	line, err := bufio.NewReader(io.LimitReader(tty, 64<<10)).ReadString('\n')

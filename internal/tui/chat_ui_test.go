@@ -168,7 +168,11 @@ func TestChatStickyStripAnswersDecision(t *testing.T) {
 	m = newChatScene()
 	m.decide = func(id, answer string) tea.Cmd { got = append(got, id+"="+answer); return nil }
 	l := strings.Split(screen(m), "\n")[headRows]
-	m = chatStep(m, tea.MouseClickMsg{X: ansi.StringWidth(l[:strings.Index(l, "later")]) - 1, Y: headRows, Button: tea.MouseLeft})
+	at := strings.Index(l, "later")
+	if at < 0 {
+		t.Fatalf("no later button:\n%s", screen(m))
+	}
+	m = chatStep(m, tea.MouseClickMsg{X: ansi.StringWidth(l[:at]) - 1, Y: headRows, Button: tea.MouseLeft})
 	if got[len(got)-1] != "d1=later" {
 		t.Fatalf("click on an option: %v", got)
 	}

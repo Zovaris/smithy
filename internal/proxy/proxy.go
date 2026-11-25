@@ -146,16 +146,16 @@ func (p *Proxy) connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.log(Entry{Kind: "connect", Host: host, Method: "CONNECT", Status: http.StatusOK})
-	io.WriteString(down, "HTTP/1.1 200 Connection established\r\n\r\n")
+	_, _ = io.WriteString(down, "HTTP/1.1 200 Connection established\r\n\r\n")
 	if n := buf.Reader.Buffered(); n > 0 {
-		b, _ := buf.Reader.Peek(n)
-		up.Write(b)
+		b, _ := buf.Peek(n)
+		_, _ = up.Write(b)
 	}
 	done := make(chan struct{}, 2)
 	pipe := func(dst, src net.Conn) {
-		io.Copy(dst, src)
+		_, _ = io.Copy(dst, src)
 		if c, ok := dst.(interface{ CloseWrite() error }); ok {
-			c.CloseWrite()
+			_ = c.CloseWrite()
 		}
 		done <- struct{}{}
 	}
@@ -281,7 +281,7 @@ func (p *Proxy) secret(w http.ResponseWriter, r *http.Request) {
 	}
 	cc := *c
 	cc.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	resp, err := cc.Do(out)
+	resp, err := cc.Do(out) //nolint:gosec // G704: the upstream comes from the proxy config, not the request
 	if err != nil {
 		refuse(http.StatusBadGateway, "upstream request failed")
 		return
@@ -304,7 +304,7 @@ func (p *Proxy) secret(w http.ResponseWriter, r *http.Request) {
 	e.Status = resp.StatusCode
 	p.log(e)
 	w.WriteHeader(resp.StatusCode)
-	w.Write(body)
+	_, _ = w.Write(body) //nolint:gosec // G705: proxied upstream bytes, passed through unchanged
 }
 
 func setPath(u *url.URL, escaped string) error {

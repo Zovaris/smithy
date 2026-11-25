@@ -98,7 +98,7 @@ func (m chatView) fileList() []string {
 		dir, _ = os.Getwd()
 	}
 	var list []string
-	filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}

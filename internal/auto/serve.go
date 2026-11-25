@@ -254,7 +254,7 @@ func acquire(path string, held func([]byte) bool) error {
 	for try := 0; ; try++ {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err == nil {
-			f.WriteString("{}\n")
+			_, _ = f.WriteString("{}\n")
 			return f.Close()
 		}
 		if !errors.Is(err, os.ErrExist) {
@@ -400,7 +400,7 @@ func (sv *Server) stopped() {
 		msg += fmt.Sprintf("; orchestrator pid %d keeps running (log %s; smithy tui or smithy cards board shows its workers)", sv.hb.SessionPID, sv.hb.SessionLog)
 	}
 	sv.logf("%s", msg)
-	events.Append(events.Event{Kind: "serve_down", Detail: "serve stopped"})
+	_ = events.Append(events.Event{Kind: "serve_down", Detail: "serve stopped"})
 	if sv.note != nil {
 		sv.note.Final(now())
 	}
@@ -453,7 +453,7 @@ func (sv *Server) Cycle() time.Duration {
 			}
 			for _, id := range gaveUp {
 				sv.logf("giving up on %s: orchestrators started nothing %d times; it stays launched", id, MaxRequeues+1)
-				events.Append(events.Event{Kind: "orchestrator_failed", ID: id, Detail: "orchestrators started nothing; gave up"})
+				_ = events.Append(events.Event{Kind: "orchestrator_failed", ID: id, Detail: "orchestrators started nothing; gave up"})
 			}
 			sv.hb.SessionPID, sv.hb.SessionDir = 0, ""
 		}
@@ -480,7 +480,7 @@ func (sv *Server) Cycle() time.Duration {
 			}
 			if day := now().Format("2006-01-02"); strings.HasPrefix(r.Why, "daily cap") && sv.capDay != day {
 				sv.capDay = day
-				events.Append(events.Event{Kind: "cap_reached", Detail: r.Why})
+				_ = events.Append(events.Event{Kind: "cap_reached", Detail: r.Why})
 			}
 		default:
 			if err := sv.launch(r.Dir); err != nil {
@@ -490,7 +490,7 @@ func (sv *Server) Cycle() time.Duration {
 				}
 				os.RemoveAll(r.Dir)
 				sv.logf("serve: orchestrator did not start, %d issue(s) back in the queue: %v", r.Count, err)
-				events.Append(events.Event{Kind: "orchestrator_failed", Detail: fmt.Sprintf("did not start, %d issue(s) back in the queue", r.Count)})
+				_ = events.Append(events.Event{Kind: "orchestrator_failed", Detail: fmt.Sprintf("did not start, %d issue(s) back in the queue", r.Count)})
 			} else {
 				sv.hb.State = "orchestrating"
 				sv.logf("orchestrator started: pid %d, %d issue(s), %s, log %s", sv.hb.SessionPID, r.Count, r.Dir, sv.hb.SessionLog)
@@ -514,7 +514,7 @@ func (sv *Server) recordOutcomes() {
 	}
 	for _, e := range Outcomes(es, prOutcome) {
 		sv.logf("outcome %s/%s %s %s", e.Batch, e.Item, e.Detail, e.PR)
-		events.Append(e)
+		_ = events.Append(e)
 	}
 }
 

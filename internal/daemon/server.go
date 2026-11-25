@@ -431,7 +431,7 @@ func (sv *Server) pairCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c, exp := sv.Pair.NewCode()
-	sv.Append("log", "", map[string]string{"line": "daemon: pairing code made, valid until " + exp.Local().Format("15:04:05")})
+	_, _ = sv.Append("log", "", map[string]string{"line": "daemon: pairing code made, valid until " + exp.Local().Format("15:04:05")})
 	writeJSON(w, 200, map[string]any{"code": c, "expires": exp})
 }
 
@@ -456,14 +456,14 @@ func (sv *Server) redeem(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 403, map[string]string{"error": err.Error()})
 		return
 	}
-	sv.Append("log", "", map[string]string{"line": "daemon: paired device " + strings.TrimSpace(b.Name)})
+	_, _ = sv.Append("log", "", map[string]string{"line": "daemon: paired device " + strings.TrimSpace(b.Name)})
 	writeJSON(w, 200, map[string]string{"token": tok, "version": sv.Version})
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func (sv *Server) state(w http.ResponseWriter, r *http.Request) {

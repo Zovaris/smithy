@@ -200,7 +200,7 @@ func TestProbeStatus(t *testing.T) {
 			json.NewEncoder(w).Encode(Hello{Smithy: true, Version: "0.23.0"})
 		case "/v1/setup":
 			if r.Header.Get("Authorization") != "Bearer tok" {
-				http.Error(w, "no", 401)
+				http.Error(w, "no", http.StatusUnauthorized)
 				return
 			}
 			w.Write([]byte(`{"agents":[{"name":"claude","ready":true,"kind":"cli"},{"name":"opencode","ready":false,"kind":"cli"}]}`))
@@ -224,7 +224,7 @@ func TestPairClient(t *testing.T) {
 		var b struct{ Code, Name string }
 		json.NewDecoder(r.Body).Decode(&b)
 		if r.URL.Path != "/v1/pair" || b.Code != "ABCD-2345" || r.Header.Get("Content-Type") != "application/json" {
-			http.Error(w, `{"error":"bad code"}`, 403)
+			http.Error(w, `{"error":"bad code"}`, http.StatusForbidden)
 			return
 		}
 		w.Write([]byte(`{"token":"devtok","version":"0.23.0"}`))

@@ -29,12 +29,8 @@ func init() {
 	register("stop", harnessSummary["stop"], daemon.StopUsage, "", func([]string) int {
 		return daemon.Stop(os.Stdout, 10*time.Second)
 	})
-	register("attach", harnessSummary["attach"], tui.AttachUsage, "--", func(args []string) int {
-		return tui.Attach(args)
-	})
-	register("chat", harnessSummary["chat"], tui.ChatUsage, "--standalone --server= --", func(args []string) int {
-		return tui.Chat(args)
-	})
+	register("attach", harnessSummary["attach"], tui.AttachUsage, "--", tui.Attach)
+	register("chat", harnessSummary["chat"], tui.ChatUsage, "--standalone --server= --", tui.Chat)
 	register("web", harnessSummary["web"], daemon.WebUsage, "--", func(args []string) int {
 		tok := func() (string, error) { return daemon.LoadToken(daemon.TokenFile(), false) }
 		return daemon.Web(args, daemon.Running, tok, tui.OpenURL, os.Stdout, os.Stderr)

@@ -254,7 +254,7 @@ func foreground(o runOpts) int {
 		return out, err
 	}
 	api.Route = api.RouteIntake(RouteBack)
-	api.Resume()
+	_ = api.Resume()
 	tctx, stopTails := context.WithCancel(context.Background())
 	defer stopTails()
 	api.Ctx = tctx
@@ -266,7 +266,7 @@ func foreground(o runOpts) int {
 	if len(conns) > 0 {
 		hub := &connect.Hub{Conns: conns, File: connect.File(), Kinds: connect.Kinds, Input: api.Input, Intake: api.Intake,
 			Answer: func(id, answer, by string) error { _, err := api.Answer(id, answer, by); return err },
-			Log:    func(l string) { api.Append("log", "", map[string]string{"line": l}) }}
+			Log:    func(l string) { _, _ = api.Append("log", "", map[string]string{"line": l}) }}
 		go api.RunNotes(tctx, hub, 30*time.Second)
 		go RunReport(tctx, hub, time.Hour)
 		go hub.Run(tctx)
@@ -280,7 +280,7 @@ func foreground(o runOpts) int {
 	h := auto.Hooks{
 		Ctx:   life,
 		Quiet: o.quiet,
-		Tap:   func(l string) { api.Append("log", "", map[string]string{"line": l}) },
+		Tap:   func(l string) { _, _ = api.Append("log", "", map[string]string{"line": l}) },
 		Started: func(sv *auto.Server) (func(), error) {
 			if len(conns) > 0 {
 				sv.StopNotify()
@@ -291,7 +291,7 @@ func foreground(o runOpts) int {
 			}
 			api.ServeState = func() any { return sv.Heartbeat() }
 			hs := &http.Server{Handler: api.Handler(), ReadHeaderTimeout: 10 * time.Second}
-			go hs.Serve(ln)
+			go func() { _ = hs.Serve(ln) }()
 			var rs *http.Server
 			if addr := config.Get("daemon.listen", ""); addr != "" && o.writeInfo {
 				if err := CheckRemoteListen(addr); err != nil {
@@ -304,8 +304,8 @@ func foreground(o runOpts) int {
 					return nil, fmt.Errorf("daemon.listen %s: %w", addr, err)
 				}
 				rs = &http.Server{Handler: api.RemoteHandler(), ReadHeaderTimeout: 10 * time.Second}
-				go rs.Serve(rln)
-				api.Append("log", "", map[string]string{"line": "daemon: also listening on " + rln.Addr().String() + " (bearer token or paired device only)"})
+				go func() { _ = rs.Serve(rln) }()
+				_, _ = api.Append("log", "", map[string]string{"line": "daemon: also listening on " + rln.Addr().String() + " (bearer token or paired device only)"})
 			}
 			info := Info{PID: os.Getpid(), PIDStart: auto.ProcStart(os.Getpid()), Addr: ln.Addr().String(), Started: time.Now().UTC(), Log: os.Getenv("SMITHY_DAEMON_LOG")}
 			if o.writeInfo {
@@ -314,11 +314,11 @@ func foreground(o runOpts) int {
 					return nil, err
 				}
 			}
-			api.Append("daemon_up", "", map[string]any{"pid": info.PID, "addr": info.Addr})
+			_, _ = api.Append("daemon_up", "", map[string]any{"pid": info.PID, "addr": info.Addr})
 			if o.idle > 0 {
 				busy := func() bool { hb := sv.Heartbeat(); return hb.SessionRunning() }
 				go api.WatchIdle(life, o.idle, 15*time.Second, busy, func() {
-					api.Append("log", "", map[string]string{"line": fmt.Sprintf("daemon: idle for %s with no clients and no running work; exiting", o.idle)})
+					_, _ = api.Append("log", "", map[string]string{"line": fmt.Sprintf("daemon: idle for %s with no clients and no running work; exiting", o.idle)})
 					quit()
 				})
 			}
@@ -326,12 +326,12 @@ func foreground(o runOpts) int {
 				o.ready(info)
 			}
 			return func() {
-				api.Append("daemon_down", "", map[string]any{"pid": info.PID})
+				_, _ = api.Append("daemon_down", "", map[string]any{"pid": info.PID})
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 				defer cancel()
-				hs.Shutdown(ctx)
+				_ = hs.Shutdown(ctx)
 				if rs != nil {
-					rs.Shutdown(ctx)
+					_ = rs.Shutdown(ctx)
 				}
 				if !o.writeInfo {
 					return
@@ -371,7 +371,7 @@ func StartBackground(port int, idle time.Duration, serveArgs []string) (*Info, e
 	}
 	pid := cmd.Process.Pid
 	exited := make(chan struct{})
-	go func() { cmd.Wait(); close(exited) }()
+	go func() { _ = cmd.Wait(); close(exited) }()
 	deadline := time.After(10 * time.Second)
 	for {
 		if i, _ := ReadInfo(); i != nil && i.PID == pid {

@@ -121,9 +121,9 @@ func Reset(text string, now time.Time) time.Time {
 		loc = l
 	}
 	var h, mi, d int
-	fmt.Sscanf(hs, "%d", &h)
+	_, _ = fmt.Sscanf(hs, "%d", &h)
 	if ms != "" {
-		fmt.Sscanf(ms, "%d", &mi)
+		_, _ = fmt.Sscanf(ms, "%d", &mi)
 	}
 	switch ap {
 	case "pm":
@@ -141,7 +141,7 @@ func Reset(text string, now time.Time) time.Time {
 	n := now.In(loc)
 	switch {
 	case mon != "":
-		fmt.Sscanf(day, "%d", &d)
+		_, _ = fmt.Sscanf(day, "%d", &d)
 		t := time.Date(n.Year(), months[mon[:3]], d, h, mi, 0, 0, loc)
 		if !t.After(now) {
 			t = t.AddDate(1, 0, 0)

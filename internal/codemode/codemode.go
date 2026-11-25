@@ -253,11 +253,11 @@ func (w *wrapped) exec(ctx context.Context, code string) (out string, err error)
 		}
 		return this.Context().NewString(res), nil
 	})
-	if v, err := rt.Eval("prelude.js", qjs.Code(prelude)); err != nil {
+	pv, err := rt.Eval("prelude.js", qjs.Code(prelude))
+	if err != nil {
 		return "", fmt.Errorf("code mode setup: %w", err)
-	} else {
-		v.Free()
 	}
+	pv.Free()
 	v, err := rt.Eval("program.js", qjs.Code(code))
 	if err == nil && v.IsPromise() {
 		var r *qjs.Value
@@ -292,7 +292,7 @@ var errTime = errors.New("time limit reached")
 type capAlloc int
 
 func (c capAlloc) Allocate(capacity, max uint64) experimental.LinearMemory {
-	return &linear{buf: make([]byte, 0, capacity), max: min(max, uint64(c))}
+	return &linear{buf: make([]byte, 0, capacity), max: min(max, uint64(c))} //nolint:gosec // c is a positive byte cap
 }
 
 type linear struct {

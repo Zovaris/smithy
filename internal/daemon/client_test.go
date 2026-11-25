@@ -116,7 +116,7 @@ func TestFollowResumesAfterRestartWithoutDuplicates(t *testing.T) {
 	}
 
 	r.stop()
-	for m := next(); m.Err == nil; m = next() {
+	for m := next(); m.Err == nil; m = next() { //revive:disable-line:empty-block drains the stream
 	}
 	r.start()
 	r.sv.Append("log", "", map[string]string{"line": "three"})

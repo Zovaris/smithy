@@ -82,7 +82,7 @@ func PairCmd(args []string, out, errw io.Writer) int {
 		Expires time.Time `json:"expires"`
 		Error   string    `json:"error"`
 	}
-	json.NewDecoder(io.LimitReader(res.Body, 1<<16)).Decode(&b)
+	_ = json.NewDecoder(io.LimitReader(res.Body, 1<<16)).Decode(&b)
 	if res.StatusCode != 200 {
 		return fail(fmt.Errorf("%s %s", res.Status, b.Error))
 	}

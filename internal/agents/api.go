@@ -60,7 +60,7 @@ func (s apiSink) event(kind, detail string) {
 	_ = events.Append(e)
 }
 
-func (s apiSink) Text(t string) { io.WriteString(s.out, t) }
+func (s apiSink) Text(t string) { _, _ = io.WriteString(s.out, t) }
 
 func (s apiSink) Tool(c apiloop.ToolCall, r apiloop.ToolResult) {
 	st := "completed"
