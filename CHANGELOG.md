@@ -38,6 +38,24 @@ part above `### Details`.
 
 - `smithy bench runs` lists saved runs; runs are named by id, unique prefix, `latest~N` or file path; `compare --json` gives the machine form. The daemon serves `GET /v1/bench` and `GET /v1/bench/compare?a=&b=` (ids only, no paths) to the web UI's plain Bench screen.
 
+- API backend `--readonly` offers only read, glob and grep, and `Permit` refuses every other tool.
+
+- API backend under `auto.sandbox native` runs shell commands under the OS sandbox (Seatbelt on macOS, bubblewrap on Linux; same writable and secret paths as claude workers, no network); `auto.sandbox container` refuses `api:` workers. Off (default) is unchanged.
+
+- API loop shell: commands run in their own process group (Windows: `taskkill /T`), so a timeout or cancel kills background children too. Long output goes to a per-run temp dir removed when the run ends.
+
+- API loop `read` refuses non-regular files (devices, fifos) and reads at most 64 MB; `fetch` dials through `HTTPS_PROXY` when set, otherwise refuses hosts resolving to loopback, private, link-local or CGNAT addresses.
+
+- API loop: a retried reply no longer repeats text already streamed; cost needs an exact model id or one with a snapshot date (`-20250929`, `-2025-08-07`, `-latest`), adds mini/nano rows, and is unknown (nil) for other models.
+
+- Code mode: the WebAssembly memory cap is the documented 64 MB (was twice that); inner tool calls report tool and permission events through the loop's sink.
+
+- `auth.json` and `auth.key` writes fsync the file and its folder; an empty `auth.json` holds no secrets and no longer blocks `smithy auth set` (a `.bak` beside it is left alone).
+
+- Config lock: a stale lock is taken over by an atomic rename and a pid recheck, so two writers can't both proceed.
+
+- `smithy bench`: SIGINT/SIGTERM kills the running agent and oracle process trees and removes the temp repos (unless `--keep`); the oracle kills its whole process group on timeout.
+
 ## v0.21.0 — 2026-11-25
 
 ### Highlights
