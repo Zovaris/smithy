@@ -159,6 +159,7 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 	case daemon.KindSessionTool:
 		var t daemon.ToolEvent
 		if json.Unmarshal(data, &t) == nil && t.Name != "" {
+			t.Output, t.Args = m.rel(t.Output), json.RawMessage(m.rel(string(t.Args)))
 			ct := toolOf(t)
 			m.into(id, chatMsg{who: "daemon", tool: &ct})
 			m.now(id, ct.Name+" "+ct.Arg)
@@ -220,13 +221,15 @@ func (m *chatView) now(id, what string) {
 // toolOf turns a session tool call into a transcript block: its main argument, its output's
 // first lines and a line count.
 func toolOf(t daemon.ToolEvent) chatTool {
-	ct := chatTool{Name: t.Name, Arg: toolArg(t.Args), Status: "ok"}
+	ct := chatTool{Name: t.Name, Arg: toolArg(t.Args), Status: "ok", Took: t.Took}
 	if t.IsError {
 		ct.Status = "failed"
 	}
-	out := strings.TrimRight(clean(t.Output), "\n")
-	if out != "" {
+	if out := strings.TrimRight(t.Output, "\n"); strings.TrimSpace(out) != "" {
 		lines := strings.Split(out, "\n")
+		for i, l := range lines {
+			lines[i] = clean(strings.ReplaceAll(l, "\t", "  "))
+		}
 		ct.Stat = fmt.Sprintf("%d lines", len(lines))
 		if len(lines) == 1 {
 			ct.Stat = short(lines[0], 24)
@@ -308,4 +311,19 @@ func patchLines(patch string) []string {
 		out = append(out, l)
 	}
 	return out
+}
+
+// rel shows paths under the chat's folder relative to it.
+func (m chatView) rel(s string) string {
+	if m.dir == "" {
+		return s
+	}
+	dirs := []string{m.dir}
+	if r, err := filepath.EvalSymlinks(m.dir); err == nil && r != m.dir {
+		dirs = append(dirs, r)
+	}
+	for _, d := range dirs {
+		s = strings.ReplaceAll(s, strings.TrimSuffix(d, "/")+"/", "")
+	}
+	return s
 }

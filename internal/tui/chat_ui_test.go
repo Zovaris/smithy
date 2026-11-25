@@ -107,6 +107,7 @@ func TestChatModesCycleWithV(t *testing.T) {
 		t.Fatalf("expandable:\n%s", out)
 	}
 	m = chatStep(m, ckey("v"))
+	m = chatStep(m, tea.WindowSizeMsg{Width: m.width, Height: 40})
 	out = screen(m)
 	if m.mode != modeVerbose || !strings.Contains(out, "134 lines read") || !strings.Contains(out, "typed classes") || !strings.Contains(out, "turn · 4 tools") {
 		t.Fatalf("verbose:\n%s", out)
@@ -151,7 +152,7 @@ func TestChatStickyStripAnswersDecision(t *testing.T) {
 		got = append(got, id+"="+answer)
 		return func() tea.Msg { return chatDecidedMsg{id: id} }
 	}
-	if rowOf(t, m, "Merge #142") != 2 {
+	if rowOf(t, m, "Merge #142") != headRows {
 		t.Fatal("waiting decision is not the top row")
 	}
 	n, cmd := m.Update(ckey("m"))
@@ -166,8 +167,8 @@ func TestChatStickyStripAnswersDecision(t *testing.T) {
 
 	m = newChatScene()
 	m.decide = func(id, answer string) tea.Cmd { got = append(got, id+"="+answer); return nil }
-	l := strings.Split(screen(m), "\n")[2]
-	m = chatStep(m, tea.MouseClickMsg{X: ansi.StringWidth(l[:strings.Index(l, "later")]) - 1, Y: 2, Button: tea.MouseLeft})
+	l := strings.Split(screen(m), "\n")[headRows]
+	m = chatStep(m, tea.MouseClickMsg{X: ansi.StringWidth(l[:strings.Index(l, "later")]) - 1, Y: headRows, Button: tea.MouseLeft})
 	if got[len(got)-1] != "d1=later" {
 		t.Fatalf("click on an option: %v", got)
 	}
@@ -178,7 +179,7 @@ func TestChatStickyStripAnswersDecision(t *testing.T) {
 		t.Fatal("an answer from elsewhere leaves the strip")
 	}
 	m = chatStep(m, ev(21, daemon.KindAsked, daemon.Decision{ID: "d2", Question: "Approve secret POST?"}))
-	if len(m.pending) != 1 || rowOf(t, m, "Approve secret POST?") != 2 {
+	if len(m.pending) != 1 || rowOf(t, m, "Approve secret POST?") != headRows {
 		t.Fatal("new decision not on the strip")
 	}
 	m.decide = func(id, answer string) tea.Cmd { got = append(got, id+"="+answer); return nil }

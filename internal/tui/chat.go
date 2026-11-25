@@ -532,7 +532,7 @@ func eventText(kind, session string, data json.RawMessage) string {
 // rows is the transcript height: the screen less the header, the decision strip, the status
 // line, the composer, the footer and the spinner row while the open session works.
 func (m chatView) rows() int {
-	n := m.height - 2 - m.stripRows() - 1 - m.input.Height() - 1
+	n := m.height - headRows - m.stripRows() - 1 - m.input.Height() - 1
 	if m.working() {
 		n -= 2
 	}
@@ -723,8 +723,7 @@ func (m chatView) View() tea.View {
 	out = append(out, m.footer(w))
 	switch m.overlay {
 	case overlayAgents:
-		top := 2
-		out = append(out[:top:top], m.sidePanel(out[top:], w)...)
+		out = append(out[:headRows:headRows], m.sidePanel(out[headRows:], w)...)
 	case overlayPalette:
 		out = m.paletteBox(out, w, m.height)
 	case overlayHelp:

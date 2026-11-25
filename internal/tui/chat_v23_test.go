@@ -191,7 +191,7 @@ func TestHeaderIsTheAnvilBand(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 160, 48
 	lines := strings.Split(screen(m), "\n")
-	if !strings.Contains(lines[0]+lines[1], "smithy") {
+	if !strings.Contains(strings.Join(lines[:headRows], ""), "smithy") {
 		t.Fatalf("no header:\n%s", strings.Join(lines[:3], "\n"))
 	}
 	if m.animating() {
@@ -229,5 +229,15 @@ func TestRawAgentJSONStaysOutOfTheTranscript(t *testing.T) {
 		if strings.HasPrefix(l, "diff --git") || strings.HasPrefix(l, "index ") {
 			t.Fatalf("git header kept: %q", l)
 		}
+	}
+}
+
+func TestToolBlockCountsLinesAndShortensPaths(t *testing.T) {
+	m := newChatTest(0)
+	m.current, m.dir = "s-1", "/work/proj"
+	m = chatStep(m, sev(1, daemon.KindSessionTool, "s-1", daemon.ToolEvent{Name: "Read", Args: []byte(`{"file_path":"/work/proj/main.go"}`), Output: "1\tpackage main\n2\n3\tfunc add() {}\n", Took: "0.3s"}))
+	tl := m.msgs[0].tool
+	if tl.Arg != "main.go" || tl.Stat != "3 lines" || tl.Took != "0.3s" || len(tl.Lines) != 3 {
+		t.Fatalf("%+v", tl)
 	}
 }

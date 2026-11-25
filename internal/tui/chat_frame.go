@@ -59,15 +59,11 @@ func (m chatView) pad() int {
 	return 1
 }
 
-var anvilMini = []string{
-	"  ########",
-	"##########",
-	"    ####  ",
-	"  ########",
-}
+// headRows is the header's height: the 16×8-pixel anvil of the dashboard header, four text rows.
+const headRows = 4
 
-// header is the anvil band: two rows of half blocks on the steel ramp with the anvil and the
-// name; the waves and the ember streak move only while something runs.
+// header is the anvil band: the dashboard's shaded anvil sprite on a steel dither band, with the
+// name beside it; the band's waves and the ember streak move only while something runs.
 func (m chatView) header(w int) []string {
 	t := m.th
 	name := "smithy"
@@ -75,22 +71,27 @@ func (m chatView) header(w int) []string {
 		name += " " + Version
 	}
 	if t.plain || t.ramp == nil || !t.g.unicode {
-		return []string{ansi.Truncate("  "+t.g.shades[3]+t.g.shades[3]+" "+name, w, ""), ""}
+		out := make([]string, headRows)
+		out[1] = ansi.Truncate("  "+name, w, "")
+		return out
 	}
 	f := 0.0
 	if m.animating() {
 		f = float64(m.frame)
 	}
-	ax, nx := 3, 3+len(anvilMini[0])+1
+	s := smallPlate
+	ax := m.pad()
+	nx := ax + s.w() + 2
+	ph := headRows * 2
 	px := func(x, y int) color.Color {
-		if ax <= x && x < ax+len(anvilMini[0]) && anvilMini[y][x-ax] == '#' {
-			return []color.Color{t.strong, t.text, t.ramp[5], t.muted}[y]
+		if s.on(x-ax, y) {
+			return dpick([]color.Color{t.ramp[3], t.ramp[4], t.ramp[5], t.muted, t.text, t.strong}, s.shade(x-ax, y), x, y)
 		}
-		v := 0.3 + 0.22*math.Sin(float64(x)*0.09+f*0.18+float64(y)*0.7) + 0.12*math.Sin(float64(x)*0.031-f*0.07)
-		if x < nx+len(name)+2 {
-			v *= 0.35
+		v := 0.28 + 0.2*math.Sin(float64(x)*0.09+f*0.18+float64(y)*0.5) + 0.12*math.Sin(float64(x)*0.031-f*0.07)
+		if x < nx+len(name)+3 {
+			v *= 0.3
 		}
-		if f > 0 && y == 1 {
+		if f > 0 && y == ph-3 {
 			hx := math.Mod(f*1.3, float64(w+40)) - 20
 			if d := math.Abs(float64(x) - hx); d < 6 && d+(1-bayerAt(x, y))*4 < 5 {
 				return t.accent
@@ -99,17 +100,18 @@ func (m chatView) header(w int) []string {
 		return dpick(t.ramp, clamp01(v), x, y)
 	}
 	nameR := []rune(name)
-	out := make([]string, 2)
+	out := make([]string, headRows)
 	for row := range out {
 		var b strings.Builder
 		for x := 0; x < w; x++ {
 			top, bot := px(x, row*2), px(x, row*2+1)
-			if row == 1 && x >= nx && x < nx+len(nameR) {
-				b.WriteString(lipgloss.NewStyle().Foreground(t.strong).Background(bot).Bold(true).Render(string(nameR[x-nx])))
+			if row == 2 && x >= nx && x < nx+len(nameR) {
+				fg := t.strong
+				if x >= nx+len("smithy") {
+					fg = t.dim
+				}
+				b.WriteString(lipgloss.NewStyle().Foreground(fg).Background(bot).Bold(x < nx+len("smithy")).Render(string(nameR[x-nx])))
 				continue
-			}
-			if row == 0 && x >= nx && x < nx+len(nameR) {
-				top = bot
 			}
 			b.WriteString(lipgloss.NewStyle().Foreground(top).Background(bot).Render("▀"))
 		}

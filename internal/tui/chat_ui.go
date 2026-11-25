@@ -349,7 +349,7 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	if msg.Button != tea.MouseLeft {
 		return m, nil
 	}
-	const head = 2
+	const head = headRows
 	strip := m.stripRows()
 	inputY := m.height - 1 - m.input.Height()
 	switch {
@@ -491,7 +491,7 @@ func (m chatView) palItems() []palItem {
 	agents := func(m *chatView) tea.Cmd { m.overlay = overlayAgents; return nil }
 	all = append(all,
 		palItem{group: "ACTIONS", glyph: "+", color: t.muted, label: "New session", hint: "your next message starts it", key: "/new", run: func(m *chatView) tea.Cmd { m.newSession(); return nil }},
-		palItem{group: "ACTIONS", glyph: "⇄", color: t.muted, label: "Agent and model", hint: m.agentLabel(), key: "ctrl+l", run: func(m *chatView) tea.Cmd { m.openPicker(overlayPicker); return m.loadSetup(false) }},
+		palItem{group: "ACTIONS", glyph: t.g.sel, color: t.muted, label: "Agent and model", hint: m.agentLabel(), key: "ctrl+l", run: func(m *chatView) tea.Cmd { m.openPicker(overlayPicker); return m.loadSetup(false) }},
 		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Skills and MCP", hint: "what goes into every session", key: "/skills", run: func(m *chatView) tea.Cmd {
 			m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
 			return m.loadSetup(false)

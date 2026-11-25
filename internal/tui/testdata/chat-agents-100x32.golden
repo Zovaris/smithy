@@ -1,4 +1,6 @@
-  ██ smithy dev
+
+  smithy dev
+
 
     ?   Merge #142 into release/v0.17?   m  merge   l  l                                            
                                                            Agents  1 running · 3 sessi… tab close   
@@ -16,10 +18,8 @@
                                                               failed                                
                                                                                                     
                                                            Waiting on you  1                        
-                                                                                                    
-                                                           ?  Merge #142 into release/v0.17?  me…   
      › Add usage-limit detection for Pi (TK-6).                                                     
-                                                                                                    
+                                                           ?  Merge #142 into release/v0.17?  me…   
      Pi prints its limit errors from packages/ai/src/err                                            
      of a failed run.                                                                               
                                                                                                     
