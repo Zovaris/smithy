@@ -35,8 +35,8 @@ installed version doesn't match the skills, the agent asks whether to run `insta
 
 If `~/.local/bin` is not on your PATH, `install.sh` prints the exact line for your shell (zsh, bash
 or fish) and, on a terminal, offers to add it (default no); use-smithy setup offers the same. On
-Windows, add `%LOCALAPPDATA%\Programs\smithy` to your user PATH. `smithy doctor` shows where smithy
-runs from and whether `~/.local/bin` is on PATH.
+Windows, add `%LOCALAPPDATA%\Programs\smithy` to your user PATH. `smithy doctor` shows the binary
+version and whether `~/.local/bin` is on PATH.
 
 ## Uninstall
 
