@@ -7,11 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	neturl "net/url"
 	"os"
+	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Zovaris/smithy/internal/daemon"
@@ -26,7 +29,7 @@ pinned at the bottom. A lost connection retries and resumes after the last event
 Keys: enter send; pgup/pgdn, wheel or ctrl+u/ctrl+d scroll; home/end top/bottom; click a tool block
 to open it; v (empty input) cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
 option's first letter (empty input) or a click on it answers the decision pinned at the top;
-/mode /agents /palette /answer /help /quit; esc or ctrl+c quit.
+/ opens every command, @ a file, ? help; esc clears the input; ctrl+c quits.
   url           default: the local daemon (token from ~/.smithy/daemon.token), started in the
                 background when none runs; it outlives the chat and exits after daemon.idle_exit
                 (default 30m) with no clients and no running work, or on smithy stop. A
@@ -65,7 +68,7 @@ type chatView struct {
 	msgs          []*chatMsg
 	offset        int     // rows scrolled up from the bottom
 	at            *anchor // where offset last landed, so a frame walks only from there
-	input         textinput.Model
+	input         textarea.Model
 	width, height int
 
 	mode     chatMode
@@ -88,14 +91,69 @@ type chatView struct {
 	setupNote string // a fix, an error or install output shown in the open overlay
 	modelFor  string
 	modelIn   string
+
+	sess     sessionAPI            // the daemon's sessions endpoints; nil: offline
+	current  string                // the open session, "" before the first message
+	convs    map[string][]*chatMsg // the other sessions' conversations
+	cost     map[string]float64    // spend per session
+	noise    []noise               // daemon events kept out of the transcript
+	dir      string                // the folder sessions start in and @ lists
+	branch   string                // its git branch, for the footer
+	webURL   string                // the web UI with its token; "" when unknown
+	files    *fileCache            // the @ popup's file list
+	popSel   int                   // the selected / or @ popup row
+	agentSel int                   // the selected session in the agents panel
+	info     infoPanel             // the open read-only panel
+	frame    int                   // motion frame, advanced only while something runs
+	ticking  bool                  // a frame tick is scheduled
+}
+
+// infoPanel is what a read-only box shows: /connect, /remote, /web, /log.
+type infoPanel struct {
+	title  string
+	lines  []string
+	scroll bool
 }
 
 func newChatView(stream <-chan daemon.ClientMsg, url string, th theme) chatView {
-	in := textinput.New()
-	in.Prompt = th.fg(th.accent).Render(th.g.prompt) + " "
+	return chatView{th: th, url: url, stream: stream, conn: "connecting", input: newComposer(th), width: 80, height: 24, at: &anchor{}, focus: -1, files: &fileCache{}}
+}
+
+// newComposer is the input pinned at the bottom: a textarea on the raised tier behind the
+// ember ›, growing to six rows; enter sends, shift+enter or alt+enter breaks the line.
+func newComposer(th theme) textarea.Model {
+	in := textarea.New()
+	in.ShowLineNumbers = false
 	in.Placeholder = "Ask, or / for commands"
+	in.DynamicHeight, in.MinHeight, in.MaxHeight = true, 1, 6
+	in.KeyMap.InsertNewline.SetKeys("shift+enter", "alt+enter", "ctrl+j")
+	in.SetPromptFunc(2, func(i textarea.PromptInfo) string {
+		st := lipgloss.NewStyle()
+		if th.raised != nil {
+			st = st.Background(th.raised)
+		}
+		if i.LineNumber == 0 {
+			return th.fg(th.accent).Inherit(st).Render(th.g.prompt) + st.Render(" ")
+		}
+		return st.Render("  ")
+	})
+	st := textarea.DefaultStyles(true)
+	for _, s := range []*textarea.StyleState{&st.Focused, &st.Blurred} {
+		base := lipgloss.NewStyle()
+		if th.raised != nil {
+			base = base.Background(th.raised)
+		}
+		s.Base, s.CursorLine, s.EndOfBuffer, s.Prompt = base, base, base, base
+		s.Text = base.Foreground(th.strong)
+		s.Placeholder = base.Foreground(th.dim)
+		if th.plain {
+			s.Text, s.Placeholder = base, base
+		}
+	}
+	in.SetStyles(st)
+	in.SetHeight(1)
 	in.Focus()
-	return chatView{th: th, url: url, stream: stream, conn: "connecting", input: in, width: 80, height: 24, at: &anchor{}, focus: -1}
+	return in
 }
 
 // chatArgs is what `smithy chat` was given.
@@ -242,7 +300,17 @@ func Chat(args []string) int {
 	m.where = where
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
-	m.setup = c
+	m.setup, m.sess = c, c
+	m.dir, _ = os.Getwd()
+	m.branch = gitBranch(m.dir)
+	if tok != "" {
+		m.webURL = url + "/#token=" + neturl.QueryEscape(tok)
+	} else {
+		m.webURL = url
+	}
+	if where == whereBackground {
+		m.status("the daemon runs in the background and keeps your sessions going after you quit")
+	}
 	m.decide = func(id, answer string) tea.Cmd {
 		return func() tea.Msg {
 			_, err := c.Decide(ctx, id, answer)
@@ -274,7 +342,7 @@ func (m *chatView) release() {
 	m.held = nil
 }
 
-func (m chatView) Init() tea.Cmd { return tea.Batch(textinput.Blink, m.wait(), m.loadSetup(true)) }
+func (m chatView) Init() tea.Cmd { return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true)) }
 
 func (m chatView) wait() tea.Cmd {
 	if m.stream == nil {
@@ -300,10 +368,44 @@ func (m *chatView) push(c chatMsg) {
 }
 
 func (m chatView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	n, cmd := m.update(msg)
+	m = n.(chatView)
+	if _, ok := msg.(chatFrameMsg); !ok && !m.ticking && m.animating() {
+		m.ticking = true
+		cmd = tea.Batch(cmd, frameTick())
+	}
+	return m, cmd
+}
+
+func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if next, cmd, ok := m.setupUpdate(msg); ok {
 		return next, cmd
 	}
 	switch msg := msg.(type) {
+	case chatFrameMsg:
+		m.frame++
+		for i := max(len(m.msgs)-8, 0); i < len(m.msgs); i++ {
+			if c := m.msgs[i]; c.tool != nil && c.tool.Status == "running" {
+				c.lines = nil
+			}
+		}
+		if !m.animating() {
+			m.ticking = false
+			return m, nil
+		}
+		return m, frameTick()
+	case sessionStartedMsg:
+		if msg.err != nil {
+			m.system(m.th.g.fail + " could not start a session: " + msg.err.Error())
+			return m, nil
+		}
+		m.meta(msg.s.ID, msg.s)
+		m.open(msg.s.ID)
+		m.status("session " + msg.s.ID + " started with " + msg.s.Agent)
+		return m, nil
+	case sessionErrMsg:
+		m.system(m.th.g.fail + " " + msg.what + " failed: " + msg.err.Error())
+		return m, nil
 	case daemon.ClientMsg:
 		switch {
 		case msg.Connected:
@@ -323,7 +425,7 @@ func (m chatView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.input.SetWidth(max(m.width-3, 1))
+		m.input.SetWidth(max(m.width-2*m.pad()-4, 1))
 		m.scroll(0)
 		return m, nil
 	case tea.MouseClickMsg:
@@ -340,13 +442,28 @@ func (m chatView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.overlay != overlayNone {
 			return m.overlayKey(msg)
 		}
+		if items := m.popup(); len(items) > 0 {
+			if n, cmd, ok := m.popupKey(msg, items); ok {
+				return n, cmd
+			}
+		}
 		if done, cmd := m.shortcut(msg); done {
 			return m, cmd
 		}
 		page := max(m.rows()-1, 1)
 		switch msg.String() {
-		case "ctrl+c", "esc":
+		case "ctrl+c":
 			return m, tea.Quit
+		case "esc":
+			if m.input.Value() != "" {
+				m.input.SetValue("")
+				return m, nil
+			}
+			if m.focus >= 0 {
+				m.setFocus(-1)
+				return m, nil
+			}
+			return m, nil
 		case "pgup", "ctrl+u":
 			m.scroll(page)
 			return m, nil
@@ -365,18 +482,19 @@ func (m chatView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.toggle(m.focus), nil
 			}
 			m.input.SetValue("")
+			m.popSel = 0
 			if strings.HasPrefix(t, "/") {
 				return m.command(t)
 			}
 			if t != "" {
-				m.offset = 0
-				m.push(chatMsg{who: "you", text: t})
+				return m.send(t)
 			}
 			return m, nil
 		}
 		if !m.input.Focused() && msg.Text != "" {
 			m.setFocus(-1)
 		}
+		m.popSel = 0
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
@@ -411,9 +529,15 @@ func eventText(kind, session string, data json.RawMessage) string {
 	return kind
 }
 
-// rows is the transcript height: the screen less the decision strip, the pinned input and the
-// footer.
-func (m chatView) rows() int { return max(m.height-2-m.stripRows(), 1) }
+// rows is the transcript height: the screen less the header, the decision strip, the status
+// line, the composer, the footer and the spinner row while the open session works.
+func (m chatView) rows() int {
+	n := m.height - headRows - m.stripRows() - 1 - m.input.Height() - 1
+	if m.working() {
+		n -= 2
+	}
+	return max(n, 1)
+}
 
 // scroll moves by d rows (up is positive), clamped so the top message stays reachable but not
 // passed. It wraps only the messages between the bottom and the new offset.
@@ -439,36 +563,84 @@ func (m chatView) wrap(i int) []string {
 	return c.lines
 }
 
-// textRows renders a text message as in the Chat-Minimal mockup: your prompts on a raised row
-// behind a dim ›, daemon text in base, a blank row after each.
+// textRows renders a text message as in the Chat mockups: your prompts on the raised tier
+// behind a dim ›, the agent's reply in strong, its notes in base, file paths as links, a
+// blank row after each.
 func (m chatView) textRows(c *chatMsg, w int) []string {
 	t := m.th
-	row, lead, body := lipgloss.NewStyle(), "  ", t.fg(t.text)
-	switch {
-	case c.who == "you":
-		lead, body = t.fg(t.dim).Render(t.g.prompt)+" ", t.fg(t.strong)
+	p := m.pad()
+	gut := strings.Repeat(" ", p)
+	bw := w - 2*p
+	if c.who == "you" {
+		row := lipgloss.NewStyle()
 		if t.raised != nil {
 			row = row.Background(t.raised)
 		}
+		var lines []string
+		for n, l := range strings.Split(ansi.Wrap(c.text, max(bw-6, 10), ""), "\n") {
+			lead := "    "
+			if n == 0 {
+				lead = "  " + t.fg(t.dim).Render(t.g.prompt) + " "
+			}
+			lines = append(lines, gut+fill(row, bw, lead+t.fg(t.strong).Render(l))+gut)
+		}
+		return append(lines, "")
+	}
+	body := t.fg(t.text)
+	text := c.text
+	switch {
+	case c.who == "agent":
+		body = t.fg(t.strong)
+	case c.kind == "thinking":
+		body = t.fg(t.dim).Italic(true)
+		text = "thinking " + t.g.dot + " " + text
 	case c.kind != "":
 		body = t.fg(t.dim)
-	}
-	text := c.text
-	if c.kind == "thinking" {
-		text = "thinking " + t.g.dot + " " + text
 	}
 	if c.at != "" {
 		text = c.at + " " + text
 	}
-	lines := []string{}
-	for n, l := range strings.Split(ansi.Wrap(text, max(w-6, 10), ""), "\n") {
-		if n > 0 {
-			lead = "  "
-		}
-		lines = append(lines, row.Width(w).Render("  "+lead+body.Render(l)))
+	var lines []string
+	for _, l := range strings.Split(ansi.Wrap(text, max(bw-4, 10), ""), "\n") {
+		lines = append(lines, gut+"  "+m.linkify(l, body))
 	}
 	return append(lines, "")
 }
+
+// linkify draws l in st: file paths in the link color, `code` spans on the raised tier
+// without their backticks.
+func (m chatView) linkify(l string, st lipgloss.Style) string {
+	t := m.th
+	if t.plain {
+		return l
+	}
+	code := st
+	if t.raised != nil {
+		code = code.Background(t.raised)
+	}
+	var b strings.Builder
+	for n, part := range strings.Split(l, "`") {
+		if n%2 == 1 {
+			b.WriteString(code.Render(part))
+			continue
+		}
+		words := strings.Split(part, " ")
+		for i, wd := range words {
+			if i > 0 {
+				b.WriteString(st.Render(" "))
+			}
+			core := strings.TrimRight(wd, ".,:;)")
+			if pathLike.MatchString(core) {
+				b.WriteString(t.fg(t.info).Render(core) + st.Render(wd[len(core):]))
+				continue
+			}
+			b.WriteString(st.Render(wd))
+		}
+	}
+	return b.String()
+}
+
+var pathLike = regexp.MustCompile(`^[\w.~-]*(/[\w.-]+)+\.[A-Za-z]\w{0,5}$|^[\w-]+\.(go|ts|tsx|js|md|json|py|rs|toml|yaml|yml|sh)$`)
 
 // seek moves the anchor to m.offset one message at a time from where it last was, so a frame
 // costs the rows scrolled since the previous one, not the whole transcript.
@@ -513,21 +685,14 @@ func (m chatView) visible() (out []string, idx []int) {
 func (m chatView) View() tea.View {
 	t := m.th
 	w := max(m.width, 20)
-	raised := lipgloss.NewStyle()
-	if t.raised != nil {
-		raised = raised.Background(t.raised)
-	}
 	out := make([]string, 0, m.height)
+	out = append(out, m.header(w)...)
 	if m.stripRows() > 0 {
 		s, _ := m.strip(w)
-		out = append(out, s)
+		out = append(out, s, "")
 	}
 	var vis []string
 	switch m.overlay {
-	case overlayAgents:
-		vis = m.agentsPanel(w)
-	case overlayPalette:
-		vis = m.palettePanel(w)
 	case overlaySetup, overlayPicker:
 		vis = m.setupPanel(w)
 	case overlaySkills:
@@ -535,12 +700,40 @@ func (m chatView) View() tea.View {
 	default:
 		vis, _ = m.visible()
 	}
+	body := make([]string, 0, m.rows()+2)
 	for range m.rows() - len(vis) {
-		out = append(out, "")
+		body = append(body, "")
 	}
-	out = append(out, vis...)
-	out = append(out, raised.Width(w).MaxWidth(w).Render("  "+m.input.View()))
+	body = append(body, vis...)
+	if m.working() {
+		body = append(body, m.spinRow(w), "")
+	}
+	if items := m.popup(); len(items) > 0 {
+		pw := min(w-2*m.pad(), 72)
+		pr := m.popupRows(items, pw)
+		for i, r := range pr {
+			if j := len(body) - len(pr) + i; j >= 0 {
+				body[j] = splice(body[j], r, m.pad(), w)
+			}
+		}
+	}
+	out = append(out, body...)
+	out = append(out, m.statusLine(w))
+	out = append(out, m.composer(w)...)
 	out = append(out, m.footer(w))
+	switch m.overlay {
+	case overlayAgents:
+		out = append(out[:headRows:headRows], m.sidePanel(out[headRows:], w)...)
+	case overlayPalette:
+		out = m.paletteBox(out, w, m.height)
+	case overlayHelp:
+		out = m.helpBox(out, w, m.height)
+	case overlayInfo:
+		out = m.infoBox(out, w, m.height)
+	}
+	if len(out) > m.height {
+		out = out[len(out)-m.height:]
+	}
 	v := tea.NewView(strings.Join(out, "\n"))
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
@@ -550,38 +743,27 @@ func (m chatView) View() tea.View {
 	return v
 }
 
-// footer is the key hints on the left and the daemon connection on the right.
-func (m chatView) footer(w int) string {
+// composer is the input block: the raised tier from gutter to gutter, the ember › inside it.
+func (m chatView) composer(w int) []string {
 	t := m.th
-	dim, key := t.fg(t.dim), t.fg(t.text)
-	hint := func(k, what string) string { return key.Render(k) + dim.Render(" "+what) }
-	left := "  " + strings.Join([]string{hint("enter", "send"), hint("v", "mode: "+m.mode.String()), hint("tab", "agents"), hint("ctrl+k", "palette")}, "   ")
-	if a := m.agentLabel(); a != "" {
-		left += "   " + hint("ctrl+l", a)
+	raised := lipgloss.NewStyle()
+	if t.raised != nil {
+		raised = raised.Background(t.raised)
 	}
-	if m.offset > 0 {
-		left += "   " + t.fg(t.info).Render(fmt.Sprintf("→ %d rows up", m.offset))
+	p := strings.Repeat(" ", m.pad())
+	bw := w - 2*m.pad()
+	var out []string
+	for _, l := range strings.Split(m.input.View(), "\n") {
+		out = append(out, p+fill(raised, bw, "  "+l)+p)
 	}
-	right := t.fg(t.ok).Render(t.g.pass) + dim.Render(" connected")
-	switch m.conn {
-	case "connecting":
-		right = t.fg(t.accent).Render(t.g.on) + dim.Render(" connecting")
-	case "reconnecting":
-		right = t.fg(t.err).Render(t.g.fail) + dim.Render(" reconnecting: "+short(m.connErr, 30))
+	return out
+}
+
+// gitBranch is dir's current branch, "" outside a repo.
+func gitBranch(dir string) string {
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--abbrev-ref", "HEAD").Output()
+	if err != nil {
+		return ""
 	}
-	where := ""
-	switch m.where {
-	case whereBackground:
-		where = dim.Render(" "+t.g.dot+" background, ") + key.Render("smithy stop") + dim.Render(" ends it")
-	case whereStandalone:
-		where = dim.Render(" " + t.g.dot + " standalone")
-	}
-	// Narrow widths drop the url first, then the daemon line; the key hints always stay.
-	for _, r := range []string{right + dim.Render(" "+t.g.dot+" "+m.url) + where, right + where, right} {
-		r += "  "
-		if gap := w - lipgloss.Width(left) - lipgloss.Width(r); gap >= 1 {
-			return left + strings.Repeat(" ", gap) + r
-		}
-	}
-	return ansi.Truncate(left, w, "")
+	return strings.TrimSpace(string(out))
 }

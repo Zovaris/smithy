@@ -161,6 +161,11 @@ func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e 
 	if r.model != "" {
 		env = append(env, "AGENT_MODEL="+r.model)
 	}
+	var cs *claudeStream
+	if r.agent == "claude" {
+		cs = newClaudeStream()
+		env = append(env, "AGENT_ARGS=--output-format stream-json --verbose")
+	}
 	env = append(env, "PATH="+agents.CLIPath(os.Getenv("PATH"), os.Getenv))
 	cmd.Env = env
 	var errOut capped
@@ -191,6 +196,9 @@ func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e 
 		off += int64(len(b))
 		var keep []byte
 		for _, l := range bytes.SplitAfter(b, []byte("\n")) {
+			if cs != nil && cs.line(l, e) {
+				continue
+			}
 			if !bytes.HasPrefix(l, []byte(`{"type":`)) {
 				keep = append(keep, l...)
 			}
@@ -221,7 +229,9 @@ loop:
 		}
 	}
 	follow(true)
-	if u, ok := usage.Read(log); ok {
+	if cs != nil && cs.usage != nil {
+		e.Usage(*cs.usage)
+	} else if u, ok := usage.Read(log); ok {
 		e.Usage(u)
 	}
 	var out capped
@@ -231,6 +241,9 @@ loop:
 		f.Close()
 	}
 	reply := out.b.String()
+	if cs != nil {
+		reply = cs.result
+	}
 	if ctx.Err() != nil {
 		return reply, ctx.Err()
 	}

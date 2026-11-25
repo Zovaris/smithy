@@ -1,32 +1,32 @@
-  ? Merge #142 into release/v0.17?   m merge  l later                                               
+
+  smithy dev
+
+
+    ?   Merge #142 into release/v0.17?   m  merge   l  l                                            
+                                                           Agents  1 running · 3 sessi… tab close   
                                                                                                     
-  Agents                                                                                 tab close  
-  1 running · 3 sessions                                                                            
+                                                           ✓  TK-6                           done   
+                                                              TK-6               ████████████████   
+                                                              › turn                                
                                                                                                     
-  ✓ TK-6         turn                                                                               
-  ● TK-29        running                                                                            
-  ✗ TES-9        failed                                                                             
+                                                           ●  TK-29                           now   
+                                                              TK-29              ░▒▓▓▓▓▓▒░··   ··   
+                                                              running                               
                                                                                                     
-  Waiting on you                                                                                    
-  ? d1           Merge #142 into release/v0.17?                                                     
+                                                           ✗  TES-9                        failed   
+                                                              TES-9              ████████████████   
+                                                              failed                                
                                                                                                     
+                                                           Waiting on you  1                        
+     › Add usage-limit detection for Pi (TK-6).                                                     
+                                                           ?  Merge #142 into release/v0.17?  me…   
+     Pi prints its limit errors from packages/ai/src/err                                            
+     of a failed run.                                                                               
                                                                                                     
+     ✓  Read · Grep · Edit detect.go +6 −1 · Bash go tes                                            
                                                                                                     
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
-                                                                                                    
+     Done: a Pi limit now marks the account limited unti                                            
                                                                                                     
                                                                                                     
-                                                                                                    
-                                                                                                    
-                                                                                                    
-  › Ask, or / for commands                                                                          
-  enter send   v mode: minimal   tab agents   ctrl+k palette  ● connecting · http://127.0.0.1:7477  
+     › Ask, or / for commands                                                                       
+   enter send  v mode: minimal  tab agents  ctrl+k palet   enter open   s stop   n new session  …   

@@ -77,6 +77,7 @@ type ToolEvent struct {
 	Args    json.RawMessage `json:"args,omitempty"`
 	Output  string          `json:"output,omitempty"`
 	IsError bool            `json:"is_error,omitempty"`
+	Took    string          `json:"took,omitempty"`
 }
 
 // Exchange is one past message, oldest first, given to a runner that keeps no history itself.
