@@ -55,6 +55,14 @@ func (e env) put(t *testing.T, name, body string) {
 	}
 }
 
+func (e env) awaitServed(call string) {
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		if _, err := os.Stat(filepath.Join(e.dir, "served-"+call)); err == nil {
+			return
+		}
+	}
+}
+
 func (e env) rm(name string) { _ = os.Remove(filepath.Join(e.dir, name)) }
 
 func sandbox(t *testing.T) env {
@@ -621,7 +629,7 @@ func TestMainEventsOption(t *testing.T) {
 	e.put(t, "slow-pr-view", "")
 	e.put(t, "pr.json", prFixture{rollup: pending}.json())
 	go func() {
-		time.Sleep(150 * time.Millisecond)
+		e.awaitServed("pr-view")
 		e.put(t, "pr.json", prFixture{rollup: pending, comments: 2}.json())
 	}()
 	o, _, c := mainOut(t, "pr:5", "--every", "0.05", "--max", "0.1", "--events", "comment")
