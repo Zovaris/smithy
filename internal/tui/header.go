@@ -27,20 +27,74 @@ const (
 	gravity   = 55.0
 )
 
-// sprite is the header plate's size in pixels (two per text row) and where sparks fly from.
+// anvilBig is the 30×14-pixel anvil (7 text rows of half blocks): three rows of headroom for
+// sparks, a flat face that ends in a pointed horn on the left and a square heel on the right, a
+// narrow waist and a wide base on two feet. anvilSmall is the 16×8 one.
+var anvilBig = []string{
+	"                              ",
+	"                              ",
+	"                              ",
+	"    ######################    ",
+	"##########################    ",
+	"    ######################    ",
+	"         ###############      ",
+	"            #########         ",
+	"             #######          ",
+	"             #######          ",
+	"           ###########        ",
+	"        #################     ",
+	"       ###################    ",
+	"       #######     #######    ",
+}
+
+var anvilSmall = []string{
+	"                ",
+	"  ###########   ",
+	"#############   ",
+	"  ###########   ",
+	"     #####      ",
+	"      ###       ",
+	"    #######     ",
+	"   ###   ###    ",
+}
+
+// sprite is the header anvil in pixels (two per text row) and where sparks fly from.
 type sprite struct {
-	pw, ph int
-	faceY  int
-	hitX   float64
+	mask  []string
+	faceY int // first face row
+	hitX  float64
 }
 
 var (
-	bigPlate   = sprite{30, 14, 13, 16}
-	smallPlate = sprite{16, 8, 7, 8}
+	bigPlate   = sprite{anvilBig, 3, 16}
+	smallPlate = sprite{anvilSmall, 1, 8}
 )
 
-func (s sprite) w() int { return s.pw }
-func (s sprite) h() int { return s.ph }
+func (s sprite) w() int { return len(s.mask[0]) }
+func (s sprite) h() int { return len(s.mask) }
+
+func (s sprite) on(x, y int) bool {
+	return y >= 0 && y < s.h() && x >= 0 && x < s.w() && s.mask[y][x] == '#'
+}
+
+// shade is the steel lightness of an anvil pixel: lit from the top left, a bright face, a
+// highlight on every top edge and darker flanks.
+func (s sprite) shade(x, y int) float64 {
+	v := 0.5 - 0.04*float64(y-s.faceY) - 0.2*float64(x)/float64(s.w())
+	switch {
+	case y == s.faceY:
+		v = 0.97 - 0.12*float64(x)/float64(s.w())
+	case y <= s.faceY+2:
+		v = 0.78 - 0.12*float64(y-s.faceY) - 0.15*float64(x)/float64(s.w())
+	case !s.on(x, y-1):
+		v += 0.28
+	case !s.on(x-1, y):
+		v += 0.12
+	case !s.on(x+1, y) || !s.on(x, y+1):
+		v -= 0.15
+	}
+	return min(1, max(0, v))
+}
 
 type spark struct{ x, y, vx, vy, age, life float64 }
 
@@ -107,7 +161,7 @@ func (m Model) plateRows(s sprite) []string {
 	if m.profile < colorprofile.ANSI256 {
 		t.ramp = nil
 	}
-	return t.plate(s.w(), s.h()/2, sp)
+	return t.plate(s, sp)
 }
 
 // wordmark draws the name in steel, dim → base across, with the shimmer band when one sweeps.

@@ -75,20 +75,29 @@ func TestShimmer(t *testing.T) {
 	}
 }
 
-func TestGradientHeader(t *testing.T) {
+func TestAnvilHeader(t *testing.T) {
 	th := newTheme(true, colorprofile.TrueColor, true)
-	rows := th.plate(30, 7, nil)
+	rows := th.plate(bigPlate, nil)
 	if len(rows) != 7 {
 		t.Fatalf("%d rows", len(rows))
 	}
 	for i, r := range rows {
-		if ansi.StringWidth(r) != 30 || !strings.Contains(r, "▀") {
-			t.Fatalf("row %d: %q", i, ansi.Strip(r))
+		if ansi.StringWidth(r) != 30 {
+			t.Fatalf("row %d width %d: %q", i, ansi.StringWidth(r), ansi.Strip(r))
 		}
 	}
-	spark := th.plate(30, 7, []spark{{x: 10, y: 5, life: 1}})
+	if strings.TrimSpace(ansi.Strip(rows[0])) != "" {
+		t.Fatalf("headroom above the anvil is not empty: %q", ansi.Strip(rows[0]))
+	}
+	if !strings.Contains(ansi.Strip(rows[2]), "▀") && !strings.Contains(ansi.Strip(rows[2]), "▄") && !strings.Contains(ansi.Strip(rows[2]), "█") {
+		t.Fatalf("no anvil face on row 2: %q", ansi.Strip(rows[2]))
+	}
+	if !strings.HasPrefix(ansi.Strip(rows[6]), "       ") {
+		t.Fatalf("anvil feet missing their left margin: %q", ansi.Strip(rows[6]))
+	}
+	spark := th.plate(bigPlate, []spark{{x: 16, y: 1, life: 1}})
 	if strings.Join(spark, "") == strings.Join(rows, "") || !strings.Contains(strings.Join(spark, ""), "242;118;46") {
-		t.Fatal("no ember spark on the plate")
+		t.Fatal("no ember spark above the anvil")
 	}
 	if got := th.loadingField(8, 0); ansi.StringWidth(got) != 8 {
 		t.Fatalf("loading field %q", got)

@@ -91,43 +91,60 @@ func (t theme) loadingField(w, phase int) string {
 // plate is the header's half-block gradient: w cells by rows text rows (two pixels each) on the
 // steel ramp, lit from the top left, with ember sparks that cool into the ramp by age. Without unicode blocks or 256
 // colors it falls back to shade glyphs.
-func (t theme) plate(w, rows int, sparks []spark) []string {
-	ph := rows * 2
-	level := func(x, y int) float64 {
-		return 1 - 0.75*float64(y)/float64(max(ph-1, 1)) - 0.25*float64(x)/float64(max(w-1, 1))
-	}
+func (t theme) plate(s sprite, sparks []spark) []string {
+	w, ph := s.w(), s.h()
+	rows := ph / 2
 	sp := map[[2]int]float64{}
-	for _, s := range sparks {
-		x, y := int(s.x), int(s.y)
-		if x >= 0 && x < w && y >= 0 && y < ph {
-			sp[[2]int{x, y}] = s.age / s.life
+	for _, k := range sparks {
+		x, y := int(k.x), int(k.y)
+		if x >= 0 && x < w && y >= 0 && y < ph && !s.on(x, y) {
+			sp[[2]int{x, y}] = k.age / k.life
 		}
+	}
+	rich := !t.plain && t.ramp != nil && t.g.unicode
+	// px is one pixel's color, or nil where there is neither steel nor a spark.
+	px := func(x, y int) color.Color {
+		if age, ok := sp[[2]int{x, y}]; ok {
+			if !rich {
+				return t.accent
+			}
+			return dpick([]color.Color{t.accent, t.ramp[len(t.ramp)-1]}, age, x, y)
+		}
+		if !s.on(x, y) {
+			return nil
+		}
+		if !rich {
+			return t.border
+		}
+		return dpick(t.ramp, s.shade(x, y), x, y)
 	}
 	out := make([]string, rows)
 	for row := range out {
 		var b strings.Builder
 		for x := 0; x < w; x++ {
-			yt, yb := row*2, row*2+1
-			at, okT := sp[[2]int{x, yt}]
-			ab, okB := sp[[2]int{x, yb}]
-			if t.plain || t.ramp == nil || !t.g.unicode {
-				g := t.g.shades[min(int(level(x, yt)*float64(len(t.g.shades))), len(t.g.shades)-1)]
-				col := t.border
-				if okT || okB {
-					g, col = "*", t.accent
+			top, bot := px(x, row*2), px(x, row*2+1)
+			switch {
+			case top == nil && bot == nil:
+				b.WriteByte(' ')
+			case !rich:
+				g := t.g.shades[len(t.g.shades)-1]
+				if _, ok := sp[[2]int{x, row * 2}]; ok {
+					g = "*"
+				} else if _, ok := sp[[2]int{x, row*2 + 1}]; ok {
+					g = "*"
 				}
-				b.WriteString(t.fg(col).Render(g))
-				continue
+				c := top
+				if c == nil {
+					c = bot
+				}
+				b.WriteString(t.fg(c).Render(g))
+			case bot == nil:
+				b.WriteString(lipgloss.NewStyle().Foreground(top).Render("▀"))
+			case top == nil:
+				b.WriteString(lipgloss.NewStyle().Foreground(bot).Render("▄"))
+			default:
+				b.WriteString(lipgloss.NewStyle().Foreground(top).Background(bot).Render("▀"))
 			}
-			top, bot := dpick(t.ramp, level(x, yt), x, yt), dpick(t.ramp, level(x, yb), x, yb)
-			cool := []color.Color{t.accent, t.ramp[len(t.ramp)-1]}
-			if okT {
-				top = dpick(cool, at, x, yt)
-			}
-			if okB {
-				bot = dpick(cool, ab, x, yb)
-			}
-			b.WriteString(lipgloss.NewStyle().Foreground(top).Background(bot).Render("▀"))
 		}
 		out[row] = b.String()
 	}
