@@ -1,4 +1,4 @@
-// Package report builds the weekly report: what shipped (PRs merged), what failed, time and known
+// Package report builds the weekly report: what shipped (PRs merged), what failed, auto PR outcomes, time and known
 // cost per harness, and the decisions still waiting, in plain language, from the events log.
 package report
 
@@ -32,6 +32,8 @@ type Report struct {
 	Shipped  []Line
 	Failed   []Line
 	Open     []Line
+	// Outcomes are the auto PRs merged, closed or sent back with changes requested this week.
+	Outcomes []Line
 	Harness  []Harness
 }
 
@@ -86,6 +88,8 @@ func Week(es []events.Event, now time.Time) Report {
 			r.Shipped = append(r.Shipped, Line{Batch: e.Batch, Item: e.Item, PR: e.PR})
 		case e.Kind == "stage" && (e.Detail == "failed" || e.Detail == "blocked"):
 			r.Failed = append(r.Failed, Line{Batch: e.Batch, Item: e.Item, PR: e.PR, Detail: e.Detail})
+		case e.Kind == "outcome":
+			r.Outcomes = append(r.Outcomes, Line{Batch: e.Batch, Item: e.Item, PR: e.PR, Detail: e.Detail})
 		case e.Kind == "orchestrator_failed":
 			r.Failed = append(r.Failed, Line{Detail: "orchestrator failed: " + clip(proof.Redact(e.Detail), 80)})
 		case e.Kind == "usage" && e.Usage != nil:
@@ -173,6 +177,12 @@ func (r Report) Text() string {
 				s += " (" + l.Detail + ")"
 			}
 			b.WriteString("  ✗ " + s + "\n")
+		}
+	}
+	if len(r.Outcomes) > 0 {
+		fmt.Fprintf(&b, "Auto PR outcomes: %d\n", len(r.Outcomes))
+		for _, l := range r.Outcomes {
+			b.WriteString("  · " + l.name() + " (" + strings.ReplaceAll(l.Detail, "_", " ") + ")\n")
 		}
 	}
 	if len(r.Harness) == 0 {
