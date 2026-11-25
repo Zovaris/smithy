@@ -51,8 +51,8 @@ type chatView struct {
 
 func newChatView(stream <-chan daemon.ClientMsg, url string, th theme) chatView {
 	in := textinput.New()
-	in.Prompt = "> "
-	in.Placeholder = "message"
+	in.Prompt = th.fg(th.accent).Render(th.g.prompt) + " "
+	in.Placeholder = "Ask, or / for commands"
 	in.Focus()
 	return chatView{th: th, url: url, stream: stream, conn: "connecting", input: in, width: 80, height: 24, at: &anchor{}}
 }
@@ -217,7 +217,7 @@ func eventText(kind, session string, data json.RawMessage) string {
 	return kind
 }
 
-// rows is the transcript height: the screen less the header and the pinned input.
+// rows is the transcript height: the screen less the pinned input and the footer.
 func (m chatView) rows() int { return max(m.height-2, 1) }
 
 // scroll moves by d rows (up is positive), clamped so the top message stays reachable but not
@@ -231,17 +231,34 @@ func (m *chatView) scroll(d int) {
 	m.offset = min(want, max(seen-m.rows(), 0))
 }
 
+// wrap renders a message at the screen width, styled as in the Chat-Minimal mockup: your
+// prompts on a raised row behind a dim ›, daemon text in base, a blank row after each.
 func (m chatView) wrap(c *chatMsg) []string {
-	w := max(m.width-2, 10)
+	t := m.th
+	w := max(m.width, 20)
 	if c.lines != nil && c.width == w {
 		return c.lines
 	}
-	head := c.who
+	row, lead, body := lipgloss.NewStyle(), "  ", t.fg(t.text)
+	if c.who == "you" {
+		lead, body = t.fg(t.dim).Render(t.g.prompt)+" ", t.fg(t.strong)
+		if t.raised != nil {
+			row = row.Background(t.raised)
+		}
+	}
+	text := c.text
 	if c.at != "" {
-		head = c.at + " " + head
+		text = c.at + " " + text
 	}
 	c.width = w
-	c.lines = strings.Split(ansi.Wrap(head+"  "+c.text, w, ""), "\n")
+	c.lines = nil
+	for n, l := range strings.Split(ansi.Wrap(text, max(w-6, 10), ""), "\n") {
+		if n > 0 {
+			lead = "  "
+		}
+		c.lines = append(c.lines, row.Width(w).Render("  "+lead+body.Render(l)))
+	}
+	c.lines = append(c.lines, "")
 	return c.lines
 }
 
@@ -249,8 +266,8 @@ func (m chatView) wrap(c *chatMsg) []string {
 // costs the rows scrolled since the previous one, not the whole transcript.
 func (m chatView) seek() (i, r int) {
 	a := m.at
-	if a.width != max(m.width-2, 10) || (a.offset == 0 && a.i != len(m.msgs)-1) {
-		*a = anchor{i: len(m.msgs) - 1, width: max(m.width-2, 10)}
+	if a.width != max(m.width, 20) || (a.offset == 0 && a.i != len(m.msgs)-1) {
+		*a = anchor{i: len(m.msgs) - 1, width: max(m.width, 20)}
 	}
 	i, r = a.i, a.r+m.offset-a.offset
 	for i >= 0 && r >= len(m.wrap(m.msgs[i])) {
@@ -287,34 +304,47 @@ func (m chatView) visible() []string {
 func (m chatView) View() tea.View {
 	t := m.th
 	w := max(m.width, 20)
-	line := func(bg lipgloss.Style, s string) string { return bg.Width(w).MaxWidth(w).Render(s) }
-	surf, raised := lipgloss.NewStyle(), lipgloss.NewStyle()
-	if t.surface != nil {
-		surf, raised = surf.Background(t.surface), raised.Background(t.raised)
+	raised := lipgloss.NewStyle()
+	if t.raised != nil {
+		raised = raised.Background(t.raised)
 	}
-	conn := t.fg(t.ok).Render(t.g.pass + " connected")
-	switch m.conn {
-	case "connecting":
-		conn = t.fg(t.accent).Render(t.g.on + " connecting")
-	case "reconnecting":
-		conn = t.fg(t.err).Render(t.g.fail+" reconnecting") + t.fg(t.dim).Render(" "+short(m.connErr, max(w-40, 10)))
-	}
-	head := " " + t.fg(t.strong).Bold(!t.plain).Render("smithy") + "  " + conn + t.fg(t.dim).Render(" "+t.g.dot+" "+m.url)
-	if m.offset > 0 {
-		head += t.fg(t.info).Render(fmt.Sprintf("  %s %d rows up", "→", m.offset))
-	}
-	out := []string{line(raised, head)}
 	vis := m.visible()
+	out := make([]string, 0, m.height)
 	for range m.rows() - len(vis) {
-		out = append(out, line(surf, ""))
+		out = append(out, "")
 	}
-	body := t.fg(t.text)
-	for _, l := range vis {
-		out = append(out, line(surf, " "+body.Render(l)))
-	}
-	out = append(out, line(raised, " "+m.input.View()))
+	out = append(out, vis...)
+	out = append(out, raised.Width(w).MaxWidth(w).Render("  "+m.input.View()))
+	out = append(out, m.footer(w))
 	v := tea.NewView(strings.Join(out, "\n"))
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
+	if t.surface != nil {
+		v.BackgroundColor = t.surface
+	}
 	return v
+}
+
+// footer is the key hints on the left and the daemon connection on the right.
+func (m chatView) footer(w int) string {
+	t := m.th
+	dim, key := t.fg(t.dim), t.fg(t.text)
+	hint := func(k, what string) string { return key.Render(k) + dim.Render(" "+what) }
+	left := "  " + strings.Join([]string{hint("enter", "send"), hint("pgup/pgdn", "scroll"), hint("esc", "quit")}, "   ")
+	if m.offset > 0 {
+		left += "   " + t.fg(t.info).Render(fmt.Sprintf("→ %d rows up", m.offset))
+	}
+	right := t.fg(t.ok).Render(t.g.pass) + dim.Render(" connected")
+	switch m.conn {
+	case "connecting":
+		right = t.fg(t.accent).Render(t.g.on) + dim.Render(" connecting")
+	case "reconnecting":
+		right = t.fg(t.err).Render(t.g.fail) + dim.Render(" reconnecting: "+short(m.connErr, 30))
+	}
+	right += dim.Render(" " + t.g.dot + " " + m.url + "  ")
+	gap := w - lipgloss.Width(left) - lipgloss.Width(right)
+	if gap < 1 {
+		return ansi.Truncate(left, w, "")
+	}
+	return left + strings.Repeat(" ", gap) + right
 }

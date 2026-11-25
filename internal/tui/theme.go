@@ -21,17 +21,17 @@ type theme struct {
 }
 
 type glyphs struct {
-	sel, on, half, off, pass, fail, wait, dot, tee, elbow, pipe, bar string
-	shades                                                           []string // light → full
-	ticks                                                            []rune   // sparkline levels
-	unicode                                                          bool
+	sel, on, half, off, pass, fail, wait, dot, tee, elbow, pipe, bar, prompt string
+	shades                                                                   []string // light → full
+	ticks                                                                    []rune   // sparkline levels
+	unicode                                                                  bool
 }
 
 var uniGlyphs = glyphs{sel: "▸", on: "●", half: "◐", off: "○", pass: "✓", fail: "✗", wait: "?", dot: "·", tee: "├─", elbow: "└─",
-	pipe: "│", bar: "━", shades: []string{"░", "▒", "▓", "█"}, ticks: []rune("▁▂▃▄▅▆▇█"), unicode: true}
+	pipe: "│", bar: "━", prompt: "›", shades: []string{"░", "▒", "▓", "█"}, ticks: []rune("▁▂▃▄▅▆▇█"), unicode: true}
 
 var asciiGlyphs = glyphs{sel: ">", on: "*", half: "~", off: "o", pass: "+", fail: "x", wait: "?", dot: "-", tee: "|-", elbow: "`-",
-	pipe: "|", bar: "=", shades: []string{".", "-", "=", "#"}, ticks: []rune("_.-=+*#@")}
+	pipe: "|", bar: "=", prompt: ">", shades: []string{".", "-", "=", "#"}, ticks: []rune("_.-=+*#@")}
 
 // utf8Locale reports whether the locale can draw box and block glyphs.
 func utf8Locale() bool {
