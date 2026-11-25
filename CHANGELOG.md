@@ -8,6 +8,8 @@ part above `### Details`.
 
 ## Unreleased
 
+## v0.21.0 — 2026-11-25
+
 ### Highlights
 
 **Same tools in every CLI.** `smithy mcp` gives every agent smithy drives the same board, search, secret calls and questions, whatever the CLI (harness build).
