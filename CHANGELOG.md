@@ -17,6 +17,11 @@ part above `### Details`.
 - Removed: `auto.sandbox container`, `auto.sandbox_image`, `auto.sandbox_network`, `auto.sandbox_memory`, `auto.sandbox_proxy_binary`, the `smithy-proxy` sidecar and its networks, docker/podman detection, and `sandbox/Dockerfile`. A user config still on `container` stops workers with a message to set `native` or `off`; `smithy doctor` fails on it.
 - `smithy proxy serve` runs natively and now listens on `127.0.0.1:8877` by default (was every interface), so bound keys stay on this machine.
 - `smithy cleanup builds` no longer lists `smithy-*` images; `smithy uninstall` still removes the images and networks older versions left, when docker or podman is on PATH.
+### New
+- API-backend costs now come from OpenRouter's public price list, refreshed daily and kept for offline use, so new models are priced without a smithy release.
+
+### Details
+- `apiloop.Cost` reads `https://openrouter.ai/api/v1/models` (cached at `~/.smithy/cache/model-prices.json`, refetched after 24h, last good cache kept when offline or the answer is bad) instead of the hand-kept table; an unlisted model still has no cost, never a guess.
 
 ## v0.22.0 — 2026-11-25
 
