@@ -264,13 +264,15 @@ func (d *Discord) connect(ctx context.Context) (*dgw, error) {
 		d.guild = ch.Guild
 		d.mu.Unlock()
 	}
-	ws, err := wsDial(ctx, DiscordGateway)
+	gu, err := url.Parse(DiscordGateway)
+	if err != nil || (gu.Scheme != "wss" && gu.Scheme != "ws") || gu.Host == "" {
+		return nil, errors.New("discord gateway: bad url")
+	}
+	ws, err := wsDial(ctx, gu)
 	if err != nil {
 		return nil, fmt.Errorf("discord gateway: %s", d.scrub(err.Error()))
 	}
-	_ = ws.c.SetReadDeadline(time.Now().Add(15 * time.Second))
-	b, err := ws.ReadText()
-	_ = ws.c.SetReadDeadline(time.Time{})
+	b, err := ws.Read(time.Now().Add(15 * time.Second))
 	var hello struct {
 		Op int `json:"op"`
 		D  struct {
@@ -322,7 +324,7 @@ func (d *Discord) connect(ctx context.Context) (*dgw, error) {
 	go func() {
 		defer close(g.done)
 		for {
-			b, err := ws.ReadText()
+			b, err := ws.Read(time.Time{})
 			if err != nil {
 				g.err = errors.New("discord gateway: " + d.scrub(err.Error()))
 				ws.Close()

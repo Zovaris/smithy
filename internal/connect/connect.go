@@ -1,7 +1,8 @@
 // Package connect is the daemon's notification layer: every note worth a human goes to each
 // enabled chat connector once (per-connector kinds), in a thread per session, with buttons for a
 // decision's options. Inbound button presses answer the decision; a reply in a session's thread
-// goes to that session as user input. State (sent notes, threads, decision buttons) is a JSON file.
+// goes to that session as user input; a message in the main chat that starts with "idea:" (or
+// /idea) goes to Intake. State (sent notes, threads, decision buttons) is a JSON file.
 package connect
 
 import (
@@ -29,7 +30,7 @@ type Note struct {
 type Button struct{ Label, Data string }
 
 // Inbound is what a connector received: a button press (Button, on the message Ref) or a text
-// message (Thread, Text). By is the sender's id on that connector.
+// message (Thread, Text; Thread "" is the main chat). By is the sender's id on that connector.
 type Inbound struct{ Thread, Text, Button, Ref, By string }
 
 // Connector is one chat service. Thread makes a thread for a session; Send posts a note (with
@@ -57,13 +58,15 @@ type state struct {
 }
 
 // Hub fans notes out to Conns and routes what they receive. Kinds gives a connector's enabled
-// kinds; Answer and Input (either may be nil) take a decision answer and a session's user input.
+// kinds; Answer, Input and Intake (any may be nil) take a decision answer, a session's user input
+// and an idea from the main chat.
 type Hub struct {
 	Conns  []Connector
 	File   string
 	Kinds  func(name string) map[string]bool
 	Answer func(id, answer, by string) error
 	Input  func(session, text, by string) error
+	Intake func(idea, by string) error
 	Log    func(string)
 
 	mu     sync.Mutex
@@ -218,14 +221,16 @@ func (h *Hub) Handle(ctx context.Context, c Connector, in Inbound) {
 	h.mu.Lock()
 	st := h.load()
 	by := c.Name() + ":" + in.By
-	var id, answer, session string
+	var id, answer, session, idea string
 	if in.Button != "" {
 		hd, idx, _ := strings.Cut(in.Button, ":")
 		i, err := strconv.Atoi(idx)
 		if d := st.Decisions[hd]; d != nil && err == nil && i >= 0 && i < len(d.Options) && d.Refs[c.Name()] == in.Ref {
 			id, answer = d.ID, d.Options[i]
 		}
-	} else if in.Thread != "" && strings.TrimSpace(in.Text) != "" {
+	} else if in.Thread == "" {
+		idea = IdeaOf(in.Text)
+	} else if strings.TrimSpace(in.Text) != "" {
 		prefix := c.Name() + "|"
 		for k, t := range st.Threads {
 			if t == in.Thread && strings.HasPrefix(k, prefix) {
@@ -240,6 +245,8 @@ func (h *Hub) Handle(ctx context.Context, c Connector, in Inbound) {
 		err = h.Answer(id, answer, by)
 	case session != "" && h.Input != nil:
 		err = h.Input(session, in.Text, by)
+	case idea != "" && h.Intake != nil:
+		err = h.Intake(idea, by)
 	default:
 		return
 	}
@@ -274,4 +281,22 @@ func (h *Hub) Run(ctx context.Context) {
 		}(c)
 	}
 	wg.Wait()
+}
+
+// IdeaOf returns the idea in a main-chat message that starts with "idea:" or "/idea" (a bot
+// suffix like /idea@name is allowed), or "" for any other message.
+func IdeaOf(msg string) string {
+	s := strings.TrimSpace(msg)
+	low := strings.ToLower(s)
+	switch {
+	case strings.HasPrefix(low, "idea:"):
+		s = s[len("idea:"):]
+	case strings.HasPrefix(low, "/idea@"):
+		_, s, _ = strings.Cut(s, " ")
+	case low == "/idea" || strings.HasPrefix(low, "/idea "):
+		s = s[len("/idea"):]
+	default:
+		return ""
+	}
+	return strings.TrimSpace(s)
 }

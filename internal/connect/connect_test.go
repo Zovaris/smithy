@@ -123,3 +123,35 @@ func TestResolveUpdatesDecisionMessage(t *testing.T) {
 		t.Fatalf("updated %q", a.updated)
 	}
 }
+
+func TestIdeaOf(t *testing.T) {
+	for in, want := range map[string]string{
+		"idea: dark mode for the board": "dark mode for the board",
+		"  /idea  export to CSV ":       "export to CSV",
+		"IDEA:x":                        "x",
+		"/idea@smithy_bot retry":        "retry",
+		"idea:   ":                      "",
+		"hello there":                   "",
+		"an idea: not a prefix":         "",
+		"/ideas list":                   "",
+	} {
+		if got := IdeaOf(in); got != want {
+			t.Errorf("IdeaOf(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestHandleMainChatIdeaGoesToIntake(t *testing.T) {
+	a := &fake{name: "a"}
+	h := hub(t, a)
+	var got []string
+	h.Intake = func(idea, by string) error { got = append(got, idea+"|"+by); return nil }
+	h.Input = func(session, text, by string) error { t.Fatalf("main chat is not session input"); return nil }
+	ctx := context.Background()
+	h.Handle(ctx, a, Inbound{Text: "idea: weekly digest", By: "5"})
+	h.Handle(ctx, a, Inbound{Text: "just chatting", By: "5"})
+	h.Handle(ctx, a, Inbound{Thread: "t-x", Text: "idea: in a thread", By: "5"})
+	if len(got) != 1 || got[0] != "weekly digest|a:5" {
+		t.Fatalf("intake got %v", got)
+	}
+}

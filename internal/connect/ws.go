@@ -14,27 +14,21 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 	"time"
 )
 
-// wsMax caps one received message so a server can't make the daemon buffer without bound.
-const wsMax = 1 << 20
-
-// wsConn is a minimal RFC 6455 client: text messages, ping/pong and close; no extensions.
+// wsConn is a minimal RFC 6455 client: text frames out (masked), text frames in (fragments
+// joined), pings answered, at most wsMax bytes a message.
 type wsConn struct {
 	c  net.Conn
-	r  *bufio.Reader
-	mu sync.Mutex
+	br *bufio.Reader
 }
+
+const wsMax = 1 << 20
 
 var errWSClosed = errors.New("websocket closed")
 
-func wsDial(ctx context.Context, raw string) (*wsConn, error) {
-	u, err := url.Parse(raw)
-	if err != nil || (u.Scheme != "wss" && u.Scheme != "ws") || u.Host == "" {
-		return nil, errors.New("bad websocket url")
-	}
+func wsDial(ctx context.Context, u *url.URL) (*wsConn, error) {
 	host := u.Host
 	if u.Port() == "" {
 		if u.Scheme == "wss" {
@@ -45,6 +39,7 @@ func wsDial(ctx context.Context, raw string) (*wsConn, error) {
 	}
 	d := &net.Dialer{Timeout: 15 * time.Second}
 	var c net.Conn
+	var err error
 	if u.Scheme == "wss" {
 		c, err = (&tls.Dialer{NetDialer: d, Config: &tls.Config{ServerName: u.Hostname(), MinVersion: tls.VersionTLS12}}).DialContext(ctx, "tcp", host)
 	} else {
@@ -53,12 +48,12 @@ func wsDial(ctx context.Context, raw string) (*wsConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	kb := make([]byte, 16)
-	_, _ = rand.Read(kb)
-	key := base64.StdEncoding.EncodeToString(kb)
+	k := make([]byte, 16)
+	_, _ = rand.Read(k)
+	key := base64.StdEncoding.EncodeToString(k)
 	path := u.RequestURI()
 	req := "GET " + path + " HTTP/1.1\r\nHost: " + u.Host + "\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
-		"Sec-WebSocket-Key: " + key + "\r\nSec-WebSocket-Version: 13\r\nUser-Agent: smithy\r\n\r\n"
+		"Sec-WebSocket-Key: " + key + "\r\nSec-WebSocket-Version: 13\r\n\r\n"
 	_ = c.SetDeadline(time.Now().Add(15 * time.Second))
 	if _, err := io.WriteString(c, req); err != nil {
 		c.Close()
@@ -70,95 +65,100 @@ func wsDial(ctx context.Context, raw string) (*wsConn, error) {
 		c.Close()
 		return nil, err
 	}
+	resp.Body.Close()
 	sum := sha1.Sum([]byte(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))
-	if resp.StatusCode != http.StatusSwitchingProtocols || !strings.EqualFold(resp.Header.Get("Upgrade"), "websocket") ||
-		resp.Header.Get("Sec-WebSocket-Accept") != base64.StdEncoding.EncodeToString(sum[:]) {
+	if resp.StatusCode != http.StatusSwitchingProtocols || resp.Header.Get("Sec-WebSocket-Accept") != base64.StdEncoding.EncodeToString(sum[:]) {
 		c.Close()
 		return nil, errors.New("websocket handshake refused: HTTP " + resp.Status)
 	}
 	_ = c.SetDeadline(time.Time{})
-	return &wsConn{c: c, r: br}, nil
+	return &wsConn{c: c, br: br}, nil
 }
 
 func (w *wsConn) write(op byte, p []byte) error {
-	w.mu.Lock()
-	defer w.mu.Unlock()
 	h := []byte{0x80 | op}
 	switch n := len(p); {
 	case n < 126:
 		h = append(h, 0x80|byte(n))
-	case n <= 0xffff:
+	case n < 1<<16:
 		h = append(h, 0x80|126, byte(n>>8), byte(n))
 	default:
-		h = append(h, 0x80|127)
-		h = binary.BigEndian.AppendUint64(h, uint64(n))
+		h = binary.BigEndian.AppendUint64(append(h, 0x80|127), uint64(n))
 	}
-	mask := make([]byte, 4)
-	_, _ = rand.Read(mask)
-	h = append(h, mask...)
-	b := make([]byte, len(p))
-	for i := range p {
-		b[i] = p[i] ^ mask[i%4]
+	m := make([]byte, 4)
+	_, _ = rand.Read(m)
+	b := append(h, m...)
+	for i, c := range p {
+		b = append(b, c^m[i%4])
 	}
-	_ = w.c.SetWriteDeadline(time.Now().Add(15 * time.Second))
-	_, err := w.c.Write(append(h, b...))
+	_ = w.c.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	_, err := w.c.Write(b)
 	return err
 }
 
 // WriteText sends one text message.
-func (w *wsConn) WriteText(p []byte) error { return w.write(1, p) }
+func (w *wsConn) WriteText(p []byte) error { return w.write(0x1, p) }
 
-// ReadText returns the next text message, answering pings on the way.
-func (w *wsConn) ReadText() ([]byte, error) {
+// Read returns the next text message, waiting until deadline (zero: forever).
+func (w *wsConn) Read(deadline time.Time) ([]byte, error) {
+	_ = w.c.SetReadDeadline(deadline)
 	var msg []byte
 	for {
 		var h [2]byte
-		if _, err := io.ReadFull(w.r, h[:]); err != nil {
+		if _, err := io.ReadFull(w.br, h[:]); err != nil {
 			return nil, err
 		}
 		fin, op := h[0]&0x80 != 0, h[0]&0x0f
-		masked, n := h[1]&0x80 != 0, uint64(h[1]&0x7f)
+		n := uint64(h[1] & 0x7f)
 		switch n {
 		case 126:
-			var b [2]byte
-			if _, err := io.ReadFull(w.r, b[:]); err != nil {
+			var e [2]byte
+			if _, err := io.ReadFull(w.br, e[:]); err != nil {
 				return nil, err
 			}
-			n = uint64(binary.BigEndian.Uint16(b[:]))
+			n = uint64(binary.BigEndian.Uint16(e[:]))
 		case 127:
-			var b [8]byte
-			if _, err := io.ReadFull(w.r, b[:]); err != nil {
+			var e [8]byte
+			if _, err := io.ReadFull(w.br, e[:]); err != nil {
 				return nil, err
 			}
-			n = binary.BigEndian.Uint64(b[:])
+			n = binary.BigEndian.Uint64(e[:])
 		}
-		if masked {
+		var mask []byte
+		if h[1]&0x80 != 0 {
 			return nil, errors.New("websocket: masked server frame")
 		}
-		if op >= 8 && (n > 125 || !fin) {
+		if op >= 0x8 && (n > 125 || !fin) {
 			return nil, errors.New("websocket: bad control frame")
 		}
-		if op == 0 && msg == nil {
+		if op == 0x0 && msg == nil {
 			return nil, errors.New("websocket: bad fragment")
 		}
 		if n > wsMax || uint64(len(msg))+n > wsMax {
 			return nil, errors.New("websocket message too large")
 		}
 		p := make([]byte, n)
-		if _, err := io.ReadFull(w.r, p); err != nil {
+		if _, err := io.ReadFull(w.br, p); err != nil {
 			return nil, err
 		}
+		if mask != nil {
+			for i := range p {
+				p[i] ^= mask[i%4]
+			}
+		}
 		switch op {
-		case 8:
-			_ = w.write(8, nil)
+		case 0x8:
+			_ = w.write(0x8, nil)
 			return nil, errWSClosed
-		case 9:
-			if err := w.write(10, p); err != nil {
+		case 0x9:
+			if err := w.write(0xA, p); err != nil {
 				return nil, err
 			}
-		case 10:
-		case 0, 1, 2:
-			if op != 0 && msg != nil {
+			continue
+		case 0xA:
+			continue
+		case 0x0, 0x1, 0x2:
+			if op != 0x0 && msg != nil {
 				return nil, errors.New("websocket: bad fragment")
 			}
 			msg = append(msg, p...)
@@ -169,13 +169,18 @@ func (w *wsConn) ReadText() ([]byte, error) {
 				return msg, nil
 			}
 		default:
-			return nil, errors.New("websocket: bad opcode")
+			return nil, errors.New("websocket: bad frame")
 		}
 	}
 }
 
-// Close sends a close frame and drops the connection.
-func (w *wsConn) Close() error {
-	_ = w.write(8, []byte{0x03, 0xe8})
-	return w.c.Close()
+func (w *wsConn) Close() error { return w.c.Close() }
+
+func isTimeout(err error) bool {
+	var ne net.Error
+	return errors.As(err, &ne) && ne.Timeout()
+}
+
+func wsURLOK(u *url.URL) bool {
+	return u.Scheme == "wss" && (u.Hostname() == "slack.com" || strings.HasSuffix(u.Hostname(), ".slack.com"))
 }

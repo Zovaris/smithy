@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -234,11 +235,8 @@ func TestDiscordReceive(t *testing.T) {
 func TestWSDialRefusesBadHandshake(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) }))
 	defer srv.Close()
-	if _, err := wsDial(context.Background(), "ws"+strings.TrimPrefix(srv.URL, "http")); err == nil {
+	if _, err := wsDial(context.Background(), &url.URL{Scheme: "ws", Host: strings.TrimPrefix(srv.URL, "http://"), Path: "/"}); err == nil {
 		t.Fatal("non-101 accepted")
-	}
-	if _, err := wsDial(context.Background(), "http://x"); err == nil {
-		t.Fatal("http scheme accepted")
 	}
 }
 
