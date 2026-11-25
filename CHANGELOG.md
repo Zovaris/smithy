@@ -8,6 +8,15 @@ part above `### Details`.
 
 ## Unreleased
 
+### Highlights
+
+**One sandbox: the OS one.** The Docker/podman container sandbox is gone. `auto.sandbox` is `off` (default) or `native` (Seatbelt on macOS, bubblewrap on Linux) for Claude Code, Codex and the API backend's shell.
+
+### Details
+
+- Removed: `auto.sandbox container`, `auto.sandbox_image`, `auto.sandbox_network`, `auto.sandbox_memory`, `auto.sandbox_proxy_binary`, the `smithy-proxy` sidecar and its networks, docker/podman detection, and `sandbox/Dockerfile`. A user config still on `container` stops workers with a message to set `native` or `off`; `smithy doctor` fails on it.
+- `smithy proxy serve` runs natively and now listens on `127.0.0.1:8877` by default (was every interface), so bound keys stay on this machine.
+- `smithy cleanup builds` no longer lists `smithy-*` images; `smithy uninstall` still removes the images and networks older versions left, when docker or podman is on PATH.
 ### New
 
 - The daemon runs agent sessions: start one with an agent, a folder and a first message, keep talking to it, stop it, and see every session with its status (harness build).

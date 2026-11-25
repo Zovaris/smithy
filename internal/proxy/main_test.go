@@ -74,3 +74,9 @@ func TestApproveRefusedUnderAutoProfile(t *testing.T) {
 		t.Fatalf("auto worker wrote %v", es)
 	}
 }
+
+func TestServeDefaultAddrIsLoopback(t *testing.T) {
+	if DefaultAddr != "127.0.0.1:8877" {
+		t.Fatalf("DefaultAddr = %q: the native proxy must not listen beyond this machine by default", DefaultAddr)
+	}
+}

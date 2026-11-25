@@ -350,9 +350,9 @@ var KitMCP []string
 
 // RunKit is the injection for one run: KitMCP as the "smithy" MCP server, told the run's warden
 // card (SMITHY_MCP_CARD) and, for a --readonly run, to expose read-only tools. nil when there is
-// no kit, for a custom AGENT_CMD, or inside a container (the host binary isn't there).
+// no kit or for a custom AGENT_CMD.
 func RunKit(cli string, o Options, getenv func(string) string) (*Injection, error) {
-	if len(KitMCP) == 0 || cli == "custom" || o.Sandbox == "container" {
+	if len(KitMCP) == 0 || cli == "custom" {
 		return nil, nil
 	}
 	args := slices.Clone(KitMCP[1:])
