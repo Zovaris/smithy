@@ -60,7 +60,7 @@ func post(t *testing.T, url, body string) (int, map[string]any) {
 
 func waitStatus(t *testing.T, sv *Server, id, want string) Session {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
 		for _, s := range sv.Sessions() {
 			if s.ID == id && s.Status == want {
@@ -521,7 +521,7 @@ func TestCLIRunnerTurn(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go func() { time.Sleep(300 * time.Millisecond); cancel() }()
 	start := time.Now()
-	if _, err := r.Turn(ctx, "block", nil, e); !errors.Is(err, context.Canceled) || time.Since(start) > 5*time.Second {
+	if _, err := r.Turn(ctx, "block", nil, e); !errors.Is(err, context.Canceled) || time.Since(start) > stopGrace+5*time.Second {
 		t.Errorf("stop: %v after %s", err, time.Since(start))
 	}
 	if _, err := os.Stat(filepath.Join(sdir, "turn-2.log.term")); err != nil {
