@@ -50,6 +50,8 @@ var Known = []Setting{
 	{"guard.enabled", "true", "smithy agent", "the dangerous-command guard: a shell command matching guard.block (or the built-in list) asks the user; nothing else asks"},
 	{"guard.block", "", "smithy agent", "regexes the guard also blocks, added to its defaults (smithy guard list): a JSON list or one per line"},
 	{"guard.allow", "", "smithy agent", "regexes that skip the guard; \"always allow this pattern\" adds to it"},
+	{"guard.fetch_block", "", "smithy agent", "comma list of domain globs (*.example.com) whose fetches ask you first; fetch is otherwise open (HTTPS only)"},
+	{"guard.fetch_allow", "", "smithy agent", "comma list of domain globs fetch reaches without asking; smithy guard suggest --add adds GitHub, model APIs, package registries and docs sites"},
 	{"decide.url", "", "smithy decide", "decision model endpoint; set with decide.model to turn smithy decide on (a path ending in /scores uses the behavior format, else System One)"},
 	{"decide.model", "", "smithy decide", "decision model id, e.g. span-01-free, jev-latest, kev-latest"},
 	{"decide.key_env", "", "smithy decide", "name of the env var holding the key (never the key); empty for a local model"},

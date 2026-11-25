@@ -33,7 +33,7 @@ var decimals = map[string]bool{"auto.max_cost_per_day": true, "watch.every": tru
 // atLeastOne are whole numbers the code rejects below 1.
 var atLeastOne = map[string]bool{"warden.max": true, "auto.every": true}
 
-var lists = map[string]bool{"route.domain": true, "watch.events": true, "tend.watch": true, "auto.sources": true, "auto.sandbox_domains": true, "notify.kinds": true,
+var lists = map[string]bool{"route.domain": true, "watch.events": true, "tend.watch": true, "auto.sources": true, "auto.sandbox_domains": true, "guard.fetch_block": true, "guard.fetch_allow": true, "notify.kinds": true,
 	"linear.team": true, "linear.project": true, "linear.states": true}
 
 // KindOf is the input a key takes: bool, enum (with its options), number, list (comma) or text.
