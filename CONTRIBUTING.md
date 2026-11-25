@@ -3,7 +3,8 @@
 - The binary's source is in `cmd/smithy` and `internal/` (Go, standard library only, except
   `internal/tui`, which uses Charm's Bubble Tea, Lip Gloss, Bubbles and Glamour v2 under `charm.land/...` plus harmonica,
   always at their latest release; keep `go.sum` committed). The harness build (`-tags harness`, ADR 0009) may also use
-  `modernc.org/sqlite`; files that need it carry `//go:build harness`. Inside a
+  `modernc.org/sqlite`, the provider SDKs for the API backend (ADR 0012) and `fastschema/qjs` with
+  `wazero` for code mode (ADR 0013); files that need it carry `//go:build harness`. Inside a
   checkout the launcher builds it from source when a `.go` file changed, so symlinked skills
   always run your working copy (the skills build: run `go build -tags harness ./cmd/smithy` to try harness commands).
 - `web/` is the one Node toolchain (ADR 0010): the web UI (Preact, Vite). Run
