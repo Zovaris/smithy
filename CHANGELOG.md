@@ -14,12 +14,14 @@ part above `### Details`.
 
 ### Details
 
+- New `internal/guard` and `smithy guard check|hook|list`: blocklist regexes (defaults plus `guard.block`), `guard.allow` skips, `guard.enabled` (default true). The API loop's shell tool runs it after its rules; Claude Code gets it as a PreToolUse hook through the run's kit settings. Questions go to the daemon as `guard:<key>` asks (`POST /v1/asks` now accepts that id); no daemon or no answer within `ask.timeout` denies; "always allow this pattern" appends the pattern to the user's `guard.allow`.
 - Removed: `auto.sandbox container`, `auto.sandbox_image`, `auto.sandbox_network`, `auto.sandbox_memory`, `auto.sandbox_proxy_binary`, the `smithy-proxy` sidecar and its networks, docker/podman detection, and `sandbox/Dockerfile`. A user config still on `container` stops workers with a message to set `native` or `off`; `smithy doctor` fails on it.
 - `smithy proxy serve` runs natively and now listens on `127.0.0.1:8877` by default (was every interface), so bound keys stay on this machine.
 - `smithy cleanup builds` no longer lists `smithy-*` images; `smithy uninstall` still removes the images and networks older versions left, when docker or podman is on PATH.
 - `internal/wait`: `TestMainEventsOption` no longer fails when the first poll starts after the test's update; the fake `gh` marks served calls and the test writes the change only after the baseline poll.
 ### New
 
+- **Dangerous-command guard, on by default.** An agent's `rm -rf /`, force push to main, `git reset --hard`, disk format, `curl | sh`, `chmod -R 777` or deletion of `~/.smithy` stops and asks you (run once, always allow, deny) in the TUI, web or chat. Nothing else asks.
 - **One command.** `smithy` (harness build) starts the daemon in the background when none runs and attaches; it keeps working after you quit, exits on its own after 30 idle minutes, and `smithy stop` ends it. `smithy --standalone` runs a private daemon that stops with the chat.
 
 ### Details
