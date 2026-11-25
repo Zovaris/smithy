@@ -17,6 +17,7 @@ part above `### Details`.
 
 ### Details
 
+- `internal/apiloop/tools`: the API loop's core tool set: read (numbered lines, offset/limit paging, 2000 lines / 50 KB cap), write, exact-match edit, apply_patch for OpenAI models, shell (timeout, output over 50 KB saved to a file), glob and grep (`internal/search`, 100 results), fetch (https, `auto.sandbox_domains` hosts and redirects only). Every call passes the `--profile auto` rules (AutoTools allowed, AutoDenied and SecretDenied first, symlinks resolved, shell lists and pipelines checked part by part, substitutions refused); a refused call becomes a decision. The rules are a best effort: without a sandbox the agent's shell can read anything the user can.
 - `internal/bench`: 20 fixture Go repos (bugs, features, refactors, docs) with tests as the oracle and a reference solution each; every task runs in a fresh git repo through `smithy agent --profile auto`, tests are restored before grading, results go to `~/.smithy/bench/<id>.json`. `api:` agents wait for the api backend.
 - `smithy bench runs` lists saved runs; runs are named by id, unique prefix, `latest~N` or file path; `compare --json` gives the machine form. The daemon serves `GET /v1/bench` and `GET /v1/bench/compare?a=&b=` (ids only, no paths) to the web UI's plain Bench screen.
 

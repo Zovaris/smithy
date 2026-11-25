@@ -140,3 +140,33 @@ func TestAPISinkReportsToolsAndRecordsRejectedPermissions(t *testing.T) {
 		t.Fatalf("events %v", details)
 	}
 }
+
+func TestAgentAPIBackendOffersTheCoreToolsUnderAutoRules(t *testing.T) {
+	fake := &apiFake{}
+	if _, _, rc, _ := apiRun(t, fake, "--backend", "api", "--model", "anthropic/claude-sonnet-4"); rc != 0 {
+		t.Fatalf("rc=%d", rc)
+	}
+	var names []string
+	for _, s := range fake.got.Tools {
+		names = append(names, s.Name)
+	}
+	for _, s := range apiTools(Options{}, "gpt-5").Specs() {
+		names = append(names, s.Name)
+	}
+	got := strings.Join(names, ",")
+	for _, want := range []string{"read", "write", "edit", "shell", "glob", "grep", "fetch", "apply_patch"} {
+		if !strings.Contains(","+got+",", ","+want+",") {
+			t.Fatalf("tools %s: missing %s", got, want)
+		}
+	}
+	set := apiTools(Options{Cwd: t.TempDir()}, "claude-sonnet-4")
+	if ok, _ := set.Permit(apiloop.ToolCall{Name: "shell", Args: []byte(`{"command":"curl https://x"}`)}); ok {
+		t.Fatal("curl must be denied as under --profile auto")
+	}
+	if ok, _ := set.Permit(apiloop.ToolCall{Name: "read", Args: []byte(`{"path":"~/.smithy/auth.json"}`)}); ok {
+		t.Fatal("auth.json must be denied")
+	}
+	if ok, _ := set.Permit(apiloop.ToolCall{Name: "shell", Args: []byte(`{"command":"git status"}`)}); !ok {
+		t.Fatal("git status must be allowed")
+	}
+}
