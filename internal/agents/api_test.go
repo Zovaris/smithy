@@ -31,7 +31,10 @@ func (f *apiFake) Stream(ctx context.Context, r apiloop.Request, onText func(str
 
 func apiRun(t *testing.T, fake *apiFake, args ...string) (string, string, int, []string) {
 	t.Helper()
-	t.Setenv("SMITHY_HOME", t.TempDir())
+	home := t.TempDir()
+	t.Setenv("SMITHY_HOME", home)
+	os.MkdirAll(filepath.Join(home, "cache"), 0o700)
+	os.WriteFile(filepath.Join(home, "cache", "model-prices.json"), []byte(`{"data":[{"id":"anthropic/claude-sonnet-4.5","pricing":{"prompt":"0.000003","completion":"0.000015"}}]}`), 0o600)
 	t.Setenv("ANTHROPIC_API_KEY", "from-env-ignored")
 	var keys []string
 	old := APIProvider
