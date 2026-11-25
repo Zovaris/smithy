@@ -1,11 +1,36 @@
 # Changelog
 
 One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skill lands under
-**Unreleased** first and moves into a version when it is tagged.
+**Unreleased** first and moves into a version when it is tagged. Each version opens with short,
+plain notes for people (`### Highlights`, `### New`, `### Fixed`): what changed for them, in a
+sentence each. The technical bullets go under `### Details`. The GitHub release shows only the
+part above `### Details`.
 
 ## Unreleased
 
 ## v0.19.0 — 2026-11-24
+
+### Highlights
+
+**A chat for the harness.** Run `smithy` in the harness build and you get a fullscreen chat with your agents. It stays fast even on long sessions, works with the mouse, and keeps anything waiting on you pinned at the top.
+
+**Install without Node.** `smithy skills install` puts the skills in every agent CLI you have. No `npx` needed.
+
+**The installer asks what you want.** `install.sh` asks "harness or skills?" and remembers your answer on `--update`.
+
+### New
+
+- **Chat modes:** press `v` to switch between minimal, expandable and verbose.
+- **Agents and commands:** `tab` shows your agents, `ctrl+k` opens a command palette, and `/` runs commands.
+- **`smithy doctor --fix`:** fixes the problems doctor finds, asking before each one.
+- **`smithy cleanup builds`:** frees space from old smithy versions, images and unused worktrees. It shows what it would delete first.
+
+### Fixed
+
+- `install.sh --update` works without Node.
+- `doctor --fix --yes` never grants permissions without asking you.
+
+### Details
 
 - Added: `smithy doctor --fix` lists each fixable check with its exact change (remove a stale `daemon.json`, `chmod 600` the daemon token, add `Bash(smithy pr merge:*)` to `permissions.allow` in `~/.claude/settings.json`) and applies it on `y`; `--yes` applies all except the permission grant, which needs an explicit `y`, and without a terminal it applies none. It only touches your own files and prints what changed.
 - Added: `smithy cleanup builds` lists old smithy builds in `~/.smithy/bin` (keeps the current one and one previous; per-checkout dev builds after 14 days), stale `smithy-*` container images other than `auto.sandbox_image`, and unlocked worktrees of the current repo with no changes, no untracked and no ignored files, with no commits beyond the base branch, with the space each takes; `--yes` deletes them. Worktrees with uncommitted changes are never touched.
