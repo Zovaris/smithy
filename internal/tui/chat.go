@@ -18,6 +18,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/remote"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
@@ -93,7 +94,9 @@ type chatView struct {
 	setupStep setupStep
 	setupNote string // a fix, an error or install output shown in the open overlay
 	modelFor  string
-	modelIn   string
+	modelIn   string       // the filter typed over the model list
+	modelSel  int          // the selected row of modelRows
+	modelList *models.List // what the agent reported; nil while it loads
 
 	sess     sessionAPI            // the daemon's sessions endpoints; nil: offline
 	current  string                // the open session, "" before the first message
