@@ -62,6 +62,7 @@ part above `### Details`.
 - Connector sends that fail are queued in `connect.json` (at most 256, oldest dropped with a log line) and retried by the hub with backoff (5 s doubling to 10 min) until they land, so a chat outage no longer loses decision prompts after the notes cursor moves on.
 - Telegram: the `getUpdates` offset is kept in `~/.smithy/telegram.offset` so a restarted daemon does not reprocess presses and replies.
 - Connectors honour HTTP 429: Telegram `parameters.retry_after`, Slack `Retry-After` and Discord `retry_after` are waited out (at most a minute, three tries) before the send fails into the retry queue.
+- The intake planner runs under the daemon context (stopped on shutdown) and keeps at most 1 MiB of its stdout and 4 KiB of stderr.
 
 ## v0.19.0 — 2026-11-24
 

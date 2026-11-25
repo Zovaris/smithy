@@ -154,6 +154,7 @@ func foreground(name string, port int, serveArgs []string, view auto.View) int {
 	api.Resume()
 	tctx, stopTails := context.WithCancel(context.Background())
 	defer stopTails()
+	api.Ctx = tctx
 	go api.RunTails(tctx, time.Second, &Tail{Path: events.File(), Source: "tail:events"}, &Tail{Path: events.ProxyFile(), Source: ProxySource})
 	conns, cerr := connect.FromConfig()
 	if cerr != nil {

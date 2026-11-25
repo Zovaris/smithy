@@ -69,6 +69,8 @@ type Server struct {
 	Route func(Decision, Outcome) error
 	// Plan, when set, replaces AgentPlan for chat intake (tests).
 	Plan func(ctx context.Context, idea string) ([]PlanTask, error)
+	// Ctx is the daemon's lifetime (cancelled on shutdown) for background work like planning; nil: Background.
+	Ctx context.Context
 
 	mu        sync.Mutex
 	decisions map[string]*Decision

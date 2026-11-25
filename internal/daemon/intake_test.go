@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Zovaris/smithy/internal/board"
 	"github.com/Zovaris/smithy/internal/store"
@@ -112,6 +113,42 @@ func TestIntakePlanFailureAsksNothing(t *testing.T) {
 	}
 	if len(sv.Pending()) != 0 {
 		t.Fatalf("pending %+v", sv.Pending())
+	}
+}
+
+func TestIntakePlansUnderTheDaemonContext(t *testing.T) {
+	sv, _ := newTest(t, filepath.Join(t.TempDir(), "s.db"))
+	ctx, cancel := context.WithCancel(context.Background())
+	sv.Ctx = ctx
+	got := make(chan error, 1)
+	sv.Plan = func(c context.Context, _ string) ([]PlanTask, error) {
+		<-c.Done()
+		got <- c.Err()
+		return nil, c.Err()
+	}
+	if err := sv.Intake("idea", "a:1"); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	select {
+	case err := <-got:
+		if err == nil {
+			t.Fatal("planner context not cancelled")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("planner kept running after the daemon stopped")
+	}
+}
+
+func TestCappedOutputKeepsOnlyTheCap(t *testing.T) {
+	var w capped
+	w.n = 10
+	if n, err := w.Write([]byte("0123456789abcdef")); n != 16 || err != nil {
+		t.Fatalf("write %d %v", n, err)
+	}
+	w.Write([]byte("more"))
+	if w.b.String() != "0123456789" {
+		t.Fatalf("kept %q", w.b.String())
 	}
 }
 
