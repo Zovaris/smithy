@@ -1,0 +1,1 @@
+{"kind": "feature", "prompt": "Implement Clamp in clamp.go: it returns v limited to the range lo..hi."}

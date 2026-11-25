@@ -49,7 +49,7 @@ type Plan struct {
 const HomeMarker = ".smithy-home"
 
 // homeFiles are the names smithy itself keeps at the top of its home.
-var homeFiles = map[string]bool{HomeMarker: true, "auth.json": true, "config.json": true, "kind": true, "installed-skills": true, "path-added": true,
+var homeFiles = map[string]bool{HomeMarker: true, "auth.json": true, "auth.key": true, "config.json": true, "kind": true, "installed-skills": true, "path-added": true,
 	"accounts": true, "pool.json": true, "pool-state.json": true, "bin": true, "plans": true, "warden": true, "decisions": true, "proxy": true,
 	"connect.json": true, "notify.json": true, "tasks-index.json": true, "telegram.offset": true, "tui.seen": true, "checkout": true,
 	"tend": true, "loose": true, "auto": true, "skills": true}

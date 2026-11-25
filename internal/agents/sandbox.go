@@ -389,12 +389,10 @@ func NativeDirs(dirs []string, smithyHome, plans, warden, repoParent string) (ad
 	return add, readOnly
 }
 
-// NativeSettings is the claude --settings JSON for a native-sandboxed worker: Bash and its children
-// write only to the worktree, its git dir, smithy's plans and warden dirs and its Go build cache,
-// reach only domains, never read the secrets smithy knows of, and can't fall back to running
-// unsandboxed. strictAllowlist blocks unlisted hosts even when a permission mode would allow them.
-// weakerNet (macOS only) turns on enableWeakerNetworkIsolation so gh and other Go CLIs can verify TLS.
-func NativeSettings(p SandboxPaths, domains []string, goos string, weakerNet bool) string {
+// nativeFS is the filesystem part of the native sandbox for p: allowWrite, denyWrite, denyRead
+// (and allowRead for an SSH signing key). Claude's sandbox settings and the API loop's shell
+// sandbox (Seatbelt, bubblewrap) both build on it.
+func nativeFS(p SandboxPaths) map[string][]string {
 	keep := func(ps ...string) []string {
 		var out []string
 		for _, x := range ps {
@@ -410,20 +408,30 @@ func NativeSettings(p SandboxPaths, domains []string, goos string, weakerNet boo
 		}
 		return filepath.Join(dir, name)
 	}
-	if domains == nil {
-		domains = []string{}
-	}
 	home, sm := p.Home, p.SmithyHome
 	fs := map[string][]string{
 		"allowWrite": keep(p.Cwd, p.GitDir, join(sm, "plans"), p.Warden, p.GoCache),
-		"denyWrite": keep(append([]string{join(sm, "auth.json"), join(sm, "config.json"), join(p.GitDir, "hooks"), join(p.GitDir, "config"),
+		"denyWrite": keep(append([]string{join(sm, "auth.json"), join(sm, "auth.key"), join(sm, "config.json"), join(p.GitDir, "hooks"), join(p.GitDir, "config"),
 			join(p.Cwd, ".claude"), join(p.Cwd, ".smithy/config.json")}, append(p.ReadOnly, p.Secret...)...)...),
-		"denyRead": keep(append([]string{join(sm, "auth.json"), join(sm, "daemon.token"), join(home, ".ssh"), join(home, ".aws"), join(home, ".netrc"), join(home, ".git-credentials"),
+		"denyRead": keep(append([]string{join(sm, "auth.json"), join(sm, "auth.key"), join(sm, "daemon.token"), join(home, ".ssh"), join(home, ".aws"), join(home, ".netrc"), join(home, ".git-credentials"),
 			join(home, ".gnupg")}, p.Secret...)...),
 	}
 	if p.SigningKey != "" && strings.HasSuffix(p.SigningKey, ".pub") && filepath.IsAbs(p.SigningKey) {
 		fs["allowRead"] = []string{p.SigningKey}
 	}
+	return fs
+}
+
+// NativeSettings is the claude --settings JSON for a native-sandboxed worker: Bash and its children
+// write only to the worktree, its git dir, smithy's plans and warden dirs and its Go build cache,
+// reach only domains, never read the secrets smithy knows of, and can't fall back to running
+// unsandboxed. strictAllowlist blocks unlisted hosts even when a permission mode would allow them.
+// weakerNet (macOS only) turns on enableWeakerNetworkIsolation so gh and other Go CLIs can verify TLS.
+func NativeSettings(p SandboxPaths, domains []string, goos string, weakerNet bool) string {
+	if domains == nil {
+		domains = []string{}
+	}
+	fs := nativeFS(p)
 	net := map[string]any{"strictAllowlist": true, "allowedDomains": domains}
 	if p.AgentSocket != "" && goos == "darwin" {
 		net["allowUnixSockets"] = []string{p.AgentSocket}

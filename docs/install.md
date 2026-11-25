@@ -74,8 +74,9 @@ curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh
 
 ## Keys
 
-API keys live in `~/.smithy/auth.json` (mode 0600), never in a config file. Set them with
+API keys live in `~/.smithy/auth.json` (mode 0600, AES-GCM encrypted with `~/.smithy/auth.key`, kept next to it), never in a config file. A plaintext `auth.json` from an older smithy is encrypted in place on first use, keys kept. Back up `auth.key` with `auth.json`: without it the keys cannot be read (delete both and set the keys again). Set them with
 `smithy auth set <name>`, for example `smithy auth set linear < keyfile`.
 
-Any process running as you can read that file, agents included, so use test or least-privilege
-keys.
+Under `--profile auto` the allow-lists for claude and opencode deny reading both files, but any
+process running as you can read `auth.json` and `auth.key`, agents included, unless the optional
+OS sandbox (`auto.sandbox`, off by default) is on. Use test or least-privilege keys.

@@ -40,6 +40,7 @@ var helpDocs = map[string]helpDoc{
 	"attach":  {groupDaily, []string{"smithy attach"}, []string{"daemon", "chat"}},
 	"web":     {groupDaily, []string{"smithy web", "smithy web open"}, []string{"daemon"}},
 	"board":   {groupDaily, []string{`smithy board add "Fix login" --priority 1`, "smithy board list --state todo", "smithy board show B-1"}, []string{"auto", "tasks"}},
+	"bench":   {groupMaint, []string{"smithy bench list", "smithy bench run --agent claude --skills v0.22.0", "smithy bench run --agent codex --task bug-sum-last"}, []string{"agent", "receipt"}},
 	"report":  {groupDaily, []string{"smithy report week"}, []string{"tui", "decisions"}},
 	"tui":     {groupDaily, []string{"smithy tui", "smithy tui --no-anim"}, []string{"auto", "report"}},
 	"auto":    {groupDaily, []string{"smithy auto serve", "smithy auto status", "smithy auto poll --source github"}, []string{"config", "tui", "notify"}},
@@ -59,7 +60,7 @@ var helpDocs = map[string]helpDoc{
 	"skills":    {groupMaint, []string{"smithy skills --list", "smithy skills smelt"}, []string{"setup"}},
 
 	"adr":         {groupSkills, []string{`smithy adr "Use SQLite for the board"`}, []string{"search"}},
-	"agent":       {groupSkills, []string{"smithy agent prompt.md", "smithy agent --model sonnet --timeout 30 prompt.md"}, []string{"pool", "route"}},
+	"agent":       {groupSkills, []string{"smithy agent prompt.md", "smithy agent --model sonnet --timeout 30 prompt.md", "smithy agent --backend api --model anthropic/<model> prompt.md"}, []string{"pool", "route"}},
 	"batch":       {groupSkills, []string{"smithy batch init ./tasks --repo ."}, []string{"brief", "cards"}},
 	"brief":       {groupSkills, []string{"smithy brief skills-v021 v021-01"}, []string{"batch"}},
 	"cards":       {groupSkills, []string{"smithy cards set my-batch t1 state=working", "smithy cards beat my-batch t1"}, []string{"status", "batch"}},

@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/ghx"
@@ -38,6 +39,7 @@ var Known = []Setting{
 	{"route.domain", "", "smithy route", "comma list of the product's own nouns (secret for a secret scanner) that never count as risk"},
 	{"agent.effort", "medium", "smelt warden scout tend", "reasoning effort for every agent smithy starts: low or medium; anything higher is capped at medium"},
 	{"ask.timeout", "10", "use-smithy smelt warden", "minutes to wait for the user's answer to a decision before smithy consult picks (0 = don't start the timer: wait for the answer)"},
+	{"agent.code_mode", "false", "smithy agent --backend api", "true: the API loop also offers run_code, one sandboxed JavaScript program (QuickJS in WebAssembly: 64 MB, 30 s, no files or network) that calls the tools; off until the benchmark shows it saves tokens"},
 	{"agent.timeout", "90", "smelt warden", "minutes before smithy agent kills a headless agent (0 = no limit)"},
 	{"watch.events", "checks,merged,closed,conflict,review,comment,push,new,updated", "smithy wait", "which events wake an agent waiting on GitHub"},
 	{"watch.every", "30", "smithy wait", "seconds between GitHub polls"},
@@ -63,7 +65,7 @@ var Known = []Setting{
 	{"daemon.port", "7477", "smithy daemon", "loopback port of the daemon's API (harness build); it never listens beyond 127.0.0.1"},
 	{"daemon.allow", "", "smithy daemon", "comma list of Tailscale logins (Tailscale-User-Login via tailscale serve) allowed to use the daemon's API; empty: only the local token. Set, it trusts any local user on this machine (the header is not authenticated past tailscale serve), so smithy doctor warns"},
 	{"auto.paused", "false", "smithy auto", "true holds smithy auto take: nothing launches until it is false again (p in smithy tui)"},
-	{"auto.agent", "", "smithy auto serve", "agent CLI for serve's orchestrator (claude, codex, opencode…, or pool: any smithy pool account); empty = the one smithy agent detects"},
+	{"auto.agent", "", "smithy auto serve", "agent CLI for serve's orchestrator (claude, codex, opencode…, pool: any smithy pool account, or api:<provider>/<model>: smithy's own loop on your key, harness build, read from the user settings only); empty = the one smithy agent detects"},
 	{"pool.order", "", "smithy agent", "comma list of harnesses a pool run (AGENT_CLI or auto.agent pool) tries in order, e.g. claude,codex: it stays on the first with a free account, falls back when all of that harness's accounts are limited (logged as pool_fallback) and goes back once a limit resets; empty = least recently used account of any harness"},
 	{"auto.session_hours", "3", "smithy auto serve", "hours one orchestrator session may run before smithy agent ends it (its workers keep going)"},
 	{"auto.sandbox", "off", "smithy agent", "isolation for unattended workers (--profile auto) on top of the allow-list: off, native (claude/codex OS sandbox) or container (docker/podman); fails closed: a worker whose sandbox can't start is not started; auto.sandbox* are read from the user settings only, never a repo's"},
@@ -193,8 +195,7 @@ func withLock(file string, f func() error) error {
 		if !os.IsExist(err) {
 			return err
 		}
-		if staleLock(lock) {
-			os.Remove(lock)
+		if staleLock(lock) && takeOver(lock) {
 			continue
 		}
 		if time.Now().After(deadline) {
@@ -207,6 +208,42 @@ func withLock(file string, f func() error) error {
 }
 
 const lockStale = 30 * time.Second
+
+var takeovers atomic.Int64
+
+// takeOver moves a stale lock aside atomically (rename to a name only this call uses), so of two
+// writers that both saw it stale only one gets it. Takeovers are serialised by a second O_EXCL
+// file, so the lock is never missing while another takeover rechecks it; if what it moved turns
+// out to be live (another writer took the lock in between), it puts it back and reports false.
+func takeOver(lock string) bool {
+	guard := lock + ".takeover"
+	g, err := os.OpenFile(guard, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	if err != nil {
+		if fi, serr := os.Stat(guard); serr == nil && time.Since(fi.ModTime()) > lockStale {
+			os.Remove(guard)
+		}
+		return false
+	}
+	g.Close()
+	defer os.Remove(guard)
+	if !staleLock(lock) {
+		return false
+	}
+	aside := fmt.Sprintf("%s.stale.%d.%d", lock, os.Getpid(), takeovers.Add(1))
+	if err := os.Rename(lock, aside); err != nil {
+		return false
+	}
+	if staleLock(aside) {
+		os.Remove(aside)
+		return true
+	}
+	if err := os.Link(aside, lock); err == nil {
+		os.Remove(aside)
+		return false
+	}
+	os.Remove(aside)
+	return false
+}
 
 // staleLock reports whether lock was left by a writer that is gone (its pid is dead) or
 // is older than lockStale.

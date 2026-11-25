@@ -8,6 +8,54 @@ part above `### Details`.
 
 ## Unreleased
 
+### Highlights
+
+**Your own API keys.** smithy can run its own agent on your Anthropic, OpenAI, Gemini, OpenRouter, DeepSeek or Ollama key, with no CLI needed (harness build).
+
+**Stored keys are encrypted.** `~/.smithy/auth.json` is now encrypted at rest, and older files are converted on first use without losing keys.
+
+**Code mode, off by default.** The API agent can run one small JavaScript program that calls its tools, once you turn it on.
+
+**A benchmark.** `smithy bench` runs smithy's own task set and compares runs.
+
+### New
+
+- `smithy bench run --agent <cli>` runs smithy's own 20-task benchmark and records pass rate, time, tokens and cost.
+
+- `smithy bench compare <a> <b>` shows how one run did against another; the web UI has a Bench screen with the same view.
+
+### Details
+
+- `~/.smithy/auth.json` is sealed with AES-GCM under `~/.smithy/auth.key`, kept next to it; an existing plaintext `auth.json` is encrypted in place on first use, keys kept. No OS keychain, no password prompts. Under `--profile auto` the claude and opencode allow-lists deny reading both files, but any process running as the user can read them unless the optional OS sandbox (`auto.sandbox`, off by default) is on.
+
+- `smithy agent --backend api --model <provider>/<model>` (and `auto.agent api:<provider>/<model>`, harness build) runs smithy's own agent loop (`internal/apiloop`) on the key from `smithy auth set <provider>`. Provider adapters: Anthropic (prompt caching), OpenAI (Responses API), Gemini, and OpenRouter, DeepSeek or Ollama through openai-go's Chat Completions. Text streams to the log; tool, permission and usage events match the CLI paths; 429/5xx are retried with backoff; cost comes from list prices or the provider's reported cost (ADR 0012).
+
+- Code mode (`agent.code_mode`, off by default): the API loop can offer `run_code`, one JavaScript program calling the loop's tools through typed `tools.<name>(args)` bindings, each call still permission-checked. It runs in QuickJS compiled to WebAssembly (fastschema/qjs on wazero, no cgo) with a 64 MB memory cap, a 30 s time cap and no files or network (ADR 0013).
+
+- `internal/apiloop/tools`: the API loop's core tool set: read (numbered lines, offset/limit paging, 2000 lines / 50 KB cap), write, exact-match edit, apply_patch for OpenAI models, shell (timeout, output over 50 KB saved to a file), glob and grep (`internal/search`, 100 results), fetch (https, `auto.sandbox_domains` hosts and redirects only). Every call passes the `--profile auto` rules (AutoTools allowed, AutoDenied and SecretDenied first, symlinks resolved, shell lists and pipelines checked part by part, substitutions refused); a refused call becomes a decision. The rules are a best effort: without a sandbox the agent's shell can read anything the user can.
+
+- `internal/bench`: 20 fixture Go repos (bugs, features, refactors, docs) with tests as the oracle and a reference solution each; every task runs in a fresh git repo through `smithy agent --profile auto`, tests are restored before grading, results go to `~/.smithy/bench/<id>.json`. `api:` agents wait for the api backend.
+
+- `smithy bench runs` lists saved runs; runs are named by id, unique prefix, `latest~N` or file path; `compare --json` gives the machine form. The daemon serves `GET /v1/bench` and `GET /v1/bench/compare?a=&b=` (ids only, no paths) to the web UI's plain Bench screen.
+
+- API backend `--readonly` offers only read, glob and grep, and `Permit` refuses every other tool.
+
+- API backend under `auto.sandbox native` runs shell commands under the OS sandbox (Seatbelt on macOS, bubblewrap on Linux; same writable and secret paths as claude workers, no network); `auto.sandbox container` refuses `api:` workers. Off (default) is unchanged.
+
+- API loop shell: commands run in their own process group (Windows: `taskkill /T`), so a timeout or cancel kills background children too. Long output goes to a per-run temp dir removed when the run ends.
+
+- API loop `read` refuses non-regular files (devices, fifos) and reads at most 64 MB; `fetch` dials through `HTTPS_PROXY` when set, otherwise refuses hosts resolving to loopback, private, link-local or CGNAT addresses.
+
+- API loop: a retried reply no longer repeats text already streamed; cost needs an exact model id or one with a snapshot date (`-20250929`, `-2025-08-07`, `-latest`), adds mini/nano rows, and is unknown (nil) for other models.
+
+- Code mode: the WebAssembly memory cap is the documented 64 MB (was twice that); inner tool calls report tool and permission events through the loop's sink.
+
+- `auth.json` and `auth.key` writes fsync the file and its folder; an empty `auth.json` holds no secrets and no longer blocks `smithy auth set` (a `.bak` beside it is left alone).
+
+- Config lock: a stale lock is taken over by an atomic rename and a pid recheck, so two writers can't both proceed.
+
+- `smithy bench`: SIGINT/SIGTERM kills the running agent and oracle process trees and removes the temp repos (unless `--keep`); the oracle kills its whole process group on timeout.
+
 ## v0.21.0 — 2026-11-25
 
 ### Highlights

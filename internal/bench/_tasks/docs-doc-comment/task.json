@@ -1,0 +1,1 @@
+{"kind": "docs", "prompt": "Every exported identifier in shapes.go needs a doc comment that starts with its name."}
