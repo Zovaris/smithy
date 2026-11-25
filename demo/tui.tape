@@ -6,6 +6,7 @@ Set Width 1280
 Set Height 760
 Set TypingSpeed 40ms
 Set Theme "Builtin Dark"
+Env COLORTERM "truecolor"
 
 Hide
 Type "export PATH=@PATH@ && clear" Enter

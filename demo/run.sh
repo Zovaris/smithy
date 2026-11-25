@@ -15,6 +15,9 @@ go build -tags harness -o "$work/bin/smithy" "$root/cmd/smithy"
 printf '#!/bin/sh\necho "claude 2.0.0 (demo stand-in)"\n' >"$work/bin/claude"
 chmod +x "$work/bin/claude"
 git -C "$work/repo" init -q && printf 'package main\n' >"$work/repo/main.go"
+# The stub the demo agent fills in, committed so the session's Changes show the diff.
+printf 'package main\n' >"$work/repo/health.go"
+git -C "$work/repo" add main.go health.go && git -C "$work/repo" -c user.name=demo -c user.email=demo@example.com commit -qm init
 # Only the stand-in agent is on the demo's PATH, so the host's own agents never show.
 demopath="$work/bin:/usr/bin:/bin"
 export SMITHY_HOME="$work/home" TERM=xterm-256color
