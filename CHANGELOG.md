@@ -8,6 +8,14 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- **PR outcomes.** What happened to each auto PR (merged, changes requested, closed) shows in the weekly report and in History.
+
+### Details
+
+- `smithy auto serve` checks the PRs of launched items each cycle and records an `outcome` event per change; `smithy report week` lists them under "Auto PR outcomes" and the TUI History view shows them as results.
+
 ## v0.20.0 — 2026-11-25
 
 ### Highlights
