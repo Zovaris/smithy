@@ -8,8 +8,13 @@ part above `### Details`.
 
 ## Unreleased
 
+### Highlights
+
+- See it run: the [demo](https://github.com/Zovaris/smithy/blob/main/docs/demo.md) walks first run, a session, tool calls, a decision and the web on a phone.
+
 ### Details
 
+- demo: `smithy daemon --demo` runs every session on a scripted agent (read, edit, test run, one decision; no CLI or key). `demo/run.sh` records the TUI with VHS (`demo/tui.tape`) and the web with Playwright (`web/scripts/demo-shots.mjs`, `DEMO_CHROME` for an installed browser) on a throwaway home; the CI `demo` job uploads the tape and screenshots as the `demo` artifact. `docs/demo.md` shows the flow.
 - daemon: claude sessions run with `--output-format stream-json --verbose`; each tool call (name, args, output, error, time) becomes a `session_tool` event and the result line gives the reply and usage, instead of raw JSON as text. `ToolEvent` gains `took`.
 - tui: chat rebuilt on the Claude Design canvas (Steel tiers, anvil header that moves only while a session works, decision strip with ember button, minimal / expandable / verbose blocks, agents side panel, floating ctrl+k palette). The composer is a textarea; `/` opens a filterable popup with every command and its description, `@` completes files, `?` opens help. The first message starts a session on the last used agent (`POST /v1/sessions`), later ones go to it; session messages, tools, diffs and cost render per session, tab switches between them. New commands: /new, /sessions, /stop, /connect, /web, /remote, /log. Daemon events (daemon_up, poll errors) go to a status line and /log, never the transcript; esc clears the input instead of quitting. Screenshots at 160x48 and 100x30 in `docs/design/tui-v023/`.
 - web: Temper design for approval (Sephiro theme `web/src/theme/temper.css`, light/dark, mock and screenshots in `docs/design/web-v023/`).
