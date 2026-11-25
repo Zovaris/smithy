@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -59,9 +58,7 @@ func parseFlags(flags string) map[string]bool {
 func atMost(name string, n int, run func(args []string) int) func(args []string) int {
 	return func(args []string) int {
 		if len(args) > n {
-			fmt.Fprintf(os.Stderr, "smithy %s: unexpected argument %s\n", name, args[n])
-			fmt.Fprintln(os.Stderr, commands[name].usage)
-			return 2
+			return usageError(name, "unexpected argument "+args[n], "")
 		}
 		return run(args)
 	}
@@ -73,9 +70,7 @@ func init() {
 			verbose := false
 			for _, a := range args {
 				if a != "--verbose" {
-					fmt.Fprintf(os.Stderr, "smithy version: unexpected argument %s\n", a)
-					fmt.Fprintln(os.Stderr, commands["version"].usage)
-					return 2
+					return usageError("version", "unexpected argument "+a, "")
 				}
 				verbose = true
 			}
@@ -91,8 +86,7 @@ func init() {
 			}
 			return 0
 		})
-	// engine-probe is hidden on purpose (empty help keeps it out of `smithy --help`).
-	register("engine-probe", "", "usage: smithy engine-probe\nPrints smithy-engine and the version.", "",
+	register("engine-probe", "print smithy-engine and the version", "usage: smithy engine-probe\nPrints smithy-engine and the version.", "",
 		atMost("engine-probe", 0, func([]string) int { fmt.Println("smithy-engine", version); return 0 }))
 }
 
@@ -117,17 +111,13 @@ func entry(name string, c command, args []string) ([]string, int, bool) {
 			break
 		}
 		if a == "-h" || a == "--help" {
-			u := c.usage
-			if len(args) > 0 {
-				if s := subUsage(name, c.usage, args[0]); s != "" {
-					u = s
-				}
-			}
-			fmt.Println(u)
+			commandHelp(os.Stdout, name, args[:1])
 			return nil, 0, true
 		}
 	}
+	sub := ""
 	if len(args) > 0 {
+		sub = args[0]
 		if f, ok := c.subs[args[0]]; ok {
 			c.flags = f
 		}
@@ -161,14 +151,21 @@ func entry(name string, c command, args []string) ([]string, int, bool) {
 		}
 		takesValue, ok := c.flags[a]
 		if !ok {
-			fmt.Fprintf(os.Stderr, "smithy %s: unknown option %s\n", name, a)
-			fmt.Fprintln(os.Stderr, c.usage)
-			return nil, 2, true
+			msg := "unknown option " + a
+			var known []string
+			for f := range c.flags {
+				if f != "--" {
+					known = append(known, f)
+				}
+			}
+			if s := suggest(a, known); s != "" {
+				msg += " (did you mean " + s + "?)"
+			}
+			return nil, usageError(name, msg, sub), true
 		}
 		if takesValue {
 			if _, isFlag := c.flags[next(args, i)]; i+1 >= len(args) || isFlag || args[i+1] == "--" {
-				fmt.Fprintf(os.Stderr, "smithy %s: %s needs a value\n", name, a)
-				return nil, 2, true
+				return nil, usageError(name, a+" needs a value", sub), true
 			}
 			i++
 			pair(a, args[i])
@@ -233,20 +230,7 @@ func isNumber(s string) bool {
 	return err == nil
 }
 
-func usage(w io.Writer) {
-	fmt.Fprintf(w, "smithy %s: the binary behind the smithy skills\n", version)
-	names := make([]string, 0, len(commands))
-	for n, c := range commands {
-		if c.help != "" {
-			names = append(names, n)
-		}
-	}
-	sort.Strings(names)
-	for _, n := range names {
-		fmt.Fprintf(w, "  smithy %-12s %s\n", n, commands[n].help)
-	}
-	fmt.Fprintln(w, "Run any command with --help for its usage. Not on PATH? smithy setup path.")
-}
+func usage(w io.Writer) { topHelp(w, false) }
 
 // noArgs runs for bare `smithy`; the harness build opens the chat, the skills build prints usage.
 var noArgs func() int
@@ -273,8 +257,7 @@ func main() {
 	}
 	switch os.Args[1] {
 	case "help", "--help", "-h":
-		usage(os.Stdout)
-		os.Exit(0)
+		os.Exit(helpMain(os.Args[2:]))
 	}
 	name := os.Args[1]
 	if name == "--version" || name == "-v" {
@@ -282,12 +265,11 @@ func main() {
 	}
 	c, ok := commands[name]
 	if !ok {
-		fmt.Fprintf(os.Stderr, "unknown command %s\n", name)
+		code := unknownCommand(os.Stderr, name)
 		if hint := warden.VersionHint(); hint != "" {
 			fmt.Fprintln(os.Stderr, hint)
 		}
-		usage(os.Stderr)
-		os.Exit(2)
+		os.Exit(code)
 	}
 	args, code, done := entry(name, c, os.Args[2:])
 	if done {

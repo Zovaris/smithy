@@ -1,0 +1,3 @@
+smithy scan: --base needs a value
+usage: smithy scan [--base <branch|ref>]
+Run smithy help scan for usage and examples.

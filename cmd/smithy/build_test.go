@@ -24,8 +24,10 @@ func TestHarnessCommandsInSkillsBuild(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s not registered", name)
 		}
-		if c.help != "" {
-			t.Errorf("%s is listed in --help of the skills build", name)
+		var top strings.Builder
+		topHelp(&top, false)
+		if c.help == "" || !strings.Contains(top.String(), name) || !strings.Contains(strings.Join(strings.Fields(top.String()), " "), c.help+" (harness build)") {
+			t.Errorf("%s is not listed as (harness build) in the skills build's help", name)
 		}
 		var b strings.Builder
 		if code := needsHarness(&b, name); code != 2 || !strings.Contains(b.String(), "smithy-harness-") || !strings.Contains(b.String(), "-tags harness") {

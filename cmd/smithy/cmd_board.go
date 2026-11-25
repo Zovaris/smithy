@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	register("board", "built-in tracker (harness build): add, list, show, set, claim, sync", board.Usage, "",
+	register("board", harnessSummary["board"], board.Usage, "",
 		func(args []string) int { return board.Main(args, os.Stdout, os.Stderr) })
 	registerSub("board", "add", "--body= --priority= --labels= --blocked-by=")
 	registerSub("board", "list", "--state= --json")
