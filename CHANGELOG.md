@@ -8,6 +8,12 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+- API-backend costs now come from OpenRouter's public price list, refreshed daily and kept for offline use, so new models are priced without a smithy release.
+
+### Details
+- `apiloop.Cost` reads `https://openrouter.ai/api/v1/models` (cached at `~/.smithy/cache/model-prices.json`, refetched after 24h, last good cache kept when offline or the answer is bad) instead of the hand-kept table; an unlisted model still has no cost, never a guess.
+
 ## v0.22.0 — 2026-11-25
 
 ### Highlights
