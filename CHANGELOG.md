@@ -8,6 +8,16 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- **ACP agents:** `AGENT_PROTOCOL=acp` runs Gemini CLI, OpenCode or any agent that speaks the Agent Client Protocol, with its tool calls, usage and permission requests in smithy's events and decisions.
+
+### Details
+
+- `internal/acp`: a stdlib JSON-RPC client for one ACP prompt turn (initialize, session/new, session/prompt); it offers no fs or terminal capability and refuses those requests.
+- `smithy agent` with `AGENT_PROTOCOL=acp`: `gemini --experimental-acp` or `opencode acp`; message chunks go to the log, completed or failed tool calls and permission answers to `tool` and `permission` events, usage to the sidecar and a `usage` event; read-only runs reject permissions and log a decision; the agent gets 5 s to exit after its turn before its group is killed.
+- `decisions.Add` and `usage.Write` exported for that path.
+
 ## v0.20.0 — 2026-11-25
 
 ### Highlights
