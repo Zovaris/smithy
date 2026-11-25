@@ -76,7 +76,7 @@ var Known = []Setting{
 	{"notify.style", "plain", "smithy auto serve", "Telegram message look: emoji (an icon per line) or plain (status tag, one monospace detail line, no emoji)"},
 	{"notify.kinds", "pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited", "smithy auto serve", "comma list of notification kinds sent to Telegram"},
 	{"connect.telegram.kinds", "", "smithy daemon", "comma list of kinds the daemon's Telegram connector sends; empty = notify.kinds; notify.telegram.chat must be a supergroup with topics, the bot an admin that can manage topics"},
-	{"connect.telegram.users", "", "smithy daemon", "comma list of Telegram user ids whose buttons and topic replies count; empty = anyone in notify.telegram.chat"},
+	{"connect.telegram.users", "", "smithy daemon", "comma list of Telegram user ids whose buttons, topic replies and idea: messages count; empty = send only"},
 	{"connect.slack.channel", "", "smithy daemon", "Slack channel id (C…) the daemon's Slack connector posts in, a thread per session (tokens: smithy auth set slack and slack_app); empty = off"},
 	{"connect.slack.kinds", "", "smithy daemon", "comma list of kinds the daemon's Slack connector sends; empty = notify.kinds"},
 	{"connect.slack.users", "", "smithy daemon", "comma list of Slack user ids whose buttons and thread replies count; empty = send only"},
