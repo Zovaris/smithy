@@ -3,20 +3,39 @@ on:
   pull_request:
   push:
     branches: [main]
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
-  check:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Go format and vet
+      - name: Go format and vet (both builds)
         run: |
           test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
           go vet ./...
           go vet -tags harness ./...
-      - name: Go tests (race detector, coverage)
+      - name: Launcher syntax
+        run: sh -n shared/smithy
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [skills, harness]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Go tests, skills build (race detector, coverage)
+        if: matrix.build == 'skills'
+        env:
+          COVERAGE_MIN: "60"
         run: |
           go test -race -covermode=atomic -coverprofile=cover.out ./...
           total="$(go tool cover -func=cover.out | awk '/^total:/ {print $3}')"
@@ -25,25 +44,50 @@ jobs:
             echo
             echo '| Package | Coverage |'
             echo '|---|---|'
-            go test -cover ./... 2>/dev/null | awk '{pkg=$1=="ok"?$2:$1; sub("github.com/Zovaris/smithy/","",pkg); for(i=1;i<=NF;i++) if($i ~ /%$/) print "| " pkg " | " $i " |"}'
+            go tool cover -func=cover.out | awk '$1 != "total:" {split($1,f,":"); pkg=f[1]; sub("/[^/]*$","",pkg); sub("github.com/Zovaris/smithy/","",pkg); n[pkg]++; s[pkg]+=$3} END {for (p in n) printf "| %s | %.1f%% |\n", p, s[p]/n[p]}' | sort
           } >> "$GITHUB_STEP_SUMMARY"
-          go test -race -tags harness ./...
           awk -v t="${total%\%}" -v min="$COVERAGE_MIN" 'BEGIN { if (t+0 < min+0) { print "coverage " t "% is below " min "%"; exit 1 } }'
-        env:
-          COVERAGE_MIN: "60"
+      - name: Go tests, harness build (race detector)
+        if: matrix.build == 'harness'
+        run: go test -race -tags harness ./...
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
       - name: Integration tests (skill lint, CLI tests through the binary)
         env:
           SKIP_GO_TEST: "1"
         run: tests/run.sh
-      - name: Builds on every release target
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # pull requests build one target per OS; main builds every release target
+        target: ${{ fromJSON(github.event_name == 'pull_request' && '["darwin/arm64","linux/amd64","windows/amd64"]' || '["darwin/arm64","darwin/amd64","linux/arm64","linux/amd64","windows/amd64"]') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build both builds for ${{ matrix.target }}
         run: |
-          for t in darwin/arm64 darwin/amd64 linux/arm64 linux/amd64 windows/amd64; do
-            GOOS=${t%/*} GOARCH=${t#*/} go build -trimpath -ldflags "-s -w" -o /dev/null ./cmd/smithy
-            GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build -tags harness -trimpath -ldflags "-s -w" -o /dev/null ./cmd/smithy
-          done
-      - name: Launcher syntax
+          t='${{ matrix.target }}'
+          GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /dev/null ./cmd/smithy
+          GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build -tags harness -trimpath -ldflags "-s -w" -o /dev/null ./cmd/smithy
+  check:
+    if: always()
+    needs: [lint, test, integration, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every check job passed
         run: |
-          sh -n shared/smithy
+          r='${{ join(needs.*.result, ' ') }}'
+          echo "results: $r"
+          for x in $r; do [ "$x" = success ] || exit 1; done
   windows-launcher:
     runs-on: windows-latest
     steps:
