@@ -205,7 +205,7 @@ func (t *Telegram) allowed(chat int64, u tgUser) bool {
 	return t.Users[strconv.FormatInt(u.ID, 10)]
 }
 
-// Receive long-polls getUpdates once: topic messages and button presses from Chat (and Users).
+// Receive long-polls getUpdates once: topic and main-chat messages and button presses from Chat (and Users).
 // Every button press is acknowledged so the client stops its spinner, kept or not.
 func (t *Telegram) Receive(ctx context.Context) ([]Inbound, error) {
 	form := url.Values{"timeout": {strconv.Itoa(int(t.poll().Seconds()))}, "allowed_updates": {`["message","callback_query"]`}}
@@ -229,9 +229,14 @@ func (t *Telegram) Receive(ctx context.Context) ([]Inbound, error) {
 			}
 		case u.Message != nil:
 			m := u.Message
-			if m.IsTopic && m.Thread != 0 && m.Text != "" && t.allowed(m.Chat.ID, m.From) {
-				out = append(out, Inbound{Thread: strconv.FormatInt(m.Thread, 10), Text: clip(m.Text, 4000), By: strconv.FormatInt(m.From.ID, 10)})
+			if m.Text == "" || !t.allowed(m.Chat.ID, m.From) {
+				continue
 			}
+			in := Inbound{Text: clip(m.Text, 4000), By: strconv.FormatInt(m.From.ID, 10)}
+			if m.IsTopic && m.Thread != 0 {
+				in.Thread = strconv.FormatInt(m.Thread, 10)
+			}
+			out = append(out, in)
 		}
 	}
 	return out, nil
