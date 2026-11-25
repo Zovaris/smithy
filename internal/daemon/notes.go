@@ -12,6 +12,7 @@ import (
 	"github.com/Zovaris/smithy/internal/connect"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/notify"
+	"github.com/Zovaris/smithy/internal/report"
 	"github.com/Zovaris/smithy/internal/store"
 )
 
@@ -135,6 +136,33 @@ func (sv *Server) RunNotes(ctx context.Context, h *connect.Hub, every time.Durat
 		select {
 		case <-ctx.Done():
 		case <-wake:
+		case <-time.After(every):
+		}
+	}
+}
+
+// WeeklyNote is the Monday report as a main-chat note, keyed by its week so each connector gets
+// it once; ok is false outside Monday 09:00 onwards.
+func WeeklyNote(es []events.Event, now time.Time) (connect.Note, bool) {
+	if !report.Due(now) {
+		return connect.Note{}, false
+	}
+	r := report.Week(es, now)
+	return connect.Note{Key: "report|" + r.From.Format("2006-01-02"), Kind: "report", Title: "Weekly report", Text: r.Text()}, true
+}
+
+// RunReport posts the weekly report through h when it is due, checking every interval until ctx ends.
+func RunReport(ctx context.Context, h *connect.Hub, every time.Duration) {
+	for ctx.Err() == nil {
+		now := time.Now()
+		if report.Due(now) {
+			es, err := events.Read(report.Start(now).AddDate(0, 0, -60), 0)
+			if n, ok := WeeklyNote(es, now); ok && err == nil {
+				h.Notify(ctx, n)
+			}
+		}
+		select {
+		case <-ctx.Done():
 		case <-time.After(every):
 		}
 	}

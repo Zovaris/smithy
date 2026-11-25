@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/Zovaris/smithy/internal/connect"
 	"github.com/Zovaris/smithy/internal/events"
@@ -111,5 +112,16 @@ func TestInputGoesToSession(t *testing.T) {
 	last := evs[len(evs)-1]
 	if last.Kind != KindInput || last.Session != "b/v1" || !strings.Contains(string(last.Data), "use redis") || !strings.Contains(string(last.Data), `"via":"chat"`) {
 		t.Fatalf("got %+v", last)
+	}
+}
+
+func TestWeeklyNoteMondayOnceKeyedByWeek(t *testing.T) {
+	mon := time.Date(2026, 11, 23, 9, 30, 0, 0, time.UTC)
+	n, ok := WeeklyNote(nil, mon)
+	if !ok || n.Kind != "report" || n.Key != "report|2026-11-16" || n.Session != "" || !strings.Contains(n.Text, "Nothing shipped") {
+		t.Fatalf("note = %+v ok=%v", n, ok)
+	}
+	if _, ok := WeeklyNote(nil, mon.Add(24*time.Hour)); ok {
+		t.Fatal("sent on Tuesday")
 	}
 }
