@@ -272,7 +272,7 @@ func (sv *Server) closeAnswered(id, answer, by string) {
 }
 
 func routable(id string) bool {
-	return strings.HasPrefix(id, "secret:") || strings.HasPrefix(id, "merge:") || strings.HasPrefix(id, "decide:")
+	return strings.HasPrefix(id, "secret:") || strings.HasPrefix(id, "merge:") || strings.HasPrefix(id, "decide:") || strings.HasPrefix(id, "intake:")
 }
 
 // RouteBack hands an answer to its asker: the proxy's approve/deny event for a secret (the path
