@@ -1,0 +1,1 @@
+{"kind": "refactor", "prompt": "In parse.go, replace the string-compared error with an exported sentinel ErrEmpty that callers can match with errors.Is; keep the message."}

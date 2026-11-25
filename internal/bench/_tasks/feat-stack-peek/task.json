@@ -1,0 +1,1 @@
+{"kind": "feature", "prompt": "Add a Peek method to Stack in stack.go: it returns the top item and true without removing it, or 0 and false when empty."}
