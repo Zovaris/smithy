@@ -17,6 +17,13 @@ part above `### Details`.
 - `internal/acp`: a stdlib JSON-RPC client for one ACP prompt turn (initialize, session/new, session/prompt); it offers no fs or terminal capability and refuses those requests.
 - `smithy agent` with `AGENT_PROTOCOL=acp`: `gemini --experimental-acp` or `opencode acp`; message chunks go to the log, completed or failed tool calls and permission answers to `tool` and `permission` events, usage to the sidecar and a `usage` event; read-only runs reject permissions and log a decision; the agent gets 5 s to exit after its turn before its group is killed.
 - `decisions.Add` and `usage.Write` exported for that path.
+- `pool.order` (e.g. `claude,codex`): when every account of one harness is limited, a pool run continues on the next pooled harness, logs the switch as a `pool_fallback` event and goes back once the limit resets.
+
+### Details
+
+- Injection kit (`agents.Inject`): per run, smithy can give a driven CLI MCP servers, skills, an appended system prompt and settings without touching the user's global config. Claude gets `--mcp-config`/`--strict-mcp-config`, `--plugin-dir`, `--append-system-prompt` and `--settings` (merged with smithy's own note and sandbox settings); codex a `CODEX_HOME` under the run dir with a `smithy` profile (auth linked from the user's home); opencode `OPENCODE_CONFIG_DIR`; gemini a settings file through `GEMINI_CLI_SYSTEM_SETTINGS_PATH`; pi `--skill` and `--append-system-prompt`. Pieces a CLI can't take are returned as unsupported.
+- `smithy search --code [--regex] "<query>"` searches the whole repo (ignored, hidden and binary files skipped) through the new `internal/search`: the ripgrep shipped next to the binary, rg on PATH, `git ls-files` in a repo or a stdlib walk, with caps on matches, line length (220) and bytes (64 KB); `SMITHY_RG=<path>|off` overrides. Docs search is unchanged.
+- Releases ship ripgrep 14.1.1 per platform as `smithy-rg-<os>-<arch>` plus `ripgrep-LICENSE.txt` (MIT or Unlicense): `scripts/fetch-ripgrep.sh` downloads each archive against pinned sha256 sums, and the build attestation covers them. `install.sh` installs it next to smithy after the same checksum and attestation checks, best effort.
 
 ## v0.20.0 — 2026-11-25
 

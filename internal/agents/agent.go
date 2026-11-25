@@ -57,7 +57,8 @@ Timeout: --timeout, else the agent.timeout setting (minutes, default 90; 0 = non
 passes, the agent's whole process group is killed (Unix; on Windows only the agent process), "timed out after Nm" goes to the log and
 smithy agent exits 124; --bg runs are watched by a detached smithy that does the same.
 Pool (smithy pool, off until an account is added): a run of a pooled harness (AGENT_CLI=pool: any)
-uses the least recently used account that is not limited, through its harness's config-dir env var;
+uses the least recently used account that is not limited, through its harness's config-dir env var
+(AGENT_CLI=pool: harnesses in pool.order first, falling back down it, logged as pool_fallback);
 a usage-limit result marks it limited; a read-only or untouched run reruns once on the next one,
 any other exits 75 with its warden card blocked (relaunch in the same worktree).
 Extra flags for the chosen CLI: $AGENT_ARGS. Workers get WARDEN_HARNESS set to the CLI and the
@@ -91,11 +92,12 @@ type Options struct {
 	// Sandbox is auto.sandbox for this run (off, native, container); SandboxSettings the claude
 	// --settings JSON under native.
 	Sandbox, SandboxSettings string
-	Proxy                    bool     // container worker behind the egress proxy (auto.sandbox_network proxy)
-	PoolEnv                  []string // the pool account's config-dir variable (smithy pool), added to the worker's env
-	Account                  string   // the pool account this run uses
-	poolSkip                 []string // accounts already tried (limited) in this run
-	poolStart                string   // the worktree's HEAD before the first attempt ("" when not a git repo)
+	Proxy                    bool       // container worker behind the egress proxy (auto.sandbox_network proxy)
+	PoolEnv                  []string   // the pool account's config-dir variable (smithy pool), added to the worker's env
+	Account                  string     // the pool account this run uses
+	poolSkip                 []string   // accounts already tried (limited) in this run
+	poolStart                string     // the worktree's HEAD before the first attempt ("" when not a git repo)
+	Inject                   *Injection // the run's injection kit (Inject), added before $AGENT_ARGS
 }
 
 // ProfileEnv carries --profile to every smithy agent an agent starts, so workers under an
@@ -314,6 +316,10 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 	}
 	stdin := false
 	path := cli
+	var kit []string
+	if o.Inject != nil {
+		kit = o.Inject.Args
+	}
 	cli = Kind(cli)
 	switch p := getenv("AGENT_PROTOCOL"); p {
 	case "", "cli":
@@ -345,6 +351,8 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 			a = append(a, "--output-format", "json")
 		}
 		a = append(a, "--permission-mode", perm)
+		kit, kitPrompt := takeArg(kit, "--append-system-prompt")
+		kit, kitSettings := takeArg(kit, "--settings")
 		if o.Profile == "auto" && !o.ReadOnly {
 			tools, denied, note := AutoTools(o.SmithyBins), AutoDenied(o.SmithyBins), AutoNote
 			if o.Proxy {
@@ -355,6 +363,10 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 			}
 			a = append(append(a, "--allowedTools"), tools...)
 			a = append(append(a, "--disallowedTools"), denied...)
+			if kitPrompt != "" {
+				note += "\n\n" + kitPrompt
+				kitPrompt = ""
+			}
 			a = append(a, "--append-system-prompt", note)
 			for _, d := range o.AddDirs {
 				a = append(a, "--add-dir", d)
@@ -363,14 +375,23 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if o.ReadOnly {
 			a = append(append(a, "--disallowedTools"), SecretDenied()...)
 		}
+		if kitPrompt != "" {
+			a = append(a, "--append-system-prompt", kitPrompt)
+		}
 		if o.Sandbox == "native" {
-			a = append(a, "--settings", o.SandboxSettings)
+			if kitSettings != "" {
+				a = append(a, "--settings", mergeSettings(kitSettings, o.SandboxSettings))
+			} else {
+				a = append(a, "--settings", o.SandboxSettings)
+			}
+		} else if kitSettings != "" {
+			a = append(a, "--settings", kitSettings)
 		}
 		opt("--model")
 		if o.Effort != "" {
 			a = append(a, "--effort", o.Effort)
 		}
-		a = append(a, extra...)
+		a = append(append(a, kit...), extra...)
 		return Spec{Argv: withPath(a, path), PromptStdin: true, Harness: "claude-cli"}, nil
 	case "codex":
 		a = []string{"codex", "exec"}
@@ -389,7 +410,7 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if o.Effort != "" {
 			a = append(a, "-c", "model_reasoning_effort="+o.Effort)
 		}
-		a = append(append(a, extra...), "-")
+		a = append(append(append(a, kit...), extra...), "-")
 		stdin = true
 	case "opencode":
 		a = []string{"opencode", "run", "--standalone", "--archived"}
@@ -399,7 +420,7 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 			a = append(a, "--auto")
 		}
 		opt("-m")
-		a = append(append(a, extra...), prompt)
+		a = append(append(append(a, kit...), extra...), prompt)
 	case "gemini":
 		mode := "yolo"
 		if o.ReadOnly {
@@ -407,24 +428,24 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		}
 		a = []string{"gemini", "--approval-mode", mode}
 		opt("-m")
-		a = append(append(a, extra...), "-p", prompt)
+		a = append(append(append(a, kit...), extra...), "-p", prompt)
 	case "cursor":
 		a = []string{"agent", "-p", "--force"}
 		opt("--model")
-		a = append(append(a, extra...), prompt)
+		a = append(append(append(a, kit...), extra...), prompt)
 	case "pi":
 		a = []string{"pi", "-p"}
 		if o.ReadOnly {
 			a = append(a, "--tools", "read")
 		}
 		opt("--model")
-		a = append(append(a, extra...), prompt)
+		a = append(append(append(a, kit...), extra...), prompt)
 	case "dsh":
 		a = []string{"dsh", "headless", "--approval-policy", "never"}
 		if o.ReadOnly {
 			a = append(a, "--permission-mode", "read-only")
 		}
-		a = append(append(a, extra...), "-")
+		a = append(append(append(a, kit...), extra...), "-")
 		stdin = true
 	default:
 		return Spec{}, ErrNoCLI
@@ -543,6 +564,9 @@ func Env(base []string, s Spec, o Options) []string {
 		env = append(env, ProfileEnv+"="+o.Profile)
 	}
 	env = append(env, o.PoolEnv...)
+	if o.Inject != nil {
+		env = append(env, o.Inject.Env...)
+	}
 	return append(env, "AGENT_PROMPT_FILE="+o.PromptFile, "AGENT_MODEL="+o.Model, "AGENT_EFFORT="+o.Effort, "AGENT_READONLY="+ro, "WARDEN_HARNESS="+s.Harness)
 }
 
