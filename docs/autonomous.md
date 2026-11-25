@@ -36,6 +36,12 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
 
 - `GET /v1/state`, `GET /v1/events?since=<seq>` (SSE, resumes with `Last-Event-ID`),
   `POST /v1/decisions` (`{"id","answer"}`: the first answer wins; later ones get the outcome, 409).
+- It tails `~/.smithy/events.jsonl` and the proxy's log into its store (once per line, across
+  rotation and restarts) and turns them into decisions: a proxy `secret_ask` is `secret:<id>`
+  (approve/deny, handed back as `smithy proxy approve|deny` would), a ready item is
+  `merge:<batch>/<item>` (merge/hold) and a `needs_decision` item `decide:<batch>/<item>/<key>`;
+  warden answers land on the card as `answer`, `answer_id` and `answered_by`. Telegram alerts
+  show the same id.
 - It binds `127.0.0.1` only. Every request needs the token (`~/.smithy/daemon.token`, 0600) or a
   `Tailscale-User-Login` listed in `daemon.allow`; anything else gets 401. The token works only
   with a loopback `Host`, the login only with a `*.ts.net` one, so a DNS-rebound web page can't
