@@ -49,8 +49,9 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
 
 - `GET /v1/state`, `GET /v1/events?since=<seq>` (SSE, resumes with `Last-Event-ID`),
   `POST /v1/decisions` (`{"id","answer"}`: the first answer wins; later ones get the outcome, 409).
-- Sessions: `POST /v1/sessions` (`{"agent","dir","message"}`; agent is a CLI name, `acp:<cli>`
-  or `api:<provider>/<model>`, `""` the last used; `dir` an absolute existing folder),
+- Sessions: `POST /v1/sessions` (`{"agent","model","dir","message"}`; agent is a CLI name, `acp:<cli>`
+  or `api:<provider>/<model>`, `""` the last used, else `session.agent`; `model` goes to a CLI's
+  `--model`; `dir` an absolute existing folder),
   `POST /v1/sessions/{id}/messages` (`{"text"}`, queued behind a running turn),
   `POST /v1/sessions/{id}/stop` and `GET /v1/sessions` (status `working`, `needs_you`, `done`,
   `failed`). Their events (`session_message`, `session_text`, `session_tool` with args and output,
@@ -60,6 +61,13 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   answers; the secret rules are never asked. Other agents run `smithy agent` once per turn with
   the conversation so far in the prompt. A reply in a session's chat thread is its next message.
   At most 16 sessions working at once and 8 queued messages each (429 past that); a permission question shows the whole call, and tool output and text are redacted before they are stored.
+- Setup: `GET /v1/setup` lists every agent CLI and API key as ready or missing with its fix, the
+  default agent and model (`chosen` is false until one is picked or used: first run), the kit
+  (`kit.mcp`, `kit.skills`) and the skills and MCP servers each harness has installed;
+  `PUT /v1/setup/default` (`{"agent","model"}`), `PUT /v1/setup/kit` (`{"mcp","skills"}`, skills
+  must be installed smithy skills) and `POST /v1/setup/skills/install` (`{"harness"}`, empty for
+  every detected one) change them. The TUI's first run, `ctrl+l`, `/agent`, `/model`, `/skills`
+  and the web's Setup screen use these.
 - It tails `~/.smithy/events.jsonl` and the proxy's log into its store (once per line, across
   rotation and restarts) and turns them into decisions: a proxy `secret_ask` is `secret:<id>`
   (approve/deny, handed back as `smithy proxy approve|deny` would), a ready item is

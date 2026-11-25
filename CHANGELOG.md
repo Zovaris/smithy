@@ -23,6 +23,14 @@ part above `### Details`.
 - `internal/wait`: `TestMainEventsOption` no longer fails when the first poll starts after the test's update; the fake `gh` marks served calls and the test writes the change only after the baseline poll.
 ### New
 
+- First run shows every agent CLI and API key on the machine as ready or missing, with the one command that fixes a missing one; Claude Code is found even off PATH. Pick the agent and model new sessions start with (`ctrl+l`, `/agent`, `/model` in the TUI; Setup in the web), and choose what goes into every session: smithy's MCP server and smithy skills (`/skills`) (harness build).
+
+### Details
+
+- `GET /v1/setup` (detected agents, default agent/model, kit, installed skills and MCP servers per harness), `PUT /v1/setup/default`, `PUT /v1/setup/kit`, `POST /v1/setup/skills/install`. Sessions take a `model` (`AGENT_MODEL`, refused if it starts with `-`); `GET /v1/sessions` adds `last_model`. New settings `session.agent`, `session.model`, `kit.mcp`, `kit.skills`; the CLI runner adds the folders of CLIs found off PATH (`~/.claude/local`, `~/.local/bin`, Homebrew…) to the agent's PATH. Screenshots in `docs/design/setup-v023/`.
+
+### New
+
 - The daemon runs agent sessions: start one with an agent, a folder and a first message, keep talking to it, stop it, and see every session with its status (harness build).
 
 ### Details
