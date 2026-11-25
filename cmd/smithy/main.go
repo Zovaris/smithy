@@ -248,8 +248,14 @@ func usage(w io.Writer) {
 	fmt.Fprintln(w, "Run any command with --help for its usage. Not on PATH? smithy setup path.")
 }
 
+// noArgs runs for bare `smithy`; the harness build opens the chat, the skills build prints usage.
+var noArgs func() int
+
 func main() {
 	warden.BinaryVersion = version
+	if len(os.Args) < 2 && noArgs != nil {
+		os.Exit(noArgs())
+	}
 	if len(os.Args) < 2 {
 		usage(os.Stderr)
 		os.Exit(2)

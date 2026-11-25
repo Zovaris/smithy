@@ -17,3 +17,12 @@ func TestHarnessBuildLinksStore(t *testing.T) {
 		t.Fatal("the harness build does not link the SQLite store")
 	}
 }
+
+func TestBareSmithyOpensChat(t *testing.T) {
+	if noArgs == nil {
+		t.Fatal("bare smithy does not open the chat in the harness build")
+	}
+	if _, ok := commands["chat"]; !ok {
+		t.Fatal("smithy chat is not registered")
+	}
+}
