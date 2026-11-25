@@ -129,7 +129,7 @@ function App() {
 
   const onAction = (a: string) => {
     if (a === "new") go({ name: "new" });
-    else if (a === "stop") s && stopSession(s.id).catch(() => {});
+    else if (a === "stop" && s) stopSession(s.id).catch(() => {});
     else if (a === "theme") toggleTheme();
     else if (a === "settings") go({ name: "setup" });
     else if (a === "agents" || a === "board" || a === "decisions") go({ name: a });
@@ -142,13 +142,22 @@ function App() {
         setPalUsed(true);
         setPal((p) => !p);
       } else if (e.altKey && !e.ctrlKey && !e.metaKey) {
-        if (e.code === "KeyN") (e.preventDefault(), go({ name: "new" }));
+        if (e.code === "KeyN") {
+          e.preventDefault();
+          go({ name: "new" });
+        }
         const p = PAGES.find((x) => "Digit" + x.key === e.code);
-        if (p) (e.preventDefault(), go({ name: p.id }));
+        if (p) {
+          e.preventDefault();
+          go({ name: p.id });
+        }
       } else if (e.key === "Escape" && sheet) setSheet("");
       else if (e.key === "Enter" && document.activeElement === document.body) {
         const b = document.querySelector<HTMLButtonElement>(".conv .decide [data-primary]");
-        if (b) (e.preventDefault(), b.click());
+        if (b) {
+          e.preventDefault();
+          b.click();
+        }
       }
     };
     addEventListener("keydown", on);
