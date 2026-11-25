@@ -19,9 +19,20 @@ part above `### Details`.
 - `decisions.Add` and `usage.Write` exported for that path.
 - A failed auto issue gets one more try on a stronger model before it is reported blocked.
 - `pool.order` (e.g. `claude,codex`): when every account of one harness is limited, a pool run continues on the next pooled harness, logs the switch as a `pool_fallback` event and goes back once the limit resets.
+- **PR outcomes.** What happened to each auto PR (merged, changes requested, closed) shows in the weekly report and in History.
 
 ### Details
 
+- `smithy auto serve` checks the PRs of launched items each cycle and records an `outcome` event per change; `smithy report week` lists them under "Auto PR outcomes" and the TUI History view shows them as results.
+- Harness build: every agent smithy drives gets a `smithy` MCP server with the board, `ask` (a decision answered from the TUI, web or chat), API calls with `secret:<name>` that never show the key, and fast search.
+- A failed auto issue gets one more try on a stronger model before it is reported blocked.
+- `pool.order` (e.g. `claude,codex`): when every account of one harness is limited, a pool run continues on the next pooled harness, logs the switch as a `pool_fallback` event and goes back once the limit resets.
+- opencode runs under `--profile auto` follow the same allow-list as claude, and opencode (auto and the intake planner) can no longer read `~/.smithy/auth.json` or other secrets. `smithy doctor` says when the configured CLI can't deny those reads.
+
+### Details
+
+- `internal/agents/guard.go`: `OpenCodePermission` builds ordered `OPENCODE_PERMISSION` rules from `AutoTools`/`AutoDenied` plus read/edit denies on the secret paths (`--readonly`: edit denied, bash denied, secret reads denied); `SecretGuarded` names the CLIs that can deny secret reads (claude, opencode). codex, gemini, pi, cursor and dsh keep running unchanged; the limit is documented in `smithy agent` help and reported by `smithy doctor`.
+- `smithy mcp [--readonly]` (harness build, `internal/mcp`): a stdio MCP server, newline-delimited JSON-RPC 2.0 (protocol 2024-11-05 to 2025-06-18), with `search`, `board_list`/`board_show`/`board_claim`/`board_set` (claims held by the run's card), `secret_call` (the egress proxy in process: bound hosts and methods, asks held for approval, key scrubbed from the response) and `ask` (sets the run's warden card to needs_decision and waits for `answer_id`). Unknown arguments, wrong types, oversized or multi-line values are refused; output is capped at 64 KB and cleaned of escapes. `smithy agent` injects it into every run through the kit (`SMITHY_MCP_CARD` from the run's card; `--readonly` runs get search and board reads only; not into container runs or a custom `AGENT_CMD`), and `--profile auto` allows `mcp__smithy`.
 - Added: `auto.retry_stronger` (default `true`): the first `smithy auto report <ref> blocked` for a launched issue requeues it at the head of the queue on the next tier (cheap → mid → strong; unlabeled → strong), prints `auto retry <ref> on <tier>` and records a `retry_stronger` event; a second failure or one on strong is reported blocked.
 - Injection kit (`agents.Inject`): per run, smithy can give a driven CLI MCP servers, skills, an appended system prompt and settings without touching the user's global config. Claude gets `--mcp-config`/`--strict-mcp-config`, `--plugin-dir`, `--append-system-prompt` and `--settings` (merged with smithy's own note and sandbox settings); codex a `CODEX_HOME` under the run dir with a `smithy` profile (auth linked from the user's home); opencode `OPENCODE_CONFIG_DIR`; gemini a settings file through `GEMINI_CLI_SYSTEM_SETTINGS_PATH`; pi `--skill` and `--append-system-prompt`. Pieces a CLI can't take are returned as unsupported.
 - `smithy search --code [--regex] "<query>"` searches the whole repo (ignored, hidden and binary files skipped) through the new `internal/search`: the ripgrep shipped next to the binary, rg on PATH, `git ls-files` in a repo or a stdlib walk, with caps on matches, line length (220) and bytes (64 KB); `SMITHY_RG=<path>|off` overrides. Docs search is unchanged.

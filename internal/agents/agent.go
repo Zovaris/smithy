@@ -49,7 +49,10 @@ AGENT_PROTOCOL=acp drives the CLI over the Agent Client Protocol instead: gemini
 --profile auto (smithy auto serve's orchestrator; never a full bypass): claude runs with
   permission mode dontAsk and an allowed-tools list limited to Read, Edit, Write, Glob, Grep and Bash for
   git, gh, go/npm test and smithy; codex keeps --sandbox workspace-write with approval_policy never;
-  the other CLIs keep their own headless mode above.
+  opencode gets the same allow-list as OPENCODE_PERMISSION rules (also with --readonly: no edits,
+  secret reads denied); the other CLIs keep their own headless mode above. Only claude and opencode
+  can deny reads of ~/.smithy/auth.json and the other secrets: codex, gemini, pi, cursor and dsh
+  can read them unless auto.sandbox is container.
 Effort: --effort, else $AGENT_EFFORT, else the agent.effort setting (default medium). Anything
 above medium is capped at medium. Passed as --effort (claude) or -c model_reasoning_effort
 (codex), and as $AGENT_EFFORT to every CLI; the others keep their own default and say so.
@@ -120,6 +123,7 @@ func AutoTools(smithy []string) []string {
 	for _, c := range []string{"ls", "pwd", "cat", "head", "tail", "wc", "grep", "rg", "find", "which", "echo", "cd", "sort", "uniq", "diff", "test", "true", "sed -n", "basename", "dirname", "realpath", "date", "jq"} {
 		t = append(t, "Bash("+c+")", "Bash("+c+" *)")
 	}
+	t = append(t, "mcp__smithy")
 	t = append(t, "Bash(go test *)", "Bash(go vet *)", "Bash(go build *)", "Bash(gofmt -l *)", "Bash(go fmt *)", "Bash(npm test *)", "Bash(npm run test *)")
 	for _, b := range smithy {
 		if filepath.IsAbs(b) {
@@ -549,6 +553,9 @@ func Env(base []string, s Spec, o Options) []string {
 	for _, k := range ParentVars {
 		drop[k] = true
 	}
+	if s.Harness == "opencode" && (o.Profile == "auto" || o.ReadOnly) {
+		drop["OPENCODE_CONFIG"], drop["OPENCODE_CONFIG_CONTENT"], drop["OPENCODE_PERMISSION"] = true, true, true
+	}
 	var env []string
 	for _, kv := range Scrub(base) {
 		k, _, _ := strings.Cut(kv, "=")
@@ -567,6 +574,7 @@ func Env(base []string, s Spec, o Options) []string {
 	if o.Inject != nil {
 		env = append(env, o.Inject.Env...)
 	}
+	env = append(env, opencodeEnv(s, o)...)
 	return append(env, "AGENT_PROMPT_FILE="+o.PromptFile, "AGENT_MODEL="+o.Model, "AGENT_EFFORT="+o.Effort, "AGENT_READONLY="+ro, "WARDEN_HARNESS="+s.Harness)
 }
 
@@ -709,6 +717,17 @@ func Run(o Options) int {
 	}
 	if cli != "custom" && !EffortFlags[Kind(cli)] {
 		fmt.Fprintf(os.Stderr, "smithy agent: %s has no effort flag; it runs at its own default (AGENT_EFFORT=%s is set)\n", cli, o.Effort)
+	}
+	if o.Inject == nil {
+		in, err := RunKit(cli, o, os.Getenv)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "smithy agent: smithy mcp not given to %s: %v\n", cli, err)
+		} else if in != nil {
+			o.Inject = in
+			if len(in.Unsupported) > 0 {
+				fmt.Fprintf(os.Stderr, "smithy agent: %s can't take %s from smithy's kit; it runs without\n", cli, strings.Join(in.Unsupported, ", "))
+			}
+		}
 	}
 	s, err := Build(cli, o, prompt, SplitArgs(os.Getenv("AGENT_ARGS")), gitDir, os.Getenv)
 	if err != nil {
