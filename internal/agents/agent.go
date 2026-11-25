@@ -27,7 +27,7 @@ import (
 
 const agentUsage = `Harness-agnostic agent runner: runs one headless coding agent on a prompt file.
   smithy agent [--bg] [--cwd <dir>] [--log <file>] [--model <m>] [--effort low|medium] [--timeout <min>]
-               [--readonly] [--profile auto] <prompt-file>
+               [--readonly] [--profile auto] [--backend cli|api] <prompt-file>
 Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list below.
   AGENT_CMD   any shell command; gets the prompt on stdin and in $AGENT_PROMPT_FILE, the model
               in $AGENT_MODEL, and $AGENT_READONLY=1 for read-only runs
@@ -46,6 +46,11 @@ AGENT_PROTOCOL=acp drives the CLI over the Agent Client Protocol instead: gemini
   to the log; finished tool calls and permission answers become events (tool, permission); usage
   goes to <log>.usage.json and a usage event. smithy allows each permission request, and rejects
   it on a read-only run with an entry in the decisions log.
+--backend api (harness build): smithy's own loop calls the provider with your key instead of a CLI;
+  --model is <provider>/<model> (anthropic, openai, gemini, openrouter, deepseek, ollama), and
+  AGENT_CLI or auto.agent api:<provider>/<model> picks it too. The key comes from smithy auth set
+  <provider> only (never an env var or argv; ollama needs none). Text goes to the log; tool calls,
+  permission answers and usage with cost become the same events as above; 429 and 5xx are retried.
 --profile auto (smithy auto serve's orchestrator; never a full bypass): claude runs with
   permission mode dontAsk and an allowed-tools list limited to Read, Edit, Write, Glob, Grep and Bash for
   git, gh, go/npm test and smithy; codex keeps --sandbox workspace-write with approval_policy never;
@@ -90,6 +95,7 @@ type Options struct {
 	PromptFile string
 	Timeout    time.Duration
 	Profile    string
+	Backend    string   // "api": smithy's own loop on the user's key (apiloop) instead of an agent CLI
 	SmithyBins []string // absolute paths of the smithy binary and launcher, allowed under --profile auto
 	AddDirs    []string // directories outside the working dir the agent may use (--add-dir), set under --profile auto
 	// Sandbox is auto.sandbox for this run (off, native, container); SandboxSettings the claude
@@ -238,6 +244,9 @@ func supervisor(o Options, log string) (*exec.Cmd, error) {
 	}
 	if o.Profile != "" {
 		a = append(a, "--profile", o.Profile)
+	}
+	if o.Backend != "" {
+		a = append(a, "--backend", o.Backend)
 	}
 	cmd := exec.Command(exe, append(a, o.PromptFile)...)
 	cmd.Dir, cmd.Env = o.Cwd, Scrub(os.Environ())
@@ -665,6 +674,9 @@ func absFile(p string) (string, error) {
 // otherwise it prints the agent's output once it ends.
 func Run(o Options) int {
 	cli := ResolveCLI(os.Getenv, installed)
+	if _, ok := APITarget(o, cli); ok {
+		return runAPI(o, cli)
+	}
 	pf, err := absFile(o.PromptFile)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -1005,6 +1017,12 @@ loop:
 			o.Effort = args[1]
 		case "--timeout":
 			o.Timeout = ParseTimeout(args[1])
+		case "--backend":
+			if args[1] != "api" && args[1] != "cli" {
+				fmt.Fprintf(os.Stderr, "smithy agent: unknown backend %q (known: cli, api)\n", args[1])
+				return 2
+			}
+			o.Backend = args[1]
 		case "--profile":
 			if args[1] != "auto" {
 				fmt.Fprintf(os.Stderr, "smithy agent: unknown profile %q (known: auto)\n", args[1])

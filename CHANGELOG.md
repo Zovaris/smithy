@@ -8,6 +8,7 @@ part above `### Details`.
 
 ## Unreleased
 
+- `smithy agent --backend api --model <provider>/<model>` (and `auto.agent api:<provider>/<model>`, harness build) runs smithy's own agent loop (`internal/apiloop`) on the key from `smithy auth set <provider>`: Anthropic, OpenAI (Responses API), Gemini, and OpenRouter, DeepSeek or Ollama through openai-go's Chat Completions. Streaming text to the log, tool, permission and usage events like the CLI paths, prompt caching on Anthropic, retries with backoff on 429/5xx, cost from list prices or the provider's reported cost (ADR 0012).
 ### New
 
 - `smithy bench run --agent <cli>` runs smithy's own 20-task benchmark and records pass rate, time, tokens and cost.

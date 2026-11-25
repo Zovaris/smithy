@@ -60,7 +60,7 @@ var helpDocs = map[string]helpDoc{
 	"skills":    {groupMaint, []string{"smithy skills --list", "smithy skills smelt"}, []string{"setup"}},
 
 	"adr":         {groupSkills, []string{`smithy adr "Use SQLite for the board"`}, []string{"search"}},
-	"agent":       {groupSkills, []string{"smithy agent prompt.md", "smithy agent --model sonnet --timeout 30 prompt.md"}, []string{"pool", "route"}},
+	"agent":       {groupSkills, []string{"smithy agent prompt.md", "smithy agent --model sonnet --timeout 30 prompt.md", "smithy agent --backend api --model anthropic/claude-sonnet-4-5 prompt.md"}, []string{"pool", "route"}},
 	"batch":       {groupSkills, []string{"smithy batch init ./tasks --repo ."}, []string{"brief", "cards"}},
 	"brief":       {groupSkills, []string{"smithy brief skills-v021 v021-01"}, []string{"batch"}},
 	"cards":       {groupSkills, []string{"smithy cards set my-batch t1 state=working", "smithy cards beat my-batch t1"}, []string{"status", "batch"}},
