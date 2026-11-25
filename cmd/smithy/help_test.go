@@ -51,7 +51,7 @@ func TestHelpGoldenFiles(t *testing.T) {
 	cases := map[string][]string{
 		"top-" + build():     {"help"},
 		"top-all-" + build(): {"help", "--all"},
-		"cmd-scan":           {"help", "scan"},
+		"cmd-doctor":         {"help", "doctor"},
 		"cmd-receipt":        {"receipt", "--help"},
 		"cmd-config-get":     {"config", "get", "--help"},
 		"cmd-auth-set":       {"help", "auth", "set"},
