@@ -15,7 +15,20 @@ import (
 var (
 	botTokenRe = regexp.MustCompile(`^[0-9]+:[A-Za-z0-9_-]+$`)
 	chatIDRe   = regexp.MustCompile(`^-?[0-9]+$`)
+	slackBotRe = regexp.MustCompile(`^xoxb-[A-Za-z0-9-]+$`)
+	slackAppRe = regexp.MustCompile(`^xapp-[A-Za-z0-9-]+$`)
+	slackChRe  = regexp.MustCompile(`^[CG][A-Z0-9]{6,}$`)
 )
+
+func idSet(key string) map[string]bool {
+	users := map[string]bool{}
+	for _, u := range strings.Split(config.Get(key, ""), ",") {
+		if u = strings.TrimSpace(u); u != "" {
+			users[u] = true
+		}
+	}
+	return users
+}
 
 // Kinds is the set of kinds connector name sends: connect.<name>.kinds, else notify.kinds.
 func Kinds(name string) map[string]bool {
@@ -48,15 +61,41 @@ func FromConfig() ([]Connector, error) {
 	case !chatIDRe.MatchString(chat):
 		err = errors.New("telegram: notify.telegram.chat must be the numeric id of a supergroup with topics")
 	default:
-		users := map[string]bool{}
-		for _, u := range strings.Split(config.Get("connect.telegram.users", ""), ",") {
-			if u = strings.TrimSpace(u); u != "" {
-				users[u] = true
-			}
-		}
-		cs = append(cs, &Telegram{Token: tok, Chat: chat, Users: users})
+		cs = append(cs, &Telegram{Token: tok, Chat: chat, Users: idSet("connect.telegram.users")})
 	}
-	return cs, err
+	sc, serr := slackFromConfig()
+	if sc != nil {
+		cs = append(cs, sc)
+	}
+	return cs, errors.Join(err, serr)
+}
+
+func slackFromConfig() (*Slack, error) {
+	ch := strings.TrimSpace(config.Get("connect.slack.channel", ""))
+	if ch == "" {
+		return nil, nil
+	}
+	bot, _, err := auth.Get("slack")
+	if err != nil {
+		return nil, err
+	}
+	app, _, err := auth.Get("slack_app")
+	if err != nil {
+		return nil, err
+	}
+	switch {
+	case !slackChRe.MatchString(ch):
+		return nil, errors.New("slack: connect.slack.channel must be a channel id (C… or G…), not a name")
+	case bot == "":
+		return nil, errors.New("slack: no bot token (smithy auth set slack)")
+	case !slackBotRe.MatchString(bot):
+		return nil, errors.New("slack: the stored slack token is not a bot token (xoxb-)")
+	case app == "":
+		return nil, errors.New("slack: no app-level token for Socket Mode (smithy auth set slack_app)")
+	case !slackAppRe.MatchString(app):
+		return nil, errors.New("slack: the stored slack_app token is not an app-level token (xapp-)")
+	}
+	return &Slack{Token: bot, AppToken: app, Channel: ch, Users: idSet("connect.slack.users")}, nil
 }
 
 // File is the hub's state file.

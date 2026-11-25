@@ -12,6 +12,7 @@ part above `### Details`.
 
 **Answer from Telegram.** In the harness build the daemon posts each session in its own Telegram topic, with buttons to answer a decision, and your reply in a topic goes to that session. It only listens to the Telegram users you list in `connect.telegram.users`.
 
+**Answer from Slack.** The daemon can also post each session in its own Slack thread, with buttons to answer a decision; your reply in the thread goes to that session. Set `connect.slack.channel`, store both Slack tokens with `smithy auth`, and list who may answer in `connect.slack.users`.
 **Ideas from chat.** Write `idea: <what you want>` in the main Telegram chat: smithy plans it, posts the plan back, and puts the tasks on the board only after you press yes.
 **Weekly report.** `smithy report week` says in plain words what shipped, what failed, the time and known cost per harness, and which decisions still wait on you. In the harness build the daemon posts it to your chat connectors every Monday.
 
@@ -22,6 +23,7 @@ part above `### Details`.
 - Kinds `pr_merged` and `ci_red` are new and on by default for connectors.
 - `internal/report` and `smithy report week`: the last full week (Monday to Sunday) from the events log; open decisions are items whose latest stage is `needs_decision` or `ready`. Time per harness counts `working` spans of items that reported usage. `smithy daemon` posts it once per week (kind `report`, on by default for connectors) from Monday 09:00 local.
 - `smithy daemon` feeds it from its store (cursor `notes:connect`, no replay of history), answers decisions from button presses through the same path as `/v1/decisions`, records topic replies as `user_input` events (`via: chat`); inbound is off until `connect.telegram.users` lists who may answer, and a button counts only on the message that asked it, and turns off serve's own Telegram flush when a connector is set up.
+- Slack connector (`internal/connect/slack.go`): Socket Mode over a stdlib websocket client (`ws.go`, only `wss://*.slack.com` URLs), a thread per session rooted at a message naming it, Block Kit buttons for decisions, `chat.update` to show the answer; tokens `slack` (`xoxb-`) and `slack_app` (`xapp-`) only from `smithy auth`; inbound only from `connect.slack.channel` and users in `connect.slack.users`, bots and edited or system messages ignored, every envelope acknowledged.
 ### Details
 
 - Web UI shell (harness build): `web/` (Preact, `@zovaris/sephiro` 1.2.0, Vite) with smithy's
