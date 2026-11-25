@@ -75,6 +75,8 @@ var Known = []Setting{
 	{"notify.telegram.chat", "", "smithy auto serve", "Telegram chat id serve notifies (bot token: smithy auth set telegram); empty = no notifications"},
 	{"notify.style", "plain", "smithy auto serve", "Telegram message look: emoji (an icon per line) or plain (status tag, one monospace detail line, no emoji)"},
 	{"notify.kinds", "pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited", "smithy auto serve", "comma list of notification kinds sent to Telegram"},
+	{"connect.telegram.kinds", "", "smithy daemon", "comma list of kinds the daemon's Telegram connector sends; empty = notify.kinds"},
+	{"connect.telegram.users", "", "smithy daemon", "comma list of Telegram user ids whose buttons and topic replies count; empty = anyone in notify.telegram.chat"},
 	{"board.linear_sync", "false", "smithy board", "true: smithy board sync and the board source pull title, body, priority and labels from Linear (linear.* filters) and push states and PRs back"},
 	{"linear.key_env", "LINEAR_API_KEY", "smithy auto", "name of the env var holding the Linear personal API key (never the key); wins over smithy auth set linear (~/.smithy/auth.json)"},
 	{"linear.team", "", "smithy auto", "required: Linear team keys smithy may work in (e.g. ENG,OPS); empty, the Linear source refuses to poll"},
