@@ -48,6 +48,7 @@ part above `### Details`.
 
 - CI `web` job: Vitest, typecheck, the 120 KB gzip first-load budget, and a stale-dist check.
 
+- CI `web` job: Vitest, typecheck, the 30 KB gzip first-load budget, and a stale-dist check.
 - Web UI screens over `/v1/events` (fetch-streamed SSE, resumes after the last seq): sessions
   with the chat transcript in minimal, expandable and verbose modes (`v`), virtualized for 10k
   messages; decisions answered through `/v1/decisions`; agents; a board by session state; and
