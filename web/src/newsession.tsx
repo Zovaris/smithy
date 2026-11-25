@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { Composer } from "./composer";
 import { I } from "./icons";
+import { ModelSelect } from "./modelselect";
 import { startSession } from "./live";
 import { go } from "./router";
 import { choice, isDefault, type Ready, type Setup } from "./setup";
@@ -111,7 +112,7 @@ export function NewSession({ setup, recent, host, onAction }: { setup: Setup | n
                   {pick === r.name && (
                     <div class="model">
                       <label class="t3" for="model" style="font-size:12px">Model</label>
-                      <input id="model" value={model} onInput={(e) => setModel(e.currentTarget.value)} placeholder={r.kind === "api" ? "required, e.g. claude-sonnet-5-5" : "the agent's default"} spellcheck={false} autoComplete="off" />
+                      <ModelSelect agent={r} value={model} onChange={setModel} />
                     </div>
                   )}
                 </>

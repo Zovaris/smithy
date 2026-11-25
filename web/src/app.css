@@ -203,6 +203,16 @@ button.row2 { width: 100%; text-align: left; }
 .on .radio::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--t-ember); }
 .model { display: flex; gap: 8px; align-items: center; padding: 8px 12px 10px 38px; border-top: 1px dashed var(--t-line); }
 .model input { flex: 1; min-width: 0; height: 32px; border: 1px solid var(--t-line-strong); border-radius: 8px; background: var(--t-bg); padding: 0 10px; font: 13px var(--sph-font-mono); }
+.msel { position: relative; flex: 1; min-width: 0; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.msel input { flex: 1; }
+.msel .refresh { height: 32px; width: 32px; border: 1px solid var(--t-line); border-radius: 8px; background: var(--t-bg); }
+.msel-list { position: absolute; z-index: 20; top: 36px; left: 0; right: 38px; max-height: 280px; overflow-y: auto; margin: 0; padding: 4px; list-style: none; background: var(--t-raised); border: 1px solid var(--t-line-strong); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); }
+.msel-list li { display: flex; gap: 8px; align-items: center; padding: 6px 8px; border-radius: 6px; font-size: 12.5px; cursor: pointer; }
+.msel-list li.on { background: var(--t-line); }
+.msel-list li .t3 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msel-list li.src { cursor: default; font-size: 11px; border-top: 1px dashed var(--t-line); border-radius: 0; margin-top: 4px; }
+.msel-list .def { font-size: 11px; color: var(--t-primary); }
+.msel-err { width: 100%; font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .starts .row2 { flex-direction: row; align-items: center; gap: 12px; }
 
 /* overview pages */

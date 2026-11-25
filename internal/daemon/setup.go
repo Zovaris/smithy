@@ -14,7 +14,9 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/text"
 )
 
@@ -66,6 +68,24 @@ func installedSkills() []string {
 		}
 	}
 	return out
+}
+
+// agentModels is GET /v1/agents/{id}/models[?refresh=1]: the models agent id reports, cached
+// for a day on this server.
+func (sv *Server) agentModels(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.PathValue("id"), "acp:")
+	p, api := strings.CutPrefix(id, "api:")
+	if _, known := apiloop.Providers[p]; !(api && known) && !slices.Contains(agents.CLIs, id) {
+		writeJSON(w, 404, map[string]string{"error": "no such agent: " + text.Clean(id)})
+		return
+	}
+	get := sv.Models
+	if get == nil {
+		get = func(ctx context.Context, agent string, refresh bool) models.List {
+			return models.Get(ctx, models.DefaultDeps(), agent, refresh)
+		}
+	}
+	writeJSON(w, 200, get(r.Context(), id, r.URL.Query().Get("refresh") == "1"))
 }
 
 func (sv *Server) setup(w http.ResponseWriter, r *http.Request) {

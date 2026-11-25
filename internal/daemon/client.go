@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/store"
 )
 
@@ -264,6 +265,17 @@ func (c *Client) Setup(ctx context.Context) (Setup, error) {
 	var s Setup
 	err := c.call(ctx, "GET", "/v1/setup", nil, &s)
 	return s, err
+}
+
+// Models is GET /v1/agents/{agent}/models: the models agent reports; refresh skips the day's cache.
+func (c *Client) Models(ctx context.Context, agent string, refresh bool) (models.List, error) {
+	var l models.List
+	p := "/v1/agents/" + url.PathEscape(agent) + "/models"
+	if refresh {
+		p += "?refresh=1"
+	}
+	err := c.call(ctx, "GET", p, nil, &l)
+	return l, err
 }
 
 // SetDefault is PUT /v1/setup/default: the agent and model new sessions start with.

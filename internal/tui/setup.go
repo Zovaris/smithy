@@ -5,12 +5,16 @@ package tui
 import (
 	"context"
 	"fmt"
+	"image/color"
 	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/models"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // setupAPI is the daemon's setup endpoints; *daemon.Client is one.
@@ -19,6 +23,18 @@ type setupAPI interface {
 	SetDefault(ctx context.Context, agent, model string) error
 	SetKit(ctx context.Context, k daemon.KitChoice) error
 	InstallSkills(ctx context.Context, harness string) (string, error)
+}
+
+// modelsAPI is the daemon's model list; *daemon.Client is one. A setupAPI without it gets
+// the typed field only.
+type modelsAPI interface {
+	Models(ctx context.Context, agent string, refresh bool) (models.List, error)
+}
+
+type modelsLoadedMsg struct {
+	agent string
+	l     models.List
+	err   error
 }
 
 type setupStep int
@@ -120,6 +136,17 @@ func (m chatView) setupUpdate(msg tea.Msg) (chatView, tea.Cmd, bool) {
 			m.system(msg.note)
 		}
 		return m, m.loadSetup(false), true
+	case modelsLoadedMsg:
+		if msg.agent != m.modelFor {
+			return m, nil, true
+		}
+		l := msg.l
+		if msg.err != nil {
+			l.Error = msg.err.Error()
+		}
+		m.modelList = &l
+		m.modelSel = m.currentModelRow()
+		return m, nil, true
 	case skillsInstalledMsg:
 		out := strings.TrimSpace(msg.out)
 		if msg.err != nil {
@@ -153,12 +180,73 @@ func (m *chatView) openPicker(o chatOverlay) {
 	}
 }
 
-// askModel opens the model step for agent (a CLI, or api:<provider> whose model is required).
-func (m *chatView) askModel(agent string) {
-	m.overlay, m.setupStep, m.modelFor, m.modelIn, m.setupNote = overlayPicker, stepModel, agent, "", ""
-	if m.setupSt != nil && m.setupSt.Default.Agent == agent {
-		m.modelIn = m.setupSt.Default.Model
+// askModel opens the model list for agent (a CLI, or api:<provider> whose model is required)
+// and fetches what the agent reports.
+func (m *chatView) askModel(agent string) tea.Cmd {
+	m.overlay, m.setupStep, m.modelFor, m.modelIn, m.setupNote, m.modelSel, m.modelList = overlayPicker, stepModel, agent, "", "", 0, nil
+	return m.loadModels(false)
+}
+
+func (m chatView) loadModels(refresh bool) tea.Cmd {
+	api, ok := m.setup.(modelsAPI)
+	if !ok {
+		return nil
 	}
+	agent := m.modelFor
+	return func() tea.Msg {
+		l, err := api.Models(context.Background(), agent, refresh)
+		return modelsLoadedMsg{agent: agent, l: l, err: err}
+	}
+}
+
+// modelRow is one line of the model list: the agent's default (id ""), a reported model, or
+// Other (the typed filter as a name).
+type modelRow struct {
+	m     models.Model
+	other bool
+}
+
+// modelRows are the rows the filter keeps: the agent default first (a CLI, no filter), the
+// reported models whose id or name holds the filter, and Other when the filter names none exactly.
+func (m chatView) modelRows() []modelRow {
+	f := strings.ToLower(strings.TrimSpace(m.modelIn))
+	var rows []modelRow
+	if f == "" && !strings.HasPrefix(m.modelFor, "api:") {
+		rows = append(rows, modelRow{})
+	}
+	exact := false
+	if m.modelList != nil {
+		for _, x := range m.modelList.Models {
+			if strings.Contains(strings.ToLower(x.ID), f) || strings.Contains(strings.ToLower(x.Name), f) {
+				rows = append(rows, modelRow{m: x})
+				exact = exact || strings.EqualFold(x.ID, f)
+			}
+		}
+	}
+	if f != "" && !exact {
+		rows = append(rows, modelRow{m: models.Model{ID: strings.TrimSpace(m.modelIn)}, other: true})
+	}
+	return rows
+}
+
+// currentModelRow is the row of the agent's saved model, else 0.
+func (m chatView) currentModelRow() int {
+	if m.setupSt == nil {
+		return 0
+	}
+	d := m.setupSt.Default
+	cur := d.Model
+	if strings.HasPrefix(m.modelFor, "api:") {
+		_, cur, _ = strings.Cut(d.Agent, "/")
+	} else if d.Agent != m.modelFor {
+		return 0
+	}
+	for i, r := range m.modelRows() {
+		if cur != "" && r.m.ID == cur {
+			return i
+		}
+	}
+	return 0
 }
 
 func (m chatView) agentLabel() string {
@@ -184,16 +272,15 @@ func (m chatView) readyRow(name string) (agents.Ready, bool) {
 	return agents.Ready{}, false
 }
 
-// pick acts on agent row a: a ready CLI becomes the default, an API provider asks for its model,
-// a missing one shows its fix.
+// pick acts on agent row a: an API provider, or any agent from the ctrl+l picker, shows its
+// models; a ready CLI on first run becomes the default; a missing one shows its fix.
 func (m *chatView) pick(a agents.Ready) tea.Cmd {
 	switch {
 	case !a.Ready:
 		m.setupNote = a.Name + " is missing: " + a.Fix
 		return nil
-	case a.Kind == "api":
-		m.askModel(a.Name)
-		return nil
+	case a.Kind == "api" || m.overlay == overlayPicker:
+		return m.askModel(a.Name)
 	}
 	return m.saveDefault(a.Name, "")
 }
@@ -229,14 +316,12 @@ func (m chatView) modelCommand(arg string) (tea.Model, tea.Cmd) {
 	if p, ok := strings.CutPrefix(cur, "api:"); ok {
 		prov, _, _ := strings.Cut(p, "/")
 		if arg == "" {
-			m.askModel("api:" + prov)
-			return m, nil
+			return m, m.askModel("api:" + prov)
 		}
 		return m, m.saveDefault("api:"+prov+"/"+arg, "")
 	}
 	if arg == "" {
-		m.askModel(cur)
-		return m, nil
+		return m, m.askModel(cur)
 	}
 	return m, m.saveDefault(cur, arg)
 }
@@ -251,29 +336,7 @@ func (m chatView) setupKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.skillsKey(msg)
 	}
 	if m.setupStep == stepModel {
-		switch k {
-		case "esc":
-			m.overlay = overlayNone
-		case "backspace":
-			if r := []rune(m.modelIn); len(r) > 0 {
-				m.modelIn = string(r[:len(r)-1])
-			}
-		case "enter":
-			mod := strings.TrimSpace(m.modelIn)
-			if strings.HasPrefix(m.modelFor, "api:") {
-				if mod == "" {
-					m.setupNote = "an API agent needs a model"
-					return m, nil
-				}
-				return m, m.saveDefault(m.modelFor+"/"+mod, "")
-			}
-			return m, m.saveDefault(m.modelFor, mod)
-		default:
-			if msg.Text != "" && msg.Text != " " {
-				m.modelIn += msg.Text
-			}
-		}
-		return m, nil
+		return m.modelKey(msg)
 	}
 	var rows []agents.Ready
 	if m.setupSt != nil {
@@ -290,11 +353,49 @@ func (m chatView) setupKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.setupNote = ""
 	case "m":
 		if m.setupSel < len(rows) && rows[m.setupSel].Ready {
-			m.askModel(rows[m.setupSel].Name)
+			return m, m.askModel(rows[m.setupSel].Name)
 		}
 	case "enter":
 		if m.setupSel < len(rows) {
 			return m, m.pick(rows[m.setupSel])
+		}
+	}
+	return m, nil
+}
+
+// modelKey handles the model list: type to filter, ↑↓ to move, enter to save, ctrl+r to ask
+// the agent again.
+func (m chatView) modelKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	rows := m.modelRows()
+	switch msg.String() {
+	case "esc":
+		m.overlay = overlayNone
+	case "up":
+		m.modelSel = max(m.modelSel-1, 0)
+	case "down":
+		m.modelSel = min(m.modelSel+1, max(len(rows)-1, 0))
+	case "ctrl+r":
+		m.modelList = nil
+		return m, m.loadModels(true)
+	case "backspace":
+		if r := []rune(m.modelIn); len(r) > 0 {
+			m.modelIn, m.modelSel = string(r[:len(r)-1]), 0
+		}
+	case "enter":
+		if m.modelSel >= len(rows) {
+			if strings.HasPrefix(m.modelFor, "api:") {
+				m.setupNote = "an API agent needs a model: type its name"
+			}
+			return m, nil
+		}
+		mod := rows[m.modelSel].m.ID
+		if strings.HasPrefix(m.modelFor, "api:") {
+			return m, m.saveDefault(m.modelFor+"/"+mod, "")
+		}
+		return m, m.saveDefault(m.modelFor, mod)
+	default:
+		if msg.Text != "" && msg.Text != " " {
+			m.modelIn, m.modelSel = m.modelIn+msg.Text, 0
 		}
 	}
 	return m, nil
@@ -363,17 +464,7 @@ func (m chatView) setupPanel(w int) []string {
 		return m.panel(w, rows)
 	}
 	if m.setupStep == stepModel {
-		rows = append(rows, "  "+strong.Render("Model for "+m.modelFor),
-			"  "+t.fg(t.accent).Render(t.g.prompt)+" "+t.fg(t.text).Render(m.modelIn)+t.fg(t.accent).Render("▏"))
-		hint := "empty: the agent's own default"
-		if strings.HasPrefix(m.modelFor, "api:") {
-			hint = "required, e.g. claude-sonnet-5-5"
-		}
-		rows = append(rows, "  "+dim.Render(hint), "")
-		if m.setupNote != "" {
-			rows = append(rows, "  "+t.fg(t.warn).Render(m.setupNote))
-		}
-		return m.panel(w, append(rows, "", dim.Render("  enter save   esc cancel")))
+		return m.modelPanel(w)
 	}
 	kind := ""
 	for i, a := range m.setupSt.Agents {
@@ -409,6 +500,95 @@ func (m chatView) setupPanel(w int) []string {
 	}
 	foot := dim.Render("  ↑↓ move   enter pick   m model   esc " + map[bool]string{true: "later", false: "close"}[m.overlay == overlaySetup])
 	n := m.rows()
+	if len(rows) >= n {
+		rows = rows[:n-1]
+	}
+	for len(rows) < n-1 {
+		rows = append(rows, "")
+	}
+	return m.panel(w, append(rows, foot))
+}
+
+// modelPanel is the model list for m.modelFor: the filter, the rows that match it in two
+// aligned columns and where the list came from. Every segment carries the panel's background so
+// no cell falls back to the terminal's.
+func (m chatView) modelPanel(w int) []string {
+	t := m.th
+	on := func(c color.Color) lipgloss.Style {
+		st := t.fg(c)
+		if t.overlay != nil {
+			st = st.Background(t.overlay)
+		}
+		return st
+	}
+	dim, strong, text := on(t.dim), on(t.strong), on(t.text)
+	sp := func(n int) string { return on(nil).Render(strings.Repeat(" ", max(n, 0))) }
+	row := func(sel bool, s string) string {
+		if sel {
+			return on(t.accent).Render(t.g.sel) + sp(1) + s
+		}
+		return sp(2) + s
+	}
+	hint := ""
+	if m.modelIn == "" {
+		hint = dim.Render("  type to filter")
+	}
+	title, closeHint := sp(2)+strong.Render("Model for "+m.modelFor), dim.Render("esc close")+sp(2)
+	rows := []string{"", title + sp(w-ansi.StringWidth(title)-ansi.StringWidth(closeHint)) + closeHint, "",
+		sp(2) + on(t.accent).Render(t.g.prompt) + sp(1) + text.Render(m.modelIn) + on(t.accent).Render("▏") + hint, ""}
+	list := m.modelRows()
+	idW := 0
+	for _, r := range list {
+		idW = max(idW, ansi.StringWidth(r.m.ID))
+	}
+	idW = min(max(idW, len("agent default")), max(w/2, 20))
+	n := m.rows()
+	room := max(n-len(rows)-4, 3)
+	from := 0
+	if m.modelSel >= room {
+		from = m.modelSel - room + 1
+	}
+	for i := from; i < len(list) && i < from+room; i++ {
+		r := list[i]
+		var left, right string
+		switch {
+		case r.other:
+			left, right = strong.Render("Other: ")+text.Render(r.m.ID), dim.Render("use this name as typed")
+		case r.m.ID == "":
+			left, right = strong.Render("agent default"), dim.Render("whatever "+m.modelFor+" starts with")
+		default:
+			left = text.Render(ansi.Truncate(r.m.ID, idW, "…"))
+			var parts []string
+			if r.m.Name != "" && r.m.Name != r.m.ID {
+				parts = append(parts, r.m.Name)
+			}
+			if r.m.InPerM != nil && r.m.OutPerM != nil {
+				parts = append(parts, fmt.Sprintf("$%.2f/$%.2f per M", *r.m.InPerM, *r.m.OutPerM))
+			}
+			tag := ""
+			if r.m.Default {
+				tag = sp(2) + on(t.accent).Render(t.g.on+" default")
+			}
+			rest := max(w-idW-8-ansi.StringWidth(tag), 8)
+			right = dim.Render(ansi.Truncate(strings.Join(parts, "  "), rest, "…")) + tag
+		}
+		line := left + sp(idW-ansi.StringWidth(left)+2) + right
+		rows = append(rows, row(i == m.modelSel, line))
+	}
+	if m.modelList == nil {
+		rows = append(rows, sp(2)+dim.Render("asking "+m.modelFor+" for its models…"))
+	}
+	rows = append(rows, "")
+	if l := m.modelList; l != nil {
+		if l.Error != "" {
+			rows = append(rows, sp(2)+on(t.warn).Render(ansi.Truncate(l.Error, w-4, "…")))
+		}
+		rows = append(rows, sp(2)+dim.Render(fmt.Sprintf("%d models from %s", len(l.Models), l.Source)))
+	}
+	if m.setupNote != "" {
+		rows = append(rows, sp(2)+on(t.warn).Render(m.setupNote))
+	}
+	foot := dim.Render("  type filter   ↑↓ move   enter save   ctrl+r ask again   esc cancel")
 	if len(rows) >= n {
 		rows = rows[:n-1]
 	}

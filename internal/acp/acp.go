@@ -101,27 +101,11 @@ type client struct {
 // Run initializes the agent, opens a session in s.Cwd with no MCP servers, sends s.Prompt and
 // returns when the prompt turn ends. from is the agent's stdout, to its stdin.
 func Run(from io.Reader, to io.Writer, s Session, sink Sink) (Result, error) {
-	in := bufio.NewScanner(from)
-	in.Buffer(make([]byte, 64<<10), 16<<20)
-	c := &client{in: in, out: to, sink: sink, tools: map[string]Tool{}}
-	var init struct {
-		ProtocolVersion int `json:"protocolVersion"`
-	}
-	err := c.call("initialize", map[string]any{
-		"protocolVersion":    ProtocolVersion,
-		"clientCapabilities": map[string]any{"fs": map[string]bool{"readTextFile": false, "writeTextFile": false}, "terminal": false},
-		"clientInfo":         map[string]string{"name": "smithy"},
-	}, &init)
-	if err != nil {
-		return c.res, err
-	}
-	if init.ProtocolVersion != ProtocolVersion {
-		return c.res, fmt.Errorf("acp: agent speaks protocol version %d, smithy speaks %d", init.ProtocolVersion, ProtocolVersion)
-	}
+	c := newClient(from, to, sink)
 	var sess struct {
 		SessionID string `json:"sessionId"`
 	}
-	if err := c.call("session/new", map[string]any{"cwd": s.Cwd, "mcpServers": []any{}}, &sess); err != nil {
+	if err := c.open(s.Cwd, &sess); err != nil {
 		return c.res, err
 	}
 	if sess.SessionID == "" {
@@ -136,7 +120,7 @@ func Run(from io.Reader, to io.Writer, s Session, sink Sink) (Result, error) {
 			CacheWrite int64 `json:"cachedWriteTokens"`
 		} `json:"usage"`
 	}
-	err = c.call("session/prompt", map[string]any{
+	err := c.call("session/prompt", map[string]any{
 		"sessionId": sess.SessionID,
 		"prompt":    []map[string]string{{"type": "text", "text": s.Prompt}},
 	}, &done)
@@ -149,6 +133,32 @@ func Run(from io.Reader, to io.Writer, s Session, sink Sink) (Result, error) {
 		c.res.Usage.Input, c.res.Usage.Output, c.res.Usage.CacheRead, c.res.Usage.CacheWrite = u.Input, u.Output, u.CacheRead, u.CacheWrite
 	}
 	return c.res, nil
+}
+
+func newClient(from io.Reader, to io.Writer, sink Sink) *client {
+	in := bufio.NewScanner(from)
+	in.Buffer(make([]byte, 64<<10), 16<<20)
+	return &client{in: in, out: to, sink: sink, tools: map[string]Tool{}}
+}
+
+// open initializes the agent and opens a session in cwd with no MCP servers; sess gets the
+// session/new answer.
+func (c *client) open(cwd string, sess any) error {
+	var init struct {
+		ProtocolVersion int `json:"protocolVersion"`
+	}
+	err := c.call("initialize", map[string]any{
+		"protocolVersion":    ProtocolVersion,
+		"clientCapabilities": map[string]any{"fs": map[string]bool{"readTextFile": false, "writeTextFile": false}, "terminal": false},
+		"clientInfo":         map[string]string{"name": "smithy"},
+	}, &init)
+	if err != nil {
+		return err
+	}
+	if init.ProtocolVersion != ProtocolVersion {
+		return fmt.Errorf("acp: agent speaks protocol version %d, smithy speaks %d", init.ProtocolVersion, ProtocolVersion)
+	}
+	return c.call("session/new", map[string]any{"cwd": cwd, "mcpServers": []any{}}, sess)
 }
 
 func (c *client) send(m message) error {
