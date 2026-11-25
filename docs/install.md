@@ -46,7 +46,7 @@ curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/uninstall.sh | 
 
 It lists everything it would remove, with sizes, then asks (without a terminal it needs `--yes`):
 the installed versions and the `smithy` command (plus the old `~/.smithy/bin`), the skill folders
-`smithy skills install` wrote (only those), a running daemon, `smithy-*` container images, the
+`smithy skills install` wrote (only those), a running daemon, `smithy-*` container images left by older versions, the
 `smithy-internal`/`smithy-egress` networks, and the PATH line install.sh or setup added.
 `~/.smithy` stays unless you pass `--purge`, and then only after you type `purge` (without a
 terminal: `--purge --confirm-purge`). Skills installed with `npx skills` are removed with
