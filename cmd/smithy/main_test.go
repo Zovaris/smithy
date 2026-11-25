@@ -418,3 +418,15 @@ func TestCleanupRemovesABranchWhoseCommitsAnotherBranchHas(t *testing.T) {
 		t.Fatalf("exit %d, out %q, err %q", code, out, e)
 	}
 }
+
+func TestCleanupBuildsDryRun(t *testing.T) {
+	repo, env := sandbox(t)
+	out, e, code := run(t, repo, env, "cleanup", "builds", "--nope")
+	if code != 2 || !strings.Contains(e, "smithy cleanup builds [--yes]") {
+		t.Errorf("cleanup builds --nope: exit %d, out %q, err %q", code, out, e)
+	}
+	out, e, code = run(t, repo, env, "cleanup", "builds")
+	if code != 0 || strings.Contains(out, "removed") {
+		t.Errorf("cleanup builds: exit %d, out %q, err %q", code, out, e)
+	}
+}
