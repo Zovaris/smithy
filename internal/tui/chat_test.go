@@ -4,6 +4,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 
@@ -114,8 +115,12 @@ func BenchmarkChatView10k(b *testing.B) {
 }
 
 func TestChatView10kFast(t *testing.T) {
+	limit := int64(5_000_000)
+	if os.Getenv("CI") != "" {
+		limit = 25_000_000 // shared runners are noisy; still catches a non-virtualized transcript
+	}
 	r := testing.Benchmark(BenchmarkChatView10k)
-	if ns := r.NsPerOp(); ns > 5_000_000 {
-		t.Fatalf("a frame of a 10k-message chat took %dns, want < 5ms", ns)
+	if ns := r.NsPerOp(); ns > limit {
+		t.Fatalf("a frame of a 10k-message chat took %dns, want < %dns", ns, limit)
 	}
 }
