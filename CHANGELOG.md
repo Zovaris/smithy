@@ -15,6 +15,10 @@ part above `### Details`.
 ### Details
 
 - Added: `auto.retry_stronger` (default `true`): the first `smithy auto report <ref> blocked` for a launched issue requeues it at the head of the queue on the next tier (cheap → mid → strong; unlabeled → strong), prints `auto retry <ref> on <tier>` and records a `retry_stronger` event; a second failure or one on strong is reported blocked.
+### Details
+
+- `smithy search --code [--regex] "<query>"` searches the whole repo (ignored, hidden and binary files skipped) through the new `internal/search`: the ripgrep shipped next to the binary, rg on PATH, `git ls-files` in a repo or a stdlib walk, with caps on matches, line length (220) and bytes (64 KB); `SMITHY_RG=<path>|off` overrides. Docs search is unchanged.
+- Releases ship ripgrep 14.1.1 per platform as `smithy-rg-<os>-<arch>` plus `ripgrep-LICENSE.txt` (MIT or Unlicense): `scripts/fetch-ripgrep.sh` downloads each archive against pinned sha256 sums, and the build attestation covers them. `install.sh` installs it next to smithy after the same checksum and attestation checks, best effort.
 
 ## v0.20.0 — 2026-11-25
 
