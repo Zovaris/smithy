@@ -13,6 +13,7 @@ import (
 	"github.com/Zovaris/smithy/internal/board"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/guard"
 	"github.com/Zovaris/smithy/internal/mcp"
 	"github.com/Zovaris/smithy/internal/proxy"
 	"github.com/Zovaris/smithy/internal/store"
@@ -29,6 +30,16 @@ An MCP server on stdin/stdout (harness build) that smithy agent gives every driv
 func init() {
 	if exe, err := os.Executable(); err == nil {
 		agents.KitMCP = []string{exe, "mcp"}
+		agents.KitGuard = guard.HookSettings
+	}
+	guard.HookGuard = func() guard.Guard {
+		return guard.Guard{Connect: func() (guard.Asker, error) {
+			a, err := daemon.LocalAsker()
+			if err != nil {
+				return nil, err
+			}
+			return a, nil
+		}}
 	}
 	register("mcp", harnessSummary["mcp"], mcpUsage, "--readonly", func(args []string) int {
 		ro := len(args) == 1 && args[0] == "--readonly"
