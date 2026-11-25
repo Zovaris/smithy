@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Zovaris/smithy/internal/apiloop"
+	"github.com/Zovaris/smithy/internal/apiloop/tools"
 	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
@@ -136,10 +137,9 @@ func runAPI(o Options, cli string) int {
 	}
 	defer cancel()
 	item := wardenItem(o.Log)
-	var tools apiloop.Tools
-	tools = withCodeMode(tools, config.Get("agent.code_mode", "false") == "true")
+	loopTools := withCodeMode(apiTools(o, model), config.Get("agent.code_mode", "false") == "true")
 	res, err := apiloop.Run(ctx, p, apiloop.Request{Model: model, Messages: []apiloop.Message{apiloop.UserText(strings.TrimSpace(string(prompt)))}},
-		tools, apiSink{out: out, item: item, log: o.Log}, apiloop.Options{Provider: name})
+		loopTools, apiSink{out: out, item: item, log: o.Log}, apiloop.Options{Provider: name})
 	fmt.Fprintln(out)
 	rc := 0
 	switch {
@@ -172,6 +172,13 @@ func runAPI(o Options, cli string) int {
 		os.Remove(out.Name())
 	}
 	return rc
+}
+
+// apiTools is the core tool set under the --profile auto rules: AutoTools allowed, AutoDenied
+// (with SecretDenied) winning, and fetch limited to the sandbox domain allow-list.
+func apiTools(o Options, model string) *tools.Set {
+	extra, _ := SandboxSetting("auto.sandbox_domains", "")
+	return &tools.Set{Cwd: o.Cwd, Model: model, Allow: AutoTools(o.SmithyBins), Deny: AutoDenied(o.SmithyBins), Hosts: SandboxDomains(extra)}
 }
 
 func openLog(o Options) (*os.File, string, error) {
