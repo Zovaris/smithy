@@ -99,8 +99,8 @@ func TestChatStreamResumesAfterLastSeq(t *testing.T) {
 	m = chatStep(m, daemon.ClientMsg{Err: fmt.Errorf("lost")})
 	m = chatStep(m, ev(1, "log", map[string]string{"line": "cycle started"}))
 	m = chatStep(m, ev(2, daemon.KindAsked, daemon.Decision{ID: "d1", Question: "merge?"}))
-	if len(m.msgs) != 2 || m.last != 2 || m.conn != "reconnecting" {
-		t.Fatalf("msgs %d last %d conn %s", len(m.msgs), m.last, m.conn)
+	if len(m.noise) != 2 || len(m.pending) != 1 || m.last != 2 || m.conn != "reconnecting" {
+		t.Fatalf("noise %d pending %d last %d conn %s", len(m.noise), len(m.pending), m.last, m.conn)
 	}
 }
 

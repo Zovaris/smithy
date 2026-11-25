@@ -27,15 +27,16 @@ func newChatScene() chatView {
 	m := newChatView(nil, "http://127.0.0.1:7477", newTheme(true, colorprofile.Ascii, true))
 	m.width, m.height = 100, 32
 	m.setPending([]daemon.Decision{{ID: "d1", Question: "Merge #142 into release/v0.17?", Options: []string{"merge", "later"}}})
+	m.current = "TK-6"
 	m.push(chatMsg{who: "you", text: "Add usage-limit detection for Pi (TK-6)."})
 	steps := []daemon.ClientMsg{
 		sev(1, "thinking", "TK-6", map[string]string{"text": "Pi's limit errors are typed classes; match their names, not prose."}),
-		sev(2, "log", "TK-6", map[string]string{"line": "Pi prints its limit errors from packages/ai/src/errors.ts."}),
+		sev(2, daemon.KindSessionText, "TK-6", map[string]string{"text": "Pi prints its limit errors from packages/ai/src/errors.ts. I'll match those near the end of a failed run."}),
 		sev(3, "tool", "TK-6", chatTool{Name: "Read", Arg: "internal/pool/detect.go", Stat: "134 lines", Took: "0.1s", Status: "ok", Lines: []string{"134 lines read"}}),
 		sev(4, "tool", "TK-6", chatTool{Name: "Grep", Arg: `"LimitError" in pi`, Stat: "2 matches", Took: "0.4s", Status: "ok", Lines: []string{"packages/ai/src/errors.ts:41  class GoUsageLimitError"}}),
 		sev(5, "tool", "TK-6", chatTool{Name: "Edit", Arg: "internal/pool/detect.go", Stat: "+6 −1", Took: "0.2s", Status: "ok", Lines: []string{"+\tpiLimitRe = regexp.MustCompile(`GoUsageLimitError`)"}}),
 		sev(6, "tool", "TK-6", chatTool{Name: "Bash", Arg: "go test ./internal/pool", Stat: "exit 0", Took: "3.8s", Status: "ok", Lines: []string{"ok  github.com/Zovaris/smithy/internal/pool 0.61s"}}),
-		sev(7, "log", "TK-6", map[string]string{"line": "Done: a Pi limit now marks the account limited until its reset."}),
+		sev(7, daemon.KindSessionMessage, "TK-6", map[string]string{"role": "agent", "text": "Done: a Pi limit now marks the account limited until its reset."}),
 		sev(8, "turn", "TK-6", map[string]string{"text": "turn · 4 tools · in 18.2k · out 1.1k · $0.06 · 4.5s"}),
 		sev(9, "running", "TK-29", nil),
 		sev(10, "failed", "TES-9", nil),
@@ -47,6 +48,7 @@ func newChatScene() chatView {
 	for _, c := range m.msgs {
 		c.at, c.lines = "", nil
 	}
+	m.noise = nil
 	return m
 }
 
@@ -96,12 +98,12 @@ func TestChatModesCycleWithV(t *testing.T) {
 		t.Fatalf("starts in %v", m.mode)
 	}
 	out := screen(m)
-	if !strings.Contains(out, "✓ Read · Grep · Edit · Bash") || strings.Contains(out, "134 lines read") || strings.Contains(out, "typed classes") {
+	if !strings.Contains(out, "✓  Read · Grep · Edit detect.go +6 −1 · Bash go test ok") || strings.Contains(out, "134 lines read") || strings.Contains(out, "typed classes") {
 		t.Fatalf("minimal shows tool details:\n%s", out)
 	}
 	m = chatStep(m, ckey("v"))
 	out = screen(m)
-	if m.mode != modeExpandable || !strings.Contains(out, "▸ ✓ Grep") || strings.Contains(out, "134 lines read") {
+	if m.mode != modeExpandable || !strings.Contains(out, "✓  Grep  \"LimitError\" in pi") || strings.Contains(out, "134 lines read") {
 		t.Fatalf("expandable:\n%s", out)
 	}
 	m = chatStep(m, ckey("v"))
@@ -137,7 +139,7 @@ func TestChatClickExpandsToolBlock(t *testing.T) {
 func TestChatClickMinimalSummaryOpensRun(t *testing.T) {
 	m := newChatScene()
 	m = chatStep(m, tea.MouseClickMsg{X: 5, Y: rowOf(t, m, "Read · Grep"), Button: tea.MouseLeft})
-	if out := screen(m); !strings.Contains(out, "✓ Bash") || strings.Contains(out, "Read · Grep") {
+	if out := screen(m); !strings.Contains(out, "✓  Bash") || strings.Contains(out, "Read · Grep") {
 		t.Fatalf("summary click did not open the run:\n%s", out)
 	}
 }
@@ -149,7 +151,7 @@ func TestChatStickyStripAnswersDecision(t *testing.T) {
 		got = append(got, id+"="+answer)
 		return func() tea.Msg { return chatDecidedMsg{id: id} }
 	}
-	if rowOf(t, m, "Merge #142") != 0 {
+	if rowOf(t, m, "Merge #142") != 2 {
 		t.Fatal("waiting decision is not the top row")
 	}
 	n, cmd := m.Update(ckey("m"))
@@ -164,8 +166,8 @@ func TestChatStickyStripAnswersDecision(t *testing.T) {
 
 	m = newChatScene()
 	m.decide = func(id, answer string) tea.Cmd { got = append(got, id+"="+answer); return nil }
-	l := strings.Split(screen(m), "\n")[0]
-	m = chatStep(m, tea.MouseClickMsg{X: strings.Index(l, "later") - 2, Y: 0, Button: tea.MouseLeft})
+	l := strings.Split(screen(m), "\n")[2]
+	m = chatStep(m, tea.MouseClickMsg{X: ansi.StringWidth(l[:strings.Index(l, "later")]) - 1, Y: 2, Button: tea.MouseLeft})
 	if got[len(got)-1] != "d1=later" {
 		t.Fatalf("click on an option: %v", got)
 	}
@@ -176,7 +178,7 @@ func TestChatStickyStripAnswersDecision(t *testing.T) {
 		t.Fatal("an answer from elsewhere leaves the strip")
 	}
 	m = chatStep(m, ev(21, daemon.KindAsked, daemon.Decision{ID: "d2", Question: "Approve secret POST?"}))
-	if len(m.pending) != 1 || rowOf(t, m, "Approve secret POST?") != 0 {
+	if len(m.pending) != 1 || rowOf(t, m, "Approve secret POST?") != 2 {
 		t.Fatal("new decision not on the strip")
 	}
 	m.decide = func(id, answer string) tea.Cmd { got = append(got, id+"="+answer); return nil }
@@ -198,7 +200,7 @@ func TestChatDecideErrorIsShown(t *testing.T) {
 func TestChatAgentsOverlay(t *testing.T) {
 	m := chatStep(newChatScene(), ckey("tab"))
 	out := screen(m)
-	for _, s := range []string{"Agents", "1 running", "● TK-29", "✗ TES-9", "? d1"} {
+	for _, s := range []string{"Agents", "1 running", "●  TK-29", "✗  TES-9", "Waiting on you", "?  Merge #142"} {
 		if !strings.Contains(out, s) {
 			t.Fatalf("agents overlay missing %q:\n%s", s, out)
 		}
@@ -221,7 +223,7 @@ func TestChatPalette(t *testing.T) {
 		}
 	}
 	m = typeIn(m, "verb")
-	if out = screen(m); strings.Contains(out, "TK-29") || !strings.Contains(out, "Verbosity") {
+	if out = screen(m); len(m.palItems()) != 1 || !strings.Contains(out, "Verbosity") || !strings.Contains(out, "1 results") {
 		t.Fatalf("filter:\n%s", out)
 	}
 	m = chatStep(m, ckey("enter"))
@@ -259,8 +261,8 @@ func TestChatSlashCommands(t *testing.T) {
 	if _, cmd := typeIn(m, "/quit").Update(ckey("enter")); cmd == nil {
 		t.Fatal("/quit did not quit")
 	}
-	if _, cmd := m.Update(ckey("esc")); cmd == nil {
-		t.Fatal("esc with no overlay should quit")
+	if _, cmd := m.Update(ckey("esc")); cmd != nil {
+		t.Fatal("esc with no overlay must not quit; ctrl+c does")
 	}
 }
 

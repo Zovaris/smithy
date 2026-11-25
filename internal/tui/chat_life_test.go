@@ -44,24 +44,6 @@ func TestParseChatArgs(t *testing.T) {
 	}
 }
 
-func TestFooterSaysWhereTheDaemonRuns(t *testing.T) {
-	m := newChatTest(0)
-	m.width = 160
-	m.where = whereBackground
-	f := ansi.Strip(m.footer(160))
-	if !strings.Contains(f, "background") || !strings.Contains(f, "smithy stop") {
-		t.Fatalf("footer does not say the daemon runs in the background and how to stop it: %q", f)
-	}
-	m.where = whereStandalone
-	if f := ansi.Strip(m.footer(160)); !strings.Contains(f, "standalone") || strings.Contains(f, "smithy stop") {
-		t.Fatalf("standalone footer: %q", f)
-	}
-	m.where = whereRemote
-	if f := ansi.Strip(m.footer(160)); strings.Contains(f, "smithy stop") {
-		t.Fatalf("remote footer offers smithy stop: %q", f)
-	}
-}
-
 func TestStartedNoteExplainsBackground(t *testing.T) {
 	n := startedNote(&daemon.Info{PID: 42, Addr: "127.0.0.1:7477"}, 30*time.Minute)
 	for _, want := range []string{"pid 42", "background", "smithy stop", "30m"} {
@@ -79,12 +61,13 @@ func TestShortDur(t *testing.T) {
 	}
 }
 
-func TestNarrowFooterKeepsStopHint(t *testing.T) {
+func TestNarrowStatusLineKeepsStopHint(t *testing.T) {
 	m := newChatTest(0)
 	m.where = whereBackground
-	f := ansi.Strip(m.footer(110))
+	m.status("serve: poll: github: To get started with GitHub CLI, please run: gh auth login")
+	f := ansi.Strip(m.statusLine(100))
 	if !strings.Contains(f, "smithy stop") {
-		t.Fatalf("at 110 columns the footer lost the stop hint: %q", f)
+		t.Fatalf("at 100 columns the status line lost the stop hint: %q", f)
 	}
 }
 
