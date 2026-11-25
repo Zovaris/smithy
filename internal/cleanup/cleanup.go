@@ -1,46 +1,27 @@
-// Package cleanup runs `smithy cleanup builds`: old smithy builds, stale sandbox images and
+// Package cleanup runs `smithy cleanup builds`: old smithy builds,
 // stale worktrees, listed by default and deleted only with --yes.
 package cleanup
 
 import (
-	"context"
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/layout"
 )
 
-const Usage = "usage: smithy cleanup builds [--yes]\n  lists old smithy builds in ~/.local/share/smithy and the old ~/.smithy/bin (keeps the current one and one previous; dev builds\n  after 14 days), stale smithy-* container images (not auto.sandbox_image) and stale worktrees of\n  the repo it runs in (clean including ignored files, not locked, with no commits beyond the base branch, not the folder it runs in), with the\n  space each takes; --yes deletes them. Worktrees with uncommitted changes are never touched."
+const Usage = "usage: smithy cleanup builds [--yes]\n  lists old smithy builds in ~/.local/share/smithy and the old ~/.smithy/bin (keeps the current one and one previous; dev builds\n  after 14 days) and stale worktrees of\n  the repo it runs in (clean including ignored files, not locked, with no commits beyond the base branch, not the folder it runs in), with the\n  space each takes; --yes deletes them. Worktrees with uncommitted changes are never touched."
 
-// Item is one thing cleanup can remove: a build folder, an image id or a worktree path.
+// Item is one thing cleanup can remove: a build folder or a worktree path.
 type Item struct {
 	Kind, Target, Size string
 	Bytes              int64
-}
-
-var engine = func(args ...string) (string, error) {
-	p := agents.HostProbe()
-	e := agents.ContainerEngine(p)
-	if e == "" {
-		return "", fmt.Errorf("no container engine")
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	c := exec.CommandContext(ctx, e, args...)
-	if set, _ := agents.DockerHost(e, p); set != "" {
-		c.Env = append(os.Environ(), "DOCKER_HOST="+set)
-	}
-	out, err := c.CombinedOutput()
-	return strings.TrimSpace(string(out)), err
 }
 
 func semver(s string) ([3]int, bool) {
@@ -137,29 +118,6 @@ func BuildsIn(bin, dev, link string) []Item {
 	return out
 }
 
-// Images picks smithy-* images from `image ls` lines (repo, tag, id, size; tab separated) that are
-// not the configured sandbox image.
-func Images(ls, keep string) []Item {
-	keepID := ""
-	var rows [][]string
-	for _, l := range strings.Split(ls, "\n") {
-		if f := strings.Split(l, "\t"); len(f) == 4 {
-			rows = append(rows, f)
-			if f[0]+":"+f[1] == keep {
-				keepID = f[2]
-			}
-		}
-	}
-	var out []Item
-	for _, f := range rows {
-		if !strings.HasPrefix(f[0], "smithy-") || f[1] == "<none>" || f[2] == keepID || f[0]+":"+f[1] == keep {
-			continue
-		}
-		out = append(out, Item{Kind: "image", Target: f[0] + ":" + f[1], Size: f[3]})
-	}
-	return out
-}
-
 func gitIn(dir string, args ...string) (string, error) {
 	return ghx.Run("git", append([]string{"-C", dir}, args...)...)
 }
@@ -237,11 +195,6 @@ func Main(args []string) int {
 		yes = true
 	}
 	items := append(BuildsIn(layout.VersionsDir(), layout.DevDir(), layout.Link()), Builds(layout.LegacyBin())...)
-	if keep, err := agents.SandboxSetting("auto.sandbox_image", agents.DefaultSandboxImage); err != nil {
-		fmt.Fprintln(os.Stderr, "smithy cleanup: skipped images:", err)
-	} else if ls, err := engine("image", "ls", "--format", "{{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}"); err == nil {
-		items = append(items, Images(ls, keep)...)
-	}
 	cwd, _ := os.Getwd()
 	if common, err := gitIn(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"); err == nil && filepath.Base(common) == ".git" {
 		repo := filepath.Dir(common)
@@ -273,11 +226,6 @@ func Main(args []string) int {
 		switch it.Kind {
 		case "build":
 			err = os.RemoveAll(it.Target)
-		case "image":
-			var out string
-			if out, err = engine("rmi", it.Target); err != nil {
-				err = fmt.Errorf("%v: %s", err, out)
-			}
 		case "worktree":
 			_, err = ghx.Run("git", "-C", it.Target, "worktree", "remove", it.Target)
 		}
@@ -292,7 +240,7 @@ func Main(args []string) int {
 	if yes {
 		verb = "freed"
 	}
-	fmt.Printf("%s %s on disk, plus the image sizes listed; %d item(s)\n", verb, human(total), len(items))
+	fmt.Printf("%s %s on disk; %d item(s)\n", verb, human(total), len(items))
 	if !yes {
 		fmt.Println("run smithy cleanup builds --yes to delete them")
 	}
