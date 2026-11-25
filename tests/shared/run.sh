@@ -254,6 +254,10 @@ echo 0.0.0 > "$L/VERSION"
 t "launcher: finds the new layout" '[ "$(env -u SMITHY_BIN HOME="$L/Ia" SMITHY_HOME="$L/Ia/.smithy" "$L/smithy" 2>"$L/err")" = fake-smithy ] && [ ! -s "$L/err" ]'
 t "launcher: falls back to ~/.local/bin/smithy with a notice" 'echo 9.9.9 > "$L/VERSION"; [ "$(env -u SMITHY_BIN HOME="$L/Ia" SMITHY_HOME="$L/Ia/.smithy" "$L/smithy" 2>"$L/err")" = fake-smithy ] && grep -q "using $L/Ia/.local/bin/smithy" "$L/err"'
 echo 0.0.0 > "$L/VERSION"
+# a checkout's dev build never takes over the smithy command on PATH
+D="$L/devco"; mkdir -p "$D/skills/x/scripts" "$D/cmd" "$D/internal" "$L/devgo"; echo "module github.com/Zovaris/smithy" > "$D/go.mod"; cp "$L/smithy" "$D/skills/x/scripts/smithy"
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = -o ] && { printf "#!/bin/sh\\necho dev-smithy\\n" > "$2"; chmod +x "$2"; }; shift; done\n' > "$L/devgo/go"; chmod +x "$L/devgo/go"
+t "launcher: dev build does not re-point ~/.local/bin/smithy" 'before=$(readlink "$L/Ia/.local/bin/smithy"); [ "$(env -u SMITHY_BIN HOME="$L/Ia" SMITHY_HOME="$L/Ia/.smithy" PATH="$L/devgo:$L/sys" "$D/skills/x/scripts/smithy" 2>"$L/err")" = dev-smithy ] && [ "$(readlink "$L/Ia/.local/bin/smithy")" = "$before" ]'
 cp "$S/../uninstall.sh" "$L/uninstall.sh"
 U() { h=$1; shift; env -u SMITHY_TTY -u XDG_DATA_HOME -u XDG_BIN_HOME HOME="$L/I$h" SMITHY_HOME="$L/I$h/.smithy" PATH="$L/sys" sh "$L/uninstall.sh" "$@" 2>"$L/err"; }
 for h in y m; do mkdir -p "$L/I$h/.claude/skills/smelt" "$L/I$h/.claude/skills/mine"; touch "$L/I$h/.claude/skills/smelt/SKILL.md" "$L/I$h/.claude/skills/mine/SKILL.md" "$L/I$h/.smithy/auth.json" "$L/I$h/.local/bin/other"; echo "$L/I$h/.claude/skills/smelt" > "$L/I$h/.smithy/installed-skills"; done
