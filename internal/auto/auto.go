@@ -87,6 +87,7 @@ type State struct {
 	Launched map[string][]Launch  `json:"launched"`
 	LastPoll map[string]time.Time `json:"last_poll"`
 	Rate     map[string]int       `json:"rate,omitempty"`     // API requests left in the window, per source that reports it
+	Retried  map[string]string    `json:"retried,omitempty"`  // "<source>:<key>": model tier of its one stronger retry
 	Requeued map[string]int       `json:"requeued,omitempty"` // "<source>:<key>": times put back after an orchestrator started nothing
 }
 
@@ -190,6 +191,69 @@ func fromTask(file string) (body, model, speed string) {
 		body = ""
 	}
 	return body, model, speed
+}
+
+// nextTier is the model tier one step stronger than model ("" when none is); an unlabeled
+// issue (route decided) retries on strong.
+func nextTier(model string) string {
+	switch model {
+	case "cheap":
+		return "mid"
+	case "mid", "":
+		return "strong"
+	}
+	return ""
+}
+
+// Retry puts a failed launched issue (ref as Report takes it) back at the head of the queue on
+// the next model tier, once per issue, and records a retry_stronger event. ok is false when the
+// issue was already retried, is on the strongest tier or is not a launched issue.
+func Retry(ref string) (model string, ok bool, err error) {
+	name, id, hasSource := strings.Cut(ref, ":")
+	if !hasSource {
+		name, id = "", ref
+	}
+	var ev events.Event
+	err = update(func(st *State) error {
+		var hit *Launch
+		for _, ls := range st.Launched {
+			for i := range ls {
+				l := &ls[i]
+				if (l.ID == id || l.Key == id) && (name == "" || l.Source == name) && (hit == nil || l.At.After(hit.At)) {
+					hit = l
+				}
+			}
+		}
+		if hit == nil {
+			return nil
+		}
+		k := hit.Source + ":" + hit.Key
+		if _, done := st.Retried[k]; done {
+			return nil
+		}
+		q := Queued{Source: hit.Source, Key: hit.Key, ID: hit.ID, Title: hit.Title, URL: hit.URL, QueuedAt: now()}
+		var old string
+		if fs, _ := filepath.Glob(filepath.Join(hit.Dir, hit.Item+"-*.md")); hit.Dir != "" && hit.Item != "" && len(fs) == 1 {
+			q.Body, old, q.Speed = fromTask(fs[0])
+		}
+		if model = nextTier(old); model == "" {
+			return nil
+		}
+		q.Model = model
+		if st.Retried == nil {
+			st.Retried = map[string]string{}
+		}
+		st.Retried[k] = model
+		st.Queue = append([]Queued{q}, st.Queue...)
+		ok = true
+		ev = events.Event{T: now(), Kind: "retry_stronger", Source: hit.Source, ID: hit.ID, Batch: hit.Batch, Item: hit.Item,
+			Detail: fmt.Sprintf("failed on %s, retrying once on %s", orRoute(old), model)}
+		return nil
+	})
+	if ok {
+		events.Append(ev)
+	}
+	return model, ok, err
 }
 
 // Rater is a Source that reports its API rate-limit headroom after a poll.
@@ -303,17 +367,19 @@ type Settings struct {
 	MaxPerDay, Every                      int
 	Paused                                bool
 	MaxCostPerDay                         *float64 // auto.max_cost_per_day in USD; nil when unset
+	RetryStronger                         bool     // auto.retry_stronger
 }
 
 // LoadSettings reads the auto.* settings.
 func LoadSettings() (Settings, error) {
 	s := Settings{
-		Mode:        config.Get("auto.mode", "labeled"),
-		Label:       config.Get("auto.label", "auto"),
-		ModelPrefix: config.Get("auto.model_prefix", "model:"),
-		SpeedPrefix: config.Get("auto.speed_prefix", "speed:"),
-		Hours:       config.Get("auto.hours", ""),
-		Paused:      config.Get("auto.paused", "false") == "true",
+		Mode:          config.Get("auto.mode", "labeled"),
+		Label:         config.Get("auto.label", "auto"),
+		ModelPrefix:   config.Get("auto.model_prefix", "model:"),
+		SpeedPrefix:   config.Get("auto.speed_prefix", "speed:"),
+		Hours:         config.Get("auto.hours", ""),
+		Paused:        config.Get("auto.paused", "false") == "true",
+		RetryStronger: config.Get("auto.retry_stronger", "true") != "false",
 	}
 	for _, x := range strings.Split(config.Get("auto.sources", "github"), ",") {
 		if x = strings.TrimSpace(x); x != "" {
