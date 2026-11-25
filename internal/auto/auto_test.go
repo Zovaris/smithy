@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/tasks"
 )
@@ -489,5 +490,66 @@ func TestPollLogsEventsAndRate(t *testing.T) {
 	}
 	if st, _ := Load(); st.Rate["linear"] != 1234 {
 		t.Fatalf("rate = %v", st.Rate)
+	}
+}
+
+func TestRetryStrongerRequeuesOnceOnNextTier(t *testing.T) {
+	home(t)
+	plans := t.TempDir()
+	mk := func(slug string) (string, error) {
+		d := filepath.Join(plans, slug)
+		return d, os.MkdirAll(d, 0o755)
+	}
+	now = at("2026-01-01 10:00")
+	defer func() { now = time.Now }()
+	src := &fakeSource{name: "github", issues: []Issue{{ID: "7", Title: "fix", Body: "do it", Labels: []string{"auto", "model:cheap", "speed:fast"}}}}
+	if _, err := Poll(defaults(), []Source{src}, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Take(defaults(), 0, mk); err != nil {
+		t.Fatal(err)
+	}
+	model, ok, err := Retry("github:7")
+	if err != nil || !ok || model != "mid" {
+		t.Fatalf("first retry = %q %v %v", model, ok, err)
+	}
+	st, _ := Load()
+	if len(st.Queue) != 1 || st.Queue[0].Model != "mid" || st.Queue[0].Speed != "fast" || st.Queue[0].Body != "do it" {
+		t.Fatalf("queue = %+v", st.Queue)
+	}
+	es, _ := events.Read(time.Time{}, 0)
+	found := false
+	for _, e := range es {
+		if e.Kind == "retry_stronger" && e.ID == "7" && strings.Contains(e.Detail, "cheap") && strings.Contains(e.Detail, "mid") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("no retry_stronger event in %+v", es)
+	}
+	if _, err := Take(defaults(), 0, mk); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok, err := Retry("7"); ok || err != nil {
+		t.Errorf("second retry ok=%v err=%v; want once only", ok, err)
+	}
+}
+
+func TestNextTier(t *testing.T) {
+	for in, want := range map[string]string{"cheap": "mid", "mid": "strong", "": "strong", "strong": ""} {
+		if got := nextTier(in); got != want {
+			t.Errorf("nextTier(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestRetryStrongerSettingDefaultsOn(t *testing.T) {
+	home(t)
+	if s, err := LoadSettings(); err != nil || !s.RetryStronger {
+		t.Fatalf("default = %v %v", s.RetryStronger, err)
+	}
+	config.Set(config.UserFile(), "auto.retry_stronger", "false")
+	if s, _ := LoadSettings(); s.RetryStronger {
+		t.Fatal("off not honoured")
 	}
 }
