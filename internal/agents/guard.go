@@ -8,7 +8,7 @@ import (
 
 // secretPaths are the files no driven CLI should read: smithy's auth.json and pool accounts,
 // ssh, gh, aws, netrc and git credentials.
-var secretPaths = []string{"~/.smithy/auth.json", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"}
+var secretPaths = []string{"~/.smithy/auth.json", "~/.smithy/auth.key", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"}
 
 // SecretGuarded reports whether cli's own config can deny reads of the secret paths: claude
 // (deny rules) and opencode (permission config). codex, gemini, pi, cursor and dsh have no

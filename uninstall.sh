@@ -87,8 +87,8 @@ ownhome() {
   for e in "$home"/* "$home"/.[!.]* "$home"/..?*; do
     [ -e "$e" ] || [ -L "$e" ] || continue
     n=${e##*/}
-    case $n in auth.json|config.json|kind|installed-skills|smithy.db) key=1 ;; esac
-    case $n in auth.json|config.json|kind|installed-skills|path-added|accounts|pool.json|pool-state.json|bin|plans|warden|decisions|connect.json|notify.json|tasks-index.json|telegram.offset|tui.seen|checkout|tend|loose|auto|skills|smithy.db*|events*|daemon*|decide*|proxy*) ;;
+    case $n in auth.json|auth.key|config.json|kind|installed-skills|smithy.db) key=1 ;; esac
+    case $n in auth.json|auth.key|config.json|kind|installed-skills|path-added|accounts|pool.json|pool-state.json|bin|plans|warden|decisions|connect.json|notify.json|tasks-index.json|telegram.offset|tui.seen|checkout|tend|loose|auto|skills|smithy.db*|events*|daemon*|decide*|proxy*) ;;
       *) odd="$odd $n" ;;
     esac
   done

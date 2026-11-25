@@ -8,6 +8,7 @@ part above `### Details`.
 
 ## Unreleased
 
+- Stored keys are encrypted at rest: `~/.smithy/auth.json` is sealed with AES-GCM under `~/.smithy/auth.key`, which only smithy and its proxy read and every agent sandbox and deny list blocks. An existing plaintext `auth.json` is encrypted on first use without losing keys. No OS keychain, no password prompts.
 - `smithy agent --backend api --model <provider>/<model>` (and `auto.agent api:<provider>/<model>`, harness build) runs smithy's own agent loop (`internal/apiloop`) on the key from `smithy auth set <provider>`: Anthropic, OpenAI (Responses API), Gemini, and OpenRouter, DeepSeek or Ollama through openai-go's Chat Completions. Streaming text to the log, tool, permission and usage events like the CLI paths, prompt caching on Anthropic, retries with backoff on 429/5xx, cost from list prices or the provider's reported cost (ADR 0012).
 ### New
 

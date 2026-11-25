@@ -416,9 +416,9 @@ func NativeSettings(p SandboxPaths, domains []string, goos string, weakerNet boo
 	home, sm := p.Home, p.SmithyHome
 	fs := map[string][]string{
 		"allowWrite": keep(p.Cwd, p.GitDir, join(sm, "plans"), p.Warden, p.GoCache),
-		"denyWrite": keep(append([]string{join(sm, "auth.json"), join(sm, "config.json"), join(p.GitDir, "hooks"), join(p.GitDir, "config"),
+		"denyWrite": keep(append([]string{join(sm, "auth.json"), join(sm, "auth.key"), join(sm, "config.json"), join(p.GitDir, "hooks"), join(p.GitDir, "config"),
 			join(p.Cwd, ".claude"), join(p.Cwd, ".smithy/config.json")}, append(p.ReadOnly, p.Secret...)...)...),
-		"denyRead": keep(append([]string{join(sm, "auth.json"), join(sm, "daemon.token"), join(home, ".ssh"), join(home, ".aws"), join(home, ".netrc"), join(home, ".git-credentials"),
+		"denyRead": keep(append([]string{join(sm, "auth.json"), join(sm, "auth.key"), join(sm, "daemon.token"), join(home, ".ssh"), join(home, ".aws"), join(home, ".netrc"), join(home, ".git-credentials"),
 			join(home, ".gnupg")}, p.Secret...)...),
 	}
 	if p.SigningKey != "" && strings.HasSuffix(p.SigningKey, ".pub") && filepath.IsAbs(p.SigningKey) {

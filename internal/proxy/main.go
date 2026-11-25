@@ -20,7 +20,7 @@ import (
 // Usage is the text for `smithy proxy --help`.
 const Usage = `usage: smithy proxy serve [--addr :8877] [--allow host,...] [--ask-timeout 5m] | approve <id> | deny <id>
 serve is the egress proxy a container worker uses under auto.sandbox_network proxy (smithy agent
-starts it as the smithy-proxy sidecar, which sees only auth.json read-only and ~/.smithy/proxy): CONNECT only to --allow hosts on 443, and
+starts it as the smithy-proxy sidecar, which sees only auth.json and auth.key read-only and ~/.smithy/proxy): CONNECT only to --allow hosts on 443, and
 /s/<secret>/<path> sends a key bound with smithy auth bind to its host. A write held by an ask
 secret is logged as a secret_ask event; approve or deny it by id, else it is denied after --ask-timeout.`
 
