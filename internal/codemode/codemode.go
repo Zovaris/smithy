@@ -197,7 +197,7 @@ func (w *wrapped) exec(ctx context.Context, code string) (out string, err error)
 	var logs bytes.Buffer
 	rt, err := qjs.New(qjs.Option{
 		CWD:                jail,
-		Context:            experimental.WithMemoryAllocator(ctx, capAlloc(2*w.lim.Memory)),
+		Context:            experimental.WithMemoryAllocator(ctx, capAlloc(w.lim.Memory)),
 		CloseOnContextDone: true,
 		MemoryLimit:        w.lim.Memory,
 		Stdout:             &capped{b: &logs},
@@ -233,10 +233,21 @@ func (w *wrapped) exec(ctx context.Context, code string) (out string, err error)
 		if !offered[c.Name] {
 			return nil, fmt.Errorf("unknown tool %q", c.Name)
 		}
+		sink := apiloop.SinkFrom(ctx)
 		if ok, why := w.inner.Permit(c); !ok {
+			if sink != nil {
+				sink.Permission(c, false, why)
+			}
 			return nil, fmt.Errorf("permission denied for %s: %s", c.Name, why)
 		}
 		res, err := w.inner.Call(ctx, c)
+		if sink != nil {
+			r := apiloop.ToolResult{ID: c.ID, Name: c.Name, Output: res}
+			if err != nil {
+				r.Output, r.IsError = err.Error(), true
+			}
+			sink.Tool(c, r)
+		}
 		if err != nil {
 			return nil, err
 		}
