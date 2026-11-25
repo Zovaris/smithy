@@ -66,6 +66,10 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `linear.project` / `linear.milestone` / `linear.initiative` | unset | Name filters (project: a comma list; initiative via the issue's project). |
 | `linear.cycle` | unset | `current` or a cycle number. |
 | `linear.states` | `unstarted,backlog` | Linear workflow state types that count as new work. |
+| `session.agent` | (empty) | Agent a new session starts with when none is named: a CLI name, `acp:<cli>` or `api:<provider>/<model>`. The agent picker (`ctrl+l`, `/agent`, web Setup) sets it; empty is the last used, else the first installed CLI. |
+| `session.model` | (empty) | Model a new CLI session passes to its agent (`--model`); `/model` sets it; empty is the agent's own default. API agents carry the model in their name. |
+| `kit.mcp` | `true` | `false` stops giving driven CLIs smithy's own MCP server (`smithy mcp`). Toggled by `/skills` in the TUI and the web Setup screen. |
+| `kit.skills` | (empty) | Comma list of installed skills linked into every driven CLI that takes skills (claude, codex, opencode, gemini, pi). Toggled by `/skills`. |
 | `tui.reduce_motion` | `false` | `true` draws every `smithy tui` frame still: no sparks, shimmer or sliding bars (like `--no-anim` or `SMITHY_REDUCE_MOTION`). |
 | `git.branch` | `{type}/{key}-{slug}` | Branch names (`smithy names`); e.g. `agent/{key}-{slug}`. |
 | `git.worktree` | `{parent}/worktrees/{repo}-{branch}` | Where worktrees go. |

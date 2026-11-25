@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/Zovaris/smithy/internal/config"
 )
 
 // MCPServer is one stdio MCP server given to a driven CLI.
@@ -348,15 +350,41 @@ func mergeSettings(kit, own string) string {
 // nil in the skills build, which has no smithy mcp.
 var KitMCP []string
 
+// KitChoice is what the user chose to inject into every driven CLI (kit.mcp, kit.skills):
+// whether smithy's MCP server goes in, and which installed skills are linked in by name.
+func KitChoice() (mcp bool, skills []string) {
+	mcp = config.Get("kit.mcp", "true") != "false"
+	for _, s := range strings.Split(config.Get("kit.skills", ""), ",") {
+		if s = strings.TrimSpace(s); s != "" && !slices.Contains(skills, s) {
+			skills = append(skills, s)
+		}
+	}
+	return mcp, skills
+}
+
 // KitGuard turns the smithy binary into the Claude Code settings that run the dangerous-command
 // guard before every Bash call ("" when the guard is off); nil in the skills build.
 var KitGuard func(exe string) string
 
-// RunKit is the injection for one run: KitMCP as the "smithy" MCP server, told the run's warden
+// RunKit is the injection for one run (kit.mcp, kit.skills): KitMCP as the "smithy" MCP server, told the run's warden
 // card (SMITHY_MCP_CARD) and, for a --readonly run, to expose read-only tools. nil when there is
 // no kit or for a custom AGENT_CMD.
 func RunKit(cli string, o Options, getenv func(string) string) (*Injection, error) {
 	if len(KitMCP) == 0 || cli == "custom" {
+		return nil, nil
+	}
+	useMCP, skillNames := KitChoice()
+	var skills []string
+	for _, n := range skillNames {
+		if p, ok := FindSkill(n); ok {
+			skills = append(skills, filepath.Dir(p))
+		}
+	}
+	guard := ""
+	if KitGuard != nil && Kind(cli) == "claude" {
+		guard = KitGuard(KitMCP[0])
+	}
+	if !useMCP && len(skills) == 0 && guard == "" {
 		return nil, nil
 	}
 	args := slices.Clone(KitMCP[1:])
@@ -381,11 +409,12 @@ func RunKit(cli string, o Options, getenv func(string) string) (*Injection, erro
 		}
 		dir = d
 	}
-	kit := Kit{MCP: map[string]MCPServer{"smithy": {Command: KitMCP[0], Args: args, Env: env}}}
-	if KitGuard != nil && Kind(cli) == "claude" {
-		kit.Settings = KitGuard(KitMCP[0])
+	k := Kit{Skills: skills}
+	if useMCP {
+		k.MCP = map[string]MCPServer{"smithy": {Command: KitMCP[0], Args: args, Env: env}}
 	}
-	in, err := Inject(cli, kit, dir, PoolGetenv(o, getenv))
+	k.Settings = guard
+	in, err := Inject(cli, k, dir, PoolGetenv(o, getenv))
 	if o.Log == "" {
 		if err != nil {
 			os.RemoveAll(dir)

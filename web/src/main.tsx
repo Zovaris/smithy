@@ -14,6 +14,7 @@ const SCREENS: Record<RouteId, ComponentType> = {
   agents: lazy(() => import("./screens/agents")),
   board: lazy(() => import("./screens/board")),
   bench: lazy(() => import("./screens/bench")),
+  setup: lazy(() => import("./screens/setup")),
 };
 const Palette = lazy(() => import("./palette"));
 
@@ -51,7 +52,11 @@ function App() {
   const [pal, setPal] = useState(false);
   const [palUsed, setPalUsed] = useState(false);
   useEffect(() => {
-    if (auth.state === "ok") start();
+    if (auth.state !== "ok") return;
+    start();
+    // First run: no agent picked or used yet, so open Setup unless a screen was asked for.
+    if (!location.hash.replace(/^#\/?/, ""))
+      api("/v1/setup").then((r) => (r.ok ? r.json() : null)).then((s) => s && !s.chosen && (location.hash = "#/setup")).catch(() => {});
   }, [auth.state]);
   useEffect(() => {
     const on = (e: KeyboardEvent) => {

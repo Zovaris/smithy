@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 
-export type RouteId = "sessions" | "decisions" | "agents" | "board" | "bench";
+export type RouteId = "sessions" | "decisions" | "agents" | "board" | "bench" | "setup";
 
 export const ROUTES: { id: RouteId; label: string; key: string }[] = [
   { id: "sessions", label: "Sessions", key: "1" },
@@ -8,6 +8,7 @@ export const ROUTES: { id: RouteId; label: string; key: string }[] = [
   { id: "agents", label: "Agents", key: "3" },
   { id: "board", label: "Board", key: "4" },
   { id: "bench", label: "Bench", key: "5" },
+  { id: "setup", label: "Setup", key: "6" },
 ];
 
 export function route(hash: string): RouteId {
