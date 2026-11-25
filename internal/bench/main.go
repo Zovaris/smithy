@@ -17,6 +17,8 @@ import (
 const Usage = `usage: smithy bench list
        smithy bench run --agent <cli> [--model <m>] [--skills <version>]
                         [--task <id>]... [--timeout <min>] [--keep]
+       smithy bench runs
+       smithy bench compare [--json] <a> <b>
 
 Runs smithy's own task set: small fixture repos (bugs, features, refactors,
 docs) whose tests are the oracle. Each task gets a fresh git worktree and one
@@ -24,15 +26,20 @@ headless agent run (smithy agent, profile auto); the tests are restored,
 then run. Records pass rate, time, tokens and cost in ~/.smithy/bench/.
 
 --agent is a CLI smithy drives (claude, codex, …). api:<provider>/<model>
-needs the api backend. --skills is a label for the skills version installed.`
+needs the api backend. --skills is a label for the skills version installed.
+
+compare measures run b against run a: pass rate, time, tokens and cost
+deltas, then the tasks that regressed (pass to fail) or got fixed. A run is
+its id, a unique id prefix, latest, latest~N or a saved .json path; the
+daemon serves the same runs to the web UI (Bench).`
 
 // Dir is where results go.
 func Dir() string { return filepath.Join(ghx.Home(), "bench") }
 
 // Main is `smithy bench`.
-func Main(args []string) int { return main(args, os.Stdout, os.Stderr) }
+func Main(args []string) int { return mainIn(Dir(), args, os.Stdout, os.Stderr) }
 
-func main(args []string, out, errw io.Writer) int {
+func mainIn(dir string, args []string, out, errw io.Writer) int {
 	if len(args) == 0 {
 		fmt.Fprintln(errw, Usage)
 		return 2
@@ -49,14 +56,18 @@ func main(args []string, out, errw io.Writer) int {
 		}
 		return 0
 	case "run":
-		return runMain(args[1:], out, errw)
+		return runMain(dir, args[1:], out, errw)
+	case "runs":
+		return runsMain(dir, out, errw)
+	case "compare":
+		return compareMain(dir, args[1:], out, errw)
 	}
 	fmt.Fprintln(errw, Usage)
 	return 2
 }
 
-func runMain(args []string, out, errw io.Writer) int {
-	o := Options{Out: Dir()}
+func runMain(dir string, args []string, out, errw io.Writer) int {
+	o := Options{Out: dir}
 	for len(args) > 0 {
 		f := args[0]
 		if f == "--keep" {
