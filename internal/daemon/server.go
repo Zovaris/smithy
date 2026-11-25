@@ -72,6 +72,8 @@ type Server struct {
 	Plan func(ctx context.Context, idea string) ([]PlanTask, error)
 	// BenchDir is where bench runs are read from; empty: bench.Dir().
 	BenchDir string
+	// Runners makes each session's runner; nil: DefaultRunner.
+	Runners RunnerFor
 	// Version is the daemon binary's version, reported in State so a client can warn on a mismatch.
 	Version string
 	// Ctx is the daemon's lifetime (cancelled on shutdown) for background work like planning; nil: Background.
@@ -84,6 +86,9 @@ type Server struct {
 	planning  atomic.Bool
 	lastSeq   int64
 	wake      chan struct{}
+	sessions  map[string]*live
+	lastAgent string
+	starting  int
 	clients   atomic.Int64 // open event streams
 	seen      atomic.Int64 // unix nanos of the last API request or stream end
 }
@@ -94,7 +99,7 @@ func New(st *store.Store, token string, allow []string, log func(string)) (*Serv
 		return nil, errors.New("daemon: empty token")
 	}
 	sv := &Server{st: st, token: token, allow: allow, log: log, started: time.Now(),
-		decisions: map[string]*Decision{}, routed: map[string]bool{}, intakes: map[string]*intakePlan{}, wake: make(chan struct{})}
+		decisions: map[string]*Decision{}, routed: map[string]bool{}, intakes: map[string]*intakePlan{}, wake: make(chan struct{}), sessions: map[string]*live{}}
 	sv.touch()
 	evs, err := st.Since(0)
 	if err != nil {
@@ -104,6 +109,9 @@ func New(st *store.Store, token string, allow []string, log func(string)) (*Serv
 		sv.apply(e)
 		sv.lastSeq = e.Seq
 	}
+	sv.mu.Lock()
+	sv.failOrphans()
+	sv.mu.Unlock()
 	return sv, nil
 }
 
@@ -127,6 +135,8 @@ func (sv *Server) apply(e store.Event) {
 		}
 	case KindIntake:
 		sv.applyIntake(e.Data)
+	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage:
+		sv.applySession(e)
 	case KindRouted:
 		var r struct{ ID string }
 		if json.Unmarshal(e.Data, &r) == nil {
@@ -282,6 +292,11 @@ func (sv *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/decisions", sv.decide)
 	mux.HandleFunc("GET /v1/decisions/{id...}", sv.decision)
 	mux.HandleFunc("POST /v1/asks", sv.ask)
+	mux.HandleFunc("GET /v1/sessions", sv.listSessions)
+	mux.HandleFunc("POST /v1/sessions", sv.startSession)
+	mux.HandleFunc("GET /v1/sessions/{id}", sv.getSession)
+	mux.HandleFunc("POST /v1/sessions/{id}/messages", sv.sendSession)
+	mux.HandleFunc("POST /v1/sessions/{id}/stop", sv.stopSession)
 	mux.HandleFunc("GET /v1/bench", sv.benchRuns)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

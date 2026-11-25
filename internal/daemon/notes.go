@@ -24,6 +24,10 @@ const notesSource = "notes:connect"
 
 func session(id string) string {
 	kind, rest, _ := strings.Cut(id, ":")
+	if kind == "perm" {
+		s, _, _ := strings.Cut(rest, "/")
+		return s
+	}
 	if kind != "merge" && kind != "decide" {
 		return ""
 	}
@@ -45,7 +49,7 @@ func NoteOf(e store.Event) (connect.Note, bool) {
 		}
 		n := connect.Note{Key: "asked|" + d.ID, Kind: "decision", Session: session(d.ID), Title: "Decision needed",
 			Text: line1(d.Question, 500), Decision: d.ID, Options: d.Options}
-		if strings.HasPrefix(d.ID, "intake:") {
+		if strings.HasPrefix(d.ID, "intake:") || strings.HasPrefix(d.ID, "perm:") {
 			n.Text = lines(d.Question, 3500)
 		}
 		if strings.HasPrefix(d.ID, "merge:") {
@@ -98,6 +102,12 @@ func lines(s string, n int) string {
 
 // Input records text from a chat thread as the session's user input.
 func (sv *Server) Input(session, text, by string) error {
+	sv.mu.Lock()
+	_, ok := sv.sessions[session]
+	sv.mu.Unlock()
+	if ok {
+		return sv.SendSession(session, text, by)
+	}
 	_, err := sv.Append(KindInput, session, map[string]string{"text": text, "by": by, "via": "chat"})
 	return err
 }
