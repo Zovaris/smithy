@@ -126,10 +126,13 @@ func (w *wsConn) Read(deadline time.Time) ([]byte, error) {
 		}
 		var mask []byte
 		if h[1]&0x80 != 0 {
-			mask = make([]byte, 4)
-			if _, err := io.ReadFull(w.br, mask); err != nil {
-				return nil, err
-			}
+			return nil, errors.New("websocket: masked server frame")
+		}
+		if op >= 0x8 && (n > 125 || !fin) {
+			return nil, errors.New("websocket: bad control frame")
+		}
+		if op == 0x0 && msg == nil {
+			return nil, errors.New("websocket: bad fragment")
 		}
 		if n > wsMax || uint64(len(msg))+n > wsMax {
 			return nil, errors.New("websocket message too large")
@@ -155,7 +158,13 @@ func (w *wsConn) Read(deadline time.Time) ([]byte, error) {
 		case 0xA:
 			continue
 		case 0x0, 0x1, 0x2:
+			if op != 0x0 && msg != nil {
+				return nil, errors.New("websocket: bad fragment")
+			}
 			msg = append(msg, p...)
+			if msg == nil {
+				msg = []byte{}
+			}
 			if fin {
 				return msg, nil
 			}

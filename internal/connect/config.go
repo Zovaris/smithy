@@ -17,6 +17,7 @@ var (
 	chatIDRe   = regexp.MustCompile(`^-?[0-9]+$`)
 	slackBotRe = regexp.MustCompile(`^xoxb-[A-Za-z0-9-]+$`)
 	slackAppRe = regexp.MustCompile(`^xapp-[A-Za-z0-9-]+$`)
+	discordRe  = regexp.MustCompile(`^[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{20,}$`)
 	slackChRe  = regexp.MustCompile(`^[CG][A-Z0-9]{6,}$`)
 )
 
@@ -67,7 +68,29 @@ func FromConfig() ([]Connector, error) {
 	if sc != nil {
 		cs = append(cs, sc)
 	}
-	return cs, errors.Join(err, serr)
+	dc, derr := discordFromConfig()
+	if dc != nil {
+		cs = append(cs, dc)
+	}
+	return cs, errors.Join(err, serr, derr)
+}
+
+func discordFromConfig() (Connector, error) {
+	tok, _, err := auth.Get("discord")
+	ch := strings.TrimSpace(config.Get("connect.discord.channel", ""))
+	switch {
+	case err != nil:
+		return nil, err
+	case tok == "" && ch == "":
+		return nil, nil
+	case tok == "":
+		return nil, errors.New("discord: no bot token (smithy auth set discord)")
+	case !discordRe.MatchString(strings.TrimPrefix(tok, "Bot ")):
+		return nil, errors.New("discord: the stored token is not a bot token")
+	case !snowflakeRe.MatchString(ch):
+		return nil, errors.New("discord: connect.discord.channel must be the numeric id of a server text channel")
+	}
+	return &Discord{Token: strings.TrimPrefix(tok, "Bot "), Channel: ch, Users: idSet("connect.discord.users")}, nil
 }
 
 func slackFromConfig() (*Slack, error) {
