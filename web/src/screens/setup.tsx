@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { api } from "../auth";
 import { loadSetup as refresh } from "../live";
 import { choice, installSkills, isDefault, loadSetup, type Ready, setDefault, setKit, type Setup as S, toggleSkill } from "../setup";
+import { ModelSelect } from "../modelselect";
 import { agentName } from "../store";
 import { St } from "../ui";
 
@@ -39,8 +40,7 @@ function AgentRow({ r, s, open, onOpen, onSaved }: { r: Ready; s: S; open: boole
       </button>
       {open && r.ready && (
         <form class="model" onSubmit={use} style="padding-left:12px;flex-wrap:wrap">
-          <input value={model} onInput={(e) => setModel(e.currentTarget.value)} aria-label={`Model for ${agentName(r.name)}`}
-            placeholder={r.kind === "api" ? "model (required), e.g. claude-sonnet-5-5" : "model (empty: the agent's default)"} spellcheck={false} autoComplete="off" />
+          <ModelSelect agent={r} value={model} onChange={setModel} id={"model-" + r.name} label={`Model for ${agentName(r.name)}`} />
           <button class="btn sm primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Use for new sessions"}</button>
           {err && <span class="err" role="alert">{err}</span>}
         </form>
