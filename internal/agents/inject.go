@@ -348,6 +348,10 @@ func mergeSettings(kit, own string) string {
 // nil in the skills build, which has no smithy mcp.
 var KitMCP []string
 
+// KitGuard turns the smithy binary into the Claude Code settings that run the dangerous-command
+// guard before every Bash call ("" when the guard is off); nil in the skills build.
+var KitGuard func(exe string) string
+
 // RunKit is the injection for one run: KitMCP as the "smithy" MCP server, told the run's warden
 // card (SMITHY_MCP_CARD) and, for a --readonly run, to expose read-only tools. nil when there is
 // no kit or for a custom AGENT_CMD.
@@ -377,7 +381,11 @@ func RunKit(cli string, o Options, getenv func(string) string) (*Injection, erro
 		}
 		dir = d
 	}
-	in, err := Inject(cli, Kit{MCP: map[string]MCPServer{"smithy": {Command: KitMCP[0], Args: args, Env: env}}}, dir, PoolGetenv(o, getenv))
+	kit := Kit{MCP: map[string]MCPServer{"smithy": {Command: KitMCP[0], Args: args, Env: env}}}
+	if KitGuard != nil && Kind(cli) == "claude" {
+		kit.Settings = KitGuard(KitMCP[0])
+	}
+	in, err := Inject(cli, kit, dir, PoolGetenv(o, getenv))
 	if o.Log == "" {
 		if err != nil {
 			os.RemoveAll(dir)
