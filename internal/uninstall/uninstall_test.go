@@ -83,6 +83,37 @@ func TestYesRemovesOnlyListed(t *testing.T) {
 	}
 }
 
+func TestPurgeRefusesAFolderThatIsNotSmithys(t *testing.T) {
+	f := setup(t)
+	os.MkdirAll(filepath.Join(f.sh, "my-project", ".git"), 0o755)
+	os.WriteFile(filepath.Join(f.sh, "notes.txt"), []byte("mine"), 0o644)
+	var out bytes.Buffer
+	Run([]string{"--yes", "--purge", "--confirm-purge"}, strings.NewReader(""), false, &out, "")
+	if !exists(filepath.Join(f.sh, "notes.txt")) || !exists(filepath.Join(f.sh, "my-project")) {
+		t.Fatalf("purged a folder holding other files:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "not smithy's") || !strings.Contains(out.String(), "notes.txt") {
+		t.Fatalf("no reason given:\n%s", out.String())
+	}
+	g := setup(t)
+	os.RemoveAll(g.sh)
+	os.MkdirAll(g.sh, 0o755)
+	os.WriteFile(filepath.Join(g.sh, "readme.md"), []byte("x"), 0o644)
+	out.Reset()
+	Run([]string{"--yes", "--purge", "--confirm-purge"}, strings.NewReader(""), false, &out, "")
+	if !exists(filepath.Join(g.sh, "readme.md")) {
+		t.Fatalf("purged a folder with no smithy files:\n%s", out.String())
+	}
+	h := setup(t)
+	os.WriteFile(filepath.Join(h.sh, ".smithy-home"), nil, 0o644)
+	os.WriteFile(filepath.Join(h.sh, "something-new"), []byte("x"), 0o644)
+	out.Reset()
+	Run([]string{"--yes", "--purge", "--confirm-purge"}, strings.NewReader(""), false, &out, "")
+	if exists(h.sh) {
+		t.Fatalf("marked smithy home not purged:\n%s", out.String())
+	}
+}
+
 func TestPurge(t *testing.T) {
 	f := setup(t)
 	var out bytes.Buffer

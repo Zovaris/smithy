@@ -266,6 +266,11 @@ t "uninstall.sh: --yes removes what it listed, keeps ~/.smithy" 'U y --yes && [ 
 t "uninstall.sh: never touches what it did not install" '[ -d "$L/Iy/.claude/skills/mine" ] && [ -e "$L/Iy/.local/bin/other" ] && [ -e "$L/Iy/.smithy/auth.json" ]'
 t "uninstall.sh: --purge without a terminal needs --confirm-purge" 'U m --yes --purge && [ -e "$L/Im/.smithy/auth.json" ] && [ ! -e "$L/Im/.smithy/bin" ] && grep -q "confirm-purge" "$L/err"'
 t "uninstall.sh: tty purge asks twice and names the contents" 'printf "y\n" > "$L/ans"; U m --purge </dev/null; printf "purge\n" > "$L/ans"; env -u XDG_DATA_HOME -u XDG_BIN_HOME HOME="$L/Im" SMITHY_HOME="$L/Im/.smithy" SMITHY_TTY="$L/ans" PATH="$L/sys" sh "$L/uninstall.sh" --yes --purge 2>"$L/err"; grep -q "holds: .*auth.json" "$L/err" && [ ! -e "$L/Im/.smithy" ] && [ -d "$L/Im/.claude/skills/mine" ]'
+t "install.sh: a fresh smithy home gets the marker" '[ -e "$L/Ia/.smithy/.smithy-home" ]'
+mkdir -p "$L/Iq/.smithy/my-project"; echo mine > "$L/Iq/.smithy/notes.txt"; touch "$L/Iq/.smithy/auth.json"
+t "uninstall.sh: --purge refuses a folder that is not smithy's" 'U q --yes --purge --confirm-purge; [ -e "$L/Iq/.smithy/notes.txt" ] && grep -q "refusing to purge .*notes.txt" "$L/err"'
+mkdir -p "$L/Ir/.smithy"; touch "$L/Ir/.smithy/.smithy-home" "$L/Ir/.smithy/whatever"
+t "uninstall.sh: --purge removes a marked smithy home" 'U r --yes --purge --confirm-purge; [ ! -e "$L/Ir/.smithy" ]'
 # launcher never downloads: no binary → exit 3 naming the install page
 LM() { env -u SMITHY_BIN -u XDG_DATA_HOME -u XDG_BIN_HOME HOME="$L/emptyH$1" SMITHY_HOME="$L/empty$1" PATH="$L/curl:$L/sys" "$L/smithy" version 2>"$L/err"; }
 t "launcher: missing binary exits 3, no download" 'rm -f "$L/curl.args"; LM a; [ $? -eq 3 ] && grep -q "not installed; the smithy skills need it" "$L/err" && [ ! -e "$L/curl.args" ]'

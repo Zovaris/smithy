@@ -41,6 +41,53 @@ type Plan struct {
 	Networks  []string
 	RCFiles   []string // startup files holding the PATH line
 	Home      string   // set with --purge
+	Refused   string   // why --purge keeps the smithy home (it does not look like smithy's)
+}
+
+// HomeMarker marks a folder as smithy's home; install.sh writes it.
+const HomeMarker = ".smithy-home"
+
+// homeFiles are the names smithy itself keeps at the top of its home.
+var homeFiles = map[string]bool{HomeMarker: true, "auth.json": true, "config.json": true, "kind": true, "installed-skills": true, "path-added": true,
+	"accounts": true, "pool.json": true, "pool-state.json": true, "bin": true, "plans": true, "warden": true, "decisions": true, "proxy": true,
+	"connect.json": true, "notify.json": true, "tasks-index.json": true, "telegram.offset": true, "tui.seen": true, "checkout": true,
+	"tend": true, "loose": true, "auto": true, "skills": true}
+
+// homePrefixes cover smithy's files that carry a suffix (db journals, rotated logs, locks).
+var homePrefixes = []string{"smithy.db", "events", "daemon", "decide", "proxy"}
+
+// ownHome reports whether dir is smithy's own home: it holds the marker, or at least one of
+// smithy's key files and nothing smithy does not write. Else it says why.
+func ownHome(dir string) (bool, string) {
+	es, err := os.ReadDir(dir)
+	if err != nil {
+		return false, err.Error()
+	}
+	key, odd := false, []string{}
+	for _, e := range es {
+		n := e.Name()
+		if n == HomeMarker {
+			return true, ""
+		}
+		switch n {
+		case "auth.json", "config.json", "kind", "installed-skills", "smithy.db":
+			key = true
+		}
+		known := homeFiles[n]
+		for _, pre := range homePrefixes {
+			known = known || strings.HasPrefix(n, pre)
+		}
+		if !known {
+			odd = append(odd, n)
+		}
+	}
+	if len(odd) > 0 {
+		return false, "it holds files smithy did not write: " + strings.Join(odd, " ")
+	}
+	if !key {
+		return false, "it holds none of smithy's files"
+	}
+	return true, ""
 }
 
 // Engine runs the container engine; tests replace it.
@@ -126,7 +173,11 @@ func Gather(purge bool, engine string) Plan {
 	}
 	if h := filepath.Clean(ghx.Home()); purge && h != filepath.Clean(layout.UserHome()) && h != filepath.Dir(h) {
 		if fi, err := os.Stat(h); err == nil && fi.IsDir() {
-			p.Home = ghx.Home()
+			if ok, why := ownHome(h); ok {
+				p.Home = ghx.Home()
+			} else {
+				p.Refused = "smithy uninstall: refusing to purge " + h + ": not smithy's home (" + why + "); remove it yourself if you mean to"
+			}
 		}
 	}
 	return p
@@ -194,6 +245,9 @@ func (p Plan) List(w io.Writer) {
 	}
 	if p.Home != "" {
 		fmt.Fprintf(w, "  %-8s %s\n           holds: %s\n", size(p.Home), p.Home, strings.Join(entries(p.Home), " "))
+	}
+	if p.Refused != "" {
+		fmt.Fprintln(w, p.Refused)
 	}
 }
 
@@ -330,6 +384,9 @@ func Run(args []string, stdin io.Reader, tty bool, w io.Writer, engine string) i
 	}
 	p := Gather(purge, engine)
 	if p.Empty() {
+		if p.Refused != "" {
+			fmt.Fprintln(w, p.Refused)
+		}
 		fmt.Fprintln(w, "smithy uninstall: nothing to remove")
 		return 0
 	}

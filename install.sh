@@ -162,7 +162,8 @@ if [ -n "$rgok" ] && [ -s "$tmp/$rgasset" ]; then
 else
   say "this release ships no ripgrep for $os/$arch; smithy search --code uses git ls-files or rg on PATH"
 fi
-mkdir -p "$home"; echo "$kind" > "$home/kind"
+[ -e "$home" ] || { mkdir -p "$home" && : > "$home/.smithy-home"; }  # the marker lets uninstall --purge know the folder is smithy's
+echo "$kind" > "$home/kind"
 say "installed v$version ($kind build) to $vdir/$version/$exe, command $bindir/$exe"
 tty=${SMITHY_TTY:-/dev/tty}
 ontty() { { [ -n "${SMITHY_TTY:-}" ] || [ -t 2 ]; } && { : < "$tty"; } 2>/dev/null; }
