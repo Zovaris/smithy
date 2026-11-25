@@ -207,3 +207,40 @@ func TestMergeSettingsReadsKitFile(t *testing.T) {
 		t.Fatal(m)
 	}
 }
+
+func TestRunKit(t *testing.T) {
+	old := KitMCP
+	t.Cleanup(func() { KitMCP = old })
+	KitMCP = nil
+	if in, err := RunKit("claude", Options{}, os.Getenv); in != nil || err != nil {
+		t.Fatalf("skills build injected: %v %v", in, err)
+	}
+	KitMCP = []string{"/bin/smithy", "mcp"}
+	home := t.TempDir()
+	t.Setenv("WARDEN_HOME", home)
+	log := filepath.Join(home, "b1", "i1.log")
+	os.MkdirAll(filepath.Dir(log), 0o755)
+	in, err := RunKit("claude", Options{Log: log, ReadOnly: true}, os.Getenv)
+	if err != nil || in == nil {
+		t.Fatalf("RunKit: %v %v", in, err)
+	}
+	b, err := os.ReadFile(filepath.Join(log+".kit", "claude-mcp.json"))
+	var cfg struct {
+		MCPServers map[string]struct {
+			Args []string          `json:"args"`
+			Env  map[string]string `json:"env"`
+		} `json:"mcpServers"`
+	}
+	json.Unmarshal(b, &cfg)
+	if s := cfg.MCPServers["smithy"]; err != nil || s.Env["SMITHY_MCP_CARD"] != "b1/i1" || !slices.Contains(s.Args, "--readonly") {
+		t.Fatalf("mcp config: %s %v", b, err)
+	}
+	for _, o := range []Options{{Sandbox: "container"}} {
+		if in, _ := RunKit("claude", o, os.Getenv); in != nil {
+			t.Fatalf("injected into %+v", o)
+		}
+	}
+	if in, _ := RunKit("custom", Options{}, os.Getenv); in != nil {
+		t.Fatal("injected into a custom AGENT_CMD")
+	}
+}

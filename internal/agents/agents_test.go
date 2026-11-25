@@ -93,7 +93,7 @@ func TestBuild(t *testing.T) {
 		t.Errorf("AGENT_PERMISSION_MODE ignored: %q", s.Argv)
 	}
 	s, _ = Build("custom", Options{}, "", nil, "", env(map[string]string{"AGENT_CMD": "cat", "WARDEN_HARNESS": "pi"}))
-	if !reflect.DeepEqual(s, Spec{[]string{"bash", "-c", "cat"}, true, "pi"}) {
+	if !reflect.DeepEqual(s, Spec{Argv: []string{"bash", "-c", "cat"}, PromptStdin: true, Harness: "pi"}) {
 		t.Errorf("custom = %+v", s)
 	}
 	if _, err := Build("", Options{}, "", nil, "", none); err != ErrNoCLI {

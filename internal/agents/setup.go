@@ -19,7 +19,7 @@ const setupUsage = `use-smithy setup: what is installed, model settings, and the
   smithy setup block status [file]    is the block in <file> (default: this harness's user file)?
   smithy setup block add [file]       add or refresh the block (between use-smithy:start/end markers)
   smithy setup block remove [file]    remove it
-  smithy setup path [status|add]      is smithy on PATH; add ~/.smithy/bin to the shell's startup file
+  smithy setup path [status|add]      is smithy on PATH; add ~/.local/bin to the shell's startup file
 Default file per harness: claude-* → ~/.claude/CLAUDE.md, codex → $CODEX_HOME/AGENTS.md,
 opencode → $XDG_CONFIG_HOME/opencode/AGENTS.md, gemini → ~/.gemini/GEMINI.md,
 pi → $PI_CODING_AGENT_DIR/AGENTS.md, dsh → $DSH_HOME/AGENTS.md, else ./AGENTS.md (Cursor has
