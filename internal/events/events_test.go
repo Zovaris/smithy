@@ -83,6 +83,18 @@ func TestAppendStripsWholeEscapeSequences(t *testing.T) {
 	}
 }
 
+func TestAppendRedactsSecretsInDetail(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	tok := "xoxb-12345-" + strings.Repeat("c", 20)
+	if err := Append(Event{Kind: "orchestrator_failed", Detail: "post failed with " + tok}); err != nil {
+		t.Fatal(err)
+	}
+	es, _ := Read(time.Time{}, 0)
+	if len(es) != 1 || strings.Contains(es[0].Detail, tok) {
+		t.Fatalf("secret kept in the events log: %+v", es)
+	}
+}
+
 func TestLogIsPrivateAfterOpenAndRotation(t *testing.T) {
 	t.Setenv("SMITHY_HOME", t.TempDir())
 	old := MaxBytes

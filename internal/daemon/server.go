@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"slices"
 	"strconv"
@@ -67,6 +69,8 @@ type Server struct {
 	Route func(Decision, Outcome) error
 	// Plan, when set, replaces AgentPlan for chat intake (tests).
 	Plan func(ctx context.Context, idea string) ([]PlanTask, error)
+	// Ctx is the daemon's lifetime (cancelled on shutdown) for background work like planning; nil: Background.
+	Ctx context.Context
 
 	mu        sync.Mutex
 	decisions map[string]*Decision
@@ -305,7 +309,29 @@ func (sv *Server) state(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, st)
 }
 
+// sameOrigin refuses a request a browser could forge from another site: the body must be JSON
+// (not a simple form or text post), the fetch not cross-site and any Origin the daemon's own host.
+func sameOrigin(r *http.Request) (int, string) {
+	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
+		return 415, "Content-Type must be application/json"
+	}
+	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
+		return 403, "cross-site request"
+	}
+	if o := r.Header.Get("Origin"); o != "" {
+		u, err := url.Parse(o)
+		if err != nil || !strings.EqualFold(u.Host, r.Host) {
+			return 403, "foreign origin"
+		}
+	}
+	return 0, ""
+}
+
 func (sv *Server) decide(w http.ResponseWriter, r *http.Request) {
+	if code, msg := sameOrigin(r); code != 0 {
+		writeJSON(w, code, map[string]string{"error": msg})
+		return
+	}
 	var req struct {
 		ID     string `json:"id"`
 		Answer string `json:"answer"`

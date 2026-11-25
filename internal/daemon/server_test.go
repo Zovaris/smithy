@@ -38,6 +38,9 @@ func newTest(t *testing.T, path string) (*Server, *httptest.Server) {
 func do(t *testing.T, method, url, body string, hdr map[string]string) *http.Response {
 	t.Helper()
 	r, _ := http.NewRequest(method, url, strings.NewReader(body))
+	if body != "" {
+		r.Header.Set("Content-Type", "application/json")
+	}
 	for k, v := range hdr {
 		r.Header.Set(k, v)
 	}
@@ -210,6 +213,31 @@ func TestDecisionFirstAnswerWins(t *testing.T) {
 	json.NewDecoder(res.Body).Decode(&o)
 	if res.StatusCode != 409 || o.Won || o.Answer != results[0].Answer {
 		t.Fatalf("after restart: %d %+v", res.StatusCode, o)
+	}
+}
+
+func TestDecisionCSRF(t *testing.T) {
+	sv, hs := newTest(t, filepath.Join(t.TempDir(), "s.db"))
+	sv.Ask("d3", "pick", []string{"a", "b"})
+	body := `{"id":"d3","answer":"a"}`
+	with := func(kv ...string) map[string]string {
+		h := map[string]string{"Authorization": auth["Authorization"]}
+		for i := 0; i < len(kv); i += 2 {
+			h[kv[i]] = kv[i+1]
+		}
+		return h
+	}
+	for name, h := range map[string]map[string]string{
+		"form content type": with("Content-Type", "text/plain"),
+		"cross-site fetch":  with("Sec-Fetch-Site", "cross-site"),
+		"foreign origin":    with("Origin", "https://evil.example"),
+	} {
+		if res := do(t, "POST", hs.URL+"/v1/decisions", body, h); res.StatusCode != 403 && res.StatusCode != 415 {
+			t.Errorf("%s: %d, want refused", name, res.StatusCode)
+		}
+	}
+	if res := do(t, "POST", hs.URL+"/v1/decisions", body, with("Origin", hs.URL, "Sec-Fetch-Site", "same-origin")); res.StatusCode != 200 {
+		t.Fatalf("same origin: %d", res.StatusCode)
 	}
 }
 

@@ -44,10 +44,48 @@ type Discord struct {
 	// Poll is how long Receive waits for events (default 25 s).
 	Poll   time.Duration
 	Client *http.Client
+	// BufferWait is how long the Gateway reader waits on a full event buffer before it drops
+	// the event and logs it (default 10 s).
+	BufferWait time.Duration
 
 	mu    sync.Mutex
 	gw    *dgw
 	guild string
+	log   func(string)
+}
+
+// SetLog sets where the connector reports what it had to drop; the hub sets it to its own Log.
+func (d *Discord) SetLog(f func(string)) {
+	d.mu.Lock()
+	d.log = f
+	d.mu.Unlock()
+}
+
+// deliver hands in to Receive, waiting up to BufferWait while the buffer is full; past that the
+// event is dropped and logged rather than stalling the Gateway (heartbeats share this reader).
+func (d *Discord) deliver(g *dgw, in Inbound) {
+	select {
+	case g.in <- in:
+		return
+	default:
+	}
+	wait := d.BufferWait
+	if wait <= 0 {
+		wait = 10 * time.Second
+	}
+	t := time.NewTimer(wait)
+	defer t.Stop()
+	select {
+	case g.in <- in:
+	case <-g.done:
+	case <-t.C:
+		d.mu.Lock()
+		log := d.log
+		d.mu.Unlock()
+		if log != nil {
+			log("connect discord: event buffer full for " + wait.String() + ", dropped one inbound event")
+		}
+	}
 }
 
 // dgw is one live Gateway connection; its reader fills in and ends with err.
@@ -75,6 +113,15 @@ func (d *Discord) poll() time.Duration {
 }
 
 func (d *Discord) call(ctx context.Context, method, path string, body, out any) error {
+	for try := 0; ; try++ {
+		wait, err := d.call1(ctx, method, path, body, out)
+		if wait == 0 || !rateLimited(ctx, wait, try) {
+			return err
+		}
+	}
+}
+
+func (d *Discord) call1(ctx context.Context, method, path string, body, out any) (time.Duration, error) {
 	cl := d.Client
 	if cl == nil {
 		cl = &http.Client{Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -90,7 +137,7 @@ func (d *Discord) call(ctx context.Context, method, path string, body, out any) 
 	}
 	req, err := http.NewRequestWithContext(ctx, method, base+path, rd)
 	if err != nil {
-		return errors.New("discord: bad request")
+		return 0, errors.New("discord: bad request")
 	}
 	req.Header.Set("Authorization", "Bot "+d.Token)
 	req.Header.Set("User-Agent", "DiscordBot (https://github.com/Zovaris/smithy, 1)")
@@ -103,21 +150,26 @@ func (d *Discord) call(ctx context.Context, method, path string, body, out any) 
 		if errors.As(err, &ue) {
 			err = ue.Err
 		}
-		return fmt.Errorf("discord %s: %s", routeOf(path), d.scrub(err.Error()))
+		return 0, fmt.Errorf("discord %s: %s", routeOf(path), d.scrub(err.Error()))
 	}
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode/100 != 2 {
 		var r struct {
-			Message string `json:"message"`
+			Message    string  `json:"message"`
+			RetryAfter float64 `json:"retry_after"`
 		}
 		_ = json.Unmarshal(b, &r)
-		return fmt.Errorf("discord %s %s: HTTP %d %s", method, routeOf(path), resp.StatusCode, d.scrub(r.Message))
+		var wait time.Duration
+		if resp.StatusCode == http.StatusTooManyRequests {
+			wait = max(time.Duration(r.RetryAfter*float64(time.Second)), time.Second)
+		}
+		return wait, fmt.Errorf("discord %s %s: HTTP %d %s", method, routeOf(path), resp.StatusCode, d.scrub(r.Message))
 	}
 	if out != nil && len(b) > 0 {
-		return json.Unmarshal(b, out)
+		return 0, json.Unmarshal(b, out)
 	}
-	return nil
+	return 0, nil
 }
 
 // routeOf keeps a path's shape for errors without ids or interaction tokens.
@@ -352,10 +404,7 @@ func (d *Discord) connect(ctx context.Context) (*dgw, error) {
 					seq.Unlock()
 				}
 				if in, ok := d.event(ev); ok {
-					select {
-					case g.in <- in:
-					default:
-					}
+					d.deliver(g, in)
 				}
 			case 1:
 				_ = beat()

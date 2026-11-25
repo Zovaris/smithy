@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Zovaris/smithy/internal/board"
 	"github.com/Zovaris/smithy/internal/store"
@@ -47,7 +48,7 @@ func TestIntakePostsPlanAndAddsTasksOnlyOnYes(t *testing.T) {
 			d = x
 		}
 	}
-	if d.ID == "" || strings.Join(d.Options, ",") != "yes,no" || !strings.Contains(d.Question, "Parse CSV") || !strings.Contains(d.Question, "export the board") {
+	if d.ID == "" || strings.Join(d.Options, ",") != "yes,no" || !strings.Contains(d.Question, "Parse CSV") || !strings.Contains(d.Question, "export the board") || !strings.Contains(d.Question, "b1") {
 		t.Fatalf("decision %+v", d)
 	}
 	bd := board.New(sv.st)
@@ -55,7 +56,7 @@ func TestIntakePostsPlanAndAddsTasksOnlyOnYes(t *testing.T) {
 		t.Fatalf("tasks before yes: %+v", ts)
 	}
 	n, ok := NoteOf(ev(t, KindAsked, "", d))
-	if !ok || n.Session != "" || n.Kind != "decision" || len(n.Options) != 2 {
+	if !ok || n.Session != "" || n.Kind != "decision" || len(n.Options) != 2 || !strings.Contains(n.Text, "\n2. Export button") || !strings.Contains(n.Text, "b1") {
 		t.Fatalf("note %+v", n)
 	}
 
@@ -109,6 +110,57 @@ func TestIntakePlanFailureAsksNothing(t *testing.T) {
 	sv.Plan = func(context.Context, string) ([]PlanTask, error) { return nil, nil }
 	if err := sv.IntakeNow(context.Background(), "idea", "a:1"); err == nil {
 		t.Fatal("want error for an empty plan")
+	}
+	if len(sv.Pending()) != 0 {
+		t.Fatalf("pending %+v", sv.Pending())
+	}
+}
+
+func TestIntakePlansUnderTheDaemonContext(t *testing.T) {
+	sv, _ := newTest(t, filepath.Join(t.TempDir(), "s.db"))
+	ctx, cancel := context.WithCancel(context.Background())
+	sv.Ctx = ctx
+	got := make(chan error, 1)
+	sv.Plan = func(c context.Context, _ string) ([]PlanTask, error) {
+		<-c.Done()
+		got <- c.Err()
+		return nil, c.Err()
+	}
+	if err := sv.Intake("idea", "a:1"); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+	select {
+	case err := <-got:
+		if err == nil {
+			t.Fatal("planner context not cancelled")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("planner kept running after the daemon stopped")
+	}
+}
+
+func TestCappedOutputKeepsOnlyTheCap(t *testing.T) {
+	var w capped
+	w.n = 10
+	if n, err := w.Write([]byte("0123456789abcdef")); n != 16 || err != nil {
+		t.Fatalf("write %d %v", n, err)
+	}
+	w.Write([]byte("more"))
+	if w.b.String() != "0123456789" {
+		t.Fatalf("kept %q", w.b.String())
+	}
+}
+
+func TestIntakeRejectsAPlanCarryingASecret(t *testing.T) {
+	sv, _ := newTest(t, filepath.Join(t.TempDir(), "s.db"))
+	tok := "123456789:" + strings.Repeat("A", 35)
+	sv.Plan = func(context.Context, string) ([]PlanTask, error) {
+		return []PlanTask{{Title: "ok"}, {Title: "Post status", Body: "with bot " + tok}}, nil
+	}
+	err := sv.IntakeNow(context.Background(), "idea", "a:1")
+	if err == nil || strings.Contains(err.Error(), tok) {
+		t.Fatalf("a plan with a token was accepted or echoed it: %v", err)
 	}
 	if len(sv.Pending()) != 0 {
 		t.Fatalf("pending %+v", sv.Pending())

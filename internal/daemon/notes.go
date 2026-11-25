@@ -14,6 +14,7 @@ import (
 	"github.com/Zovaris/smithy/internal/notify"
 	"github.com/Zovaris/smithy/internal/report"
 	"github.com/Zovaris/smithy/internal/store"
+	"github.com/Zovaris/smithy/internal/text"
 )
 
 // KindInput is a user's message to a session (a reply in its chat thread).
@@ -44,6 +45,9 @@ func NoteOf(e store.Event) (connect.Note, bool) {
 		}
 		n := connect.Note{Key: "asked|" + d.ID, Kind: "decision", Session: session(d.ID), Title: "Decision needed",
 			Text: line1(d.Question, 500), Decision: d.ID, Options: d.Options}
+		if strings.HasPrefix(d.ID, "intake:") {
+			n.Text = lines(d.Question, 3500)
+		}
 		if strings.HasPrefix(d.ID, "merge:") {
 			n.Kind, n.Title = "pr_ready", "PR ready for review"
 		}
@@ -81,6 +85,15 @@ func NoteOf(e store.Event) (connect.Note, bool) {
 		return n, true
 	}
 	return connect.Note{}, false
+}
+
+// lines cleans each line of s (keeping the line breaks and leading indent) and caps it at n runes.
+func lines(s string, n int) string {
+	ls := strings.Split(s, "\n")
+	for i, l := range ls {
+		ls[i] = strings.Repeat(" ", len(l)-len(strings.TrimLeft(l, " "))) + text.Clean(l)
+	}
+	return clipRunes(strings.Join(ls, "\n"), n)
 }
 
 // Input records text from a chat thread as the session's user input.

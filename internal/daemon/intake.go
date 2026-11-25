@@ -3,6 +3,7 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/board"
+	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/text"
 )
 
@@ -109,15 +111,33 @@ func AgentPlan(ctx context.Context, idea string) ([]PlanTask, error) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, exe, "agent", "--readonly", "--timeout", strconv.Itoa(int(PlanTimeout.Minutes())), prompt)
 	cmd.Env = agents.Scrub(os.Environ())
-	out, err := cmd.Output()
-	if err != nil {
+	out, errOut := capped{n: MaxPlanOutput}, capped{n: 4 << 10}
+	cmd.Stdout, cmd.Stderr = &out, &errOut
+	if err := cmd.Run(); err != nil {
 		var ee *exec.ExitError
 		if errors.As(err, &ee) {
-			return nil, fmt.Errorf("planner: %v: %s", err, clipRunes(text.Clean(string(ee.Stderr)), 300))
+			return nil, fmt.Errorf("planner: %v: %s", err, clipRunes(text.Clean(errOut.b.String()), 300))
 		}
 		return nil, fmt.Errorf("planner: %v", err)
 	}
-	return ParsePlan(string(out)), nil
+	return ParsePlan(out.b.String()), nil
+}
+
+// MaxPlanOutput caps how much of the planner's stdout is kept.
+const MaxPlanOutput = 1 << 20
+
+// capped keeps the first n bytes written to it and drops the rest, so a runaway planner cannot
+// fill the daemon's memory.
+type capped struct {
+	b bytes.Buffer
+	n int
+}
+
+func (c *capped) Write(p []byte) (int, error) {
+	if room := c.n - c.b.Len(); room > 0 {
+		c.b.Write(p[:min(len(p), room)])
+	}
+	return len(p), nil
 }
 
 // IntakeNow plans idea and asks for a yes before its tasks go on the board.
@@ -134,6 +154,11 @@ func (sv *Server) IntakeNow(ctx context.Context, idea, by string) error {
 	if len(tasks) == 0 {
 		return errors.New("intake: the planner returned no tasks")
 	}
+	for i, t := range tasks {
+		if r := proof.Secret(t.Title + "\n" + t.Body); r != "" {
+			return fmt.Errorf("intake: planned task %d looks like it carries a secret (%s); plan dropped", i+1, r)
+		}
+	}
 	h := sha256.Sum256([]byte(idea + "\x00" + by + "\x00" + time.Now().UTC().Format(time.RFC3339Nano)))
 	p := intakePlan{ID: "intake:" + hex.EncodeToString(h[:6]), Idea: idea, By: by, Tasks: tasks}
 	if _, err := sv.Append(KindIntake, "", p); err != nil {
@@ -145,8 +170,15 @@ func (sv *Server) IntakeNow(ctx context.Context, idea, by string) error {
 	q := []string{"Plan for: " + text.Clean(clipRunes(idea, 300))}
 	for i, t := range tasks {
 		q = append(q, strconv.Itoa(i+1)+". "+t.Title)
+		if t.Body != "" {
+			b := clipRunes(t.Body, 300)
+			if b != t.Body {
+				b += "…"
+			}
+			q = append(q, "   "+b)
+		}
 	}
-	q = append(q, "Add these "+strconv.Itoa(len(tasks))+" tasks to the board?")
+	q = append(q, "Add these "+strconv.Itoa(len(tasks))+" tasks to the board? They wait with label "+board.IntakeLabel+" until you review them; smithy auto skips them until the label is removed.")
 	return sv.Ask(p.ID, strings.Join(q, "\n"), []string{"yes", "no"})
 }
 
@@ -157,9 +189,13 @@ func (sv *Server) Intake(idea, by string) error {
 		return errors.New("intake: a plan is already being made; send the idea again when it is posted")
 	}
 	idea = clipRunes(idea, 2000)
+	ctx := sv.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	go func() {
 		defer sv.planning.Store(false)
-		if err := sv.IntakeNow(context.Background(), idea, by); err != nil {
+		if err := sv.IntakeNow(ctx, idea, by); err != nil {
 			_, _ = sv.Append("log", "", map[string]string{"line": "intake: " + text.Clean(err.Error())})
 		}
 	}()
@@ -196,7 +232,7 @@ func (sv *Server) RouteIntake(next func(Decision, Outcome) error) func(Decision,
 				continue
 			}
 			body := strings.TrimSpace(t.Body + "\n\nFrom chat idea (" + text.Clean(p.By) + "): " + text.Clean(p.Idea) + " " + mark)
-			if _, err := bd.Add(board.Task{Title: t.Title, Body: body, Labels: []string{"intake"}}); err != nil {
+			if _, err := bd.Add(board.Task{Title: t.Title, Body: body, Labels: []string{board.IntakeLabel}}); err != nil {
 				return err
 			}
 		}

@@ -243,6 +243,24 @@ func TestWSDialRefusesBadHandshake(t *testing.T) {
 	}
 }
 
+func TestDiscordFullBufferWaitsThenLogsADrop(t *testing.T) {
+	var logged []string
+	d := &Discord{BufferWait: 200 * time.Millisecond}
+	d.SetLog(func(s string) { logged = append(logged, s) })
+	g := &dgw{in: make(chan Inbound, 1), done: make(chan struct{})}
+	d.deliver(g, Inbound{Text: "a"})
+	go func() { time.Sleep(50 * time.Millisecond); <-g.in }()
+	d.deliver(g, Inbound{Text: "b"})
+	if len(logged) != 0 || (<-g.in).Text != "b" {
+		t.Fatalf("a slow reader lost an event: %v", logged)
+	}
+	d.deliver(g, Inbound{Text: "c"})
+	d.deliver(g, Inbound{Text: "d"})
+	if len(logged) != 1 || !strings.Contains(logged[0], "dropped") {
+		t.Fatalf("a drop was not logged: %v", logged)
+	}
+}
+
 func TestDiscordFromConfig(t *testing.T) {
 	cfg := filepath.Join(t.TempDir(), "config.json")
 	t.Setenv("SMITHY_CONFIG", cfg)

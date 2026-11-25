@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -86,7 +87,7 @@ func Week(es []events.Event, now time.Time) Report {
 		case e.Kind == "stage" && (e.Detail == "failed" || e.Detail == "blocked"):
 			r.Failed = append(r.Failed, Line{Batch: e.Batch, Item: e.Item, PR: e.PR, Detail: e.Detail})
 		case e.Kind == "orchestrator_failed":
-			r.Failed = append(r.Failed, Line{Detail: "orchestrator failed: " + e.Detail})
+			r.Failed = append(r.Failed, Line{Detail: "orchestrator failed: " + clip(proof.Redact(e.Detail), 80)})
 		case e.Kind == "usage" && e.Usage != nil:
 			h := row(harness(e))
 			h.Runs++
@@ -197,7 +198,15 @@ func (r Report) Text() string {
 			b.WriteString("  ? " + l.name() + " (" + what + ")\n")
 		}
 	}
-	return b.String()
+	return proof.Redact(b.String())
+}
+
+// clip cuts raw error detail to n runes, marking the cut.
+func clip(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n-1]) + "…"
+	}
+	return s
 }
 
 // Usage is the help for smithy report.

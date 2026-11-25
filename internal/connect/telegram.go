@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +30,35 @@ type Telegram struct {
 	// Poll is the getUpdates long-poll timeout (default 25 s).
 	Poll   time.Duration
 	Client *http.Client
-	offset int64
+	// OffsetFile keeps the getUpdates offset across restarts ("" keeps it in memory only).
+	OffsetFile string
+	offset     int64
+	loaded     bool
+}
+
+func (t *Telegram) loadOffset() {
+	if t.loaded || t.OffsetFile == "" {
+		return
+	}
+	t.loaded = true
+	if b, err := os.ReadFile(t.OffsetFile); err == nil {
+		if n, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64); err == nil && n > t.offset {
+			t.offset = n
+		}
+	}
+}
+
+func (t *Telegram) saveOffset() {
+	if t.OffsetFile == "" {
+		return
+	}
+	if os.MkdirAll(filepath.Dir(t.OffsetFile), 0o700) != nil {
+		return
+	}
+	tmp := t.OffsetFile + ".tmp"
+	if os.WriteFile(tmp, []byte(strconv.FormatInt(t.offset, 10)+"\n"), 0o600) == nil {
+		_ = os.Rename(tmp, t.OffsetFile)
+	}
 }
 
 func (t *Telegram) Name() string { return "telegram" }
@@ -43,7 +73,34 @@ func (t *Telegram) scrub(s string) string {
 	return text.Clean(s)
 }
 
+// MaxRetryAfter caps how long one call waits on a rate limit (HTTP 429) before it gives up and
+// leaves the note to the hub's retry queue.
+const MaxRetryAfter = time.Minute
+
+// rateLimited waits d (at most MaxRetryAfter) when a call was rate limited; false means give up.
+func rateLimited(ctx context.Context, d time.Duration, try int) bool {
+	if try >= 3 || d > MaxRetryAfter {
+		return false
+	}
+	d = max(d, time.Second)
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(d):
+		return true
+	}
+}
+
 func (t *Telegram) call(ctx context.Context, method string, form url.Values, out any) error {
+	for try := 0; ; try++ {
+		wait, err := t.call1(ctx, method, form, out)
+		if wait == 0 || !rateLimited(ctx, wait, try) {
+			return err
+		}
+	}
+}
+
+func (t *Telegram) call1(ctx context.Context, method string, form url.Values, out any) (time.Duration, error) {
 	base := t.Base
 	if base == "" {
 		base = TelegramAPI
@@ -54,7 +111,7 @@ func (t *Telegram) call(ctx context.Context, method string, form url.Values, out
 	}
 	req, err := http.NewRequestWithContext(ctx, "POST", base+"/bot"+t.Token+"/"+method, strings.NewReader(form.Encode()))
 	if err != nil {
-		return errors.New("telegram: bad request")
+		return 0, errors.New("telegram: bad request")
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	resp, err := cl.Do(req)
@@ -63,7 +120,7 @@ func (t *Telegram) call(ctx context.Context, method string, form url.Values, out
 		if errors.As(err, &ue) {
 			err = ue.Err
 		}
-		return fmt.Errorf("telegram %s: %s", method, t.scrub(err.Error()))
+		return 0, fmt.Errorf("telegram %s: %s", method, t.scrub(err.Error()))
 	}
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
@@ -71,14 +128,21 @@ func (t *Telegram) call(ctx context.Context, method string, form url.Values, out
 		OK     bool            `json:"ok"`
 		Desc   string          `json:"description"`
 		Result json.RawMessage `json:"result"`
+		Params struct {
+			RetryAfter int `json:"retry_after"`
+		} `json:"parameters"`
 	}
 	if json.Unmarshal(b, &r) != nil || !r.OK {
-		return fmt.Errorf("telegram %s: HTTP %d %s", method, resp.StatusCode, t.scrub(r.Desc))
+		var wait time.Duration
+		if resp.StatusCode == http.StatusTooManyRequests {
+			wait = max(time.Duration(r.Params.RetryAfter)*time.Second, time.Second)
+		}
+		return wait, fmt.Errorf("telegram %s: HTTP %d %s", method, resp.StatusCode, t.scrub(r.Desc))
 	}
 	if out != nil {
-		return json.Unmarshal(r.Result, out)
+		return 0, json.Unmarshal(r.Result, out)
 	}
-	return nil
+	return 0, nil
 }
 
 func (t *Telegram) poll() time.Duration {
@@ -208,6 +272,7 @@ func (t *Telegram) allowed(chat int64, u tgUser) bool {
 // Receive long-polls getUpdates once: topic and main-chat messages and button presses from Chat (and Users).
 // Every button press is acknowledged so the client stops its spinner, kept or not.
 func (t *Telegram) Receive(ctx context.Context) ([]Inbound, error) {
+	t.loadOffset()
 	form := url.Values{"timeout": {strconv.Itoa(int(t.poll().Seconds()))}, "allowed_updates": {`["message","callback_query"]`}}
 	if t.offset > 0 {
 		form.Set("offset", strconv.FormatInt(t.offset, 10))
@@ -221,6 +286,11 @@ func (t *Telegram) Receive(ctx context.Context) ([]Inbound, error) {
 		if u.ID >= t.offset {
 			t.offset = u.ID + 1
 		}
+	}
+	if len(ups) > 0 {
+		t.saveOffset()
+	}
+	for _, u := range ups {
 		switch {
 		case u.Callback != nil:
 			_ = t.call(ctx, "answerCallbackQuery", url.Values{"callback_query_id": {u.Callback.ID}}, nil)

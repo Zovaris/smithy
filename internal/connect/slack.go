@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -53,6 +54,15 @@ func (s *Slack) scrub(v string) string {
 }
 
 func (s *Slack) call(ctx context.Context, method, token string, body any, out any) error {
+	for try := 0; ; try++ {
+		wait, err := s.call1(ctx, method, token, body, out)
+		if wait == 0 || !rateLimited(ctx, wait, try) {
+			return err
+		}
+	}
+}
+
+func (s *Slack) call1(ctx context.Context, method, token string, body any, out any) (time.Duration, error) {
 	base := s.Base
 	if base == "" {
 		base = SlackAPI
@@ -64,7 +74,7 @@ func (s *Slack) call(ctx context.Context, method, token string, body any, out an
 	b, _ := json.Marshal(body)
 	req, err := http.NewRequestWithContext(ctx, "POST", base+"/"+method, bytes.NewReader(b))
 	if err != nil {
-		return errors.New("slack: bad request")
+		return 0, errors.New("slack: bad request")
 	}
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -74,7 +84,7 @@ func (s *Slack) call(ctx context.Context, method, token string, body any, out an
 		if errors.As(err, &ue) {
 			err = ue.Err
 		}
-		return fmt.Errorf("slack %s: %s", method, s.scrub(err.Error()))
+		return 0, fmt.Errorf("slack %s: %s", method, s.scrub(err.Error()))
 	}
 	defer resp.Body.Close()
 	rb, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
@@ -83,12 +93,17 @@ func (s *Slack) call(ctx context.Context, method, token string, body any, out an
 		Error string `json:"error"`
 	}
 	if json.Unmarshal(rb, &r) != nil || !r.OK {
-		return fmt.Errorf("slack %s: HTTP %d %s", method, resp.StatusCode, s.scrub(r.Error))
+		var wait time.Duration
+		if resp.StatusCode == http.StatusTooManyRequests {
+			n, _ := strconv.Atoi(resp.Header.Get("Retry-After"))
+			wait = max(time.Duration(n)*time.Second, time.Second)
+		}
+		return wait, fmt.Errorf("slack %s: HTTP %d %s", method, resp.StatusCode, s.scrub(r.Error))
 	}
 	if out != nil {
-		return json.Unmarshal(rb, out)
+		return 0, json.Unmarshal(rb, out)
 	}
-	return nil
+	return 0, nil
 }
 
 var slackEsc = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace
