@@ -1,0 +1,1 @@
+{"kind": "feature", "prompt": "Implement Slugify in slug.go: lower case, runs of non-alphanumeric ASCII become one dash, no leading or trailing dash."}

@@ -1,0 +1,1 @@
+{"kind": "bug", "prompt": "Reverse in reverse.go breaks non-ASCII text. Make it reverse by character."}

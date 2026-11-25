@@ -1,0 +1,1 @@
+{"kind": "bug", "prompt": "Sum in sum.go skips the last element. Fix it."}
