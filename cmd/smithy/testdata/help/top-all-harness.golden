@@ -44,6 +44,8 @@ Maintenance
   cleanup       remove a finished task's worktree and local branch, or old
                 builds, images and worktrees
   skills        find installed skills (smithy skills --list)
+  uninstall     remove smithy: binaries, the skills it installed, daemon,
+                images, PATH line (lists first)
 
 Used by the skills
   adr           next numbered ADR (smithy adr "<title>" [adr-dir])
@@ -61,6 +63,8 @@ Used by the skills
   drift         doc-drift report against a base (smithy drift [base])
   guard-tests   pre-edit hook: blocks test edits in the green phase
   harness       "<harness> <adapter>" for this shell
+  mcp           MCP server (stdio) for driven CLIs: board, ask, secret calls,
+                search (harness build)
   names         branch and worktree names
   pr            pull requests that follow the repo's PR template
   pr-state      compact JSON state of one PR (tend)

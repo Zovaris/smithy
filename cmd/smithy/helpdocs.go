@@ -26,6 +26,7 @@ var harnessSummary = map[string]string{
 	"chat":   "fullscreen chat over a daemon (also bare smithy)",
 	"web":    "print or open the daemon's web UI link",
 	"board":  "built-in tracker: add, list, show, set, claim, sync",
+	"mcp":    "MCP server (stdio) for driven CLIs: board, ask, secret calls, search",
 }
 
 var helpDocs = map[string]helpDoc{
@@ -53,8 +54,9 @@ var helpDocs = map[string]helpDoc{
 	"config": {groupAccounts, []string{"smithy config list", "smithy config get auto.sources", "smithy config set-model cheap haiku"}, []string{"setup", "auth"}},
 	"notify": {groupAccounts, []string{"smithy notify status", "smithy notify test"}, []string{"auth", "auto"}},
 
-	"cleanup": {groupMaint, []string{"smithy cleanup . feat/42-login", "smithy cleanup . feat/42-login ../wt/login --force"}, []string{"worktree"}},
-	"skills":  {groupMaint, []string{"smithy skills --list", "smithy skills smelt"}, []string{"setup"}},
+	"cleanup":   {groupMaint, []string{"smithy cleanup . feat/42-login", "smithy cleanup . feat/42-login ../wt/login --force"}, []string{"worktree"}},
+	"uninstall": {groupMaint, []string{"smithy uninstall", "smithy uninstall --yes"}, []string{"cleanup", "skills"}},
+	"skills":    {groupMaint, []string{"smithy skills --list", "smithy skills smelt"}, []string{"setup"}},
 
 	"adr":         {groupSkills, []string{`smithy adr "Use SQLite for the board"`}, []string{"search"}},
 	"agent":       {groupSkills, []string{"smithy agent prompt.md", "smithy agent --model sonnet --timeout 30 prompt.md"}, []string{"pool", "route"}},
@@ -70,6 +72,7 @@ var helpDocs = map[string]helpDoc{
 	"drift":       {groupSkills, []string{"smithy drift", "smithy drift main"}, []string{"comments", "search"}},
 	"guard-tests": {groupSkills, []string{"smithy guard-tests internal/x/x_test.go"}, []string{"stack"}},
 	"harness":     {groupSkills, []string{"smithy harness"}, []string{"config"}},
+	"mcp":         {groupSkills, []string{"smithy mcp", "smithy mcp --readonly"}, []string{"agent", "search", "board"}},
 	"names":       {groupSkills, []string{`smithy names branch 42 "Add login"`, "smithy names worktree feat/42-add-login"}, []string{"worktree"}},
 	"pr":          {groupSkills, []string{"smithy pr template", `smithy pr create --base main --title "Add login" --body-file body.md`}, []string{"commit", "pr-state"}},
 	"pr-state":    {groupSkills, []string{"smithy pr-state 42"}, []string{"pr", "wait"}},

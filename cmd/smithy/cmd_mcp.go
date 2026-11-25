@@ -29,7 +29,7 @@ func init() {
 	if exe, err := os.Executable(); err == nil {
 		agents.KitMCP = []string{exe, "mcp"}
 	}
-	register("mcp", "MCP server (stdio) for driven CLIs: board, ask, secret calls, search", mcpUsage, "--readonly", func(args []string) int {
+	register("mcp", harnessSummary["mcp"], mcpUsage, "--readonly", func(args []string) int {
 		ro := len(args) == 1 && args[0] == "--readonly"
 		if len(args) > 0 && !ro {
 			fmt.Fprintln(os.Stderr, mcpUsage)
