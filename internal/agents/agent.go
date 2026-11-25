@@ -139,8 +139,8 @@ func AutoTools(smithy []string) []string {
 func SecretDenied() []string {
 	// shell readers must not reach the secrets the Read rules protect; pool accounts hold other accounts' logins
 	d := []string{"Bash(*auth.json*)", "Bash(*.ssh*)", "Bash(*.config/gh*)", "Bash(*.aws*)", "Bash(*.netrc*)", "Bash(*.git-credentials*)",
-		"Bash(*.smithy/accounts*)"}
-	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
+		"Bash(*.smithy/accounts*)", "Bash(*daemon.token*)"}
+	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/daemon.token", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
 		d = append(d, "Read("+f+")")
 	}
 	return d
@@ -165,8 +165,12 @@ func AutoDenied(smithy []string) []string {
 	d = append(d, SecretDenied()...)
 	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.smithy/accounts/**", "~/.smithy/pool.json", "~/.smithy/pool-state.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
 		"~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile", "~/.zshenv", "~/.claude/**",
-		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json"} {
+		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json", "~/.smithy/warden/**/*.json"} {
 		d = append(d, "Edit("+f+")") // Edit rules cover every file-editing tool, Write included
+	}
+	// warden cards change only through smithy's own commands, never the worker's edit tools
+	if h := cards.Home(); filepath.IsAbs(h) {
+		d = append(d, "Edit(/"+filepath.ToSlash(h)+"/**/*.json)")
 	}
 	return append(d, poolDenied()...)
 }
