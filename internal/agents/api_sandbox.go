@@ -1,7 +1,6 @@
 package agents
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -12,18 +11,15 @@ import (
 	"github.com/Zovaris/smithy/internal/ghx"
 )
 
-// errAPIContainer is why an api: worker refuses auto.sandbox container.
-var errAPIContainer = errors.New("api workers don't run in a container (container mode is being removed next release): use auto.sandbox native or off")
-
 // apiShellSandbox is the auto.sandbox wrapper for an API run's shell commands: nil when the
 // sandbox is off, the native OS sandbox (Seatbelt on macOS, bubblewrap on Linux) for native, and
-// an error for container or when the native sandbox can't start here (callers fail closed).
+// an error when the native sandbox can't start here (callers fail closed).
 func apiShellSandbox(mode string, p Probe, paths SandboxPaths) (func([]string) []string, error) {
 	switch mode {
 	case "off", "":
 		return nil, nil
 	case "container":
-		return nil, errAPIContainer
+		return nil, ErrContainerRemoved
 	case "native":
 	default:
 		return nil, fmt.Errorf("unknown sandbox mode %q", mode)
