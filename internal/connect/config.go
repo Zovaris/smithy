@@ -66,7 +66,8 @@ func FromConfig() ([]Connector, error) {
 	case !chatIDRe.MatchString(chat):
 		err = errors.New("telegram: notify.telegram.chat must be the numeric id of a supergroup with topics")
 	default:
-		cs = append(cs, &Telegram{Token: tok, Chat: chat, Users: idSet("connect.telegram.users")})
+		cs = append(cs, &Telegram{Token: tok, Chat: chat, Users: idSet("connect.telegram.users"),
+			OffsetFile: filepath.Join(ghx.Home(), "telegram.offset")})
 	}
 	sc, serr := slackFromConfig()
 	if sc != nil {

@@ -60,6 +60,7 @@ part above `### Details`.
 - Chat intake drops a plan whose task title or body matches a secret scan rule (`proof.Secret`), and logs only the rule name.
 - The events log masks secret-looking strings in `detail` before writing (`proof.Redact`), and the weekly report clips an orchestrator error to 80 characters and redacts its whole text.
 - Connector sends that fail are queued in `connect.json` (at most 256, oldest dropped with a log line) and retried by the hub with backoff (5 s doubling to 10 min) until they land, so a chat outage no longer loses decision prompts after the notes cursor moves on.
+- Telegram: the `getUpdates` offset is kept in `~/.smithy/telegram.offset` so a restarted daemon does not reprocess presses and replies.
 
 ## v0.19.0 — 2026-11-24
 

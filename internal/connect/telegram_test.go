@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 type botAPI struct {
@@ -51,6 +53,41 @@ func tg(t *testing.T, api *botAPI) *Telegram {
 	srv := httptest.NewServer(api)
 	t.Cleanup(srv.Close)
 	return &Telegram{Base: srv.URL, Token: "123:" + "SECRETpart", Chat: "-100500"}
+}
+
+func TestTelegramOffsetSurvivesRestart(t *testing.T) {
+	api := &botAPI{updates: `[{"update_id":41,"message":{"message_id":1,"chat":{"id":-100500},"from":{"id":5},"text":"hi"}}]`}
+	c := tg(t, api)
+	c.OffsetFile = filepath.Join(t.TempDir(), "telegram.offset")
+	if _, err := c.Receive(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	c2 := tg(t, api)
+	c2.OffsetFile = c.OffsetFile
+	if _, err := c2.Receive(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if f := api.forms[len(api.forms)-1]; f["offset"] != "42" {
+		t.Fatalf("restarted connector asked from offset %q, want 42", f["offset"])
+	}
+}
+
+func TestTelegramWaitsOutRetryAfter(t *testing.T) {
+	n := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if n++; n == 1 {
+			w.WriteHeader(429)
+			w.Write([]byte(`{"ok":false,"error_code":429,"description":"Too Many Requests","parameters":{"retry_after":1}}`))
+			return
+		}
+		w.Write([]byte(`{"ok":true,"result":{"message_id":9}}`))
+	}))
+	t.Cleanup(srv.Close)
+	c := &Telegram{Base: srv.URL, Token: "123:x", Chat: "-1"}
+	start := time.Now()
+	if _, err := c.Send(context.Background(), "", Note{Kind: "blocked", Title: "x"}, nil); err != nil || n != 2 || time.Since(start) < time.Second {
+		t.Fatalf("429 not waited out: err %v calls %d after %v", err, n, time.Since(start))
+	}
 }
 
 func TestTelegramThreadSendUpdate(t *testing.T) {
