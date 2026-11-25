@@ -143,12 +143,12 @@ func AutoTools(smithy []string) []string {
 func SecretDenied() []string {
 	// shell readers must not reach the secrets the Read rules protect; pool accounts hold other accounts' logins
 	d := []string{"Bash(*auth.json*)", "Bash(*.ssh*)", "Bash(*.config/gh*)", "Bash(*.aws*)", "Bash(*.netrc*)", "Bash(*.git-credentials*)",
-		"Bash(*.smithy/accounts*)", "Bash(*daemon.token*)",
+		"Bash(*.smithy/accounts*)", "Bash(*daemon.token*)", "Bash(*auth.key*)",
 		// glob and variable forms the literal rules miss (cat ~/.s*/id_*, $HOME/...); a best effort:
 		// only the native or container sandbox fully keeps secrets out of reach
 		"Bash(*~/.*)", "Bash(*$HOME*)", "Bash(*${HOME}*)", "Bash(*.smithy/auth*)", "Bash(*.s*/id_*)", "Bash(*.[*)",
 		"Bash(*id_rsa*)", "Bash(*id_ed25519*)", "Bash(*id_ecdsa*)"}
-	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/daemon.token", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
+	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/auth.key", "~/.smithy/daemon.token", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
 		d = append(d, "Read("+f+")")
 	}
 	return d
@@ -181,7 +181,7 @@ func AutoDenied(smithy []string) []string {
 		}
 	}
 	d = append(d, SecretDenied()...)
-	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.smithy/accounts/**", "~/.smithy/pool.json", "~/.smithy/pool-state.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
+	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/auth.key", "~/.smithy/config.json", "~/.smithy/accounts/**", "~/.smithy/pool.json", "~/.smithy/pool-state.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
 		"~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile", "~/.zshenv", "~/.claude/**",
 		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json", "~/.smithy/warden/**/*.json"} {
 		d = append(d, "Edit("+f+")") // Edit rules cover every file-editing tool, Write included

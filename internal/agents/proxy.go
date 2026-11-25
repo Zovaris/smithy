@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/proxy"
@@ -85,7 +86,7 @@ func ProxyDomains(extra string) []string {
 }
 
 // ProxySidecar is the smithy-proxy container: on smithy-egress, read-only, no capabilities, running the
-// linux smithy as `smithy proxy serve` with only auth.json (read-only, bound secrets) and
+// linux smithy as `smithy proxy serve` with only auth.json and its auth.key (read-only, bound secrets) and
 // <home>/proxy (its events: asks, approvals, refusals) mounted. Workers mount neither.
 type ProxySidecar struct {
 	Engine, Image, Bin, Home, User string
@@ -96,7 +97,8 @@ type ProxySidecar struct {
 // auth.json is rewritten by rename, which a single-file mount never sees.
 func (s ProxySidecar) Hash() string {
 	auth, _ := os.ReadFile(filepath.Join(s.Home, "auth.json"))
-	sum := sha256.Sum256(auth)
+	key, _ := os.ReadFile(filepath.Join(s.Home, "auth.key"))
+	sum := sha256.Sum256(append(auth, key...))
 	h := sha256.Sum256([]byte(strings.Join([]string{EgressNetwork, "narrow-mounts", s.Image, s.Bin, s.Home, s.User, strings.Join(s.Allow, ","), hex.EncodeToString(sum[:])}, "\x00")))
 	return hex.EncodeToString(h[:8])
 }
@@ -108,7 +110,7 @@ func (s ProxySidecar) RunArgv() []string {
 	if s.User != "" {
 		a = append(a, "--user", s.User)
 	}
-	return append(a, "-v", s.Bin+":/usr/local/bin/smithy-proxy:ro", "-v", filepath.Join(s.Home, "auth.json")+":/smithy/auth.json:ro", "-v", filepath.Join(s.Home, "proxy")+":/smithy/proxy", "-e", "SMITHY_HOME=/smithy",
+	return append(a, "-v", s.Bin+":/usr/local/bin/smithy-proxy:ro", "-v", filepath.Join(s.Home, "auth.json")+":/smithy/auth.json:ro", "-v", filepath.Join(s.Home, "auth.key")+":/smithy/auth.key:ro", "-v", filepath.Join(s.Home, "proxy")+":/smithy/proxy", "-e", "SMITHY_HOME=/smithy",
 		"--entrypoint", "/usr/local/bin/smithy-proxy", s.Image, "proxy", "serve", "--addr", ":"+strconv.Itoa(proxy.Port), "--allow", strings.Join(s.Allow, ","))
 }
 
@@ -128,6 +130,9 @@ func (s ProxySidecar) Ensure(env []string) error {
 	if f, err := os.OpenFile(filepath.Join(s.Home, "auth.json"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600); err == nil {
 		f.WriteString("{}\n")
 		f.Close()
+	}
+	if err := auth.EnsureKey(s.Home); err != nil {
+		return err
 	}
 	for _, n := range [][]string{{ProxyNetwork, "--internal"}, {EgressNetwork}} {
 		if _, err := run("network", "inspect", n[0]); err != nil {
