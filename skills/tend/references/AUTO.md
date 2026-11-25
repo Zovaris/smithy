@@ -6,7 +6,8 @@ today's count against `auto.max_per_day`, hours, whether the watcher is alive an
 
 For unattended use, recommend `smithy auto serve` (the loop outside the LLM, no tokens while idle;
 `smithy auto serve --help`): it starts one headless session per task dir that runs `tend auto
-once <dir>`. In-chat `tend auto` stays for supervised short runs.
+once <dir>`; in the harness build it runs inside `smithy daemon`. In-chat `tend auto` stays for
+supervised short runs.
 
 Security: tell the user to run serve under a dedicated OS user or machine with a least-privilege
 GitHub token and a test or least-privilege Linear key. The `--profile auto` guard differs per

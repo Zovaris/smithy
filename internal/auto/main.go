@@ -25,7 +25,7 @@ Autonomous intake (settings auto.*; state in ~/.smithy/auto/state.json).
           the workflow state and the PR attached); the issue is <source>:<id> (linear:TES-1 or
           linear:<uuid>) or a bare id taken by auto take
   status  queue, today's count and cap, hours, last poll per source, watcher alive or stale, serve
-  serve   the unattended loop in the foreground, no tokens while idle: polls every auto.every and per
+  serve   the unattended loop in the foreground (harness build: via smithy daemon), no tokens while idle: polls every auto.every and per
           task dir from take starts one headless orchestrator (smithy agent with the auto profile, running
           tend auto once <dir>, log in ~/.smithy/auto/sessions/), one at a time; --agent <cli> (default
           auto.agent), --once (one cycle), --max-hours <n>; a live view in a terminal (Esc, q or Ctrl+C
