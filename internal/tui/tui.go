@@ -897,6 +897,9 @@ func sh(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
+// OpenURL opens u in the default browser.
+func OpenURL(u string) error { return openURL(u) }
+
 func openURL(u string) error {
 	name := "xdg-open"
 	switch runtime.GOOS {
