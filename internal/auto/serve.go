@@ -28,7 +28,8 @@ import (
 
 // ServeUsage is the text for `smithy auto serve --help`.
 const ServeUsage = `usage: smithy auto serve [--agent <cli>] [--once] [--max-hours <n>]
-Runs the auto loop in the foreground with no tokens: polls auto.sources every auto.every seconds and,
+Runs the auto loop in the foreground with no tokens (in the harness build it starts smithy daemon,
+which runs this loop, or attaches to it): polls auto.sources every auto.every seconds and,
 when auto take yields a task dir, starts one headless orchestrator session (smithy agent --bg
 --profile auto) that runs tend auto once on it. At most one orchestrator at a time; new issues stay
 queued until it ends. Its output goes to ~/.smithy/auto/sessions/<time>.log.

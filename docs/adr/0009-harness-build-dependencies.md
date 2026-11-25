@@ -16,7 +16,8 @@ One command, two builds from the same source, commands and config:
   and harmonica, already allowed). Harness-only commands (`daemon`, `attach`, `board`) stay
   hidden and print how to get the harness build, exit code 2.
 - **harness build** (`go build -tags harness ./cmd/smithy`): harness-only packages carry
-  `//go:build harness`. It may also depend on:
+  `//go:build harness`. Exception: the daemon's auth and detach helpers stay untagged so the
+  skills build's `smithy doctor` can check a running daemon; they import no SQLite. It may also depend on:
   - `modernc.org/sqlite` (pure Go, no cgo), latest release, for `internal/store`
     (`~/.smithy/smithy.db`, WAL, append-only `events`, a `migrations` table);
   - later, a bundled ripgrep, when a feature needs it (its own ADR update).

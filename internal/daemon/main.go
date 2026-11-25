@@ -40,7 +40,7 @@ serve a Tailscale-User-Login listed in daemon.allow; anything else gets 401):
                                  the recorded outcome (409)
 Worker events (events.jsonl, the proxy log) are tailed into the store; proxy secret asks,
 ready items and needs_decision items become decisions whose answers go back to the asker.
-Stop a --bg daemon with: kill <pid> (smithy auto status or daemon.json show it).`
+Stop a --bg daemon with: kill <pid> (~/.smithy/daemon.json shows it).`
 
 type flags struct {
 	bg   bool

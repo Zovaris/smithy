@@ -21,7 +21,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `warden.worker_model` | `route` | `route`: a tier per task; `session`: the parent's model; or one model name for every worker. |
 | `tasks.commit` | ask (no default: smelt `plan` asks once) | `true`: commit specs and tasks (`docs/specs/`); `false`: keep them out of git (`.docs/specs/`). |
 | `tasks.ignore` | ask (no default: asked once when `tasks.commit` is false) | `gitignore`: a committed `.gitignore` line; `exclude`: `.git/info/exclude` (this machine only). |
-| `tasks.location` | `repo` | `repo`, `local` (`~/.smithy/plans`) or `board`. |
+| `tasks.location` | `repo` | `repo`, `local` (`~/.smithy/plans`) or `board` (an external tracker: GitHub Issues, Linear, Jira; not `smithy board`). |
 | `warden.merge` | unset (warden asks once per batch) | Merge mode only. Unset: warden asks once per batch in its plan line (auto or manual); `auto`: warden merges green PRs (workers never merge); `manual`: warden lists each green PR for you. A value you save counts as your words, except for the production branch (use-smithy **Merges**: only your yes). |
 | `warden.cleanup` | `auto` | End finished workers and remove their worktrees and branches without asking; `ask`: warden asks before ending them. |
 | `warden.stuck_minutes` | `15` | Minutes without a worker heartbeat before a working item counts as stuck. |
@@ -52,7 +52,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `auto.session_hours` | `3` | Hours one serve orchestrator may run before `smithy agent` ends it; its workers keep going. |
 | `notify.telegram.chat` | unset (off) | Telegram chat id (numeric, or `@channel`) that `smithy auto serve` notifies; the bot token goes in `smithy auth set telegram` (or `TELEGRAM_API_KEY`). `smithy notify test` sends a test message (`--all`: a sample of every kind), `smithy notify status` shows the setup. Messages are short HTML (every value escaped, link previews off): the kind, item key and title, repo, stage, model · speed, known cost, duration, the reason or pending question, and Open PR / Open issue buttons; never an issue body or a key; each (item, kind) once, at most 20 a minute (the overflow in one summary). |
 | `notify.style` | `plain` | Telegram message look: `plain` (status tag, one monospace detail line) or `emoji` (an icon per line). |
-| `notify.kinds` | `pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited` | Comma list of the notification kinds sent; drop one to turn it off. |
+| `notify.kinds` | `pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited` | Comma list of the notification kinds sent; drop one to turn it off. Decision alerts carry the decision id (`Decision <id>`) so an answer can name it. |
 | `board.linear_sync` | `false` | `true`: `smithy board sync` and the `board` source pull title, body, priority and labels from Linear (`linear.*` filters, `updatedAt` cursor) and push states and PR links back. |
 | `linear.team` | unset (required) | Linear team keys smithy may work in (e.g. `ENG,OPS`); empty, the Linear source refuses to poll. |
 | `linear.key_env` | `LINEAR_API_KEY` | Name of the env var holding the Linear personal API key (never the key); wins over `smithy auth set linear` (`~/.smithy/auth.json`). |

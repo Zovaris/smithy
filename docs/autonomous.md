@@ -52,7 +52,7 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
 - `smithy attach [url]` follows it in a terminal UI: live events, the decisions waiting on you
   (keys 1-9 answer; the first answer wins, a later one shows the recorded outcome), and on a lost
   connection it retries and resumes after the last event seen, so a daemon restart neither
-  repeats nor drops events. Without a url it uses the local daemon and its token; a `*.ts.net`
+  repeats nor drops events. Without a url it uses the local daemon and its token; a non-loopback
   url sends no token (`daemon.allow` decides).
 - `smithy doctor` reports whether it runs, a stale `daemon.json`, and a token readable by others.
 
