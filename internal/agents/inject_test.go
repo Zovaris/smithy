@@ -53,7 +53,7 @@ func TestInjectClaude(t *testing.T) {
 	if len(in.Unsupported) != 0 || len(in.Env) != 0 {
 		t.Fatalf("claude supports every piece: %+v", in)
 	}
-	if !slices.Contains(in.Args, "--strict-mcp-config") || argAfter(in.Args, "--append-system-prompt") != "be brief" || argAfter(in.Args, "--settings") != `{"model":"x"}` {
+	if !slices.Contains(in.Args, "--strict-mcp-config") || argAfter(in.Args, "--append-system-prompt") != "be brief" || readJSON(t, argAfter(in.Args, "--settings"))["model"] != "x" {
 		t.Fatalf("args %q", in.Args)
 	}
 	m := readJSON(t, argAfter(in.Args, "--mcp-config"))
@@ -188,5 +188,22 @@ func TestBuildAppliesInjection(t *testing.T) {
 	}
 	if e := Env(nil, s, o); !slices.Contains(e, "CODEX_HOME=/k") {
 		t.Fatalf("env %q", e)
+	}
+}
+
+func TestPoolGetenvPrefersPoolAccount(t *testing.T) {
+	g := PoolGetenv(Options{PoolEnv: []string{"CODEX_HOME=/pool/b"}}, env(map[string]string{"CODEX_HOME": "/default", "X": "1"}))
+	if g("CODEX_HOME") != "/pool/b" || g("X") != "1" {
+		t.Fatal(g("CODEX_HOME"), g("X"))
+	}
+}
+
+func TestMergeSettingsReadsKitFile(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "s.json")
+	os.WriteFile(p, []byte(`{"model":"x","sandbox":1}`), 0o600)
+	var m map[string]any
+	json.Unmarshal([]byte(mergeSettings(p, `{"sandbox":2}`)), &m)
+	if m["model"] != "x" || m["sandbox"] != 2.0 {
+		t.Fatal(m)
 	}
 }

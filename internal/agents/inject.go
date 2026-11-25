@@ -92,7 +92,11 @@ func Inject(cli string, k Kit, dir string, getenv func(string) string) (Injectio
 			in.Args = append(in.Args, "--append-system-prompt", k.SystemPrompt)
 		}
 		if has["settings"] {
-			in.Args = append(in.Args, "--settings", k.Settings)
+			p := filepath.Join(dir, "claude-settings.json")
+			if err := os.WriteFile(p, []byte(k.Settings), 0o600); err != nil {
+				return in, err
+			}
+			in.Args = append(in.Args, "--settings", p)
 		}
 	case "codex":
 		home := filepath.Join(dir, "codex-home")
@@ -186,6 +190,9 @@ func Inject(cli string, k Kit, dir string, getenv func(string) string) (Injectio
 		unsupported("skills", "system-prompt")
 	case "pi":
 		for _, s := range k.Skills {
+			if _, err := os.Stat(filepath.Join(s, "SKILL.md")); err != nil {
+				return in, fmt.Errorf("skill %s: no SKILL.md", s)
+			}
 			in.Args = append(in.Args, "--skill", s)
 		}
 		if has["system-prompt"] {
@@ -300,9 +307,25 @@ func takeArg(a []string, flag string) ([]string, string) {
 	return slices.Delete(slices.Clone(a), i, i+2), a[i+1]
 }
 
+// PoolGetenv reads the pool account's variables (o.PoolEnv) before getenv, so a pooled run's
+// kit links that account's login, not the default one.
+func PoolGetenv(o Options, getenv func(string) string) func(string) string {
+	return func(k string) string {
+		for i := len(o.PoolEnv) - 1; i >= 0; i-- {
+			if key, v, ok := strings.Cut(o.PoolEnv[i], "="); ok && key == k {
+				return v
+			}
+		}
+		return getenv(k)
+	}
+}
+
 // mergeSettings lays the kit's settings JSON under smithy's own (smithy's keys win).
 func mergeSettings(kit, own string) string {
 	var k, o map[string]any
+	if b, err := os.ReadFile(kit); err == nil {
+		kit = string(b)
+	}
 	if json.Unmarshal([]byte(kit), &k) != nil || json.Unmarshal([]byte(own), &o) != nil {
 		return own
 	}
