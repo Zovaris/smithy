@@ -11,8 +11,11 @@ part above `### Details`.
 ### Highlights
 
 - See it run: the [demo](https://github.com/Zovaris/smithy/blob/main/docs/demo.md) walks first run, a session, tool calls, a decision and the web on a phone.
+- Pick a model from a list instead of typing its name: each agent reports its own models (OpenCode and Gemini over ACP, Claude Code's aliases, each API provider's model list with OpenRouter prices). The web's Model field is a searchable select with the agent default first; `/model` and `ctrl+l` in the TUI show the same list with a filter. "Other" keeps any name you type.
 
 ### Details
+
+- models: new `internal/models` discovers each agent's models (ACP `session/new` config option or `models` field; `opencode models` as fallback; Claude Code aliases plus `model` from `~/.claude/settings.json`; `/v1/models` of Anthropic, OpenAI, DeepSeek, OpenRouter and Ollama, Gemini `v1beta/models` with generateContent) and caches each list in `~/.smithy/cache/models/<agent>.json` for a day, keeping the last good list when a refresh fails. `GET /v1/agents/{id}/models[?refresh=1]` serves it per server; `acp.Models` opens a session without prompting to read the list.
 
 - demo: `smithy daemon --demo` runs every session on a scripted agent (read, edit, test run, one decision; no CLI or key). `demo/run.sh` records the TUI with VHS (`demo/tui.tape`) and the web with Playwright (`web/scripts/demo-shots.mjs`, `DEMO_CHROME` for an installed browser) on a throwaway home; the CI `demo` job uploads the tape and screenshots as the `demo` artifact. `docs/demo.md` shows the flow.
 - tui: the chat composer is three rows tall by default, grows with its text up to ten rows then scrolls, and shrinks back after sending; shift+enter, alt+enter or ctrl+j break the line (footer hint), pasted newlines are kept, and the footer drops its last hints before the agent and cost when narrow.
