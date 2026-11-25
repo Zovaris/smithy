@@ -234,6 +234,8 @@ t "install.sh: --update keeps the harness kind" 'LK b "$L/install.sh" --update 0
 t "install.sh: --skills overrides the kept kind" 'LK b "$L/install.sh" --update --skills 0.0.0 && ! grep -q harness "$L/err" && [ "$(cat "$L/kb/kind")" = skills ]'
 t "install.sh: tty answer harness" 'echo harness > "$L/ans"; LK c env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && grep -q "harness or skills" "$L/err" && grep -q "(smithy-harness-" "$L/err"'
 t "install.sh: tty empty answer defaults to skills" ': > "$L/ans"; LK d env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && grep -q "harness or skills" "$L/err" && ! grep -q "(smithy-harness-" "$L/err"'
+t "install.sh: non-tty prints the skills install hint" 'LK e "$L/install.sh" 0.0.0 </dev/null && grep -q "skills install" "$L/err"'
+t "install.sh: tty offers skills install, no on n" 'echo n > "$L/ans"; LK f env SMITHY_TTY="$L/ans" "$L/install.sh" --skills 0.0.0 && grep -q "install the skills now" "$L/err" && ! grep -q "skills install failed" "$L/err"'
 t "install.sh: --harness with --skills refused" 'LK e "$L/install.sh" --harness --skills 0.0.0; [ $? -eq 3 ]'
 t "install.sh: rejects a bad version" 'env -u SMITHY_BIN SMITHY_HOME="$L/bad" PATH="$L/sys" "$L/install.sh" "../x" 2>"$L/err"; [ $? -eq 3 ] && grep -q "bad version" "$L/err"'
 # launcher never downloads: no binary → exit 3 naming the install page
