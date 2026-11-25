@@ -16,6 +16,10 @@ part above `### Details`.
   (loopback, or `*.ts.net` for a login in `daemon.allow`) with a strict CSP. ADR 0010.
 - `smithy web [open]` prints or opens the daemon's web link with the token in the URL fragment.
 - CI `web` job: Vitest, typecheck, the 120 KB gzip first-load budget, and a stale-dist check.
+- Web UI screens over `/v1/events` (fetch-streamed SSE, resumes after the last seq): sessions
+  with the chat transcript in minimal, expandable and verbose modes (`v`), virtualized for 10k
+  messages; decisions answered through `/v1/decisions`; agents; a board by session state; and
+  the ctrl+k command palette. Each screen is its own chunk.
 
 ## v0.19.0 — 2026-11-24
 
