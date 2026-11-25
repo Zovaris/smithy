@@ -18,12 +18,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/remote"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 )
 
 // ChatUsage is the text for `smithy chat --help`; `smithy` with no arguments opens it too.
-const ChatUsage = `usage: smithy chat [url | --standalone]
+const ChatUsage = `usage: smithy chat [url | --server <name|url> | --standalone]
 A fullscreen chat over a smithy daemon: its events stream into the transcript and the input stays
 pinned at the bottom. A lost connection retries and resumes after the last event seen.
 Keys: enter send; pgup/pgdn, wheel or ctrl+u/ctrl+d scroll; home/end top/bottom; click a tool block
@@ -34,6 +35,8 @@ option's first letter (empty input) or a click on it answers the decision pinned
                 background when none runs; it outlives the chat and exits after daemon.idle_exit
                 (default 30m) with no clients and no running work, or on smithy stop. A
                 tailscale serve URL needs no token (daemon.allow decides)
+  --server      a saved server (smithy servers), local or a URL; default: SMITHY_SERVER, then the
+                default /connect or smithy servers use saved, then this machine
   --standalone  run a private daemon inside this process instead; it stops when the chat quits`
 
 // chatWhere is where the daemon the chat talks to runs.
@@ -106,6 +109,13 @@ type chatView struct {
 	info     infoPanel             // the open read-only panel
 	frame    int                   // motion frame, advanced only while something runs
 	ticking  bool                  // a frame tick is scheduled
+
+	server      string                    // the saved server name, local or URL this chat talks to
+	picker      *connectPicker            // /connect's state while its box is open
+	connectLoad func() tea.Msg            // loads /connect's servers; nil: none
+	connectUse  func(string) error        // saves the default server
+	connectAdd  func(remote.Server) error // saves a discovered server
+	switchTo    *chatSwitch               // set when /connect picked another server
 }
 
 // infoPanel is what a read-only box shows: /connect, /remote, /web, /log.
@@ -159,15 +169,27 @@ func newComposer(th theme) textarea.Model {
 // chatArgs is what `smithy chat` was given.
 type chatArgs struct {
 	url        string
+	server     string
 	standalone bool
+	open       string // a session to open once connected (after /connect)
 }
 
 func parseChatArgs(args []string) (chatArgs, error) {
 	var a chatArgs
-	for _, x := range args {
+	for i := 0; i < len(args); i++ {
+		x := args[i]
 		switch {
 		case x == "--standalone":
 			a.standalone = true
+		case x == "--server":
+			if i+1 >= len(args) || args[i+1] == "" {
+				return a, errors.New("--server takes a name or url")
+			}
+			a.server, i = args[i+1], i+1
+		case strings.HasPrefix(x, "--server="):
+			if a.server = strings.TrimPrefix(x, "--server="); a.server == "" {
+				return a, errors.New("--server takes a name or url")
+			}
 		case strings.HasPrefix(x, "-"):
 			return a, fmt.Errorf("unknown flag %s", x)
 		case a.url != "":
@@ -176,8 +198,11 @@ func parseChatArgs(args []string) (chatArgs, error) {
 			a.url = x
 		}
 	}
-	if a.standalone && a.url != "" {
-		return a, errors.New("--standalone runs its own daemon; it takes no url")
+	if a.standalone && (a.url != "" || a.server != "") {
+		return a, errors.New("--standalone runs its own daemon; it takes no url or server")
+	}
+	if a.url != "" && a.server != "" {
+		return a, errors.New("a url or --server, not both")
 	}
 	return a, nil
 }
@@ -229,15 +254,46 @@ func Chat(args []string) int {
 		fmt.Fprintln(os.Stderr, "smithy chat:", err)
 		return 2
 	}
+	env := os.Getenv("SMITHY_SERVER")
+	for {
+		code, next := runChat(a, env)
+		if next == nil {
+			return code
+		}
+		a, env = chatArgs{server: next.server, open: next.open}, ""
+	}
+}
+
+// runChat runs one chat program against the server a resolves to; a non-nil switch means
+// /connect picked another server and Chat should run again there.
+func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	url, tok, where := a.url, "", whereRemote
+	srv := remote.Server{Name: remote.Local}
+	if a.url == "" && !a.standalone {
+		s, err := remote.Resolve(remote.File(), a.server, env)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "smithy chat:", err)
+			return 1, nil
+		}
+		srv = s
+		if srv.Name != remote.Local {
+			a.url = srv.URL
+		}
+	}
+	url, tok, where := a.url, srv.Token, whereRemote
+	serverName := serverKey(srv)
+	if a.standalone {
+		serverName = "standalone"
+	} else if srv.Name == remote.Local && a.url != "" {
+		serverName = a.url
+	}
 	var notes []string
 	switch {
 	case a.standalone:
 		if i := daemon.Running(); i != nil {
 			fmt.Fprintf(os.Stderr, "smithy --standalone: a background daemon runs (pid %d); stop it first with smithy stop, or run smithy to use it\n", i.PID)
-			return 1
+			return 1, nil
 		}
 		ready := make(chan daemon.Info, 1)
 		ended := make(chan int, 1)
@@ -247,7 +303,7 @@ func Chat(args []string) int {
 			url = i.URL()
 		case code := <-ended:
 			fmt.Fprintln(os.Stderr, "smithy --standalone: the in-process daemon did not start")
-			return max(code, 1)
+			return max(code, 1), nil
 		}
 		defer func() { cancel(); <-ended }()
 		where = whereStandalone
@@ -266,26 +322,29 @@ func Chat(args []string) int {
 		})
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "smithy: could not start the daemon:", err)
-			return 1
+			return 1, nil
 		}
 		if fresh {
 			notes = append(notes, startedNote(i, idle))
 		}
 		url, where = i.URL(), whereBackground
 	}
-	if where != whereRemote || loopbackURL(url) {
+	if tok == "" && (where != whereRemote || loopbackURL(url)) {
 		t, terr := daemon.LoadToken(daemon.TokenFile(), false)
 		if terr != nil {
 			fmt.Fprintln(os.Stderr, "smithy chat: token:", terr)
-			return 1
+			return 1, nil
 		}
 		tok = t
 	}
 	c := &daemon.Client{Base: url, Token: tok}
 	st, err := c.State(ctx)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "smithy chat:", err)
-		return 1
+		fmt.Fprintf(os.Stderr, "smithy chat: %s: %v\n", serverName, err)
+		if serverName != remote.Local && a.server == "" && env == "" {
+			fmt.Fprintln(os.Stderr, "smithy chat: the default server is unreachable; smithy servers use local goes back to this machine")
+		}
+		return 1, nil
 	}
 	if n := versionNote(st.Version, Version); n != "" && where != whereStandalone {
 		notes = append(notes, n)
@@ -298,6 +357,23 @@ func Chat(args []string) int {
 	}
 	m := newChatView(ch, url, newTheme(true, p, utf8Locale()))
 	m.where = where
+	m.server = serverName
+	m.connectLoad = defaultConnectLoad(func() (string, string) {
+		if where == whereBackground || where == whereStandalone {
+			return url, tok
+		}
+		i := daemon.Running()
+		if i == nil {
+			return "", ""
+		}
+		t, _ := daemon.LoadToken(daemon.TokenFile(), false)
+		return i.URL(), t
+	})
+	m.connectUse = func(n string) error { return remote.Use(remote.File(), n) }
+	m.connectAdd = func(s remote.Server) error { return remote.Add(remote.File(), s) }
+	if a.open != "" {
+		m.open(a.open)
+	}
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
 	m.setup, m.sess = c, c
@@ -317,14 +393,18 @@ func Chat(args []string) int {
 			return chatDecidedMsg{id: id, err: err}
 		}
 	}
-	if _, err := tea.NewProgram(m).Run(); err != nil {
+	fm, err := tea.NewProgram(m).Run()
+	if err != nil {
 		fmt.Fprintln(os.Stderr, "smithy chat:", err)
-		return 1
+		return 1, nil
+	}
+	if fm, ok := fm.(chatView); ok && fm.switchTo != nil {
+		return 0, fm.switchTo
 	}
 	if where == whereBackground {
 		fmt.Fprintln(os.Stderr, "smithy: the daemon keeps running in the background; smithy stop ends it")
 	}
-	return 0
+	return 0, nil
 }
 
 // hold keeps notes until the replayed history reaches seq, so they land below it, not above.
@@ -420,6 +500,9 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, m.wait()
+	case connectLoadedMsg:
+		m.connectLoaded(msg)
+		return m, nil
 	case chatDecidedMsg:
 		m.decided(msg)
 		return m, nil

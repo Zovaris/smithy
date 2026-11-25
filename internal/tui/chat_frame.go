@@ -320,7 +320,12 @@ func (m chatView) paletteBox(screen []string, w, h int) []string {
 		items = append(items, boxItem{glyph: it.glyph, color: it.color, label: it.label, hint: it.hint, key: it.key})
 	}
 	foot := spread("  "+keyHints(t, "↑↓", "move", "enter", "run", "tab", "next group"), t.fg(t.dim).Render(fmt.Sprintf("%d results", len(pal)))+"  ", bw)
-	return m.overBox(screen, m.floatBox(bw, bh, m.pal.query, "Search actions, sessions, settings", items, m.pal.sel, foot), w)
+	title := "Search actions, sessions, settings"
+	if m.picker != nil {
+		title = m.connectTitle()
+		foot = spread("  "+keyHints(t, "↑↓", "move", "enter", "connect", "esc", "close"), t.fg(t.dim).Render(fmt.Sprintf("%d rows", len(pal)))+"  ", bw)
+	}
+	return m.overBox(screen, m.floatBox(bw, bh, m.pal.query, title, items, m.pal.sel, foot), w)
 }
 
 // helpBox is ? and /help: every key and command.

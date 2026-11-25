@@ -310,7 +310,7 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 	case "web":
 		return m.openWeb()
 	case "connect":
-		m.showConnect()
+		return m, m.showConnect()
 	case "remote":
 		m.showRemote()
 	case "log":
@@ -413,7 +413,7 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	items := m.palItems()
 	switch k {
 	case "esc", "ctrl+k":
-		m.overlay = overlayNone
+		m.overlay, m.picker = overlayNone, nil
 	case "up":
 		m.pal.sel = max(m.pal.sel-1, 0)
 	case "down":
@@ -433,7 +433,11 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		m.overlay = overlayNone
 		if m.pal.sel < len(items) {
-			return m, items[m.pal.sel].run(&m)
+			c := items[m.pal.sel].run(&m)
+			if m.overlay == overlayNone {
+				m.picker = nil
+			}
+			return m, c
 		}
 	default:
 		if msg.Text != "" {
@@ -479,6 +483,9 @@ func (m chatView) agentsKey(k string) (tea.Model, tea.Cmd) {
 // palItems are the palette's rows after the query filter, in group order.
 func (m chatView) palItems() []palItem {
 	t := m.th
+	if m.picker != nil {
+		return m.connectItems()
+	}
 	var all []palItem
 	for i, d := range m.pending {
 		all = append(all, palItem{group: "WAITING ON YOU", glyph: t.g.wait, color: t.warn, label: d.Question, hint: strings.Join(d.Options, " "+t.g.dot+" "),
@@ -499,7 +506,7 @@ func (m chatView) palItems() []palItem {
 		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Verbosity: " + m.mode.String(), hint: "minimal · expandable · verbose", key: "v", run: cycle},
 		palItem{group: "ACTIONS", glyph: t.g.on, color: t.muted, label: "Agents panel", hint: "sessions and waiting items", key: "tab", run: agents},
 		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Open the web UI", hint: "same sessions in the browser", key: "/web", run: func(m *chatView) tea.Cmd { _, c := m.openWeb(); return c }},
-		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Connect", hint: m.url, key: "/connect", run: func(m *chatView) tea.Cmd { m.showConnect(); return nil }},
+		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Connect", hint: strings.TrimPrefix(m.server+" "+t.g.dot+" "+m.url, " "+t.g.dot+" "), key: "/connect", run: func(m *chatView) tea.Cmd { return m.showConnect() }},
 		palItem{group: "ACTIONS", glyph: t.g.dot, color: t.muted, label: "Daemon log", hint: fmt.Sprintf("%d events", len(m.noise)), key: "/log", run: func(m *chatView) tea.Cmd { m.showLog(); return nil }},
 		palItem{group: "ACTIONS", glyph: "↓", color: t.muted, label: "Jump to latest", key: "end", run: func(m *chatView) tea.Cmd { m.offset = 0; return nil }},
 		palItem{group: "ACTIONS", glyph: t.g.fail, color: t.muted, label: "Quit", key: "ctrl+c", run: func(*chatView) tea.Cmd { return tea.Quit }},
