@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/text"
 	"github.com/Zovaris/smithy/internal/usage"
 )
@@ -102,7 +103,7 @@ func appendTo(f string, e Event) error {
 	}
 	e.T = e.T.UTC().Truncate(time.Second)
 	e.Kind, e.Batch, e.Item, e.Source, e.ID = flat(e.Kind, 32), flat(e.Batch, 80), flat(e.Item, 80), flat(e.Source, 32), flat(e.ID, 80)
-	e.PR, e.Detail, e.Account = flat(e.PR, 200), flat(e.Detail, 160), flat(e.Account, 80)
+	e.PR, e.Detail, e.Account = flat(e.PR, 200), flat(proof.Redact(e.Detail), 160), flat(e.Account, 80)
 	b, err := json.Marshal(e)
 	if err != nil {
 		return err

@@ -58,6 +58,7 @@ part above `### Details`.
 - Every `--readonly` claude run (the intake planner among them) carries the same secret deny rules as `--profile auto` (`agents.SecretDenied`: `Read` and shell access to `~/.smithy/auth.json`, pool accounts, ssh, gh, aws, netrc).
 - The secret scan (`smithy proof`, `proof.Redact`) also knows Telegram and Discord bot tokens and Slack app tokens (`xapp-`); `proof.Secret` names the rule a string matches.
 - Chat intake drops a plan whose task title or body matches a secret scan rule (`proof.Secret`), and logs only the rule name.
+- The events log masks secret-looking strings in `detail` before writing (`proof.Redact`), and the weekly report clips an orchestrator error to 80 characters and redacts its whole text.
 
 ## v0.19.0 — 2026-11-24
 

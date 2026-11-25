@@ -64,6 +64,19 @@ func TestTextIsPlain(t *testing.T) {
 	}
 }
 
+func TestTextRedactsAndClipsErrors(t *testing.T) {
+	tok := "ghp_" + strings.Repeat("a", 36)
+	long := strings.Repeat("x", 300)
+	es := []events.Event{
+		{T: at(19, 9), Kind: "orchestrator_failed", Detail: "auth " + tok},
+		{T: at(19, 10), Kind: "orchestrator_failed", Detail: long},
+	}
+	s := Week(es, at(23, 9)).Text()
+	if strings.Contains(s, tok) || strings.Contains(s, long) {
+		t.Fatalf("report shows a secret or a raw long error:\n%s", s)
+	}
+}
+
 func TestEmptyWeekSaysSo(t *testing.T) {
 	s := Week(nil, at(23, 9)).Text()
 	if !strings.Contains(s, "Nothing shipped") || !strings.Contains(s, "No open decisions") {
