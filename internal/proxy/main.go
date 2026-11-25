@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -71,6 +72,10 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	}
 	switch {
 	case len(args) == 2 && (args[0] == "approve" || args[0] == "deny"):
+		// approvals come from the user (TUI, web or chat through smithy daemon), never from a worker
+		if os.Getenv("SMITHY_AGENT_PROFILE") == "auto" {
+			return fail(1, fmt.Errorf("%s refused: this process runs under an unattended worker (--profile auto); answer from the TUI, web or chat", args[0]))
+		}
 		if !askID.MatchString(args[1]) {
 			return fail(2, fmt.Errorf("bad id %q", args[1]))
 		}

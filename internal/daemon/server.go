@@ -272,6 +272,8 @@ func (sv *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/state", sv.state)
 	mux.HandleFunc("GET /v1/events", sv.events)
 	mux.HandleFunc("POST /v1/decisions", sv.decide)
+	mux.HandleFunc("GET /v1/decisions/{id...}", sv.decision)
+	mux.HandleFunc("POST /v1/asks", sv.ask)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1" && !strings.HasPrefix(r.URL.Path, "/v1/") {
 			if !ShellAllowed(r, sv.allow) {
@@ -325,6 +327,55 @@ func sameOrigin(r *http.Request) (int, string) {
 		}
 	}
 	return 0, ""
+}
+
+// decision is GET /v1/decisions/{id}: one decision with its outcome once answered.
+func (sv *Server) decision(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	sv.mu.Lock()
+	d := sv.decisions[id]
+	var out Decision
+	if d != nil {
+		out = *d
+	}
+	sv.mu.Unlock()
+	if d == nil {
+		writeJSON(w, 404, map[string]string{"error": errNotFound.Error()})
+		return
+	}
+	writeJSON(w, 200, out)
+}
+
+// ask is POST /v1/asks: smithy mcp's ask tool records a warden decision (decide:<batch>/<item>/<key>)
+// here, so its answer comes only from the daemon's own record, never from a file the worker can write.
+func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
+	if code, msg := sameOrigin(r); code != 0 {
+		writeJSON(w, code, map[string]string{"error": msg})
+		return
+	}
+	var req struct {
+		ID       string   `json:"id"`
+		Question string   `json:"question"`
+		Options  []string `json:"options"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&req); err != nil || req.Question == "" || len(req.Options) > 6 {
+		writeJSON(w, 400, map[string]string{"error": "body must be {\"id\":…,\"question\":…,\"options\":[…]}"})
+		return
+	}
+	parts := strings.Split(strings.TrimPrefix(req.ID, "decide:"), "/")
+	if !strings.HasPrefix(req.ID, "decide:") || len(parts) != 3 || !cardID(parts[0]) || !cardID(parts[1]) || !cardID(parts[2]) {
+		writeJSON(w, 400, map[string]string{"error": "id must be decide:<batch>/<item>/<key>"})
+		return
+	}
+	opts := make([]string, 0, len(req.Options))
+	for _, o := range req.Options {
+		opts = append(opts, line1(o, 200))
+	}
+	if err := sv.Ask(req.ID, line1(req.Question, 500), opts); err != nil {
+		writeJSON(w, 500, map[string]string{"error": "store failed"})
+		return
+	}
+	writeJSON(w, 200, map[string]string{"id": req.ID})
 }
 
 func (sv *Server) decide(w http.ResponseWriter, r *http.Request) {

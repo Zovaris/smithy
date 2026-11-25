@@ -1,8 +1,10 @@
 package agents
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
+	"time"
 )
 
 // TestMain clears the variables the host agent session sets (harness markers and agent/consult
@@ -10,6 +12,15 @@ import (
 func TestMain(m *testing.M) {
 	if os.Getenv("SMITHY_TEST_FAKE_ACP") == "1" {
 		fakeACP()
+		os.Exit(0)
+	}
+	if os.Getenv("SMITHY_TEST_FAKE_ACP") == "broken" {
+		// a protocol error, then a child that never exits on its own
+		var m map[string]any
+		json.NewDecoder(os.Stdin).Decode(&m)
+		b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": m["id"], "error": map[string]any{"code": -32000, "message": "broken"}})
+		os.Stdout.Write(append(b, '\n'))
+		time.Sleep(time.Minute)
 		os.Exit(0)
 	}
 	if os.Getenv("SMITHY_TEST_AGENT_MAIN") == "1" && len(os.Args) > 1 && os.Args[1] == "agent" {

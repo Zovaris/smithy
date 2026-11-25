@@ -248,12 +248,19 @@ t "install.sh: PATH offer defaults to no" ': > "$L/ans"; LI n env SMITHY_TTY="$L
 t "install.sh: --update keeps working in the new layout" 'LI a "$L/install.sh" --update 0.0.0 && [ "$("$L/Ia/.local/bin/smithy")" = fake-smithy ]'
 mkdir -p "$L/Im/.smithy/bin/0.0.1" "$L/Im/.smithy/bin/dev/k"; printf '#!/bin/sh\necho old-smithy\n' > "$L/Im/.smithy/bin/0.0.1/smithy"; chmod +x "$L/Im/.smithy/bin/0.0.1/smithy"; ln -s "$L/Im/.smithy/bin/0.0.1/smithy" "$L/Im/.smithy/bin/smithy"
 t "install.sh: migrates ~/.smithy/bin and says so" 'LI m "$L/install.sh" 0.0.0 </dev/null && grep -q "moved the old install" "$L/err" && [ -x "$L/Im/.local/share/smithy/versions/0.0.1/smithy" ] && [ -d "$L/Im/.local/share/smithy/dev/k" ] && [ -L "$L/Im/.smithy/bin/0.0.1" ]'
+J="$L/Ij"; mkdir -p "$J/.smithy/bin/0.0.1" "$J/.smithy/bin/dev/k1" "$J/.smithy/bin/dev/k2" "$J/.local/share/smithy/versions/0.0.1" "$J/.local/share/smithy/dev/k2"
+echo old > "$J/.smithy/bin/0.0.1/smithy"; echo new > "$J/.local/share/smithy/versions/0.0.1/smithy"; echo a > "$J/.smithy/bin/dev/k1/smithy"; echo b > "$J/.smithy/bin/dev/k2/smithy"; echo c > "$J/.local/share/smithy/dev/k2/smithy"
+t "install.sh: migration keeps what already sits at the target" 'LI j "$L/install.sh" 0.0.0 </dev/null && [ "$(cat "$J/.smithy/bin/0.0.1/smithy")" = old ] && [ "$(cat "$J/.local/share/smithy/versions/0.0.1/smithy")" = new ] && [ "$(cat "$J/.local/share/smithy/dev/k2/smithy")" = c ] && [ "$(cat "$J/.local/share/smithy/dev/k1/smithy")" = a ] && [ "$(cat "$J/.smithy/bin/dev/k2/smithy")" = b ]'
 t "install.sh: old ~/.smithy/bin/smithy now runs the new one" '[ "$("$L/Im/.smithy/bin/smithy")" = fake-smithy ] && [ "$("$L/Im/.smithy/bin/0.0.0/smithy")" = fake-smithy ] && [ "$("$L/Im/.smithy/bin/0.0.1/smithy")" = old-smithy ]'
 t "launcher: an old 0.0.1 skill still finds its binary after migration" 'echo 0.0.1 > "$L/VERSION"; [ "$(env -u SMITHY_BIN HOME="$L/Im" SMITHY_HOME="$L/Im/.smithy" "$L/smithy" 2>"$L/err")" = old-smithy ] && [ ! -s "$L/err" ]'
 echo 0.0.0 > "$L/VERSION"
 t "launcher: finds the new layout" '[ "$(env -u SMITHY_BIN HOME="$L/Ia" SMITHY_HOME="$L/Ia/.smithy" "$L/smithy" 2>"$L/err")" = fake-smithy ] && [ ! -s "$L/err" ]'
 t "launcher: falls back to ~/.local/bin/smithy with a notice" 'echo 9.9.9 > "$L/VERSION"; [ "$(env -u SMITHY_BIN HOME="$L/Ia" SMITHY_HOME="$L/Ia/.smithy" "$L/smithy" 2>"$L/err")" = fake-smithy ] && grep -q "using $L/Ia/.local/bin/smithy" "$L/err"'
 echo 0.0.0 > "$L/VERSION"
+# a checkout's dev build never takes over the smithy command on PATH
+D="$L/devco"; mkdir -p "$D/skills/x/scripts" "$D/cmd" "$D/internal" "$L/devgo"; echo "module github.com/Zovaris/smithy" > "$D/go.mod"; cp "$L/smithy" "$D/skills/x/scripts/smithy"
+printf '#!/bin/sh\nwhile [ $# -gt 0 ]; do [ "$1" = -o ] && { printf "#!/bin/sh\\necho dev-smithy\\n" > "$2"; chmod +x "$2"; }; shift; done\n' > "$L/devgo/go"; chmod +x "$L/devgo/go"
+t "launcher: dev build does not re-point ~/.local/bin/smithy" 'before=$(readlink "$L/Ia/.local/bin/smithy"); [ "$(env -u SMITHY_BIN HOME="$L/Ia" SMITHY_HOME="$L/Ia/.smithy" PATH="$L/devgo:$L/sys" "$D/skills/x/scripts/smithy" 2>"$L/err")" = dev-smithy ] && [ "$(readlink "$L/Ia/.local/bin/smithy")" = "$before" ]'
 cp "$S/../uninstall.sh" "$L/uninstall.sh"
 U() { h=$1; shift; env -u SMITHY_TTY -u XDG_DATA_HOME -u XDG_BIN_HOME HOME="$L/I$h" SMITHY_HOME="$L/I$h/.smithy" PATH="$L/sys" sh "$L/uninstall.sh" "$@" 2>"$L/err"; }
 for h in y m; do mkdir -p "$L/I$h/.claude/skills/smelt" "$L/I$h/.claude/skills/mine"; touch "$L/I$h/.claude/skills/smelt/SKILL.md" "$L/I$h/.claude/skills/mine/SKILL.md" "$L/I$h/.smithy/auth.json" "$L/I$h/.local/bin/other"; echo "$L/I$h/.claude/skills/smelt" > "$L/I$h/.smithy/installed-skills"; done
@@ -262,6 +269,16 @@ t "uninstall.sh: --yes removes what it listed, keeps ~/.smithy" 'U y --yes && [ 
 t "uninstall.sh: never touches what it did not install" '[ -d "$L/Iy/.claude/skills/mine" ] && [ -e "$L/Iy/.local/bin/other" ] && [ -e "$L/Iy/.smithy/auth.json" ]'
 t "uninstall.sh: --purge without a terminal needs --confirm-purge" 'U m --yes --purge && [ -e "$L/Im/.smithy/auth.json" ] && [ ! -e "$L/Im/.smithy/bin" ] && grep -q "confirm-purge" "$L/err"'
 t "uninstall.sh: tty purge asks twice and names the contents" 'printf "y\n" > "$L/ans"; U m --purge </dev/null; printf "purge\n" > "$L/ans"; env -u XDG_DATA_HOME -u XDG_BIN_HOME HOME="$L/Im" SMITHY_HOME="$L/Im/.smithy" SMITHY_TTY="$L/ans" PATH="$L/sys" sh "$L/uninstall.sh" --yes --purge 2>"$L/err"; grep -q "holds: .*auth.json" "$L/err" && [ ! -e "$L/Im/.smithy" ] && [ -d "$L/Im/.claude/skills/mine" ]'
+mkdir -p "$L/Ic/.local/share/smithy/versions/0.0.0" "$L/Ic/.local/bin" "$L/Id/.local/share/smithy/versions/0.0.0" "$L/Id/.local/bin"
+for h in c d; do echo bin > "$L/I$h/.local/share/smithy/versions/0.0.0/smithy"; done
+echo bin > "$L/Ic/.local/bin/smithy"; echo other > "$L/Id/.local/bin/smithy"
+t "uninstall.sh: removes a copied smithy binary" 'U c --yes && [ ! -e "$L/Ic/.local/bin/smithy" ]'
+t "uninstall.sh: keeps a binary smithy did not install" 'U d --yes && [ -e "$L/Id/.local/bin/smithy" ]'
+t "install.sh: a fresh smithy home gets the marker" '[ -e "$L/Ia/.smithy/.smithy-home" ]'
+mkdir -p "$L/Iq/.smithy/my-project"; echo mine > "$L/Iq/.smithy/notes.txt"; touch "$L/Iq/.smithy/auth.json"
+t "uninstall.sh: --purge refuses a folder that is not smithy's" 'U q --yes --purge --confirm-purge; [ -e "$L/Iq/.smithy/notes.txt" ] && grep -q "refusing to purge .*notes.txt" "$L/err"'
+mkdir -p "$L/Ir/.smithy"; touch "$L/Ir/.smithy/.smithy-home" "$L/Ir/.smithy/whatever"
+t "uninstall.sh: --purge removes a marked smithy home" 'U r --yes --purge --confirm-purge; [ ! -e "$L/Ir/.smithy" ]'
 # launcher never downloads: no binary → exit 3 naming the install page
 LM() { env -u SMITHY_BIN -u XDG_DATA_HOME -u XDG_BIN_HOME HOME="$L/emptyH$1" SMITHY_HOME="$L/empty$1" PATH="$L/curl:$L/sys" "$L/smithy" version 2>"$L/err"; }
 t "launcher: missing binary exits 3, no download" 'rm -f "$L/curl.args"; LM a; [ $? -eq 3 ] && grep -q "not installed; the smithy skills need it" "$L/err" && [ ! -e "$L/curl.args" ]'

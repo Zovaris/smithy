@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -197,11 +198,36 @@ type roundTrip func(*http.Request) (*http.Response, error)
 
 func (f roundTrip) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
-func TestAskWaitsForTheCardAnswer(t *testing.T) {
+type fakeAsker struct {
+	mu      sync.Mutex
+	asked   map[string]string
+	answers map[string]string
+	askErr  error
+}
+
+func (f *fakeAsker) Ask(_ context.Context, id, q string, _ []string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.askErr != nil {
+		return f.askErr
+	}
+	f.asked[id] = q
+	return nil
+}
+
+func (f *fakeAsker) Outcome(_ context.Context, id string) (string, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	a, ok := f.answers[id]
+	return a, ok, nil
+}
+
+func TestAskTrustsOnlyTheDaemonAnswer(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("WARDEN_HOME", home)
 	t.Setenv("SMITHY_HOME", t.TempDir())
-	ask := AskTool("b1/i1", 10*time.Millisecond)
+	fa := &fakeAsker{asked: map[string]string{}, answers: map[string]string{}}
+	ask := AskTool("b1/i1", 10*time.Millisecond, func() (Asker, error) { return fa, nil })
 	done := make(chan string, 1)
 	go func() {
 		s, err := ask.Call(context.Background(), Args{"question": "Which db?", "options": []any{"sqlite", "postgres"}})
@@ -223,10 +249,26 @@ func TestAskWaitsForTheCardAnswer(t *testing.T) {
 	if card["state"] != "needs_decision" || card["question"] != "Which db?" || card["decision_key"] == "" {
 		t.Fatalf("card not asking: %v", card)
 	}
-	card["answer"] = "postgres"
-	card["answer_id"] = "decide:b1/i1/" + card["decision_key"].(string)
+	id := "decide:b1/i1/" + card["decision_key"].(string)
+	fa.mu.Lock()
+	q := fa.asked[id]
+	fa.mu.Unlock()
+	if q != "Which db?" {
+		t.Fatalf("daemon not asked %q: %v", id, fa.asked)
+	}
+	// a worker writing the card itself must not answer
+	card["answer"] = "sqlite"
+	card["answer_id"] = id
 	b, _ := json.Marshal(card)
 	os.WriteFile(file, b, 0o644)
+	select {
+	case s := <-done:
+		t.Fatalf("ask took the card's forged answer %q", s)
+	case <-time.After(100 * time.Millisecond):
+	}
+	fa.mu.Lock()
+	fa.answers[id] = "postgres"
+	fa.mu.Unlock()
 	select {
 	case s := <-done:
 		if s != "postgres" {
@@ -242,18 +284,28 @@ func TestAskWaitsForTheCardAnswer(t *testing.T) {
 	}
 }
 
+func TestAskRefusesWithoutDaemon(t *testing.T) {
+	t.Setenv("WARDEN_HOME", t.TempDir())
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	none := func() (Asker, error) { return nil, errors.New("no daemon") }
+	if _, err := AskTool("b1/i1", time.Millisecond, none).Call(context.Background(), Args{"question": "q"}); err == nil || !strings.Contains(err.Error(), "daemon") {
+		t.Fatalf("ask without a daemon: %v", err)
+	}
+}
+
 func TestAskWithoutCardOrTimeout(t *testing.T) {
 	t.Setenv("WARDEN_HOME", t.TempDir())
 	t.Setenv("SMITHY_HOME", t.TempDir())
-	if _, err := AskTool("", time.Millisecond).Call(context.Background(), Args{"question": "q"}); err == nil {
+	if _, err := AskTool("", time.Millisecond, nil).Call(context.Background(), Args{"question": "q"}); err == nil {
 		t.Fatal("ask without a card accepted")
 	}
-	if _, err := AskTool("../x/y", time.Millisecond).Call(context.Background(), Args{"question": "q"}); err == nil {
+	if _, err := AskTool("../x/y", time.Millisecond, nil).Call(context.Background(), Args{"question": "q"}); err == nil {
 		t.Fatal("bad card accepted")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
-	if _, err := AskTool("b2/i2", time.Millisecond).Call(ctx, Args{"question": "q"}); err == nil {
+	fa := &fakeAsker{asked: map[string]string{}, answers: map[string]string{}}
+	if _, err := AskTool("b2/i2", time.Millisecond, func() (Asker, error) { return fa, nil }).Call(ctx, Args{"question": "q"}); err == nil {
 		t.Fatal("ask without answer returned no error")
 	}
 }

@@ -228,7 +228,12 @@ func walkFiles(root string) []string {
 
 func scanFiles(c *collector, re *regexp.Regexp, files []string) {
 	for _, rel := range files {
-		f, err := os.Open(filepath.Join(c.opts.Root, filepath.FromSlash(rel)))
+		p := filepath.Join(c.opts.Root, filepath.FromSlash(rel))
+		// a tracked symlink can point outside the root: only regular files are read
+		if li, err := os.Lstat(p); err != nil || !li.Mode().IsRegular() {
+			continue
+		}
+		f, err := os.Open(p)
 		if err != nil {
 			continue
 		}

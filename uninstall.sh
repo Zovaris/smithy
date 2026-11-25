@@ -35,7 +35,18 @@ echo "smithy uninstall: would remove" >&2
 [ -d "$data" ] && add "$data"
 if [ -L "$bindir/smithy" ]; then
   t=$(readlink "$bindir/smithy"); inside "$t" && add "$bindir/smithy"
+elif [ -f "$bindir/smithy" ]; then
+  # a copy, not a link: smithy's own only when it matches an installed version byte for byte
+  for v in "$data"/versions/*/smithy; do
+    [ -f "$v" ] && cmp -s "$v" "$bindir/smithy" && { add "$bindir/smithy"; break; }
+  done
 fi
+# Windows (Git Bash): install.sh copies smithy.exe into %LOCALAPPDATA%\Programs\smithy, a folder of its own
+case $(uname -s 2>/dev/null) in MINGW*|MSYS*|CYGWIN*)
+  lad=${LOCALAPPDATA:-$HOME/AppData/Local}; command -v cygpath >/dev/null 2>&1 && lad=$(cygpath -u "$lad")
+  [ -d "$lad/smithy/versions" ] && add "$lad/smithy"
+  [ -f "$lad/Programs/smithy/smithy.exe" ] && add "$lad/Programs/smithy" ;;
+esac
 [ -d "$home/bin" ] || [ -L "$home/bin" ] && add "$home/bin"
 skills=
 if [ -f "$home/installed-skills" ]; then
@@ -69,6 +80,25 @@ $rc"; echo "  PATH line in $rc" >&2; }
   done < "$home/path-added"
 fi
 case $home in "$HOME"|"$HOME"/|/) [ -z "$purge" ] || say "refusing to purge $home"; purge= ;; esac
+# ownhome: $home is smithy's when it holds the marker, or smithy's key files and nothing else
+ownhome() {
+  [ -e "$home/.smithy-home" ] && return 0
+  key=; odd=
+  for e in "$home"/* "$home"/.[!.]* "$home"/..?*; do
+    [ -e "$e" ] || [ -L "$e" ] || continue
+    n=${e##*/}
+    case $n in auth.json|config.json|kind|installed-skills|smithy.db) key=1 ;; esac
+    case $n in auth.json|config.json|kind|installed-skills|path-added|accounts|pool.json|pool-state.json|bin|plans|warden|decisions|connect.json|notify.json|tasks-index.json|telegram.offset|tui.seen|checkout|tend|loose|auto|skills|smithy.db*|events*|daemon*|decide*|proxy*) ;;
+      *) odd="$odd $n" ;;
+    esac
+  done
+  [ -n "$odd" ] && { why="it holds files smithy did not write:$odd"; return 1; }
+  [ -n "$key" ] || { why="it holds none of smithy's files"; return 1; }
+  return 0
+}
+if [ -n "$purge" ] && [ -d "$home" ] && ! ownhome; then
+  say "refusing to purge $home: not smithy's home ($why); remove it yourself if you mean to"; purge=
+fi
 if [ -n "$purge" ] && [ -d "$home" ]; then
   add "$home"
   echo "           holds: $(ls -A "$home" | tr '\n' ' ')" >&2

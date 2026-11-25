@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -80,6 +81,60 @@ func TestYesRemovesOnlyListed(t *testing.T) {
 	b, _ := os.ReadFile(f.rc)
 	if string(b) != "alias a=b\n\nalias c=d\n" {
 		t.Fatalf("rc: %q", b)
+	}
+}
+
+func TestCopiedBinaryRemovedOnlyWhenItIsSmithys(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows removes Programs\\smithy as a folder")
+	}
+	f := setup(t)
+	link := filepath.Join(f.bin, "smithy")
+	os.Remove(link)
+	os.WriteFile(link, []byte("bin"), 0o755) // a copy of versions/0.21.0/smithy
+	var out bytes.Buffer
+	Run([]string{"--yes"}, strings.NewReader(""), false, &out, "")
+	if exists(link) {
+		t.Fatalf("copied smithy binary left behind:\n%s", out.String())
+	}
+	f = setup(t)
+	os.Remove(link)
+	os.WriteFile(link, []byte("someone else's smithy"), 0o755)
+	out.Reset()
+	Run([]string{"--yes"}, strings.NewReader(""), false, &out, "")
+	if !exists(link) {
+		t.Fatalf("removed a binary smithy did not install:\n%s", out.String())
+	}
+}
+
+func TestPurgeRefusesAFolderThatIsNotSmithys(t *testing.T) {
+	f := setup(t)
+	os.MkdirAll(filepath.Join(f.sh, "my-project", ".git"), 0o755)
+	os.WriteFile(filepath.Join(f.sh, "notes.txt"), []byte("mine"), 0o644)
+	var out bytes.Buffer
+	Run([]string{"--yes", "--purge", "--confirm-purge"}, strings.NewReader(""), false, &out, "")
+	if !exists(filepath.Join(f.sh, "notes.txt")) || !exists(filepath.Join(f.sh, "my-project")) {
+		t.Fatalf("purged a folder holding other files:\n%s", out.String())
+	}
+	if !strings.Contains(out.String(), "not smithy's") || !strings.Contains(out.String(), "notes.txt") {
+		t.Fatalf("no reason given:\n%s", out.String())
+	}
+	g := setup(t)
+	os.RemoveAll(g.sh)
+	os.MkdirAll(g.sh, 0o755)
+	os.WriteFile(filepath.Join(g.sh, "readme.md"), []byte("x"), 0o644)
+	out.Reset()
+	Run([]string{"--yes", "--purge", "--confirm-purge"}, strings.NewReader(""), false, &out, "")
+	if !exists(filepath.Join(g.sh, "readme.md")) {
+		t.Fatalf("purged a folder with no smithy files:\n%s", out.String())
+	}
+	h := setup(t)
+	os.WriteFile(filepath.Join(h.sh, ".smithy-home"), nil, 0o644)
+	os.WriteFile(filepath.Join(h.sh, "something-new"), []byte("x"), 0o644)
+	out.Reset()
+	Run([]string{"--yes", "--purge", "--confirm-purge"}, strings.NewReader(""), false, &out, "")
+	if exists(h.sh) {
+		t.Fatalf("marked smithy home not purged:\n%s", out.String())
 	}
 }
 

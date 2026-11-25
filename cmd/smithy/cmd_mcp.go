@@ -11,6 +11,7 @@ import (
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/board"
+	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/mcp"
 	"github.com/Zovaris/smithy/internal/proxy"
@@ -22,7 +23,7 @@ An MCP server on stdin/stdout (harness build) that smithy agent gives every driv
   search       search the working folder (smithy search's engines and caps)
   board_*      list, show, claim and set tasks of the built-in tracker
   secret_call  call an API with secret:<name> through the egress proxy; the key never returns
-  ask          ask the user a decision through the run's warden card and wait for the answer
+  ask          ask the user a decision through smithy daemon (shown on the run's card) and wait
 --readonly keeps search, board_list and board_show. Inputs are validated and output is capped.`
 
 func init() {
@@ -59,7 +60,13 @@ func init() {
 						events.AppendProxy(events.Event{Kind: "proxy_denied", Detail: fmt.Sprintf("%s %s %s %s %d", e.Kind, e.Name, e.Method, e.Host, e.Status)})
 					}
 				}}
-			tools = append(tools, mcp.SecretTool(p), mcp.AskTool(card, 2*time.Second))
+			tools = append(tools, mcp.SecretTool(p), mcp.AskTool(card, 2*time.Second, func() (mcp.Asker, error) {
+				a, err := daemon.LocalAsker()
+				if err != nil {
+					return nil, err
+				}
+				return a, nil
+			}))
 		}
 		s := &mcp.Server{Name: "smithy", Version: version, Tools: tools}
 		if err := s.Serve(context.Background(), os.Stdin, os.Stdout); err != nil {

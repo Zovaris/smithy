@@ -107,6 +107,10 @@ type Options struct {
 // unattended orchestrator get the same allow-list.
 const ProfileEnv = "SMITHY_AGENT_PROFILE"
 
+// WorkerEnv names a warden worker's item (<batch>/<item>); commands only the orchestrator or the
+// user may run (smithy auto report) refuse when it is set.
+const WorkerEnv = "SMITHY_WARDEN_ITEM"
+
 // AutoTools are the only tools a claude session under --profile auto may use; everything else
 // is denied (permission mode dontAsk), so an unattended run never asks and never bypasses.
 // smithy itself is allowed only by the absolute paths in Options.SmithyBins.
@@ -139,8 +143,12 @@ func AutoTools(smithy []string) []string {
 func SecretDenied() []string {
 	// shell readers must not reach the secrets the Read rules protect; pool accounts hold other accounts' logins
 	d := []string{"Bash(*auth.json*)", "Bash(*.ssh*)", "Bash(*.config/gh*)", "Bash(*.aws*)", "Bash(*.netrc*)", "Bash(*.git-credentials*)",
-		"Bash(*.smithy/accounts*)"}
-	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
+		"Bash(*.smithy/accounts*)", "Bash(*daemon.token*)",
+		// glob and variable forms the literal rules miss (cat ~/.s*/id_*, $HOME/...); a best effort:
+		// only the native or container sandbox fully keeps secrets out of reach
+		"Bash(*~/.*)", "Bash(*$HOME*)", "Bash(*${HOME}*)", "Bash(*.smithy/auth*)", "Bash(*.s*/id_*)", "Bash(*.[*)",
+		"Bash(*id_rsa*)", "Bash(*id_ed25519*)", "Bash(*id_ecdsa*)"}
+	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/daemon.token", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
 		d = append(d, "Read("+f+")")
 	}
 	return d
@@ -162,11 +170,25 @@ func AutoDenied(smithy []string) []string {
 			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config set *)", "Bash("+b+" config set-model *)", "Bash("+b+" pool *)")
 		}
 	}
+	// approvals and answers come only from the user's channels, never from a worker
+	for _, b := range append([]string{"smithy"}, smithy...) {
+		if b != "smithy" && !filepath.IsAbs(b) {
+			continue
+		}
+		d = append(d, "Bash("+b+" proxy approve *)", "Bash("+b+" proxy deny *)")
+		for _, c := range []string{"chat", "attach", "web", "tui"} {
+			d = append(d, "Bash("+b+" "+c+")", "Bash("+b+" "+c+" *)")
+		}
+	}
 	d = append(d, SecretDenied()...)
 	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.smithy/accounts/**", "~/.smithy/pool.json", "~/.smithy/pool-state.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
 		"~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile", "~/.zshenv", "~/.claude/**",
-		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json"} {
+		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json", "~/.smithy/warden/**/*.json"} {
 		d = append(d, "Edit("+f+")") // Edit rules cover every file-editing tool, Write included
+	}
+	// warden cards change only through smithy's own commands, never the worker's edit tools
+	if h := cards.Home(); filepath.IsAbs(h) {
+		d = append(d, "Edit(/"+filepath.ToSlash(h)+"/**/*.json)")
 	}
 	return append(d, poolDenied()...)
 }
@@ -544,7 +566,7 @@ func withPath(a []string, path string) []string {
 // Env is the worker's environment: base without the parent harness's variables, with
 // WARDEN_HARNESS and the AGENT_* run variables set.
 func Env(base []string, s Spec, o Options) []string {
-	drop := map[string]bool{ProfileEnv: true, SandboxRoleEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
+	drop := map[string]bool{ProfileEnv: true, SandboxRoleEnv: true, WorkerEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
 	if len(o.PoolEnv) > 0 {
 		for _, k := range PoolDropEnv {
 			drop[k] = true
@@ -571,6 +593,9 @@ func Env(base []string, s Spec, o Options) []string {
 		env = append(env, ProfileEnv+"="+o.Profile)
 	}
 	env = append(env, o.PoolEnv...)
+	if batch, id := cardOf(o.Log, o.Cwd); batch != "" {
+		env = append(env, WorkerEnv+"="+batch+"/"+id)
+	}
 	if o.Inject != nil {
 		env = append(env, o.Inject.Env...)
 	}
@@ -724,6 +749,9 @@ func Run(o Options) int {
 			fmt.Fprintf(os.Stderr, "smithy agent: smithy mcp not given to %s: %v\n", cli, err)
 		} else if in != nil {
 			o.Inject = in
+			if !o.Bg { // a detached run still needs its kit
+				defer in.Remove()
+			}
 			if len(in.Unsupported) > 0 {
 				fmt.Fprintf(os.Stderr, "smithy agent: %s can't take %s from smithy's kit; it runs without\n", cli, strings.Join(in.Unsupported, ", "))
 			}

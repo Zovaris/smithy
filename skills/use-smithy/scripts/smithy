@@ -19,7 +19,7 @@ case ${XDG_BIN_HOME:-} in /*) cmd=$XDG_BIN_HOME/smithy ;; *) cmd=$HOME/.local/bi
 repo=Zovaris/smithy
 version=$(cat "$here/VERSION" 2>/dev/null || echo dev)
 
-# link points the smithy command on PATH at $1 when install.sh made it a link.
+# link points the smithy command on PATH at $1 (a versioned install only) when install.sh made it a link.
 link() { [ ! -L "$cmd" ] || ln -sfn "$1" "$cmd" 2>/dev/null || true; }
 
 # Development: the skill folder is inside a checkout of the repo (skills/<name>/scripts or shared).
@@ -31,7 +31,7 @@ for root in "$here/../../.." "$here/.."; do
       mkdir -p "$data/dev/$key"
       (cd "$root" && go build -trimpath -ldflags "-s -w -X main.version=dev" -o "$bin" ./cmd/smithy) >&2
     fi
-    link "$bin"; exec "$bin" "$@"
+    exec "$bin" "$@"  # a dev build never takes over the smithy command on PATH
   fi
 done
 

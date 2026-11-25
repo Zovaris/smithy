@@ -130,6 +130,28 @@ func TestAgentReadOnlyACPRejectsAndRecordsTheDecision(t *testing.T) {
 	}
 }
 
+func TestACPProtocolErrorStopsTheChild(t *testing.T) {
+	old := acpGrace
+	acpGrace = 100 * time.Millisecond
+	t.Cleanup(func() { acpGrace = old })
+	exe, _ := os.Executable()
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	t.Setenv("SMITHY_TEST_FAKE_ACP", "broken")
+	t.Setenv("AGENT_PROTOCOL", "acp")
+	t.Setenv("AGENT_CMD", "'"+exe+"'")
+	dir := t.TempDir()
+	p := filepath.Join(dir, "prompt.md")
+	os.WriteFile(p, []byte("fix it\n"), 0o644)
+	start := time.Now()
+	rc := AgentMain([]string{"--timeout", "1", "--log", filepath.Join(dir, "run.log"), p})
+	if rc == 0 {
+		t.Fatal("protocol error reported success")
+	}
+	if time.Since(start) > 20*time.Second {
+		t.Fatal("the child kept running after the protocol error")
+	}
+}
+
 func TestBuildACP(t *testing.T) {
 	acp := env(map[string]string{"AGENT_PROTOCOL": "acp"})
 	cases := []struct {

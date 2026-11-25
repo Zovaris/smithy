@@ -33,6 +33,14 @@ type Injection struct {
 	Args        []string
 	Env         []string
 	Unsupported []string
+	Temp        string // a temp kit dir RunKit made; Remove deletes it after the run
+}
+
+// Remove deletes the temp kit dir (claude-mcp.json, a CODEX_HOME linking auth.json), if any.
+func (in *Injection) Remove() {
+	if in != nil && in.Temp != "" {
+		os.RemoveAll(in.Temp)
+	}
 }
 
 var safeName = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
@@ -370,6 +378,13 @@ func RunKit(cli string, o Options, getenv func(string) string) (*Injection, erro
 		dir = d
 	}
 	in, err := Inject(cli, Kit{MCP: map[string]MCPServer{"smithy": {Command: KitMCP[0], Args: args, Env: env}}}, dir, PoolGetenv(o, getenv))
+	if o.Log == "" {
+		if err != nil {
+			os.RemoveAll(dir)
+			return nil, err
+		}
+		in.Temp = dir
+	}
 	if err != nil {
 		return nil, err
 	}

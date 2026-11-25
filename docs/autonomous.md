@@ -129,11 +129,15 @@ machine, with a fine-grained, repo-scoped GitHub token and a test or least-privi
   | Claude Code | smithy's allow-list: explicit git/gh subcommands; config edits, credential and network commands, and secret files denied |
   | Codex | its workspace-write sandbox, network on (push needs it), approvals off |
   | OpenCode | smithy's allow-list as `OPENCODE_PERMISSION` rules: bash allow-list, web fetch and outside directories denied, secret files denied for read and edit (also for `--readonly` runs such as the intake planner) |
+  | Any CLI over ACP (`AGENT_PROTOCOL=acp`) | each permission request goes through the same allow-list: a command must match an allowed rule and no denied one (no `;`, `&&`, pipes, redirects or `$`), edits stay inside the worktree and off denied paths, reads off secret paths; fetch, delete, move and anything smithy can't classify are rejected |
   | Others (gemini, pi, cursor, dsh) | their own headless mode, no smithy allow-list: use `container` with `proxy` (needs your own `auto.sandbox_image`) |
 
   Only Claude Code and OpenCode can deny reads of `~/.smithy/auth.json` and the other secret
   files. Codex, gemini, pi, cursor and dsh have no per-path read deny, so outside `container`
-  they can read them; `smithy doctor` says so for the configured CLI.
+  they can read them; `smithy doctor` says so for the configured CLI. Even for Claude Code and
+  OpenCode the shell deny rules match command text (globs such as `~/.s*`, `$HOME` and key file
+  names included), so a command that builds the path another way can slip past: only the `native`
+  or `container` sandbox fully keeps secrets out of reach.
 
   None of these removes the risk. Nothing stops Codex or the others sending data out, so
   least-privilege tokens matter most there.

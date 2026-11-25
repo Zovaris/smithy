@@ -31,7 +31,7 @@ and opening PRs without prompts.
 | `AGENT_CLI` | picks the CLI |
 | `AGENT_ARGS` | adds flags |
 | `AGENT_CMD` | plugs in any other command |
-| `AGENT_PROTOCOL=acp` | drives Gemini CLI, OpenCode or an ACP `AGENT_CMD` over the Agent Client Protocol: tool calls, permission answers and usage land in smithy's events |
+| `AGENT_PROTOCOL=acp` | drives Gemini CLI, OpenCode or an ACP `AGENT_CMD` over the Agent Client Protocol: tool calls, permission answers and usage land in smithy's events; under `--profile auto` each permission request is checked against the auto allow-list and anything unclassified is rejected |
 
 Every skill can be run by an agent. Only warden is kept out of implicit invocation: Codex reads
 `allow_implicit_invocation: false` from `skills/warden/agents/openai.yaml`. Warden still asks for
