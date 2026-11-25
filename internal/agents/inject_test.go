@@ -208,6 +208,21 @@ func TestMergeSettingsReadsKitFile(t *testing.T) {
 	}
 }
 
+func TestAgentRemovesTheTempKitAfterTheRun(t *testing.T) {
+	old := KitMCP
+	t.Cleanup(func() { KitMCP = old })
+	KitMCP = []string{"/bin/smithy", "mcp"}
+	p, _, _ := fakePoolClaude(t)
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+	if rc := AgentMain([]string{"--timeout", "0", p}); rc != 0 {
+		t.Fatalf("rc = %d", rc)
+	}
+	if left, _ := filepath.Glob(filepath.Join(tmp, "smithy-kit-*")); len(left) != 0 {
+		t.Fatalf("temp kit left behind: %v", left)
+	}
+}
+
 func TestRunKit(t *testing.T) {
 	old := KitMCP
 	t.Cleanup(func() { KitMCP = old })

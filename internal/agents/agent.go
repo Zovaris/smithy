@@ -742,6 +742,9 @@ func Run(o Options) int {
 			fmt.Fprintf(os.Stderr, "smithy agent: smithy mcp not given to %s: %v\n", cli, err)
 		} else if in != nil {
 			o.Inject = in
+			if !o.Bg { // a detached run still needs its kit
+				defer in.Remove()
+			}
 			if len(in.Unsupported) > 0 {
 				fmt.Fprintf(os.Stderr, "smithy agent: %s can't take %s from smithy's kit; it runs without\n", cli, strings.Join(in.Unsupported, ", "))
 			}
