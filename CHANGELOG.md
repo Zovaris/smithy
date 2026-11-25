@@ -12,11 +12,14 @@ part above `### Details`.
 
 **Answer from Telegram.** In the harness build the daemon posts each session in its own Telegram topic, with buttons to answer a decision, and your reply in a topic goes to that session. It only listens to the Telegram users you list in `connect.telegram.users`.
 
+**Answer from Discord.** The same works in Discord: each session gets a thread in the channel you set in `connect.discord.channel`, decisions come with buttons, and only the Discord users in `connect.discord.users` are heard.
+
 ### Details
 
 - `internal/connect`: one notification layer (each enabled connector gets a note once, kinds per connector via `connect.<name>.kinds`), a `Connector` interface (thread, send, update, buttons, receive) and the Telegram connector (forum topics, inline keyboards, `getUpdates` long polling, token only from `smithy auth`).
 - Kinds `pr_merged` and `ci_red` are new and on by default for connectors.
 - `smithy daemon` feeds it from its store (cursor `notes:connect`, no replay of history), answers decisions from button presses through the same path as `/v1/decisions`, records topic replies as `user_input` events (`via: chat`); inbound is off until `connect.telegram.users` lists who may answer, and a button counts only on the message that asked it, and turns off serve's own Telegram flush when a connector is set up.
+- Discord connector: a public thread per session in `connect.discord.channel`, button components for decisions (five per row, every press acknowledged), the Gateway (GUILD_MESSAGES and MESSAGE_CONTENT intents) for thread replies and presses, only from `connect.discord.users` in the channel's own server; token only from `smithy auth set discord`, origins fixed in code, mentions off, markdown escaped. A small stdlib websocket client (`internal/connect/ws.go`) backs it.
 ### Details
 
 - Web UI shell (harness build): `web/` (Preact, `@zovaris/sephiro` 1.2.0, Vite) with smithy's
