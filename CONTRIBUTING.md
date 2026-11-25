@@ -5,7 +5,7 @@
   always at their latest release; keep `go.sum` committed). The harness build (`-tags harness`, ADR 0009) may also use
   `modernc.org/sqlite`; files that need it carry `//go:build harness`. Inside a
   checkout the launcher builds it from source when a `.go` file changed, so symlinked skills
-  always run your working copy.
+  always run your working copy (the skills build: run `go build -tags harness ./cmd/smithy` to try harness commands).
 - Pull requests run `check` (gofmt, vet, `go test`, every offline test through the binary, a
   build per release target). A `v*` tag runs `release`: it checks the tag matches
   `shared/VERSION`, builds darwin, linux (arm64, amd64) and windows binaries, skills and harness builds each, gzips them,
