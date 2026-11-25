@@ -2,7 +2,8 @@
 // write, edit (and apply_patch for OpenAI models), shell, glob, grep and fetch. Every call is
 // first checked against the same allow and deny rules a claude worker gets under --profile auto
 // (agents.AutoTools, AutoDenied, SecretDenied); deny rules always win, and a refused call becomes
-// a decision through the loop's sink.
+// a decision through the loop's sink. The rules are a best effort, not a boundary: without a
+// sandbox the shell can read anything the user can.
 package tools
 
 import (
