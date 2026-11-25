@@ -1,15 +1,22 @@
 import { type ComponentType, render } from "preact";
 import { lazy, Suspense } from "preact/compat";
-import { useEffect, useState } from "preact/hooks";
-import "./theme/steel.css";
+import { useEffect, useMemo, useState } from "preact/hooks";
+import "./theme/temper.css";
 import "./app.css";
 import { api, initAuth } from "./auth";
-import { start } from "./live";
-import { Header } from "./header";
-import { ROUTES, type RouteId, useRoute } from "./router";
+import { Composer } from "./composer";
+import { Conversation } from "./conversation";
+import { parse, totals, withComments, type Comment } from "./diff";
+import { Anvil, I } from "./icons";
+import { sendMessage, start, stopSession, useLive } from "./live";
+import { NewSession } from "./newsession";
+import { Agents, Changes, Decisions } from "./rail";
+import { go, href, PAGES, type Page, useView } from "./router";
+import { agentName, ago, open, sessions as list, type Sess } from "./store";
+import { initTheme, toggleTheme, current } from "./theme";
+import { St } from "./ui";
 
-const SCREENS: Record<RouteId, ComponentType> = {
-  sessions: lazy(() => import("./screens/sessions")),
+const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
   decisions: lazy(() => import("./screens/decisions")),
   agents: lazy(() => import("./screens/agents")),
   board: lazy(() => import("./screens/board")),
@@ -17,6 +24,7 @@ const SCREENS: Record<RouteId, ComponentType> = {
   setup: lazy(() => import("./screens/setup")),
 };
 const Palette = lazy(() => import("./palette"));
+const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", setup: "gear" };
 
 type Auth = { state: "checking" } | { state: "ok" } | { state: "denied" } | { state: "down"; error: string };
 
@@ -31,90 +39,207 @@ function useAuth(): Auth {
 }
 
 function Gate({ auth }: { auth: Auth }) {
-  if (auth.state === "denied")
-    return (
-      <p class="msg" role="alert">
-        <span class="g wait">?</span>Not signed in. Run <code>smithy web</code> and open the link it prints.
-      </p>
-    );
-  if (auth.state === "down")
-    return (
-      <p class="msg" role="alert">
-        <span class="g fail">✗</span>The daemon did not answer ({auth.error}). Is <code>smithy daemon</code> running?
-      </p>
-    );
-  return null;
+  if (auth.state === "checking") return null;
+  return (
+    <div class="gate" role="alert">
+      <Anvil />
+      {auth.state === "denied" ? (
+        <><h2>Not signed in</h2><p class="t2">Run <code>smithy web</code> and open the link it prints.</p></>
+      ) : (
+        <><h2>The daemon did not answer</h2><p class="t2">{auth.state === "down" && auth.error}. Is <code>smithy daemon</code> running?</p></>
+      )}
+    </div>
+  );
+}
+
+const HOST = location.hostname === "localhost" || location.hostname === "127.0.0.1" || location.hostname === "[::1]" ? "This machine" : location.hostname;
+
+function Sidebar({ ss, cur, pending, conn, sheet, onClose, onPalette, onCollapse }: {
+  ss: Sess[]; cur: string; pending: number; conn: string; sheet: boolean; onClose: () => void; onPalette: () => void; onCollapse: () => void;
+}) {
+  const [mode, setMode] = useState(current);
+  return (
+    <aside class={"side" + (sheet ? " sheet" : "")} aria-label="Sessions" onClick={(e) => (e.target as HTMLElement).closest("a") && onClose()}>
+      <div class="grab" />
+      <div class="brand">
+        <Anvil />smithy<span class="sp" />
+        <button class="icon s" aria-label="Collapse sidebar" title="Collapse sidebar" onClick={sheet ? onClose : onCollapse}><I n="panel" /></button>
+      </div>
+      <a class="newbtn" href="#/new" aria-current={cur === "new" ? "page" : undefined}><I n="plus" />New session<kbd>⌥N</kbd></a>
+      <div class="grp">
+        <h4><I n="server" sm />{HOST}<span class="sp" /><span class="mono">{ss.length}</span></h4>
+        {!ss.length && <p class="muted-empty">No sessions yet.</p>}
+        {ss.map((s) => (
+          <a class="sess" href={href({ name: "session", id: s.id })} aria-current={cur === s.id ? "page" : undefined}>
+            <span class="t">{s.title}</span>
+            <span class="s"><St s={s.status} /><span>{s.status === "done" || s.status === "failed" ? ago(s.updated) : agentName(s.agent)}</span></span>
+          </a>
+        ))}
+      </div>
+      <nav class="nav" aria-label="Pages">
+        {PAGES.map((p) => (
+          <a href={"#/" + p.id} aria-current={cur === p.id ? "page" : undefined} aria-keyshortcuts={"Alt+" + p.key}>
+            <I n={ICON[p.id]} />{p.label}
+            {p.id === "decisions" && pending > 0 && <span class="n">{pending}</span>}
+          </a>
+        ))}
+      </nav>
+      <div class="foot">
+        <span class={"st conn " + (conn === "connected" ? "done" : "need")}>{conn === "connected" ? "live" : conn}</span>
+        <span class="sp" />
+        <button class="pill" onClick={onPalette} aria-label="Command palette" aria-keyshortcuts="Meta+K"><kbd>⌘K</kbd></button>
+        <button class="icon" aria-label={mode === "dark" ? "Light mode" : "Dark mode"} title="Toggle theme" onClick={() => setMode(toggleTheme())}>
+          <I n={mode === "dark" ? "sun" : "moon"} />
+        </button>
+      </div>
+    </aside>
+  );
 }
 
 function App() {
-  const r = useRoute();
+  const v = useView();
   const auth = useAuth();
+  const l = useLive();
   const [pal, setPal] = useState(false);
   const [palUsed, setPalUsed] = useState(false);
+  const [sheet, setSheet] = useState<"" | "side" | "rail">("");
+  const [collapsed, setCollapsed] = useState(false);
+  const [notes, setNotes] = useState<Record<string, Comment[]>>({});
+  const ss = list(l.store);
+  const sid = v.name === "session" ? v.id : "";
+  const s = sid ? l.store.sessions[sid] : undefined;
+  const decs = useMemo(() => Object.fromEntries(l.store.decisions.map((d) => [d.id, d])), [l.store.decisions]);
+  const pend = open(l.store);
+  const diff = s ? l.store.diffs[s.id] : undefined;
+  const t = useMemo(() => totals(parse(diff?.patch ?? "")), [diff?.patch]);
+  const mine = notes[sid] ?? [];
+  const skills = l.setup?.skills ?? [];
+
   useEffect(() => {
     if (auth.state !== "ok") return;
     start();
-    // First run: no agent picked or used yet, so open Setup unless a screen was asked for.
     if (!location.hash.replace(/^#\/?/, ""))
-      api("/v1/setup").then((r) => (r.ok ? r.json() : null)).then((s) => s && !s.chosen && (location.hash = "#/setup")).catch(() => {});
+      api("/v1/setup").then((r) => (r.ok ? r.json() : null)).then((x) => x && !x.chosen && (location.hash = "#/setup")).catch(() => {});
   }, [auth.state]);
+  useEffect(() => setSheet(""), [v]);
+
+  const onAction = (a: string) => {
+    if (a === "new") go({ name: "new" });
+    else if (a === "stop") s && stopSession(s.id).catch(() => {});
+    else if (a === "theme") toggleTheme();
+    else if (a === "settings") go({ name: "setup" });
+    else if (a === "agents" || a === "board" || a === "decisions") go({ name: a });
+  };
+
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPalUsed(true);
         setPal((p) => !p);
-        return;
-      }
-      if (e.altKey && !e.ctrlKey && !e.metaKey) {
-        const t = ROUTES.find((x) => x.key === e.key);
-        if (t) {
-          e.preventDefault();
-          location.hash = "#/" + t.id;
-        }
+      } else if (e.altKey && !e.ctrlKey && !e.metaKey) {
+        if (e.code === "KeyN") (e.preventDefault(), go({ name: "new" }));
+        const p = PAGES.find((x) => "Digit" + x.key === e.code);
+        if (p) (e.preventDefault(), go({ name: p.id }));
+      } else if (e.key === "Escape" && sheet) setSheet("");
+      else if (e.key === "Enter" && document.activeElement === document.body) {
+        const b = document.querySelector<HTMLButtonElement>(".conv .decide [data-primary]");
+        if (b) (e.preventDefault(), b.click());
       }
     };
     addEventListener("keydown", on);
     return () => removeEventListener("keydown", on);
-  }, []);
-  const Screen = SCREENS[r];
-  return (
+  }, [sheet]);
+
+  if (auth.state !== "ok") return <Gate auth={auth} />;
+
+  const title = v.name === "session" ? s?.title ?? "Session" : v.name === "new" ? "New session" : PAGES.find((p) => p.id === v.name)!.label;
+  const rail = !!s;
+  const railBody = s && (
     <>
-      <a class="skip" href="#main" onClick={(e) => { e.preventDefault(); document.getElementById("main")?.focus(); }}>
-        Skip to content
-      </a>
-      <Header />
-      <header class="bar">
-        <span class="brand">smithy</span>
-        <nav class="nav" aria-label="Screens">
-          {ROUTES.map((x) => (
-            <a href={"#/" + x.id} aria-current={x.id === r ? "page" : undefined} aria-keyshortcuts={"Alt+" + x.key}>
-              <kbd>{x.key}</kbd>
-              {x.label}
-            </a>
-          ))}
-        </nav>
-        <button class="who" onClick={() => { setPalUsed(true); setPal(true); }} aria-keyshortcuts="Control+K">
-          ctrl+k
-        </button>
+      <Changes diff={diff} comments={mine} onComment={(c) => setNotes({ ...notes, [sid]: [...mine, c] })} onDrop={(c) => setNotes({ ...notes, [sid]: mine.filter((x) => x !== c) })} />
+      <Decisions list={l.store.decisions.filter((d) => d.session === s.id || (!d.session && d.answer == null))} sessions={l.store.sessions} />
+      <Agents sessions={ss} host={HOST} />
+    </>
+  );
+  const delta = (cls: string) =>
+    s && (
+      <button class={"delta " + cls} onClick={() => setSheet("rail")} aria-label={`Changes: ${t.add} added, ${t.del} removed`}>
+        <span class="plus">+{t.add}</span><span class="minus">−{t.del}</span>
+      </button>
+    );
+
+  let center;
+  if (v.name === "new") center = <NewSession setup={l.setup} recent={ss} host={HOST} onAction={onAction} />;
+  else if (v.name === "session")
+    center = s ? (
+      <>
+        <Conversation s={s} items={l.store.convo[s.id] ?? []} decisions={decs} loose={s.status === "working" || s.status === "needs_you" ? pend.filter((d) => !d.session) : []} />
+        <Composer
+          placeholder={`Reply to ${agentName(s.agent)}`}
+          skills={skills}
+          working={s.status === "working" || s.status === "needs_you"}
+          onStop={() => stopSession(s.id).catch(() => {})}
+          onAction={onAction}
+          above={!!mine.length && <div class="cmts"><span class="tag"><I n="pen" />{mine.length} diff comment{mine.length > 1 ? "s" : ""} go with this message</span></div>}
+          onSend={async (text) => {
+            await sendMessage(s.id, withComments(text, mine));
+            setNotes({ ...notes, [sid]: [] });
+            return "";
+          }}
+          pills={<span class="pill"><I n="term" />{agentName(s.agent)}<span class="hide-s t3">{s.model || "default"}</span></span>}
+        />
+      </>
+    ) : (
+      <div class="empty"><h2>{l.store.last ? "No such session" : "Loading…"}</h2>{l.store.last ? <a class="btn" href="#/new">New session</a> : null}</div>
+    );
+  else {
+    const P = PAGE[v.name];
+    center = <div class="scroll"><Suspense fallback={null}><P onAction={onAction} /></Suspense></div>;
+  }
+
+  return (
+    <div class={"app" + (rail ? " with-rail" : "") + (collapsed ? " collapsed" : "")}>
+      <a class="skip" href="#main" onClick={(e) => (e.preventDefault(), document.getElementById("main")?.focus())}>Skip to content</a>
+      <header class="top">
+        <button class="icon" aria-label="Sessions" onClick={() => setSheet("side")}><I n="menu" /></button>
+        <h1>{title}</h1>
+        {s && <St s={s.status} />}
+        {delta("")}
       </header>
-      <main id="main" tabIndex={-1}>
-        {auth.state === "ok" ? (
-          <Suspense fallback={null}>
-            <Screen />
-          </Suspense>
-        ) : (
-          <Gate auth={auth} />
-        )}
+      {sheet === "side" && <div class="scrim for-side" onClick={() => setSheet("")} />}
+      <Sidebar ss={ss} cur={v.name === "session" ? v.id : v.name} pending={pend.length} conn={l.conn} sheet={sheet === "side"} onClose={() => setSheet("")}
+        onPalette={() => (setPalUsed(true), setPal(true))} onCollapse={() => setCollapsed(true)} />
+      <main class="main" id="main" tabIndex={-1}>
+        <div class="meta-bar">
+          {collapsed && <button class="icon s" aria-label="Show sidebar" onClick={() => setCollapsed(false)}><I n="panel" /></button>}
+          <h1>{title}</h1>
+          {s && <St s={s.status} />}
+          <span class="sp" />
+          {s && <span class="tag" title={s.dir}><I n="folder" /><span class="mono">{s.dir.split("/").slice(-2).join("/")}</span></span>}
+          {delta("rail-btn")}
+          {s && (s.status === "working" || s.status === "needs_you") && (
+            <button class="btn" onClick={() => stopSession(s.id).catch(() => {})}>Stop<kbd>esc</kbd></button>
+          )}
+        </div>
+        {center}
       </main>
-      {palUsed && auth.state === "ok" && (
+      {rail && sheet !== "rail" && <aside class="rail" aria-label="Changes and decisions">{railBody}</aside>}
+      {sheet === "rail" && (
+        <>
+          <div class="scrim" onClick={() => setSheet("")} />
+          <aside class="rail sheet" aria-label="Changes and decisions"><div class="grab" />{railBody}</aside>
+        </>
+      )}
+      {palUsed && (
         <Suspense fallback={null}>
-          <Palette open={pal} onOpenChange={setPal} />
+          <Palette open={pal} onOpenChange={setPal} onAction={onAction} />
         </Suspense>
       )}
-    </>
+    </div>
   );
 }
 
+initTheme();
 initAuth();
 render(<App />, document.getElementById("app")!);

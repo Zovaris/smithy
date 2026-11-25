@@ -1,32 +1,35 @@
-import { board } from "../model";
 import { useLive } from "../live";
-import { G } from "../ui";
-import "./chat.css";
+import { href } from "../router";
+import { agentName, sessions, STATUS_WORD, type Status } from "../store";
+import { St } from "../ui";
 
-const TITLE = { running: "Running", waiting: "Waiting on you", done: "Done", failed: "Failed" };
+const COLS: Status[] = ["working", "needs_you", "done", "failed"];
 
+// Board is the sessions by state, the same columns as the TUI's board.
 export default function Board() {
   const l = useLive();
+  const ss = sessions(l.store);
   return (
-    <section aria-label="Board">
-      <h1 class="h">Board <span class="dim">{l.sessions.length} sessions</span></h1>
+    <section class="page" aria-label="Board" style="max-width:1200px">
+      <header>
+        <h2>Board</h2>
+        <p>{ss.length} sessions</p>
+      </header>
       <div class="cols">
-        {board(l.sessions).map((c) => (
-          <div class="col" role="group" aria-label={TITLE[c.state]}>
-            <h2 class="h2">
-              <G s={c.state} /> {TITLE[c.state]} <span class="dim">{c.items.length}</span>
-            </h2>
-            <ul class="list">
-              {c.items.map((s) => (
-                <li>
-                  <a href={"#/sessions?s=" + encodeURIComponent(s.id)}>
-                    <span class="strong id">{s.id}</span> <span class="dim">{s.kind}</span>
-                  </a>
-                </li>
+        {COLS.map((c) => {
+          const items = ss.filter((s) => s.status === c);
+          return (
+            <div class="card" role="group" aria-label={STATUS_WORD[c]}>
+              <h3><St s={c} /><span class="sp" /><span class="mono t3">{items.length}</span></h3>
+              {items.map((s) => (
+                <a class="row2" href={href({ name: "session", id: s.id })}>
+                  <span style="font-weight:500">{s.title}</span>
+                  <span class="t3" style="font-size:12px">{agentName(s.agent)}{s.model ? " · " + s.model : ""}</span>
+                </a>
               ))}
-            </ul>
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </section>
   );
