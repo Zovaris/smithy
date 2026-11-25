@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/proxy"
 )
 
@@ -37,8 +38,9 @@ var ProxyNote = "Network: only GitHub, model APIs, package registries and the ho
 func goarch() string { return runtime.GOARCH }
 
 // ProxyBinary is the linux smithy binary the sidecar runs: auto.sandbox_proxy_binary (an absolute
-// path), else this binary on linux, else <smithy home>/bin/smithy-linux-<arch>.
-func ProxyBinary(goos, arch, setting, exe, home string) (string, error) {
+// path), else this binary on linux, else <data dir>/smithy-linux-<arch>, or the legacy
+// <smithy home>/bin/smithy-linux-<arch> when only that one exists.
+func ProxyBinary(goos, arch, setting, exe, data, home string, exists func(string) bool) (string, error) {
 	switch {
 	case setting != "":
 		if !filepath.IsAbs(setting) {
@@ -48,7 +50,11 @@ func ProxyBinary(goos, arch, setting, exe, home string) (string, error) {
 	case goos == "linux":
 		return exe, nil
 	}
-	return filepath.Join(home, "bin", "smithy-linux-"+arch), nil
+	b := filepath.Join(data, "smithy-linux-"+arch)
+	if legacy := filepath.Join(home, "bin", "smithy-linux-"+arch); exists != nil && !exists(b) && exists(legacy) {
+		return legacy, nil
+	}
+	return b, nil
 }
 
 func proxyBinary(p Probe) (string, error) {
@@ -57,7 +63,7 @@ func proxyBinary(p Probe) (string, error) {
 		return "", err
 	}
 	exe, _ := os.Executable()
-	b, err := ProxyBinary(p.GOOS, goarch(), set, exe, ghx.Home())
+	b, err := ProxyBinary(p.GOOS, goarch(), set, exe, layout.DataDir(), ghx.Home(), p.Exists)
 	if err != nil {
 		return "", err
 	}

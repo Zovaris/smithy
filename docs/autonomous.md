@@ -14,11 +14,14 @@ smithy config set auto.sources github,linear
 smithy config set linear.team ENG              # required for Linear
 smithy auth set linear < keyfile               # or LINEAR_API_KEY
 smithy config set auto.max_per_day 20
+smithy config set auto.max_cost_per_day 15             # optional USD cap on reported spend per day
 smithy auto serve                              # Esc/q stops the loop; running agents keep going
 ```
 
 Issues opt in with the `auto` label. `model:` and `speed:` labels pick the tier and smelt speed.
-A daily cap and an optional hours window bound the spend. `smithy tui` shows the queue, running
+A daily issue cap (`auto.max_per_day`), an optional daily cost cap (`auto.max_cost_per_day`, USD
+of reported cost; running agents finish) and an optional hours window bound the spend; reaching
+either cap records a `cap_reached` event (and notification) once that day. `smithy tui` shows the queue, running
 agents and the cost of each issue, a History tab of past days' work with PR, cost and outcome, and
 edits settings in place. Every setting is listed in
 [settings.md](settings.md).

@@ -20,7 +20,7 @@ One command, two builds from the same source, commands and config:
   skills build's `smithy doctor` can check a running daemon; they import no SQLite. It may also depend on:
   - `modernc.org/sqlite` (pure Go, no cgo), latest release, for `internal/store`
     (`~/.smithy/smithy.db`, WAL, append-only `events`, a `migrations` table);
-  - later, a bundled ripgrep, when a feature needs it (its own ADR update).
+  - a bundled ripgrep binary (see the 2026-11-25 amendment below).
   It does not need `tsnet`: remote access goes through `tailscale serve` in front of a
   loopback-only daemon, with no Tailscale code in smithy.
 - Release assets, per platform (darwin arm64/amd64, linux arm64/amd64, windows amd64), all
@@ -36,3 +36,16 @@ One command, two builds from the same source, commands and config:
 - Bad: two binaries per platform to release and test; a harness-only change can break only the
   tagged build, so CI must keep running `-tags harness`. `modernc.org/sqlite` adds several MB
   and transitive modules to the harness build.
+
+## Amendment (2026-11-25): bundled ripgrep
+
+`smithy search --code` needs fast repo search, so releases now bundle ripgrep:
+
+- ripgrep ships per platform as `smithy-rg-<os>-<arch>`, next to the smithy binaries, in
+  `checksums.txt` and the build attestation; `install.sh` installs it next to smithy after the same
+  checks, best effort.
+- The version is pinned (14.1.1) with one sha256 per upstream archive in `scripts/fetch-ripgrep.sh`;
+  a mismatch fails the release.
+- Its license (MIT or Unlicense) ships with the release as `ripgrep-LICENSE.txt`.
+- Without it, `internal/search` falls back to rg on PATH, then `git ls-files`, then a stdlib walker,
+  so smithy links no ripgrep code and keeps working when the binary is missing.
