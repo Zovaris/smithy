@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/config"
 )
 
 func testKit(t *testing.T) Kit {
@@ -255,5 +257,41 @@ func TestRunKit(t *testing.T) {
 	}
 	if in, _ := RunKit("custom", Options{}, os.Getenv); in != nil {
 		t.Fatal("injected into a custom AGENT_CMD")
+	}
+}
+
+func TestRunKitFollowsKitChoice(t *testing.T) {
+	old := KitMCP
+	t.Cleanup(func() { KitMCP = old })
+	KitMCP = []string{"/bin/smithy", "mcp"}
+	home := t.TempDir()
+	cfg := filepath.Join(home, "config.json")
+	t.Setenv("SMITHY_CONFIG", cfg)
+	t.Setenv("HOME", home)
+	sk := filepath.Join(home, ".claude", "skills", "hush")
+	os.MkdirAll(sk, 0o755)
+	os.WriteFile(filepath.Join(sk, "SKILL.md"), []byte("x"), 0o644)
+
+	if mcp, skills := KitChoice(); !mcp || len(skills) != 0 {
+		t.Fatalf("default kit: smithy mcp on, no skills; got %v %v", mcp, skills)
+	}
+	config.Set(cfg, "kit.mcp", "false")
+	if in, err := RunKit("claude", Options{Cwd: home}, os.Getenv); in != nil || err != nil {
+		t.Fatalf("kit.mcp false and no skills injects nothing: %v %v", in, err)
+	}
+	config.Set(cfg, "kit.skills", "hush, nope,hush")
+	if _, skills := KitChoice(); !slices.Equal(skills, []string{"hush", "nope"}) {
+		t.Fatalf("kit.skills parsed: %v", skills)
+	}
+	in, err := RunKit("claude", Options{Cwd: home}, os.Getenv)
+	if err != nil || in == nil {
+		t.Fatalf("RunKit with a skill: %v %v", in, err)
+	}
+	defer in.Remove()
+	if strings.Contains(strings.Join(in.Args, " "), "mcp-config") {
+		t.Fatalf("smithy mcp was turned off: %v", in.Args)
+	}
+	if !slices.Contains(in.Args, "--plugin-dir") {
+		t.Fatalf("the hush skill is linked in: %v", in.Args)
 	}
 }
