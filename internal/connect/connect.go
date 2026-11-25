@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -55,6 +56,15 @@ type state struct {
 	Sent      map[string]time.Time `json:"sent"`
 	Threads   map[string]string    `json:"threads"`
 	Decisions map[string]*decision `json:"decisions"`
+	Queue     []*queued            `json:"queue,omitempty"`
+}
+
+// queued is a send that failed, waiting for its next try.
+type queued struct {
+	Conn  string    `json:"conn"`
+	Note  Note      `json:"note"`
+	Tries int       `json:"tries"`
+	Next  time.Time `json:"next"`
 }
 
 // Hub fans notes out to Conns and routes what they receive. Kinds gives a connector's enabled
@@ -68,6 +78,7 @@ type Hub struct {
 	Input  func(session, text, by string) error
 	Intake func(idea, by string) error
 	Log    func(string)
+	Now    func() time.Time // nil: time.Now; the retry backoff's clock
 
 	mu     sync.Mutex
 	st     *state
@@ -139,12 +150,93 @@ func handle(id string) string {
 	return hex.EncodeToString(s[:6])
 }
 
+// MaxQueued bounds the retry queue; past it the oldest failed send is dropped (and logged).
+const MaxQueued = 256
+
+func (h *Hub) now() time.Time {
+	if h.Now != nil {
+		return h.Now()
+	}
+	return time.Now()
+}
+
+// Queued is how many failed sends wait for a retry.
+func (h *Hub) Queued() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return len(h.load().Queue)
+}
+
+// backoff is the wait after the tries-th failed send: 5s doubling, at most 10 minutes.
+func backoff(tries int) time.Duration {
+	d := 5 * time.Second
+	for i := 1; i < tries && d < 10*time.Minute; i++ {
+		d *= 2
+	}
+	return min(d, 10*time.Minute)
+}
+
 // Notify sends n to every connector that has n.Kind on and has not sent n.Key yet. A failed send
-// is logged once and tried again the next time the same note comes.
+// is logged once and queued (kept in the state file, at most MaxQueued); Retry sends it again
+// with backoff until it lands, so a chat outage loses no decision prompt.
 func (h *Hub) Notify(ctx context.Context, n Note) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	st := h.load()
+	for _, c := range h.Conns {
+		name := c.Name()
+		if h.Kinds != nil && !h.Kinds(name)[n.Kind] {
+			continue
+		}
+		key := name + "|" + n.Key
+		if _, done := st.Sent[key]; done || slices.ContainsFunc(st.Queue, func(q *queued) bool { return q.Conn+"|"+q.Note.Key == key }) {
+			continue
+		}
+		if err := h.send(ctx, c, n); err != nil {
+			st.Queue = append(st.Queue, &queued{Conn: name, Note: n, Tries: 1, Next: h.now().Add(backoff(1))})
+			if len(st.Queue) > MaxQueued {
+				if h.Log != nil {
+					h.Log("connect " + st.Queue[0].Conn + ": retry queue full, dropped " + st.Queue[0].Note.Key)
+				}
+				st.Queue = st.Queue[1:]
+			}
+		}
+	}
+	h.save()
+}
+
+// Retry sends every queued note whose backoff has passed; one that fails again waits longer.
+func (h *Hub) Retry(ctx context.Context) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	st := h.load()
+	if len(st.Queue) == 0 {
+		return
+	}
+	now := h.now()
+	keep := st.Queue[:0]
+	for _, q := range st.Queue {
+		i := slices.IndexFunc(h.Conns, func(c Connector) bool { return c.Name() == q.Conn })
+		switch {
+		case i < 0:
+			continue
+		case q.Next.After(now):
+		case h.send(ctx, h.Conns[i], q.Note) == nil:
+			continue
+		default:
+			q.Tries++
+			q.Next = now.Add(backoff(q.Tries))
+		}
+		keep = append(keep, q)
+	}
+	st.Queue = keep
+	h.save()
+}
+
+// send posts n on c (making its session thread first) and records it as sent; h.mu is held.
+func (h *Hub) send(ctx context.Context, c Connector, n Note) error {
+	st := h.st
+	name := c.Name()
 	var buttons []Button
 	hd := ""
 	if n.Decision != "" {
@@ -153,15 +245,8 @@ func (h *Hub) Notify(ctx context.Context, n Note) {
 			buttons = append(buttons, Button{Label: o, Data: hd + ":" + strconv.Itoa(i)})
 		}
 	}
-	for _, c := range h.Conns {
-		name := c.Name()
-		if h.Kinds != nil && !h.Kinds(name)[n.Kind] {
-			continue
-		}
-		key := name + "|" + n.Key
-		if _, done := st.Sent[key]; done {
-			continue
-		}
+	key := name + "|" + n.Key
+	{
 		thread := ""
 		if n.Session != "" {
 			tk := name + "|" + n.Session
@@ -178,7 +263,7 @@ func (h *Hub) Notify(ctx context.Context, n Note) {
 		ref, err := c.Send(ctx, thread, n, buttons)
 		h.logOnce(name, err)
 		if err != nil {
-			continue
+			return err
 		}
 		st.Sent[key] = time.Now()
 		if hd != "" {
@@ -190,7 +275,7 @@ func (h *Hub) Notify(ctx context.Context, n Note) {
 			d.Refs[name] = ref
 		}
 	}
-	h.save()
+	return nil
 }
 
 // Resolve edits every message that asked decision id to show its answer and drops its buttons.
@@ -255,9 +340,22 @@ func (h *Hub) Handle(ctx context.Context, c Connector, in Inbound) {
 	h.mu.Unlock()
 }
 
-// Run receives from every connector until ctx ends, backing off after an error.
+// Run receives from every connector until ctx ends, backing off after an error, and retries
+// queued sends every few seconds.
 func (h *Hub) Run(ctx context.Context) {
 	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(5 * time.Second):
+				h.Retry(ctx)
+			}
+		}
+	}()
 	for _, c := range h.Conns {
 		wg.Add(1)
 		go func(c Connector) {

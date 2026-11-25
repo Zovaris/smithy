@@ -59,6 +59,7 @@ part above `### Details`.
 - The secret scan (`smithy proof`, `proof.Redact`) also knows Telegram and Discord bot tokens and Slack app tokens (`xapp-`); `proof.Secret` names the rule a string matches.
 - Chat intake drops a plan whose task title or body matches a secret scan rule (`proof.Secret`), and logs only the rule name.
 - The events log masks secret-looking strings in `detail` before writing (`proof.Redact`), and the weekly report clips an orchestrator error to 80 characters and redacts its whole text.
+- Connector sends that fail are queued in `connect.json` (at most 256, oldest dropped with a log line) and retried by the hub with backoff (5 s doubling to 10 min) until they land, so a chat outage no longer loses decision prompts after the notes cursor moves on.
 
 ## v0.19.0 — 2026-11-24
 

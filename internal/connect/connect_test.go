@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 type fake struct {
@@ -14,6 +16,7 @@ type fake struct {
 	sent    []string
 	updated []string
 	failT   bool
+	failS   int
 	in      []Inbound
 }
 
@@ -29,6 +32,10 @@ func (f *fake) Thread(_ context.Context, session, title string) (string, error) 
 	return "t-" + session, nil
 }
 func (f *fake) Send(_ context.Context, thread string, n Note, buttons []Button) (string, error) {
+	if f.failS > 0 {
+		f.failS--
+		return "", errors.New("chat down")
+	}
 	var bs []string
 	for _, b := range buttons {
 		bs = append(bs, b.Label+"="+b.Data)
@@ -50,6 +57,50 @@ func hub(t *testing.T, cs ...Connector) *Hub {
 			}
 			return map[string]bool{"blocked": true, "decision": true}
 		}}
+}
+
+func TestFailedSendIsRetriedWithBackoffUntilItLands(t *testing.T) {
+	a := &fake{name: "a", failS: 2}
+	h := hub(t, a)
+	now := time.Unix(1000, 0)
+	h.Now = func() time.Time { return now }
+	ctx := context.Background()
+	n := Note{Key: "asked|d1", Kind: "decision", Title: "Decision needed", Decision: "d1", Options: []string{"yes", "no"}}
+	h.Notify(ctx, n)
+	if len(a.sent) != 0 || h.Queued() != 1 {
+		t.Fatalf("sent %v queued %d", a.sent, h.Queued())
+	}
+	h.Retry(ctx)
+	if a.failS != 1 {
+		t.Fatal("retried before its backoff")
+	}
+	now = now.Add(time.Minute)
+	h.Retry(ctx)
+	if a.failS != 0 || len(a.sent) != 0 || h.Queued() != 1 {
+		t.Fatalf("second try: fail %d sent %v queued %d", a.failS, a.sent, h.Queued())
+	}
+	now = now.Add(time.Hour)
+	h2 := hub(t)
+	h2.File, h2.Conns, h2.Now = h.File, h.Conns, h.Now
+	h2.Retry(ctx)
+	if len(a.sent) != 1 || h2.Queued() != 0 || !strings.Contains(a.sent[0], "yes=") {
+		t.Fatalf("queue not kept across restart or decision lost: sent %v queued %d", a.sent, h2.Queued())
+	}
+	h2.Notify(ctx, n)
+	if len(a.sent) != 1 {
+		t.Fatalf("sent twice: %v", a.sent)
+	}
+}
+
+func TestRetryQueueIsBounded(t *testing.T) {
+	a := &fake{name: "a", failS: 1 << 20}
+	h := hub(t, a)
+	for i := range MaxQueued + 5 {
+		h.Notify(context.Background(), Note{Key: "k" + strconv.Itoa(i), Kind: "blocked"})
+	}
+	if h.Queued() != MaxQueued {
+		t.Fatalf("queued %d, want %d", h.Queued(), MaxQueued)
+	}
 }
 
 func TestNotifyOncePerConnectorAndKind(t *testing.T) {
