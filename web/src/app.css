@@ -12,10 +12,10 @@ a { color: var(--steel-link); }
 .nav a:hover { color: var(--steel-text); }
 .nav a[aria-current="page"] { color: var(--steel-strong); background: var(--steel-focus); }
 .nav kbd { color: var(--steel-dim); font: inherit; margin-right: 6px; }
-.who { margin-left: auto; color: var(--steel-dim); white-space: nowrap; }
+.who { margin-left: auto; color: var(--steel-dim); white-space: nowrap; background: none; border: 0; font: inherit; cursor: pointer; padding: 8px; }
 main { padding: 24px 16px; max-width: 960px; width: 100%; box-sizing: border-box; margin: 0 auto; }
 .msg { color: var(--steel-text); }
 .msg .g { margin-right: 8px; }
 .wait { color: var(--steel-wait); } .fail { color: var(--steel-fail); } .ok { color: var(--steel-ok); }
 code { color: var(--steel-strong); }
-@media (max-width: 520px) { .who { display: none; } .bar { gap: 8px; padding: 0 8px; } }
+@media (max-width: 520px) { .bar { gap: 8px; padding: 0 8px; } }

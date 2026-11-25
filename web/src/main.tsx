@@ -4,6 +4,7 @@ import { useEffect, useState } from "preact/hooks";
 import "./theme/steel.css";
 import "./app.css";
 import { api, initAuth } from "./auth";
+import { start } from "./live";
 import { Header } from "./header";
 import { ROUTES, type RouteId, useRoute } from "./router";
 
@@ -13,6 +14,7 @@ const SCREENS: Record<RouteId, ComponentType> = {
   agents: lazy(() => import("./screens/agents")),
   board: lazy(() => import("./screens/board")),
 };
+const Palette = lazy(() => import("./palette"));
 
 type Auth = { state: "checking" } | { state: "ok" } | { state: "denied" } | { state: "down"; error: string };
 
@@ -45,8 +47,19 @@ function Gate({ auth }: { auth: Auth }) {
 function App() {
   const r = useRoute();
   const auth = useAuth();
+  const [pal, setPal] = useState(false);
+  const [palUsed, setPalUsed] = useState(false);
+  useEffect(() => {
+    if (auth.state === "ok") start();
+  }, [auth.state]);
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPalUsed(true);
+        setPal((p) => !p);
+        return;
+      }
       if (e.altKey && !e.ctrlKey && !e.metaKey) {
         const t = ROUTES.find((x) => x.key === e.key);
         if (t) {
@@ -75,7 +88,9 @@ function App() {
             </a>
           ))}
         </nav>
-        <span class="who">alt+1–4</span>
+        <button class="who" onClick={() => { setPalUsed(true); setPal(true); }} aria-keyshortcuts="Control+K">
+          ctrl+k
+        </button>
       </header>
       <main id="main" tabIndex={-1}>
         {auth.state === "ok" ? (
@@ -86,6 +101,11 @@ function App() {
           <Gate auth={auth} />
         )}
       </main>
+      {palUsed && auth.state === "ok" && (
+        <Suspense fallback={null}>
+          <Palette open={pal} onOpenChange={setPal} />
+        </Suspense>
+      )}
     </>
   );
 }
