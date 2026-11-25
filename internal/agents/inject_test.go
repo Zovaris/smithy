@@ -250,10 +250,8 @@ func TestRunKit(t *testing.T) {
 	if s := cfg.MCPServers["smithy"]; err != nil || s.Env["SMITHY_MCP_CARD"] != "b1/i1" || !slices.Contains(s.Args, "--readonly") {
 		t.Fatalf("mcp config: %s %v", b, err)
 	}
-	for _, o := range []Options{{Sandbox: "container"}} {
-		if in, _ := RunKit("claude", o, os.Getenv); in != nil {
-			t.Fatalf("injected into %+v", o)
-		}
+	if in, _ := RunKit("claude", Options{Sandbox: "native"}, os.Getenv); in == nil {
+		t.Fatal("native sandbox run lost its kit")
 	}
 	if in, _ := RunKit("custom", Options{}, os.Getenv); in != nil {
 		t.Fatal("injected into a custom AGENT_CMD")

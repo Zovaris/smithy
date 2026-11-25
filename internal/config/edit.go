@@ -17,7 +17,7 @@ var enums = map[string][]string{
 	"warden.mode":    {"smelt fast", "smelt normal", "smelt full", "plain"},
 	"agent.effort":   {"low", "medium"},
 	"auto.mode":      {"labeled", "all"},
-	"auto.sandbox":   {"off", "native", "container"},
+	"auto.sandbox":   {"off", "native"},
 }
 
 var bools = map[string]bool{"auto.paused": true, "auto.retry_stronger": true, "auto.sandbox_weaker_net": true, "decide.enabled": true, "agent.code_mode": true, "tui.reduce_motion": true, "board.linear_sync": true}

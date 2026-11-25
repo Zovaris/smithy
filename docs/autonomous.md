@@ -104,7 +104,7 @@ own per-run config (never your global one): `search` over the working folder, `b
 `board_show`, `board_claim` and `board_set`, `secret_call` to call an API with a key you bound
 with `smithy auth bind` (the agent never sees the key; writes follow the bind's methods and asks),
 and `ask`, which puts a decision on the run's warden card and waits for your answer from the TUI,
-web or chat. `--readonly` runs get search and board reads only; container runs get none.
+web or chat. `--readonly` runs get search and board reads only.
 
 ## Notifications
 
@@ -131,14 +131,14 @@ machine, with a fine-grained, repo-scoped GitHub token and a test or least-privi
   | Codex | its workspace-write sandbox, network on (push needs it), approvals off |
   | OpenCode | smithy's allow-list as `OPENCODE_PERMISSION` rules: bash allow-list, web fetch and outside directories denied, secret files denied for read and edit (also for `--readonly` runs such as the intake planner) |
   | Any CLI over ACP (`AGENT_PROTOCOL=acp`) | each permission request goes through the same allow-list: a command must match an allowed rule and no denied one (no `;`, `&&`, pipes, redirects or `$`), edits stay inside the worktree and off denied paths, reads off secret paths; fetch, delete, move and anything smithy can't classify are rejected |
-  | Others (gemini, pi, cursor, dsh) | their own headless mode, no smithy allow-list: use `container` with `proxy` (needs your own `auto.sandbox_image`) |
+  | Others (gemini, pi, cursor, dsh) | their own headless mode, no smithy allow-list |
 
   Only Claude Code and OpenCode can deny reads of `~/.smithy/auth.json` and the other secret
-  files. Codex, gemini, pi, cursor and dsh have no per-path read deny, so outside `container`
-  they can read them; `smithy doctor` says so for the configured CLI. Even for Claude Code and
+  files. Codex, gemini, pi, cursor and dsh have no per-path read deny, so they can read
+  them; `smithy doctor` says so for the configured CLI. Even for Claude Code and
   OpenCode the shell deny rules match command text (globs such as `~/.s*`, `$HOME` and key file
   names included), so a command that builds the path another way can slip past: only the `native`
-  or `container` sandbox fully keeps secrets out of reach.
+  sandbox (Claude Code, the API backend's shell) fully keeps secrets out of reach.
 
   None of these removes the risk. Nothing stops Codex or the others sending data out, so
   least-privilege tokens matter most there.
@@ -155,39 +155,24 @@ it.
 |---|---|---|
 | `off` (default) | the guard above only | every harness |
 | `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off, so push and `gh` fail; Gemini CLI is refused (its sandbox can't limit hosts) |
-| `container` | docker or podman, read-only root, dropped capabilities; with `auto.sandbox_network proxy`, egress allow-list and secrets | Claude Code and OpenCode in the default image; others with your own `auto.sandbox_image` |
 
 The API backend (`auto.agent api:<provider>/<model>`) runs its tools on the `--profile auto`
 rules only while `auto.sandbox` is `off` (the default); with `auto.sandbox native` its shell tool
 runs inside the OS sandbox.
 
-Container mode notes:
+The container mode (`auto.sandbox container`, docker or podman) was removed in v0.23; a setting
+left on it stops workers until you set `native` or `off`. The egress proxy that bound secrets to
+hosts runs natively: `smithy proxy serve` listens on `127.0.0.1:8877`, and a worker with the
+smithy MCP kit uses its secret tool:
 
-- **Network:** it needs `auto.sandbox_network`. `proxy` puts workers on an internal network whose
-  only exit is the `smithy-proxy` sidecar: GitHub, the model APIs, package registries and
-  `auto.sandbox_domains`, nothing else. `bridge` is open egress with no domain allow-list.
-- **Secrets (proxy only):** the worker never gets the key. Bind it to its host, then the worker
-  calls the proxy, which adds the key and scrubs it from the response:
+```sh
+smithy auth set linear < key.txt
+smithy auth bind linear api.linear.app GET,POST
+# a worker: curl http://127.0.0.1:8877/s/linear/graphql, or the secret tool
+```
 
-  ```sh
-  smithy auth set linear < key.txt
-  smithy auth bind linear api.linear.app GET,POST
-  # inside the worker: curl http://smithy-proxy:8877/s/linear/graphql
-  ```
-
-  Writes are refused unless bound; `smithy auth ask <name> on` holds them until
-  `smithy proxy approve <id>` instead. The sidecar needs a linux smithy binary
-  (`auto.sandbox_proxy_binary`, see [settings](settings.md)).
-- **Credentials:** each worker gets only its own harness's credential from `smithy auth`:
-
-  | Harness | Credential |
-  |---|---|
-  | Claude Code | `claude` (from `claude setup-token`) or `anthropic` |
-  | Codex | `openai` |
-  | OpenCode | none for free models; `anthropic` or `openai` for those providers' models |
-
-  Credentials are visible to `docker inspect` and to anyone with the engine socket.
-- **User:** on macOS the container runs as root inside the engine VM; on Linux it runs as your uid.
+Writes are refused unless bound; `smithy auth ask <name> on` holds them until
+`smithy proxy approve <id>`.
 
 ## Account pool
 
@@ -233,8 +218,3 @@ provider's terms apply to each account.
 
 - **Hiding the account dirs:** `native` hides them from workers. With the sandbox `off`, only
   Claude Code workers get a deny rule for them.
-- **Container:** a pooled container worker mounts only its own account's dir and gets its
-  config-dir variable (`CODEX_HOME`, `XDG_DATA_HOME`, ...). A claude account's Keychain login never
-  reaches a container, so each needs its own token: run `claude setup-token` signed in as that
-  account, then `smithy auth set claude:<account>`. `smithy doctor` fails until every claude account
-  in the pool has one.

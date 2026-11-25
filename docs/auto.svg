@@ -65,8 +65,8 @@
   <text class="k" x="685" y="66" text-anchor="middle">PER ISSUE</text>
   <text class="t" x="685" y="88" text-anchor="middle">worker</text>
   <text class="s" x="685" y="108" text-anchor="middle">own worktree</text>
-  <text class="s" x="685" y="125" text-anchor="middle">sandbox off, native</text>
-  <text class="s" x="685" y="142" text-anchor="middle">or container</text>
+  <text class="s" x="685" y="125" text-anchor="middle">sandbox off</text>
+  <text class="s" x="685" y="142" text-anchor="middle">or native (OS)</text>
   <rect class="smelt" x="610" y="196" width="150" height="98" rx="12"/>
   <text class="t" x="685" y="222" text-anchor="middle">account pool</text>
   <text class="s" x="685" y="242" text-anchor="middle">opt-in, your accounts</text>

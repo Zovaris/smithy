@@ -28,7 +28,7 @@ const Usage = `usage: smithy uninstall [--yes] [--purge [--confirm-purge]]
   Lists what it would remove, with sizes, then asks (a terminal) or needs --yes:
   the installed versions and the smithy command (~/.local/share/smithy, ~/.local/bin/smithy, the
   old ~/.smithy/bin), the skill folders ` + "`smithy skills install`" + ` wrote, a running daemon,
-  smithy-* container images, the smithy-internal/smithy-egress networks, and the PATH line
+  smithy-* container images and smithy-internal/smithy-egress networks older versions left, and the PATH line
   install.sh or ` + "`smithy setup path add`" + ` added. ~/.smithy (keys, db, plans) stays unless --purge,
   and then only after typing purge (or --confirm-purge without a terminal).`
 
@@ -182,7 +182,7 @@ func Gather(purge bool, engine string) Plan {
 				}
 			}
 		}
-		for _, n := range []string{agents.ProxyNetwork, agents.EgressNetwork} {
+		for _, n := range []string{"smithy-internal", "smithy-egress"} { // left by the container sandbox (removed in v0.23)
 			if _, err := Engine(engine, "network", "inspect", n); err == nil {
 				p.Networks = append(p.Networks, n)
 			}
@@ -382,7 +382,18 @@ func ask(in *bufio.Reader, w io.Writer, q string) string {
 
 // Main runs `smithy uninstall`.
 func Main(args []string) int {
-	return Run(args, os.Stdin, isTerminal(os.Stdin), os.Stderr, agents.ContainerEngine(agents.HostProbe()))
+	return Run(args, os.Stdin, isTerminal(os.Stdin), os.Stderr, leftoverEngine())
+}
+
+// leftoverEngine is docker or podman when one is on PATH, to remove the images and networks the
+// container sandbox (removed in v0.23) left behind; "" skips them.
+func leftoverEngine() string {
+	for _, e := range []string{"docker", "podman"} {
+		if _, err := exec.LookPath(e); err == nil {
+			return e
+		}
+	}
+	return ""
 }
 
 // Run is Main with its input, terminal check, output and container engine given.
