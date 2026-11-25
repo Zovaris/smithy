@@ -5,13 +5,16 @@ package tui
 import (
 	"context"
 	"fmt"
+	"image/color"
 	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/models"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // setupAPI is the daemon's setup endpoints; *daemon.Client is one.
@@ -506,14 +509,39 @@ func (m chatView) setupPanel(w int) []string {
 	return m.panel(w, append(rows, foot))
 }
 
-// modelPanel is the model list for m.modelFor: the filter, the rows that match it and where
-// the list came from.
+// modelPanel is the model list for m.modelFor: the filter, the rows that match it in two
+// aligned columns and where the list came from. Every segment carries the panel's background so
+// no cell falls back to the terminal's.
 func (m chatView) modelPanel(w int) []string {
 	t := m.th
-	dim, strong := t.fg(t.dim), t.fg(t.strong)
-	rows := []string{"", spread("  "+strong.Render("Model for "+m.modelFor), dim.Render("esc close  "), w), "",
-		"  " + t.fg(t.accent).Render(t.g.prompt) + " " + t.fg(t.text).Render(m.modelIn) + t.fg(t.accent).Render("▏") + dim.Render(map[bool]string{true: "  type to filter", false: ""}[m.modelIn == ""]), ""}
+	on := func(c color.Color) lipgloss.Style {
+		st := t.fg(c)
+		if t.overlay != nil {
+			st = st.Background(t.overlay)
+		}
+		return st
+	}
+	dim, strong, text := on(t.dim), on(t.strong), on(t.text)
+	sp := func(n int) string { return on(nil).Render(strings.Repeat(" ", max(n, 0))) }
+	row := func(sel bool, s string) string {
+		if sel {
+			return on(t.accent).Render(t.g.sel) + sp(1) + s
+		}
+		return sp(2) + s
+	}
+	hint := ""
+	if m.modelIn == "" {
+		hint = dim.Render("  type to filter")
+	}
+	title, closeHint := sp(2)+strong.Render("Model for "+m.modelFor), dim.Render("esc close")+sp(2)
+	rows := []string{"", title + sp(w-ansi.StringWidth(title)-ansi.StringWidth(closeHint)) + closeHint, "",
+		sp(2) + on(t.accent).Render(t.g.prompt) + sp(1) + text.Render(m.modelIn) + on(t.accent).Render("▏") + hint, ""}
 	list := m.modelRows()
+	idW := 0
+	for _, r := range list {
+		idW = max(idW, ansi.StringWidth(r.m.ID))
+	}
+	idW = min(max(idW, len("agent default")), max(w/2, 20))
 	n := m.rows()
 	room := max(n-len(rows)-4, 3)
 	from := 0
@@ -522,39 +550,43 @@ func (m chatView) modelPanel(w int) []string {
 	}
 	for i := from; i < len(list) && i < from+room; i++ {
 		r := list[i]
-		var line string
+		var left, right string
 		switch {
 		case r.other:
-			line = strong.Render("Other: ") + t.fg(t.text).Render(r.m.ID) + dim.Render("  use this name as typed")
+			left, right = strong.Render("Other: ")+text.Render(r.m.ID), dim.Render("use this name as typed")
 		case r.m.ID == "":
-			line = strong.Render("agent default") + dim.Render("  whatever "+m.modelFor+" starts with")
+			left, right = strong.Render("agent default"), dim.Render("whatever "+m.modelFor+" starts with")
 		default:
-			line = t.fg(t.text).Render(fmt.Sprintf("%-36s", r.m.ID))
+			left = text.Render(ansi.Truncate(r.m.ID, idW, "…"))
+			var parts []string
 			if r.m.Name != "" && r.m.Name != r.m.ID {
-				line += " " + dim.Render(short(r.m.Name, max(w/4, 12)))
+				parts = append(parts, r.m.Name)
 			}
 			if r.m.InPerM != nil && r.m.OutPerM != nil {
-				line += " " + t.fg(t.muted).Render(fmt.Sprintf("$%.2f/$%.2f per M", *r.m.InPerM, *r.m.OutPerM))
+				parts = append(parts, fmt.Sprintf("$%.2f/$%.2f per M", *r.m.InPerM, *r.m.OutPerM))
 			}
+			tag := ""
 			if r.m.Default {
-				line += t.fg(t.accent).Render("  " + t.g.on + " default")
+				tag = sp(2) + on(t.accent).Render(t.g.on+" default")
 			}
+			rest := max(w-idW-8-ansi.StringWidth(tag), 8)
+			right = dim.Render(ansi.Truncate(strings.Join(parts, "  "), rest, "…")) + tag
 		}
-		rows = append(rows, m.selRow(i == m.modelSel, line))
+		line := left + sp(idW-ansi.StringWidth(left)+2) + right
+		rows = append(rows, row(i == m.modelSel, line))
 	}
 	if m.modelList == nil {
-		rows = append(rows, "  "+dim.Render("asking "+m.modelFor+" for its models…"))
+		rows = append(rows, sp(2)+dim.Render("asking "+m.modelFor+" for its models…"))
 	}
 	rows = append(rows, "")
 	if l := m.modelList; l != nil {
-		src := fmt.Sprintf("%d models from %s", len(l.Models), l.Source)
 		if l.Error != "" {
-			rows = append(rows, "  "+t.fg(t.warn).Render(short(l.Error, w-4)))
+			rows = append(rows, sp(2)+on(t.warn).Render(ansi.Truncate(l.Error, w-4, "…")))
 		}
-		rows = append(rows, "  "+dim.Render(src))
+		rows = append(rows, sp(2)+dim.Render(fmt.Sprintf("%d models from %s", len(l.Models), l.Source)))
 	}
 	if m.setupNote != "" {
-		rows = append(rows, "  "+t.fg(t.warn).Render(m.setupNote))
+		rows = append(rows, sp(2)+on(t.warn).Render(m.setupNote))
 	}
 	foot := dim.Render("  type filter   ↑↓ move   enter save   ctrl+r ask again   esc cancel")
 	if len(rows) >= n {
