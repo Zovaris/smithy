@@ -21,13 +21,15 @@ type helpDoc struct {
 
 // harnessSummary is the one-line help of each harness-only command, shared by both builds.
 var harnessSummary = map[string]string{
-	"daemon": "run the auto loop with a local API (events, decisions)",
-	"attach": "watch a daemon live: events, decisions, reconnect and resume",
-	"chat":   "fullscreen chat over a daemon (also bare smithy, which starts the daemon)",
-	"stop":   "stop the local background daemon",
-	"web":    "print or open the daemon's web UI link",
-	"board":  "built-in tracker: add, list, show, set, claim, sync",
-	"mcp":    "MCP server (stdio) for driven CLIs: board, ask, secret calls, search",
+	"daemon":  "run the auto loop with a local API (events, decisions)",
+	"attach":  "watch a daemon live: events, decisions, reconnect and resume",
+	"chat":    "fullscreen chat over a daemon (also bare smithy, which starts the daemon)",
+	"stop":    "stop the local background daemon",
+	"web":     "print or open the daemon's web UI link",
+	"board":   "built-in tracker: add, list, show, set, claim, sync",
+	"pair":    "one-time code another machine trades for a device token",
+	"servers": "the daemons this machine talks to: list, add, use, discover",
+	"mcp":     "MCP server (stdio) for driven CLIs: board, ask, secret calls, search",
 }
 
 var helpDocs = map[string]helpDoc{
@@ -40,6 +42,8 @@ var helpDocs = map[string]helpDoc{
 	"stop":    {groupDaily, []string{"smithy stop"}, []string{"chat", "daemon"}},
 	"daemon":  {groupDaily, []string{"smithy daemon", "smithy daemon --bg", "smithy daemon --once"}, []string{"chat", "stop", "web", "auto"}},
 	"attach":  {groupDaily, []string{"smithy attach"}, []string{"daemon", "chat"}},
+	"servers": {groupDaily, []string{"smithy servers", "smithy servers discover", "smithy servers add home http://100.64.0.2:7478 --code ABCD-2345", "smithy servers use home"}, []string{"pair", "chat"}},
+	"pair":    {groupDaily, []string{"smithy pair", "smithy pair list", "smithy pair revoke laptop"}, []string{"servers", "daemon"}},
 	"web":     {groupDaily, []string{"smithy web", "smithy web open"}, []string{"daemon"}},
 	"board":   {groupDaily, []string{`smithy board add "Fix login" --priority 1`, "smithy board list --state todo", "smithy board show B-1"}, []string{"auto", "tasks"}},
 	"bench":   {groupMaint, []string{"smithy bench list", "smithy bench run --agent claude --skills v0.22.0", "smithy bench run --agent codex --task bug-sum-last"}, []string{"agent", "receipt"}},

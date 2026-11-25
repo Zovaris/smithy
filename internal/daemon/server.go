@@ -4,10 +4,12 @@ package daemon
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -83,6 +85,10 @@ type Server struct {
 	SkillsInstall func(ctx context.Context, harness string) (string, error)
 	// Ctx is the daemon's lifetime (cancelled on shutdown) for background work like planning; nil: Background.
 	Ctx context.Context
+	// Pair hands out pairing codes and checks device tokens; nil: pairing is off.
+	Pair *Pairing
+	// Servers lists the saved servers the web switcher reaches through this daemon; nil: none.
+	Servers func() ([]RemoteServer, error)
 
 	mu         sync.Mutex
 	decisions  map[string]*Decision
@@ -291,8 +297,7 @@ var (
 	errBadRequest = errors.New("bad request")
 )
 
-// Handler is the API, every route behind Authorize.
-func (sv *Server) Handler() http.Handler {
+func (sv *Server) apiMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/state", sv.state)
 	mux.HandleFunc("GET /v1/events", sv.events)
@@ -312,6 +317,28 @@ func (sv *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/setup/skills/install", sv.installSkills)
 	mux.HandleFunc("GET /v1/bench", sv.benchRuns)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
+	return mux
+}
+
+// public answers the routes that need no auth: hello and redeeming a pairing code.
+func (sv *Server) public(w http.ResponseWriter, r *http.Request) bool {
+	switch {
+	case r.Method == "GET" && r.URL.Path == "/v1/hello":
+		writeJSON(w, 200, map[string]any{"smithy": true, "version": sv.Version})
+	case r.Method == "POST" && r.URL.Path == "/v1/pair":
+		sv.redeem(w, r)
+	default:
+		return false
+	}
+	return true
+}
+
+// Handler is the loopback API, every route but the public ones behind Authorize.
+func (sv *Server) Handler() http.Handler {
+	mux := sv.apiMux()
+	mux.HandleFunc("POST /v1/pair/code", sv.pairCode)
+	mux.HandleFunc("GET /v1/servers", sv.listServers)
+	mux.HandleFunc("/v1/servers/{name}/{rest...}", sv.proxyServer)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1" && !strings.HasPrefix(r.URL.Path, "/v1/") {
 			if !ShellAllowed(r, sv.allow) {
@@ -321,7 +348,15 @@ func (sv *Server) Handler() http.Handler {
 			web.Handler().ServeHTTP(w, r)
 			return
 		}
+		if sv.public(w, r) {
+			return
+		}
 		who, ok := Authorize(r, sv.token, sv.allow)
+		if !ok {
+			if loopback, _ := hostKind(r); loopback {
+				who, ok = sv.device(r)
+			}
+		}
 		if !ok {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="smithy"`)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -331,6 +366,94 @@ func (sv *Server) Handler() http.Handler {
 		sv.touch()
 		mux.ServeHTTP(w, r)
 	})
+}
+
+// RemoteHandler is the daemon.listen API: a bearer token (the daemon's or a paired device's) on
+// every route but hello and pair, whatever the Host, and the Tailscale login header is ignored
+// (anyone on the network could send it). Codes are minted only on the loopback listener.
+func (sv *Server) RemoteHandler() http.Handler {
+	mux := sv.apiMux()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1" && !strings.HasPrefix(r.URL.Path, "/v1/") {
+			web.Handler().ServeHTTP(w, r)
+			return
+		}
+		if sv.public(w, r) {
+			return
+		}
+		who, ok := "", false
+		if got, has := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); has &&
+			subtle.ConstantTimeCompare([]byte(strings.TrimSpace(got)), []byte(sv.token)) == 1 {
+			who, ok = "local", true
+		} else {
+			who, ok = sv.device(r)
+		}
+		if !ok {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="smithy"`)
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		r.Header.Set("X-Smithy-Who", who)
+		sv.touch()
+		mux.ServeHTTP(w, r)
+	})
+}
+
+// device is the paired device whose token the request carries.
+func (sv *Server) device(r *http.Request) (string, bool) {
+	got, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if !ok {
+		return "", false
+	}
+	name, ok := sv.Pair.Who(strings.TrimSpace(got))
+	if !ok {
+		return "", false
+	}
+	return "device:" + name, true
+}
+
+// pairCode is POST /v1/pair/code: a one-time code, for the daemon token holder only.
+func (sv *Server) pairCode(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("X-Smithy-Who") != "local" {
+		writeJSON(w, 403, map[string]string{"error": "only the daemon token on this machine can make pairing codes"})
+		return
+	}
+	if code, msg := sameOrigin(r); code != 0 {
+		writeJSON(w, code, map[string]string{"error": msg})
+		return
+	}
+	if sv.Pair == nil {
+		writeJSON(w, 503, map[string]string{"error": "pairing is off"})
+		return
+	}
+	c, exp := sv.Pair.NewCode()
+	sv.Append("log", "", map[string]string{"line": "daemon: pairing code made, valid until " + exp.Local().Format("15:04:05")})
+	writeJSON(w, 200, map[string]any{"code": c, "expires": exp})
+}
+
+// redeem is POST /v1/pair {code, name}: trades a code for a device token.
+func (sv *Server) redeem(w http.ResponseWriter, r *http.Request) {
+	if code, msg := sameOrigin(r); code != 0 {
+		writeJSON(w, code, map[string]string{"error": msg})
+		return
+	}
+	var b struct{ Code, Name string }
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&b); err != nil {
+		writeJSON(w, 400, map[string]string{"error": "bad request"})
+		return
+	}
+	if sv.Pair == nil {
+		writeJSON(w, 403, map[string]string{"error": "pairing is off"})
+		return
+	}
+	addr, _, _ := net.SplitHostPort(r.RemoteAddr)
+	tok, err := sv.Pair.RedeemFrom(addr, b.Code, b.Name)
+	if err != nil {
+		writeJSON(w, 403, map[string]string{"error": err.Error()})
+		return
+	}
+	sv.Append("log", "", map[string]string{"line": "daemon: paired device " + strings.TrimSpace(b.Name)})
+	writeJSON(w, 200, map[string]string{"token": tok, "version": sv.Version})
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

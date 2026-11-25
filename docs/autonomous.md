@@ -74,13 +74,19 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   `merge:<batch>/<item>` (merge/hold) and a `needs_decision` item `decide:<batch>/<item>/<key>`;
   warden answers land on the card as `answer`, `answer_id` and `answered_by`. Telegram alerts
   show the same id.
-- It binds `127.0.0.1` only. Every request needs the token (`~/.smithy/daemon.token`, 0600) or a
+- It binds `127.0.0.1` (plus `daemon.listen` when set, below). Every request needs the token (`~/.smithy/daemon.token`, 0600) or a
   `Tailscale-User-Login` listed in `daemon.allow`; anything else gets 401. The token works only
   with a loopback `Host`, the login only with a `*.ts.net` one, so a DNS-rebound web page can't
   use the API.
 - Remote access: `tailscale serve --bg 7477` puts it on your tailnet over HTTPS with the
   identity header; smithy has no Tailscale code. Any local process can send that header, so set
   `daemon.allow` only on a machine where every local user is trusted (the dedicated OS user above).
+- Another machine without tailscale serve: set `daemon.listen` to a non-loopback `ip:port`, run
+  `smithy pair` here and `smithy servers add <name> http://<ip>:<port> --code <code>` there. That
+  listener takes only bearer tokens (the daemon token or a paired device's, revoked with `smithy pair
+  revoke`), never the login header. `smithy servers` lists saved daemons with their status,
+  `smithy servers discover` finds Tailscale peers running smithy, and `/connect` in the chat or
+  the web sidebar switches between them; `--server` / `SMITHY_SERVER` pick one for a run.
 - `smithy attach [url]` follows it in a terminal UI: live events, the decisions waiting on you
   (keys 1-9 answer; the first answer wins, a later one shows the recorded outcome), and on a lost
   connection it retries and resumes after the last event seen, so a daemon restart neither

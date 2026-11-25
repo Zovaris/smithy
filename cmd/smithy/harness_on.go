@@ -11,6 +11,7 @@ import (
 	"github.com/Zovaris/smithy/internal/apiloop/provider"
 	"github.com/Zovaris/smithy/internal/codemode"
 	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/remote"
 	_ "github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/tui"
 )
@@ -31,12 +32,18 @@ func init() {
 	register("attach", harnessSummary["attach"], tui.AttachUsage, "--", func(args []string) int {
 		return tui.Attach(args)
 	})
-	register("chat", harnessSummary["chat"], tui.ChatUsage, "--standalone --", func(args []string) int {
+	register("chat", harnessSummary["chat"], tui.ChatUsage, "--standalone --server= --", func(args []string) int {
 		return tui.Chat(args)
 	})
 	register("web", harnessSummary["web"], daemon.WebUsage, "--", func(args []string) int {
 		tok := func() (string, error) { return daemon.LoadToken(daemon.TokenFile(), false) }
 		return daemon.Web(args, daemon.Running, tok, tui.OpenURL, os.Stdout, os.Stderr)
+	})
+	register("pair", harnessSummary["pair"], daemon.PairUsage, "list revoke", func(args []string) int {
+		return daemon.PairCmd(args, os.Stdout, os.Stderr)
+	})
+	register("servers", harnessSummary["servers"], remote.Usage, "list add rm use discover --code", func(args []string) int {
+		return remote.Cmd(args, remote.Env{})
 	})
 	noArgs = func() int { return tui.Chat(nil) }
 	serveMain = daemon.ServeOrAttach

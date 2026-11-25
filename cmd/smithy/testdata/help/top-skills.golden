@@ -21,12 +21,16 @@ Daily
                 the daemon) (harness build)
   daemon        run the auto loop with a local API (events, decisions) (harness
                 build)
+  pair          one-time code another machine trades for a device token (harness
+                build)
   receipt       run a command and record it as evidence for a claim
   report        weekly report: shipped, failed, time and cost per harness, open
                 decisions
   scan          check a change's added lines and files for secrets
   search        search ADRs, glossary and docs, best sources first (--code: the
                 whole repo)
+  servers       the daemons this machine talks to: list, add, use, discover
+                (harness build)
   stop          stop the local background daemon (harness build)
   tasks         the shared task list (smithy tasks board --all)
   tui           live dashboard of the forge: agents, incoming issues, what needs

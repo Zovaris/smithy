@@ -36,24 +36,6 @@ func hostOf(u string) string {
 	return p.Host
 }
 
-// showConnect is /connect: the daemon this chat talks to, and how to reach another one.
-func (m *chatView) showConnect() {
-	where := map[chatWhere]string{whereBackground: "background daemon on this machine", whereStandalone: "inside this chat", whereRemote: "another machine"}[m.where]
-	state := "ok "
-	if m.conn != "connected" {
-		state = ""
-	}
-	m.info = infoPanel{title: "Connect", lines: []string{
-		"#THIS CHAT",
-		state + hostOf(m.url) + "\t" + where + ", " + m.conn,
-		"#ANOTHER DAEMON",
-		"-> smithy attach <url>\ta daemon on another machine; a tailscale serve URL needs no token",
-		"#THIS DAEMON",
-		"smithy stop\tstops the background daemon and every session it runs",
-	}}
-	m.overlay, m.pal = overlayInfo, palette{}
-}
-
 // showRemote is /remote: how to reach this daemon from a phone or another machine.
 func (m *chatView) showRemote() {
 	lines := []string{"#FROM ANOTHER MACHINE"}

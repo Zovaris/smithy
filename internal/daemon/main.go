@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -22,6 +23,7 @@ import (
 	"github.com/Zovaris/smithy/internal/connect"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/remote"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/text"
 )
@@ -229,6 +231,15 @@ func foreground(o runOpts) int {
 		return 1
 	}
 	api.Version = Version
+	api.Pair = &Pairing{File: DevicesFile()}
+	api.Servers = func() ([]RemoteServer, error) {
+		l, err := remote.Load(remote.File())
+		var out []RemoteServer
+		for _, s := range l.Servers {
+			out = append(out, RemoteServer{Name: s.Name, URL: s.URL, Token: s.Token})
+		}
+		return out, err
+	}
 	api.Route = api.RouteIntake(RouteBack)
 	api.Resume()
 	tctx, stopTails := context.WithCancel(context.Background())
@@ -268,6 +279,21 @@ func foreground(o runOpts) int {
 			api.ServeState = func() any { return sv.Heartbeat() }
 			hs := &http.Server{Handler: api.Handler(), ReadHeaderTimeout: 10 * time.Second}
 			go hs.Serve(ln)
+			var rs *http.Server
+			if addr := config.Get("daemon.listen", ""); addr != "" && o.writeInfo {
+				if err := CheckRemoteListen(addr); err != nil {
+					hs.Close()
+					return nil, err
+				}
+				rln, err := net.Listen("tcp", addr)
+				if err != nil {
+					hs.Close()
+					return nil, fmt.Errorf("daemon.listen %s: %w", addr, err)
+				}
+				rs = &http.Server{Handler: api.RemoteHandler(), ReadHeaderTimeout: 10 * time.Second}
+				go rs.Serve(rln)
+				api.Append("log", "", map[string]string{"line": "daemon: also listening on " + rln.Addr().String() + " (bearer token or paired device only)"})
+			}
 			info := Info{PID: os.Getpid(), PIDStart: auto.ProcStart(os.Getpid()), Addr: ln.Addr().String(), Started: time.Now().UTC(), Log: os.Getenv("SMITHY_DAEMON_LOG")}
 			if o.writeInfo {
 				if err := WriteInfo(info); err != nil {
@@ -291,6 +317,9 @@ func foreground(o runOpts) int {
 				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 				defer cancel()
 				hs.Shutdown(ctx)
+				if rs != nil {
+					rs.Shutdown(ctx)
+				}
 				if !o.writeInfo {
 					return
 				}
