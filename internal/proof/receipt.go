@@ -297,6 +297,16 @@ func Quote(argv []string) string {
 	return strings.Join(out, " ")
 }
 
+// Secret names the first scan rule s matches (a token, key or private key), or "" when none does.
+func Secret(s string) string {
+	for _, r := range rules {
+		if r.re.MatchString(s) {
+			return r.name
+		}
+	}
+	return ""
+}
+
 // Redact masks anything in s that the scan rules take for a secret.
 func Redact(s string) string {
 	for _, r := range rules {
