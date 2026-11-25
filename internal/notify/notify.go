@@ -223,9 +223,11 @@ func enabled() map[string]bool {
 type item struct {
 	kind, batch, key, title, pr, reason, dedupe string
 	issue, repo, stage, model, speed, question  string
-	cost                                        *float64
-	dur                                         time.Duration
-	first                                       time.Time
+	// id is the smithy daemon decision this alert asks (events.DecisionID), answered by that id.
+	id    string
+	cost  *float64
+	dur   time.Duration
+	first time.Time
 }
 
 var header = map[string]string{"pr_ready": "✅ <b>PR ready</b>", "blocked": "⛔ <b>Blocked</b>", "stuck": "⏳ <b>Stuck</b>",
@@ -309,6 +311,9 @@ func render(it item) (string, []button) {
 	if it.reason != "" {
 		lines = append(lines, "<blockquote>"+clean(it.reason, 200)+"</blockquote>")
 	}
+	if it.id != "" {
+		lines = append(lines, "Decision <code>"+clean(it.id, 200)+"</code>")
+	}
 	_, kb := renderButtons(it)
 	return strings.Join(lines, "\n"), kb
 }
@@ -357,6 +362,7 @@ func enrich(it *item, evs []events.Event, now time.Time) {
 		it.model, it.speed = str("model"), str("speed")
 		if it.kind == "decision" {
 			it.question = str("question")
+			it.id = events.DecisionID(events.Event{Kind: "stage", Batch: it.batch, Item: it.key, Detail: "needs_decision"}, str("decision_key"))
 		}
 		if it.reason == "" {
 			it.reason = str("reason")
@@ -386,6 +392,7 @@ func classify(e events.Event) (item, bool) {
 	switch {
 	case e.Kind == "stage" && e.Detail == "ready":
 		it.kind = "pr_ready"
+		it.id = events.DecisionID(e, "")
 	case e.Kind == "stage" && (e.Detail == "blocked" || e.Detail == "failed"):
 		it.kind = "blocked"
 	case e.Kind == "stage" && e.Detail == "needs_decision":
@@ -724,6 +731,9 @@ func renderPlain(it item) (string, []button) {
 	}
 	if it.reason != "" {
 		lines = append(lines, "<blockquote>"+clean(it.reason, 200)+"</blockquote>")
+	}
+	if it.id != "" {
+		lines = append(lines, "Decision <code>"+clean(it.id, 200)+"</code>")
 	}
 	_, kb := renderButtons(it)
 	return strings.Join(lines, "\n"), kb
