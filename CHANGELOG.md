@@ -57,6 +57,7 @@ part above `### Details`.
 - Intake review: the approval message lists each task with its body (first 300 characters, line breaks kept, up to 3500 characters in chat), and the board source of `smithy auto` skips tasks labelled `intake` until someone removes the label after reviewing them.
 - Every `--readonly` claude run (the intake planner among them) carries the same secret deny rules as `--profile auto` (`agents.SecretDenied`: `Read` and shell access to `~/.smithy/auth.json`, pool accounts, ssh, gh, aws, netrc).
 - The secret scan (`smithy proof`, `proof.Redact`) also knows Telegram and Discord bot tokens and Slack app tokens (`xapp-`); `proof.Secret` names the rule a string matches.
+- Chat intake drops a plan whose task title or body matches a secret scan rule (`proof.Secret`), and logs only the rule name.
 
 ## v0.19.0 — 2026-11-24
 

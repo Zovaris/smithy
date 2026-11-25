@@ -19,6 +19,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/board"
+	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/text"
 )
 
@@ -133,6 +134,11 @@ func (sv *Server) IntakeNow(ctx context.Context, idea, by string) error {
 	}
 	if len(tasks) == 0 {
 		return errors.New("intake: the planner returned no tasks")
+	}
+	for i, t := range tasks {
+		if r := proof.Secret(t.Title + "\n" + t.Body); r != "" {
+			return fmt.Errorf("intake: planned task %d looks like it carries a secret (%s); plan dropped", i+1, r)
+		}
 	}
 	h := sha256.Sum256([]byte(idea + "\x00" + by + "\x00" + time.Now().UTC().Format(time.RFC3339Nano)))
 	p := intakePlan{ID: "intake:" + hex.EncodeToString(h[:6]), Idea: idea, By: by, Tasks: tasks}
