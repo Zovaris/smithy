@@ -1,11 +1,13 @@
-# Web design pass (v0.23): Hearth
+# Web design pass (v0.23): Temper
 
 Design for approval before the web screens are built (spec §5). Open `mock.html` in a browser
 (`?mode=dark`, `?view=sheet`, `?view=new`); `phones.html` shows the three phone states side by side.
 
-**Theme:** `web/src/theme/hearth.css`, a Sephiro theme: warm paper and ink, one ember accent shared
-with the TUI's Steel, light/dark from the system with a `data-mode` override for the toggle.
-Status always pairs a color with a glyph (● working, ? needs you, ✓ done, ✕ failed).
+**Theme:** `web/src/theme/temper.css`, a Sephiro theme. Direction: a forge harness, exact and steady
+with a little heat. Graphite neutral surfaces (no warm paper), Geist + Geist Mono, one ember accent shared
+with the TUI's Steel for heat (running, the action that matters), amber for "needs you". Primary
+buttons are ink (light) or off-white (dark). Signature: keycaps for every shortcut (`/`, `@`, ⌘K, esc,
+↵). Moments: the Changes diff and the guard decision card. Status is always a dot plus a word.
 
 **Layout (mobile-first):**
 - Phone (<1024px): one column, top bar with session title, status and `+/−` changes chip; sessions
@@ -14,7 +16,7 @@ Status always pairs a color with a glyph (● working, ? needs you, ✓ done, �
 - Wide (≥1280px): adds the right rail: Changes (file list, diff, inline comment sent with the next
   message), Decisions, Agents.
 - Decisions (guard, permission, plan approval) render inline in the conversation and in the rail.
-- New session: serif greeting, detected agents as ready/missing chips (§3), skill-shaped starters.
+- New session: context tags (server, folder, branch), detected agents as ready/missing rows (§3), skill starters.
 
 **Grounded in** the v0.23 research (`research.md` §3): Claude Code on the web (sidebar, Changes card
 with inline comments), Jules (plan approve), OpenCode web (same server, QR pairing), Conductor and

@@ -10,7 +10,7 @@ part above `### Details`.
 
 ### Details
 
-- web: Hearth design for approval (Sephiro theme `web/src/theme/hearth.css`, light/dark, mock and screenshots in `docs/design/web-v023/`).
+- web: Temper design for approval (Sephiro theme `web/src/theme/temper.css`, light/dark, mock and screenshots in `docs/design/web-v023/`).
 
 ## v0.22.0 — 2026-11-25
 
