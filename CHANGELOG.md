@@ -8,6 +8,9 @@ part above `### Details`.
 
 ## Unreleased
 
+### Details
+
+- web: Temper design for approval (Sephiro theme `web/src/theme/temper.css`, light/dark, mock and screenshots in `docs/design/web-v023/`).
 ### Highlights
 
 **One sandbox: the OS one.** The Docker/podman container sandbox is gone. `auto.sandbox` is `off` (default) or `native` (Seatbelt on macOS, bubblewrap on Linux) for Claude Code, Codex and the API backend's shell.
@@ -22,6 +25,11 @@ part above `### Details`.
 ### New
 
 - **Dangerous-command guard, on by default.** An agent's `rm -rf /`, force push to main, `git reset --hard`, disk format, `curl | sh`, `chmod -R 777` or deletion of `~/.smithy` stops and asks you (run once, always allow, deny) in the TUI, web or chat. Nothing else asks.
+- The daemon runs agent sessions: start one with an agent, a folder and a first message, keep talking to it, stop it, and see every session with its status (harness build).
+
+### Details
+
+- `POST /v1/sessions`, `POST /v1/sessions/{id}/messages`, `POST /v1/sessions/{id}/stop` and `GET /v1/sessions`; session events (messages, live text, tool calls with args and output, diffs, usage, status) stream on `/v1/events` with the session id. `api:` sessions run in the daemon and turn a refused tool call into a `perm:<id>/<n>` decision; other agents run `smithy agent` per turn. Chat-thread replies reach the session; sessions left running by a stopped daemon show as failed.
 - **One command.** `smithy` (harness build) starts the daemon in the background when none runs and attaches; it keeps working after you quit, exits on its own after 30 idle minutes, and `smithy stop` ends it. `smithy --standalone` runs a private daemon that stops with the chat.
 
 ### Details

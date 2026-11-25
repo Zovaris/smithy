@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -201,4 +202,59 @@ func (c *Client) stream(ctx context.Context, last *int64, out chan<- ClientMsg) 
 		}
 	}
 	return true, sc.Err()
+}
+
+func (c *Client) call(ctx context.Context, method, path string, body, out any) error {
+	var b []byte
+	if body != nil {
+		b, _ = json.Marshal(body)
+	}
+	r, err := c.req(ctx, method, path, b)
+	if err != nil {
+		return err
+	}
+	if body != nil {
+		r.Header.Set("Content-Type", "application/json")
+	}
+	res, err := c.http().Do(r)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode/100 != 2 {
+		var e struct{ Error string }
+		json.NewDecoder(io.LimitReader(res.Body, 4<<10)).Decode(&e)
+		if e.Error != "" {
+			return fmt.Errorf("daemon %s: %s", path, e.Error)
+		}
+		return fmt.Errorf("daemon %s: %s", path, res.Status)
+	}
+	if out == nil {
+		return nil
+	}
+	return json.NewDecoder(res.Body).Decode(out)
+}
+
+// StartSession is POST /v1/sessions: agent "" is the last used one; msg may be empty.
+func (c *Client) StartSession(ctx context.Context, agent, dir, msg string) (Session, error) {
+	var s Session
+	err := c.call(ctx, "POST", "/v1/sessions", map[string]string{"agent": agent, "dir": dir, "message": msg}, &s)
+	return s, err
+}
+
+// SendSession is POST /v1/sessions/{id}/messages.
+func (c *Client) SendSession(ctx context.Context, id, text string) error {
+	return c.call(ctx, "POST", "/v1/sessions/"+url.PathEscape(id)+"/messages", map[string]string{"text": text}, nil)
+}
+
+// StopSession is POST /v1/sessions/{id}/stop.
+func (c *Client) StopSession(ctx context.Context, id string) error {
+	return c.call(ctx, "POST", "/v1/sessions/"+url.PathEscape(id)+"/stop", map[string]string{}, nil)
+}
+
+// Sessions is GET /v1/sessions.
+func (c *Client) Sessions(ctx context.Context) (SessionList, error) {
+	var l SessionList
+	err := c.call(ctx, "GET", "/v1/sessions", nil, &l)
+	return l, err
 }

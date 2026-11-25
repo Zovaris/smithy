@@ -43,6 +43,15 @@ serve a Tailscale-User-Login listed in daemon.allow; anything else gets 401):
   GET  /v1/events?since=<seq>    SSE of every event after seq; resumes with Last-Event-ID
   POST /v1/decisions             {"id","answer"}: the first answer wins (200); later ones get
                                  the recorded outcome (409)
+  POST /v1/sessions              {"agent","dir","message"}: start a session (agent: a CLI name,
+                                 acp:<cli> or api:<provider>/<model>; "" the last used); 201
+  GET  /v1/sessions              every session with status working, needs_you, done or failed
+  POST /v1/sessions/{id}/messages  {"text"}: the next user message (queued behind a turn); 202
+  POST /v1/sessions/{id}/stop    cancel the turn; a later message goes on with the history
+Session events (session_* kinds, decision_asked for a permission) carry the session id on
+/v1/events. api: agents run in the daemon, so tool calls stream live and a call the auto rules
+refuse becomes a decision (perm:<id>/<n>) until someone answers; other agents run smithy agent
+once per turn. A reply in a session's chat-connector thread is that session's next message.
 Worker events (events.jsonl, the proxy log) are tailed into the store; proxy secret asks,
 ready items and needs_decision items become decisions whose answers go back to the asker.
 Stop a background daemon with: smithy stop.`
