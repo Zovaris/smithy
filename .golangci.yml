@@ -1,0 +1,80 @@
+version: "2"
+run:
+  build-tags: [harness]
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - errcheck
+    - gocritic
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - revive
+    - staticcheck
+    - unconvert
+    - unused
+  settings:
+    gocritic:
+      disabled-checks:
+        - ifElseChain # style preference; the chains read in order of likelihood
+    staticcheck:
+      checks:
+        - all
+        - -QF1001 # De Morgan rewrites are editor quick fixes, not defects
+        - -QF1002 # same: tagged-switch suggestion
+        - -QF1003 # same
+        - -ST1000 # package comments: packages are internal
+        - -ST1003 # naming: existing exported names stay stable
+        - -ST1020 # comment form on exported symbols: packages are internal
+        - -ST1021 # same
+        - -ST1022 # same
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+    gosec:
+      excludes:
+        - G204 # smithy runs git, gh and agent CLIs by design; args come from the user or the repo
+        - G301 # state dirs live under the user's home; group/world read is intended
+        - G302 # same: user-owned files
+        - G304 # reading paths the user or the repo names is the CLI's job
+        - G306 # same: user-owned files
+        - G104 # duplicate of errcheck, which is configured above
+        - G404 # math/rand only drives retry jitter and visual effects, never secrets
+        - G602 # false positives on bounds already checked a line above (gosec bounds analysis)
+        - G702 # taint form of G204
+        - G703 # taint form of G304
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: dot-imports
+        - name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: superfluous-else
+        - name: time-naming
+        - name: unreachable-code
+        - name: var-declaration
+        # redefines-builtin-id is off: local max/min/real names are scoped and predate the Go 1.21 builtins
+        # exported and unused-parameter are off: packages are internal, handlers must match their signatures
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters: [errcheck, gosec, bodyclose] # tests fail loudly on their own; unchecked cleanup is fine there
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+formatters:
+  enable: [gofmt]

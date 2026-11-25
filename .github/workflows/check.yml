@@ -21,6 +21,10 @@ jobs:
           go vet -tags harness ./...
       - name: Launcher syntax
         run: sh -n shared/smithy
+      - name: golangci-lint (both builds, config in .golangci.yml)
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.15.0
   test:
     runs-on: ubuntu-latest
     strategy:
