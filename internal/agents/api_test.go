@@ -141,6 +141,28 @@ func TestAPISinkReportsToolsAndRecordsRejectedPermissions(t *testing.T) {
 	}
 }
 
+type stubTools struct{ name string }
+
+func (s stubTools) Specs() []apiloop.ToolSpec                            { return []apiloop.ToolSpec{{Name: s.name}} }
+func (stubTools) Permit(apiloop.ToolCall) (bool, string)                 { return true, "" }
+func (stubTools) Call(context.Context, apiloop.ToolCall) (string, error) { return "", nil }
+
+func TestCodeModeOffByDefault(t *testing.T) {
+	old := CodeMode
+	CodeMode = func(apiloop.Tools) apiloop.Tools { return stubTools{"wrapped"} }
+	t.Cleanup(func() { CodeMode = old })
+	base := stubTools{"read"}
+	if got := withCodeMode(base, false); got.Specs()[0].Name != "read" {
+		t.Errorf("off: got %v", got.Specs())
+	}
+	if got := withCodeMode(base, true); got.Specs()[0].Name != "wrapped" {
+		t.Errorf("on: got %v", got.Specs())
+	}
+	if got := withCodeMode(nil, true); got != nil {
+		t.Errorf("no tools: got %v", got)
+	}
+}
+
 func TestAgentAPIBackendOffersTheCoreToolsUnderAutoRules(t *testing.T) {
 	fake := &apiFake{}
 	if _, _, rc, _ := apiRun(t, fake, "--backend", "api", "--model", "anthropic/claude-sonnet-4"); rc != 0 {

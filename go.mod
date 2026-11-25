@@ -11,7 +11,9 @@ require (
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/harmonica v0.2.0
 	github.com/charmbracelet/x/ansi v0.11.9
+	github.com/fastschema/qjs v0.0.6
 	github.com/openai/openai-go/v3 v3.107.0
+	github.com/tetratelabs/wazero v1.9.0
 	google.golang.org/genai v1.79.1
 	modernc.org/sqlite v1.63.0
 )
