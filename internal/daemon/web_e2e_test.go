@@ -7,17 +7,26 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/web"
 )
 
 // TestWebScreensServed walks what a browser does on the served UI: the shell, every first-load
 // asset, each lazy screen chunk, the event stream the screens fold, and an answer from the
 // decisions screen.
 func TestWebScreensServed(t *testing.T) {
+	if !web.Built() {
+		if os.Getenv("SMITHY_REQUIRE_WEB_BUILD") != "" {
+			t.Fatal("SMITHY_REQUIRE_WEB_BUILD is set but the web UI is the placeholder: build it (npm ci && npm run build in web/) before the harness tests")
+		}
+		t.Skip("only the placeholder web UI is embedded: run npm ci && npm run build in web/ to test the screens")
+	}
 	sv, hs := newTest(t, filepath.Join(t.TempDir(), "s.db"))
 	body := func(url string) string {
 		t.Helper()

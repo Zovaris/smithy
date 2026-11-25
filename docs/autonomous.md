@@ -14,11 +14,14 @@ smithy config set auto.sources github,linear
 smithy config set linear.team ENG              # required for Linear
 smithy auth set linear < keyfile               # or LINEAR_API_KEY
 smithy config set auto.max_per_day 20
+smithy config set auto.max_cost_per_day 15             # optional USD cap on reported spend per day
 smithy auto serve                              # Esc/q stops the loop; running agents keep going
 ```
 
 Issues opt in with the `auto` label. `model:` and `speed:` labels pick the tier and smelt speed.
-A daily cap and an optional hours window bound the spend. `smithy tui` shows the queue, running
+A daily issue cap (`auto.max_per_day`), an optional daily cost cap (`auto.max_cost_per_day`, USD
+of reported cost; running agents finish) and an optional hours window bound the spend; reaching
+either cap records a `cap_reached` event (and notification) once that day. `smithy tui` shows the queue, running
 agents and the cost of each issue, a History tab of past days' work with PR, cost and outcome, and
 edits settings in place. Every setting is listed in
 [settings.md](settings.md).
@@ -85,11 +88,22 @@ smithy board claim B-1 --by me --ttl 30m
 smithy board set B-1 --state review --pr https://github.com/o/r/pull/7
 ```
 
+Every flag and subcommand: `smithy help board` (or `smithy help board <sub>`).
+
 With `board.linear_sync true`, `smithy board sync` (and every board poll) syncs with Linear by
 field ownership: Linear owns title, body, priority and labels; the board owns state, claims, PRs
 and branch. Issues in `linear.states` under the `linear.*` filters are imported as `todo`; later
 edits are read with an `updatedAt` cursor (no webhooks), and state changes and new PR links are
 pushed back. A board task linked to Linear refuses local edits to the fields Linear owns.
+
+### Tools for the agents (smithy mcp)
+
+In the harness build, `smithy agent` gives every driven CLI a `smithy` MCP server through its
+own per-run config (never your global one): `search` over the working folder, `board_list`,
+`board_show`, `board_claim` and `board_set`, `secret_call` to call an API with a key you bound
+with `smithy auth bind` (the agent never sees the key; writes follow the bind's methods and asks),
+and `ask`, which puts a decision on the run's warden card and waits for your answer from the TUI,
+web or chat. `--readonly` runs get search and board reads only; container runs get none.
 
 ## Notifications
 
@@ -114,7 +128,16 @@ machine, with a fine-grained, repo-scoped GitHub token and a test or least-privi
   |---|---|
   | Claude Code | smithy's allow-list: explicit git/gh subcommands; config edits, credential and network commands, and secret files denied |
   | Codex | its workspace-write sandbox, network on (push needs it), approvals off |
-  | Others | their own headless mode, no smithy allow-list: use `container` with `proxy` (needs your own `auto.sandbox_image`) |
+  | OpenCode | smithy's allow-list as `OPENCODE_PERMISSION` rules: bash allow-list, web fetch and outside directories denied, secret files denied for read and edit (also for `--readonly` runs such as the intake planner) |
+  | Any CLI over ACP (`AGENT_PROTOCOL=acp`) | each permission request goes through the same allow-list: a command must match an allowed rule and no denied one (no `;`, `&&`, pipes, redirects or `$`), edits stay inside the worktree and off denied paths, reads off secret paths; fetch, delete, move and anything smithy can't classify are rejected |
+  | Others (gemini, pi, cursor, dsh) | their own headless mode, no smithy allow-list: use `container` with `proxy` (needs your own `auto.sandbox_image`) |
+
+  Only Claude Code and OpenCode can deny reads of `~/.smithy/auth.json` and the other secret
+  files. Codex, gemini, pi, cursor and dsh have no per-path read deny, so outside `container`
+  they can read them; `smithy doctor` says so for the configured CLI. Even for Claude Code and
+  OpenCode the shell deny rules match command text (globs such as `~/.s*`, `$HOME` and key file
+  names included), so a command that builds the path another way can slip past: only the `native`
+  or `container` sandbox fully keeps secrets out of reach.
 
   None of these removes the risk. Nothing stops Codex or the others sending data out, so
   least-privilege tokens matter most there.
@@ -190,7 +213,12 @@ smithy pool add main <harness>       # ~/.smithy/accounts/main
 smithy pool login main               # sign in once, then exit
 smithy pool list                     # status, reset time, runs and cost today
 smithy config set auto.agent pool    # optional: the orchestrator may use any pooled harness
+smithy config set pool.order claude,codex  # optional: harness order for a pool run
 ```
+
+With `pool.order` set, a pool run stays on the first listed harness that has a free account. When
+every account of that harness is limited, it falls back to the next one (logged as a
+`pool_fallback` event) and goes back once the limit resets.
 
 When every account is limited, `smithy agent` exits 75 and serve waits for the earliest reset,
 then notifies you on Telegram if it is set up.

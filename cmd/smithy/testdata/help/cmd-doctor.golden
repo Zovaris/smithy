@@ -1,0 +1,17 @@
+smithy doctor: check everything a warden batch needs (--quiet: problems only;
+--fix [--yes]: apply fixes)
+
+usage: smithy doctor [--quiet] [--fix [--yes]]
+Checks everything a warden batch needs, one line per check; --quiet prints
+problems only. --fix lists each fix that changes only your own files (exact
+change shown) and applies it on y; --yes applies all but permission grants
+(those need y); without a terminal and without --yes it applies none. Exit 1
+when a check failed (the checks run before any fix).
+
+Examples:
+  smithy doctor
+  smithy doctor --quiet
+  smithy doctor --fix
+
+See also: smithy help setup, smithy help version
+Exit codes: 0 success, 1 failure, 2 usage error (3 where a command's help says).

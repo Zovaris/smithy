@@ -41,10 +41,18 @@ Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list be
   cursor      agent -p --force (Cursor CLI)
   pi          pi -p (--tools read when read-only)
   dsh         dsh headless --approval-policy never (DeepSeek Harness; model from its profile)
+AGENT_PROTOCOL=acp drives the CLI over the Agent Client Protocol instead: gemini --experimental-acp,
+  opencode acp, or an AGENT_CMD that speaks ACP. The prompt goes over the protocol; the answer goes
+  to the log; finished tool calls and permission answers become events (tool, permission); usage
+  goes to <log>.usage.json and a usage event. smithy allows each permission request, and rejects
+  it on a read-only run with an entry in the decisions log.
 --profile auto (smithy auto serve's orchestrator; never a full bypass): claude runs with
   permission mode dontAsk and an allowed-tools list limited to Read, Edit, Write, Glob, Grep and Bash for
   git, gh, go/npm test and smithy; codex keeps --sandbox workspace-write with approval_policy never;
-  the other CLIs keep their own headless mode above.
+  opencode gets the same allow-list as OPENCODE_PERMISSION rules (also with --readonly: no edits,
+  secret reads denied); the other CLIs keep their own headless mode above. Only claude and opencode
+  can deny reads of ~/.smithy/auth.json and the other secrets: codex, gemini, pi, cursor and dsh
+  can read them unless auto.sandbox is container.
 Effort: --effort, else $AGENT_EFFORT, else the agent.effort setting (default medium). Anything
 above medium is capped at medium. Passed as --effort (claude) or -c model_reasoning_effort
 (codex), and as $AGENT_EFFORT to every CLI; the others keep their own default and say so.
@@ -52,7 +60,8 @@ Timeout: --timeout, else the agent.timeout setting (minutes, default 90; 0 = non
 passes, the agent's whole process group is killed (Unix; on Windows only the agent process), "timed out after Nm" goes to the log and
 smithy agent exits 124; --bg runs are watched by a detached smithy that does the same.
 Pool (smithy pool, off until an account is added): a run of a pooled harness (AGENT_CLI=pool: any)
-uses the least recently used account that is not limited, through its harness's config-dir env var;
+uses the least recently used account that is not limited, through its harness's config-dir env var
+(AGENT_CLI=pool: harnesses in pool.order first, falling back down it, logged as pool_fallback);
 a usage-limit result marks it limited; a read-only or untouched run reruns once on the next one,
 any other exits 75 with its warden card blocked (relaunch in the same worktree).
 Extra flags for the chosen CLI: $AGENT_ARGS. Workers get WARDEN_HARNESS set to the CLI and the
@@ -86,16 +95,21 @@ type Options struct {
 	// Sandbox is auto.sandbox for this run (off, native, container); SandboxSettings the claude
 	// --settings JSON under native.
 	Sandbox, SandboxSettings string
-	Proxy                    bool     // container worker behind the egress proxy (auto.sandbox_network proxy)
-	PoolEnv                  []string // the pool account's config-dir variable (smithy pool), added to the worker's env
-	Account                  string   // the pool account this run uses
-	poolSkip                 []string // accounts already tried (limited) in this run
-	poolStart                string   // the worktree's HEAD before the first attempt ("" when not a git repo)
+	Proxy                    bool       // container worker behind the egress proxy (auto.sandbox_network proxy)
+	PoolEnv                  []string   // the pool account's config-dir variable (smithy pool), added to the worker's env
+	Account                  string     // the pool account this run uses
+	poolSkip                 []string   // accounts already tried (limited) in this run
+	poolStart                string     // the worktree's HEAD before the first attempt ("" when not a git repo)
+	Inject                   *Injection // the run's injection kit (Inject), added before $AGENT_ARGS
 }
 
 // ProfileEnv carries --profile to every smithy agent an agent starts, so workers under an
 // unattended orchestrator get the same allow-list.
 const ProfileEnv = "SMITHY_AGENT_PROFILE"
+
+// WorkerEnv names a warden worker's item (<batch>/<item>); commands only the orchestrator or the
+// user may run (smithy auto report) refuse when it is set.
+const WorkerEnv = "SMITHY_WARDEN_ITEM"
 
 // AutoTools are the only tools a claude session under --profile auto may use; everything else
 // is denied (permission mode dontAsk), so an unattended run never asks and never bypasses.
@@ -113,6 +127,7 @@ func AutoTools(smithy []string) []string {
 	for _, c := range []string{"ls", "pwd", "cat", "head", "tail", "wc", "grep", "rg", "find", "which", "echo", "cd", "sort", "uniq", "diff", "test", "true", "sed -n", "basename", "dirname", "realpath", "date", "jq"} {
 		t = append(t, "Bash("+c+")", "Bash("+c+" *)")
 	}
+	t = append(t, "mcp__smithy")
 	t = append(t, "Bash(go test *)", "Bash(go vet *)", "Bash(go build *)", "Bash(gofmt -l *)", "Bash(go fmt *)", "Bash(npm test *)", "Bash(npm run test *)")
 	for _, b := range smithy {
 		if filepath.IsAbs(b) {
@@ -128,8 +143,12 @@ func AutoTools(smithy []string) []string {
 func SecretDenied() []string {
 	// shell readers must not reach the secrets the Read rules protect; pool accounts hold other accounts' logins
 	d := []string{"Bash(*auth.json*)", "Bash(*.ssh*)", "Bash(*.config/gh*)", "Bash(*.aws*)", "Bash(*.netrc*)", "Bash(*.git-credentials*)",
-		"Bash(*.smithy/accounts*)"}
-	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
+		"Bash(*.smithy/accounts*)", "Bash(*daemon.token*)",
+		// glob and variable forms the literal rules miss (cat ~/.s*/id_*, $HOME/...); a best effort:
+		// only the native or container sandbox fully keeps secrets out of reach
+		"Bash(*~/.*)", "Bash(*$HOME*)", "Bash(*${HOME}*)", "Bash(*.smithy/auth*)", "Bash(*.s*/id_*)", "Bash(*.[*)",
+		"Bash(*id_rsa*)", "Bash(*id_ed25519*)", "Bash(*id_ecdsa*)"}
+	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/daemon.token", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"} {
 		d = append(d, "Read("+f+")")
 	}
 	return d
@@ -151,11 +170,25 @@ func AutoDenied(smithy []string) []string {
 			d = append(d, "Bash("+b+" auth *)", "Bash("+b+" config set *)", "Bash("+b+" config set-model *)", "Bash("+b+" pool *)")
 		}
 	}
+	// approvals and answers come only from the user's channels, never from a worker
+	for _, b := range append([]string{"smithy"}, smithy...) {
+		if b != "smithy" && !filepath.IsAbs(b) {
+			continue
+		}
+		d = append(d, "Bash("+b+" proxy approve *)", "Bash("+b+" proxy deny *)")
+		for _, c := range []string{"chat", "attach", "web", "tui"} {
+			d = append(d, "Bash("+b+" "+c+")", "Bash("+b+" "+c+" *)")
+		}
+	}
 	d = append(d, SecretDenied()...)
 	for _, f := range []string{"~/.smithy/auth.json", "~/.smithy/config.json", "~/.smithy/accounts/**", "~/.smithy/pool.json", "~/.smithy/pool-state.json", "~/.ssh/**", "~/.config/**", "~/.aws/**", "~/.gitconfig", "~/.netrc",
 		"~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile", "~/.zshenv", "~/.claude/**",
-		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json"} {
+		"**/.git/hooks/**", "**/.git/config", "**/.claude/settings*.json", "**/.smithy/config.json", "~/.smithy/warden/**/*.json"} {
 		d = append(d, "Edit("+f+")") // Edit rules cover every file-editing tool, Write included
+	}
+	// warden cards change only through smithy's own commands, never the worker's edit tools
+	if h := cards.Home(); filepath.IsAbs(h) {
+		d = append(d, "Edit(/"+filepath.ToSlash(h)+"/**/*.json)")
 	}
 	return append(d, poolDenied()...)
 }
@@ -230,6 +263,7 @@ type Spec struct {
 	Argv        []string
 	PromptStdin bool
 	Harness     string
+	ACP         bool
 }
 
 // Efforts are the reasoning efforts smithy passes on, lowest first; MaxEffort is the cap.
@@ -308,14 +342,25 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 	}
 	stdin := false
 	path := cli
+	var kit []string
+	if o.Inject != nil {
+		kit = o.Inject.Args
+	}
 	cli = Kind(cli)
+	switch p := getenv("AGENT_PROTOCOL"); p {
+	case "", "cli":
+	case "acp":
+		return buildACP(cli, o, path, extra, getenv)
+	default:
+		return Spec{}, fmt.Errorf("smithy agent: AGENT_PROTOCOL=%s: want cli or acp", p)
+	}
 	switch cli {
 	case "custom":
 		h := getenv("WARDEN_HARNESS")
 		if h == "" {
 			h = "unknown"
 		}
-		return Spec{[]string{"bash", "-c", getenv("AGENT_CMD")}, true, h}, nil
+		return Spec{Argv: []string{"bash", "-c", getenv("AGENT_CMD")}, PromptStdin: true, Harness: h}, nil
 	case "claude":
 		perm := getenv("AGENT_PERMISSION_MODE")
 		if perm == "" {
@@ -332,6 +377,8 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 			a = append(a, "--output-format", "json")
 		}
 		a = append(a, "--permission-mode", perm)
+		kit, kitPrompt := takeArg(kit, "--append-system-prompt")
+		kit, kitSettings := takeArg(kit, "--settings")
 		if o.Profile == "auto" && !o.ReadOnly {
 			tools, denied, note := AutoTools(o.SmithyBins), AutoDenied(o.SmithyBins), AutoNote
 			if o.Proxy {
@@ -342,6 +389,10 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 			}
 			a = append(append(a, "--allowedTools"), tools...)
 			a = append(append(a, "--disallowedTools"), denied...)
+			if kitPrompt != "" {
+				note += "\n\n" + kitPrompt
+				kitPrompt = ""
+			}
 			a = append(a, "--append-system-prompt", note)
 			for _, d := range o.AddDirs {
 				a = append(a, "--add-dir", d)
@@ -350,15 +401,24 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if o.ReadOnly {
 			a = append(append(a, "--disallowedTools"), SecretDenied()...)
 		}
+		if kitPrompt != "" {
+			a = append(a, "--append-system-prompt", kitPrompt)
+		}
 		if o.Sandbox == "native" {
-			a = append(a, "--settings", o.SandboxSettings)
+			if kitSettings != "" {
+				a = append(a, "--settings", mergeSettings(kitSettings, o.SandboxSettings))
+			} else {
+				a = append(a, "--settings", o.SandboxSettings)
+			}
+		} else if kitSettings != "" {
+			a = append(a, "--settings", kitSettings)
 		}
 		opt("--model")
 		if o.Effort != "" {
 			a = append(a, "--effort", o.Effort)
 		}
-		a = append(a, extra...)
-		return Spec{withPath(a, path), true, "claude-cli"}, nil
+		a = append(append(a, kit...), extra...)
+		return Spec{Argv: withPath(a, path), PromptStdin: true, Harness: "claude-cli"}, nil
 	case "codex":
 		a = []string{"codex", "exec"}
 		if o.ReadOnly {
@@ -376,7 +436,7 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		if o.Effort != "" {
 			a = append(a, "-c", "model_reasoning_effort="+o.Effort)
 		}
-		a = append(append(a, extra...), "-")
+		a = append(append(append(a, kit...), extra...), "-")
 		stdin = true
 	case "opencode":
 		a = []string{"opencode", "run", "--standalone", "--archived"}
@@ -386,7 +446,7 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 			a = append(a, "--auto")
 		}
 		opt("-m")
-		a = append(append(a, extra...), prompt)
+		a = append(append(append(a, kit...), extra...), prompt)
 	case "gemini":
 		mode := "yolo"
 		if o.ReadOnly {
@@ -394,29 +454,57 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		}
 		a = []string{"gemini", "--approval-mode", mode}
 		opt("-m")
-		a = append(append(a, extra...), "-p", prompt)
+		a = append(append(append(a, kit...), extra...), "-p", prompt)
 	case "cursor":
 		a = []string{"agent", "-p", "--force"}
 		opt("--model")
-		a = append(append(a, extra...), prompt)
+		a = append(append(append(a, kit...), extra...), prompt)
 	case "pi":
 		a = []string{"pi", "-p"}
 		if o.ReadOnly {
 			a = append(a, "--tools", "read")
 		}
 		opt("--model")
-		a = append(append(a, extra...), prompt)
+		a = append(append(append(a, kit...), extra...), prompt)
 	case "dsh":
 		a = []string{"dsh", "headless", "--approval-policy", "never"}
 		if o.ReadOnly {
 			a = append(a, "--permission-mode", "read-only")
 		}
-		a = append(append(a, extra...), "-")
+		a = append(append(append(a, kit...), extra...), "-")
 		stdin = true
 	default:
 		return Spec{}, ErrNoCLI
 	}
-	return Spec{withPath(a, path), stdin, cli}, nil
+	return Spec{Argv: withPath(a, path), PromptStdin: stdin, Harness: cli}, nil
+}
+
+// ACPCLIs are the CLIs smithy can drive over the Agent Client Protocol, with their ACP command.
+var ACPCLIs = map[string][]string{"gemini": {"gemini", "--experimental-acp"}, "opencode": {"opencode", "acp"}}
+
+func buildACP(cli string, o Options, path string, extra []string, getenv func(string) string) (Spec, error) {
+	if cli == "custom" {
+		h := getenv("WARDEN_HARNESS")
+		if h == "" {
+			h = "unknown"
+		}
+		return Spec{Argv: []string{"bash", "-c", getenv("AGENT_CMD")}, Harness: h, ACP: true}, nil
+	}
+	base, ok := ACPCLIs[cli]
+	if !ok {
+		return Spec{}, fmt.Errorf("smithy agent: %s does not speak ACP (AGENT_PROTOCOL=acp drives gemini, opencode or an AGENT_CMD that does)", cli)
+	}
+	a := slices.Clone(base)
+	if cli == "gemini" {
+		if o.ReadOnly {
+			a = append(a, "--approval-mode", "plan")
+		}
+		if o.Model != "" {
+			a = append(a, "-m", o.Model)
+		}
+	}
+	a = append(a, extra...)
+	return Spec{Argv: withPath(a, path), Harness: cli, ACP: true}, nil
 }
 
 func hasArg(a []string, flag string) bool {
@@ -478,7 +566,7 @@ func withPath(a []string, path string) []string {
 // Env is the worker's environment: base without the parent harness's variables, with
 // WARDEN_HARNESS and the AGENT_* run variables set.
 func Env(base []string, s Spec, o Options) []string {
-	drop := map[string]bool{ProfileEnv: true, SandboxRoleEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
+	drop := map[string]bool{ProfileEnv: true, SandboxRoleEnv: true, WorkerEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
 	if len(o.PoolEnv) > 0 {
 		for _, k := range PoolDropEnv {
 			drop[k] = true
@@ -486,6 +574,9 @@ func Env(base []string, s Spec, o Options) []string {
 	}
 	for _, k := range ParentVars {
 		drop[k] = true
+	}
+	if s.Harness == "opencode" && (o.Profile == "auto" || o.ReadOnly) {
+		drop["OPENCODE_CONFIG"], drop["OPENCODE_CONFIG_CONTENT"], drop["OPENCODE_PERMISSION"] = true, true, true
 	}
 	var env []string
 	for _, kv := range Scrub(base) {
@@ -502,6 +593,13 @@ func Env(base []string, s Spec, o Options) []string {
 		env = append(env, ProfileEnv+"="+o.Profile)
 	}
 	env = append(env, o.PoolEnv...)
+	if batch, id := cardOf(o.Log, o.Cwd); batch != "" {
+		env = append(env, WorkerEnv+"="+batch+"/"+id)
+	}
+	if o.Inject != nil {
+		env = append(env, o.Inject.Env...)
+	}
+	env = append(env, opencodeEnv(s, o)...)
 	return append(env, "AGENT_PROMPT_FILE="+o.PromptFile, "AGENT_MODEL="+o.Model, "AGENT_EFFORT="+o.Effort, "AGENT_READONLY="+ro, "WARDEN_HARNESS="+s.Harness)
 }
 
@@ -627,7 +725,7 @@ func Run(o Options) int {
 		}
 	}
 	prompt := ""
-	if cli != "custom" {
+	{
 		b, err := os.ReadFile(pf)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -644,6 +742,20 @@ func Run(o Options) int {
 	}
 	if cli != "custom" && !EffortFlags[Kind(cli)] {
 		fmt.Fprintf(os.Stderr, "smithy agent: %s has no effort flag; it runs at its own default (AGENT_EFFORT=%s is set)\n", cli, o.Effort)
+	}
+	if o.Inject == nil {
+		in, err := RunKit(cli, o, os.Getenv)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "smithy agent: smithy mcp not given to %s: %v\n", cli, err)
+		} else if in != nil {
+			o.Inject = in
+			if !o.Bg { // a detached run still needs its kit
+				defer in.Remove()
+			}
+			if len(in.Unsupported) > 0 {
+				fmt.Fprintf(os.Stderr, "smithy agent: %s can't take %s from smithy's kit; it runs without\n", cli, strings.Join(in.Unsupported, ", "))
+			}
+		}
 	}
 	s, err := Build(cli, o, prompt, SplitArgs(os.Getenv("AGENT_ARGS")), gitDir, os.Getenv)
 	if err != nil {
@@ -737,7 +849,7 @@ func Run(o Options) int {
 	cmd.Dir, cmd.Env = o.Cwd, env
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, out, out
 	if o.Bg {
-		if o.Timeout > 0 || asJSON || ph != "" {
+		if o.Timeout > 0 || asJSON || ph != "" || s.ACP {
 			if cmd, err = supervisor(o, out.Name()); err != nil {
 				fmt.Fprintln(os.Stderr, err)
 				return 1
@@ -766,7 +878,12 @@ func Run(o Options) int {
 		fmt.Println(strconv.Itoa(cmd.Process.Pid), log)
 		return 0
 	}
-	rc := wait(cmd, o.Timeout, out)
+	var rc int
+	if s.ACP {
+		rc = runACP(cmd, o, prompt, out)
+	} else {
+		rc = wait(cmd, o.Timeout, out)
+	}
 	out.Close()
 	hit := acct.Name != "" && limited(acct, out.Name(), Kind(cli), rc)
 	if asJSON {
@@ -810,6 +927,10 @@ func lastLine(file string) string {
 }
 
 func wait(cmd *exec.Cmd, timeout time.Duration, out *os.File) int {
+	return waitUntil(cmd, timeout, out, nil)
+}
+
+func waitUntil(cmd *exec.Cmd, timeout time.Duration, out *os.File, ended <-chan struct{}) int {
 	ownGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -826,12 +947,16 @@ func wait(cmd *exec.Cmd, timeout time.Duration, out *os.File) int {
 		defer t.Stop()
 		expired = t.C
 	}
-	timedOut := false
+	timedOut, stopped := false, false
+	var grace <-chan time.Time
 	for {
 		select {
 		case err := <-done:
 			if timedOut {
 				return 124
+			}
+			if stopped {
+				return 0
 			}
 			if err != nil {
 				return exitCode(err)
@@ -839,6 +964,11 @@ func wait(cmd *exec.Cmd, timeout time.Duration, out *os.File) int {
 			return 0
 		case s := <-sig:
 			forward(cmd, s)
+		case <-ended:
+			ended, grace = nil, time.After(acpGrace)
+		case <-grace:
+			stopped = true
+			forward(cmd, syscall.SIGKILL)
 		case <-expired:
 			timedOut = true
 			forward(cmd, syscall.SIGKILL)

@@ -8,6 +8,88 @@ part above `### Details`.
 
 ## Unreleased
 
+### Highlights
+
+**Same tools in every CLI.** `smithy mcp` gives every agent smithy drives the same board, search, secret calls and questions, whatever the CLI (harness build).
+
+**More agents.** Gemini CLI, OpenCode and other agents that speak ACP run under smithy with their tool calls, usage and permission requests shown like the others.
+
+### New
+
+- When every account of one harness is limited, a pool run carries on with the next harness in `pool.order`.
+- A failed `smithy auto serve` issue gets one more try on a stronger model.
+- The weekly report and History show what happened to each auto PR.
+- Releases bundle ripgrep, and `smithy search --code` searches the whole repo fast.
+- smithy installs to `~/.local/bin`, and `smithy uninstall` removes it cleanly.
+
+### Fixed
+
+- OpenCode runs follow the same allow-list as Claude and can't read your keys; `smithy doctor` warns when a CLI can't block those reads.
+- Help is clearer, and a mistyped command or option suggests the right one.
+- The web UI is built in CI instead of committed to the repo.
+
+### Details
+
+- `smithy help` teaches the tool: a short intro, then the commands people run grouped as Start here, Daily, Accounts and secrets and Maintenance (harness-only commands marked "(harness build)" in the skills build); `smithy help --all` adds the commands the skills call. `smithy help <command> [sub]` and `<command> --help` show one layout: summary, usage, examples, see also and exit codes, wrapped to 80 columns, colored only on a terminal without `NO_COLOR`. An unknown command or option suggests the closest one (`did you mean …?`) instead of dumping the list, and a usage mistake prints only that command's usage line.
+
+- `pool.order` (e.g. `claude,codex`): when every account of one harness is limited, a pool run continues on the next pooled harness, logs the switch as a `pool_fallback` event and goes back once the limit resets.
+
+- The built web UI is no longer committed (ADR 0011): `npm run build` in `web/` writes the git-ignored `internal/web/dist/app`; without it the harness build serves a committed placeholder page saying how to build it, so a clean clone builds without Node. CI and the release build the UI first, the release fails if the placeholder would ship, and the stale-dist check is gone. `.gitignore` covers coverage, test and editor output.
+
+- `internal/acp`: a stdlib JSON-RPC client for one ACP prompt turn (initialize, session/new, session/prompt); it offers no fs or terminal capability and refuses those requests.
+
+- `smithy agent` with `AGENT_PROTOCOL=acp`: `gemini --experimental-acp` or `opencode acp`; message chunks go to the log, completed or failed tool calls and permission answers to `tool` and `permission` events, usage to the sidecar and a `usage` event; read-only runs reject permissions and log a decision; the agent gets 5 s to exit after its turn before its group is killed.
+
+- `decisions.Add` and `usage.Write` exported for that path.
+
+- Install layout (`internal/layout`): versions in `$XDG_DATA_HOME/smithy/versions/<v>` (default `~/.local/share`), dev builds in `.../smithy/dev`, the command at `$XDG_BIN_HOME/smithy` (default `~/.local/bin`); Windows `%LOCALAPPDATA%\smithy\versions` and `%LOCALAPPDATA%\Programs\smithy`. `install.sh` migrates `~/.smithy/bin/<v>` (leaving links there), offers the PATH line on a terminal (default no) and records the file in `~/.smithy/path-added`. The launchers (`shared/smithy`, `smithy.cmd`) look in the new layout first, then the old one; `smithy setup path add`, `smithy cleanup builds` and `smithy doctor` follow.
+
+- `auto.sandbox_proxy_binary` unset now defaults to `~/.local/share/smithy/smithy-linux-<arch>` (`$XDG_DATA_HOME`), falling back to the legacy `~/.smithy/bin/smithy-linux-<arch>` when only that one exists.
+
+- `smithy uninstall [--yes] [--purge [--confirm-purge]]` and `uninstall.sh`: remove only what smithy installed. `smithy skills install` now records the skill folders it writes in `~/.smithy/installed-skills`, so uninstall never touches other skills.
+
+- `smithy auto serve` checks the PRs of launched items each cycle and records an `outcome` event per change; `smithy report week` lists them under "Auto PR outcomes" and the TUI History view shows them as results.
+
+- opencode runs under `--profile auto` follow the same allow-list as claude, and opencode (auto and the intake planner) can no longer read `~/.smithy/auth.json` or other secrets. `smithy doctor` says when the configured CLI can't deny those reads.
+
+- `internal/agents/guard.go`: `OpenCodePermission` builds ordered `OPENCODE_PERMISSION` rules from `AutoTools`/`AutoDenied` plus read/edit denies on the secret paths (`--readonly`: edit denied, bash denied, secret reads denied); `SecretGuarded` names the CLIs that can deny secret reads (claude, opencode). codex, gemini, pi, cursor and dsh keep running unchanged; the limit is documented in `smithy agent` help and reported by `smithy doctor`.
+
+- `smithy mcp [--readonly]` (harness build, `internal/mcp`): a stdio MCP server, newline-delimited JSON-RPC 2.0 (protocol 2024-11-05 to 2025-06-18), with `search`, `board_list`/`board_show`/`board_claim`/`board_set` (claims held by the run's card), `secret_call` (the egress proxy in process: bound hosts and methods, asks held for approval, key scrubbed from the response) and `ask` (records the question on smithy daemon, shows it on the run's warden card as needs_decision and waits for the daemon's answer). Unknown arguments, wrong types, oversized or multi-line values are refused; output is capped at 64 KB and cleaned of escapes. `smithy agent` injects it into every run through the kit (`SMITHY_MCP_CARD` from the run's card; `--readonly` runs get search and board reads only; not into container runs or a custom `AGENT_CMD`), and `--profile auto` allows `mcp__smithy`.
+
+- Added: `auto.retry_stronger` (default `true`): the first `smithy auto report <ref> blocked` for a launched issue requeues it at the head of the queue on the next tier (cheap → mid → strong; unlabeled → strong), prints `auto retry <ref> on <tier>` and records a `retry_stronger` event; a second failure or one on strong is reported blocked.
+
+- Injection kit (`agents.Inject`): per run, smithy can give a driven CLI MCP servers, skills, an appended system prompt and settings without touching the user's global config. Claude gets `--mcp-config`/`--strict-mcp-config`, `--plugin-dir`, `--append-system-prompt` and `--settings` (merged with smithy's own note and sandbox settings); codex a `CODEX_HOME` under the run dir with a `smithy` profile (auth linked from the user's home); opencode `OPENCODE_CONFIG_DIR`; gemini a settings file through `GEMINI_CLI_SYSTEM_SETTINGS_PATH`; pi `--skill` and `--append-system-prompt`. Pieces a CLI can't take are returned as unsupported.
+
+- `smithy search --code [--regex] "<query>"` searches the whole repo (ignored, hidden and binary files skipped) through the new `internal/search`: the ripgrep shipped next to the binary, rg on PATH, `git ls-files` in a repo or a stdlib walk, with caps on matches, line length (220) and bytes (64 KB); `SMITHY_RG=<path>|off` overrides. Docs search is unchanged.
+
+- Releases ship ripgrep 14.1.1 per platform as `smithy-rg-<os>-<arch>` plus `ripgrep-LICENSE.txt` (MIT or Unlicense): `scripts/fetch-ripgrep.sh` downloads each archive against pinned sha256 sums, and the build attestation covers them. `install.sh` installs it next to smithy after the same checksum and attestation checks, best effort.
+
+- `smithy mcp`'s `ask` records its question on smithy daemon (new `POST /v1/asks`, `decide:<batch>/<item>/<key>` ids only) and reads the answer back from the daemon (new `GET /v1/decisions/{id}`), never from the warden card, which a worker can write; with no daemon running, `ask` refuses. `--profile auto` denies Edit/Write on warden card JSON and reads of `~/.smithy/daemon.token` (Read, shell, and the native sandbox's `denyRead`).
+
+- `smithy proxy approve|deny` refuses under `SMITHY_AGENT_PROFILE=auto`, and `--profile auto` denies `smithy proxy approve|deny`, `smithy chat`, `attach`, `web` and `tui`: answers come only from the user's channels.
+
+- ACP runs under `--profile auto` check each permission request against the auto rules: commands must match an `AutoTools` Bash rule and no `AutoDenied` one (compound, piped, redirected or `$` commands rejected), edits stay inside the worktree and off denied paths, reads off secret paths; fetch, delete, move and unclassified requests are rejected and logged as decisions. `acp.Permission` carries the tool kind, command and paths.
+
+- `SecretDenied` adds glob and variable forms (`~/.*`, `$HOME`, `${HOME}`, `.smithy/auth*`, `*.s*/id_*`, bracket globs, `id_rsa`/`id_ed25519`/`id_ecdsa`); only the native or container sandbox fully protects secrets.
+
+- `smithy search --code` (git and walk engines) reads only regular files, so a tracked symlink to a file outside the repo is skipped.
+
+- An ACP run stops its child after a protocol error too, not only after a clean turn.
+
+- `smithy agent` removes the temp `smithy-kit-*` dir (MCP config, a `CODEX_HOME` linking `auth.json`) after a run without `--log`.
+
+- The launcher no longer re-points `~/.local/bin/smithy` at a checkout's dev build; only versioned installs are linked.
+
+- `smithy uninstall --purge` and `uninstall.sh --purge` remove the smithy home only when it is smithy's (a `.smithy-home` marker, written by `install.sh` on a fresh home, or smithy's own files and nothing else); otherwise they refuse and say why.
+
+- `install.sh`'s migration from `~/.smithy/bin` never deletes: a version or dev build already at the target stays, and the old copy is kept.
+
+- Uninstall removes a copied (not linked) `~/.local/bin/smithy` when it matches an installed version byte for byte, and `uninstall.sh` on Windows (Git Bash) removes `%LOCALAPPDATA%\smithy` and `%LOCALAPPDATA%\Programs\smithy`.
+
+- Warden workers get `SMITHY_WARDEN_ITEM=<batch>/<item>`, and `smithy auto report` refuses when it is set: only the orchestrator reports, so a worker can't trigger `auto.retry_stronger` itself.
+
+- `TestWebScreensServed` skips when only the placeholder web UI is embedded, and fails instead when `SMITHY_REQUIRE_WEB_BUILD` is set (CI's harness job sets it after building the UI).
+
 ## v0.20.0 — 2026-11-25
 
 ### Highlights

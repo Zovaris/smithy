@@ -101,10 +101,23 @@ func Main(args []string) int {
 		if len(pos) != 2 {
 			break
 		}
+		// workers never report: a worker writing blocked would queue itself on a stronger model
+		if item := os.Getenv("SMITHY_WARDEN_ITEM"); item != "" {
+			fmt.Fprintln(os.Stderr, "smithy auto: report refused: warden workers ("+Clean(item)+") don't report issues; set your card's state and the orchestrator reports")
+			return 2
+		}
 		srcs, openErr := s.Open("")
 		if len(srcs) == 0 {
 			fmt.Fprintln(os.Stderr, "smithy auto:", errText(openErr))
 			return openCode(openErr)
+		}
+		if pos[1] == "blocked" && s.RetryStronger {
+			if model, ok, err := Retry(pos[0]); err != nil {
+				fmt.Fprintln(os.Stderr, "smithy auto: retry:", Clean(err.Error()))
+			} else if ok {
+				fmt.Println("auto retry", pos[0], "on", model)
+				return 0
+			}
 		}
 		if err := Report(srcs, pos[0], pos[1], flags["--pr"]); err != nil {
 			fmt.Fprintln(os.Stderr, "smithy auto:", Clean(err.Error()))

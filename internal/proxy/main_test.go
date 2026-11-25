@@ -60,3 +60,17 @@ func TestMainRefusesBadArgs(t *testing.T) {
 		}
 	}
 }
+
+func TestApproveRefusedUnderAutoProfile(t *testing.T) {
+	t.Setenv("SMITHY_HOME", filepath.Join(t.TempDir(), "h"))
+	t.Setenv("SMITHY_AGENT_PROFILE", "auto")
+	for _, verb := range []string{"approve", "deny"} {
+		var out, errb bytes.Buffer
+		if rc := Main([]string{verb, "abcd1234"}, &out, &errb); rc == 0 || !strings.Contains(errb.String(), "unattended") {
+			t.Fatalf("%s under auto: rc %d %q", verb, rc, errb.String())
+		}
+	}
+	if es, _ := events.Read(time.Time{}, 0); len(es) != 0 {
+		t.Fatalf("auto worker wrote %v", es)
+	}
+}

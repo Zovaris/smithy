@@ -1,0 +1,11 @@
+smithy auth set: subcommand of smithy auth
+
+usage: smithy auth set <service> < keyfile | list | remove <service>
+       smithy auth bind <service> <host> [METHODS] [--header <name>]
+           [--prefix <scheme>] | ask <service> on|off
+
+Examples:
+  smithy auth set linear < key.txt
+
+See also: smithy help auth, smithy help pool, smithy help config
+Exit codes: 0 success, 1 failure, 2 usage error (3 where a command's help says).

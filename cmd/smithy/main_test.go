@@ -430,3 +430,27 @@ func TestCleanupBuildsDryRun(t *testing.T) {
 		t.Errorf("cleanup builds: exit %d, out %q, err %q", code, out, e)
 	}
 }
+
+func TestSearchCode(t *testing.T) {
+	repo, env := sandbox(t)
+	os.WriteFile(filepath.Join(repo, "main.go"), []byte("package main\nfunc Needle() {}\n"), 0o644)
+	os.WriteFile(filepath.Join(repo, ".gitignore"), []byte("skip.txt\n"), 0o644)
+	os.WriteFile(filepath.Join(repo, "skip.txt"), []byte("needle\n"), 0o644)
+	for _, rg := range []string{"off", ""} {
+		e := append(env, "SMITHY_RG="+rg)
+		out, errOut, code := run(t, repo, e, "search", "--code", "needle")
+		if code != 0 || out != "main.go:2:func Needle() {}\n" {
+			t.Fatalf("rg=%q: exit %d out %q err %q", rg, code, out, errOut)
+		}
+	}
+	out, _, code := run(t, repo, env, "search", "--code", "--regex", "Need.e\\(", "--max", "1")
+	if code != 0 || !strings.HasPrefix(out, "main.go:2:") {
+		t.Fatalf("regex: %d %q", code, out)
+	}
+	if _, _, code := run(t, repo, env, "search", "--code", "absent-zzz"); code != 1 {
+		t.Fatalf("no match exit %d", code)
+	}
+	if _, _, code := run(t, repo, env, "search", "--code", "--regex", "("); code != 2 {
+		t.Fatalf("bad regex exit %d", code)
+	}
+}

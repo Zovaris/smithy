@@ -6,7 +6,7 @@
          ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
   1 Overview   2 Agents   3 Incoming   4 Needs you ? 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System   0 History                                     
-   Health · read-only                                                           ╭─ Settings · 72 · enter edits ────────────────────────────────────────────────╮
+   Health · read-only                                                           ╭─ Settings · 74 · enter edits ────────────────────────────────────────────────╮
   Versions                                                                      │ auto.*                                                                       │
   binary  0.15.0                                                                │ ▸ auto.sources           github,linear  user    comma list of issue sources… │
   skills  0.15.0  ✓ match                                                       │   auto.mode              labeled        default labeled: only issues with t… │
@@ -15,33 +15,33 @@
   running  pid 4242 · agent claude · orchestrating · last cycle 25s ago         │   auto.speed_prefix      speed:         default label prefix for the smelt … │
   session /home/dev/.smithy/auto/sessions/20261123-091500.log  l opens it       │   auto.max_per_day       80             user    issues launched per local c… │
                                                                                 │   auto.max_cost_per_day  -              unset   USD of reported agent cost … │
-  Paths                                                                         │   auto.hours             -              unset   launch window HH:MM-HH:MM i… │
-  home    /home/dev/.smithy                                                     │   auto.every             60             default seconds between polls of ea… │
-  events  /home/dev/.smithy/events.jsonl  (412.7 KB)                            │   auto.paused            false          default true holds smithy auto take… │
-                                                                                │   auto.agent             -              unset   agent CLI for serve's orche… │
-  Auth  keys are masked                                                         │   auto.session_hours     3              default hours one orchestrator sess… │
-  github ****9f2c                                                               │   auto.sandbox           off            default isolation for unattended wo… │
-  linear ****a41b                                                               │   auto.sandbox_domains   -              unset   comma list of extra hosts a… │
-                                                                                │   auto.sandbox_image     smithy-sandbo… default container image for auto.sa… │
-  Notify  Telegram, smithy notify test                                          │   auto.sandbox_network   -              unset   docker/podman --network for… │
-  token  ****x7Qa (/home/dev/.smithy/auth.json)                                 │   auto.sandbox_proxy_bi… -              unset   absolute path of the linux … │
-  chat 123456789                                                                │   auto.sandbox_memory    4g             default docker/podman --memory for … │
-  kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_r…  │   auto.sandbox_weaker_n… true           default macOS native sandbox: enabl… │
-  state  on (smithy auto serve sends)                                           │   auto.merge             manual         default merge mode for auto batches… │
-  last sent 2026-11-23 09:12                                                    │                                                                              │
-                                                                                │ linear.*                                                                     │
-  Pool  smithy pool                                                             │   linear.key_env         LINEAR_API_KEY default name of the env var holding… │
-  account    harness status   resets      runs    cost                          │   linear.team            TES            user    required: Linear team keys … │
-  work       claude  ok       -              6   $3.42                          │   linear.project         -              unset   Linear project name filter;… │
-  home       claude  limited  11-23 14:00    9   $5.10                          │   linear.milestone       -              unset   Linear project milestone na… │
-  codex      codex   ok       -              2       -                          │   linear.cycle           -              unset   Linear cycle filter: curren… │
-                                                                                │   linear.initiative      -              unset   Linear initiative name filt… │
-  Doctor                                                                        │   linear.states          unstarted,bac… default Linear workflow state types… │
-  warden doctor                                                                 │                                                                              │
-  ok   binary v0.15.0                                                           │ warden.*                                                                     │
-  ok   git found                                                                │   warden.merge           manual         user    auto: warden merges green P… │
-  ok   gh found and authenticated                                               │   warden.cleanup         auto           default auto: end finished workers … │
-  ok   claude found                                                             │   warden.max             5              default parallel workers (a token-c… │
+  Paths                                                                         │   auto.retry_stronger    true           default a launched issue reported b… │
+  home    /home/dev/.smithy                                                     │   auto.hours             -              unset   launch window HH:MM-HH:MM i… │
+  events  /home/dev/.smithy/events.jsonl  (412.7 KB)                            │   auto.every             60             default seconds between polls of ea… │
+                                                                                │   auto.paused            false          default true holds smithy auto take… │
+  Auth  keys are masked                                                         │   auto.agent             -              unset   agent CLI for serve's orche… │
+  github ****9f2c                                                               │   auto.session_hours     3              default hours one orchestrator sess… │
+  linear ****a41b                                                               │   auto.sandbox           off            default isolation for unattended wo… │
+                                                                                │   auto.sandbox_domains   -              unset   comma list of extra hosts a… │
+  Notify  Telegram, smithy notify test                                          │   auto.sandbox_image     smithy-sandbo… default container image for auto.sa… │
+  token  ****x7Qa (/home/dev/.smithy/auth.json)                                 │   auto.sandbox_network   -              unset   docker/podman --network for… │
+  chat 123456789                                                                │   auto.sandbox_proxy_bi… -              unset   absolute path of the linux … │
+  kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_r…  │   auto.sandbox_memory    4g             default docker/podman --memory for … │
+  state  on (smithy auto serve sends)                                           │   auto.sandbox_weaker_n… true           default macOS native sandbox: enabl… │
+  last sent 2026-11-23 09:12                                                    │   auto.merge             manual         default merge mode for auto batches… │
+                                                                                │                                                                              │
+  Pool  smithy pool                                                             │ linear.*                                                                     │
+  account    harness status   resets      runs    cost                          │   linear.key_env         LINEAR_API_KEY default name of the env var holding… │
+  work       claude  ok       -              6   $3.42                          │   linear.team            TES            user    required: Linear team keys … │
+  home       claude  limited  11-23 14:00    9   $5.10                          │   linear.project         -              unset   Linear project name filter;… │
+  codex      codex   ok       -              2       -                          │   linear.milestone       -              unset   Linear project milestone na… │
+                                                                                │   linear.cycle           -              unset   Linear cycle filter: curren… │
+  Doctor                                                                        │   linear.initiative      -              unset   Linear initiative name filt… │
+  warden doctor                                                                 │   linear.states          unstarted,bac… default Linear workflow state types… │
+  ok   binary v0.15.0                                                           │                                                                              │
+  ok   git found                                                                │ warden.*                                                                     │
+  ok   gh found and authenticated                                               │   warden.merge           manual         user    auto: warden merges green P… │
+  ok   claude found                                                             │   warden.cleanup         auto           default auto: end finished workers … │
   ok   worktree root /home/dev/worktrees writable                               │                                                                              │
   ok   sandbox: native (claude, hosts github.com,api.github.com,api.anthropic…  │ enter edits · u unsets · auth stays in smithy auth                           │
                                                                                 ╰──────────────────────────────────────────────────────────────────────────────╯

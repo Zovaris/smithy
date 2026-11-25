@@ -1,0 +1,9 @@
+smithy config get: subcommand of smithy config
+
+  get <key> effective value (repo, user, default); exit 3 when unset
+
+Examples:
+  smithy config get auto.sources
+
+See also: smithy help config, smithy help setup, smithy help auth
+Exit codes: 0 success, 1 failure, 2 usage error (3 where a command's help says).

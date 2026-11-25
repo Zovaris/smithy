@@ -1,0 +1,55 @@
+smithy dev turns your coding agent into a small engineering team. The skills
+call it for evidence, waits and batches; you run it to set up, check and watch
+the work. Two builds: the skills build (this one) and the harness build; the
+harness build adds the daemon, chat, web UI and board.
+
+Start here
+  doctor        check everything a warden batch needs (--quiet: problems only;
+                --fix [--yes]: apply fixes)
+  setup         use-smithy setup: installed skills, settings, instructions block
+  status        every task list and batch on this machine
+  version       print the version
+
+Daily
+  attach        watch a daemon live: events, decisions, reconnect and resume
+                (harness build)
+  auto          autonomous intake: poll issue sources, take queued issues,
+                report back, serve the loop
+  board         built-in tracker: add, list, show, set, claim, sync (harness
+                build)
+  chat          fullscreen chat over a daemon (also bare smithy) (harness build)
+  daemon        run the auto loop with a local API (events, decisions) (harness
+                build)
+  receipt       run a command and record it as evidence for a claim
+  report        weekly report: shipped, failed, time and cost per harness, open
+                decisions
+  scan          check a change's added lines and files for secrets
+  search        search ADRs, glossary and docs, best sources first (--code: the
+                whole repo)
+  tasks         the shared task list (smithy tasks board --all)
+  tui           live dashboard of the forge: agents, incoming issues, what needs
+                you, activity
+  wait          wait without tokens for PRs, runs, branches, issues or a batch
+  web           print or open the daemon's web UI link (harness build)
+
+Accounts and secrets
+  auth          source API keys in ~/.smithy/auth.json: set (stdin only), list,
+                remove, bind, ask
+  config        settings and models (smithy config list)
+  notify        Telegram notifications from smithy auto serve: test, status
+  pool          your own agent accounts for smithy agent: add, login, list,
+                remove, clear
+
+Maintenance
+  cleanup       remove a finished task's worktree and local branch, or old
+                builds, images and worktrees
+  skills        find installed skills (smithy skills --list)
+  uninstall     remove smithy: binaries, the skills it installed, daemon,
+                images, PATH line (lists first)
+
+(harness build): get smithy-harness-<os>-<arch> from
+https://github.com/Zovaris/smithy/releases, or go build -tags harness
+./cmd/smithy.
+Run smithy help <command> for usage and examples. smithy help --all also lists
+the commands the skills call. Not on PATH? smithy setup path.
+Exit codes: 0 success, 1 failure, 2 usage error (3 where a command's help says).

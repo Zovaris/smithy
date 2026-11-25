@@ -32,6 +32,16 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        if: matrix.build == 'harness'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the web UI (embedded by the harness build)
+        if: matrix.build == 'harness'
+        working-directory: web
+        run: npm ci && npm run build
       - name: Go tests, skills build (race detector, coverage)
         if: matrix.build == 'skills'
         env:
@@ -49,6 +59,8 @@ jobs:
           awk -v t="${total%\%}" -v min="$COVERAGE_MIN" 'BEGIN { if (t+0 < min+0) { print "coverage " t "% is below " min "%"; exit 1 } }'
       - name: Go tests, harness build (race detector)
         if: matrix.build == 'harness'
+        env:
+          SMITHY_REQUIRE_WEB_BUILD: "1" # the web e2e test runs on the real build, never skips
         run: go test -race -tags harness ./...
   integration:
     runs-on: ubuntu-latest
@@ -73,6 +85,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the web UI (embedded by the harness build)
+        working-directory: web
+        run: npm ci && npm run build
       - name: Build both builds for ${{ matrix.target }}
         run: |
           t='${{ matrix.target }}'
@@ -87,17 +107,13 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Web UI tests, typecheck, build within budget (ADR 0010)
+      - name: Web UI tests, typecheck, build within budget (ADR 0010, 0011)
         working-directory: web
         run: |
           npm ci
           npm test
           npm run typecheck
           npm run build
-      - name: Committed internal/web/dist matches the build
-        run: |
-          git add -N internal/web/dist
-          git diff --exit-code --stat -- internal/web/dist || { echo "internal/web/dist is stale: run npm run build in web/ and commit it"; exit 1; }
   check:
     if: always()
     needs: [lint, test, integration, build, web]
@@ -127,7 +143,9 @@ jobs:
           echo %tag:~1%> "%RUNNER_TEMP%\l\VERSION"
           set "SMITHY_HOME=%RUNNER_TEMP%\home"
           call "%RUNNER_TEMP%\l\smithy.cmd" version || exit /b 1
+          if not exist "%LOCALAPPDATA%\Programs\smithy\smithy.exe" ( echo install.sh did not create the smithy command & exit /b 1 )
           set "SMITHY_HOME=%RUNNER_TEMP%\empty"
+          set "LOCALAPPDATA=%RUNNER_TEMP%\empty"
           call "%RUNNER_TEMP%\l\smithy.cmd" version 2> "%RUNNER_TEMP%\err.txt"
           if not errorlevel 3 ( type "%RUNNER_TEMP%\err.txt" & exit /b 1 )
           findstr /c:"is not installed" "%RUNNER_TEMP%\err.txt" || exit /b 1

@@ -9,16 +9,24 @@ import (
 )
 
 func TestProxyBinary(t *testing.T) {
-	if b, err := ProxyBinary("linux", "amd64", "", "/usr/bin/smithy", "/h/.smithy"); err != nil || b != "/usr/bin/smithy" {
+	if b, err := ProxyBinary("linux", "amd64", "", "/usr/bin/smithy", "/d", "/h/.smithy", nil); err != nil || b != "/usr/bin/smithy" {
 		t.Errorf("linux: %q %v", b, err)
 	}
-	if b, _ := ProxyBinary("darwin", "arm64", "", "/x/smithy", "/h/.smithy"); b != "/h/.smithy/bin/smithy-linux-arm64" {
+	if b, _ := ProxyBinary("darwin", "arm64", "", "/x/smithy", "/d", "/h/.smithy", nil); b != "/d/smithy-linux-arm64" {
 		t.Errorf("darwin: %q", b)
 	}
-	if b, _ := ProxyBinary("darwin", "arm64", "/opt/smithy-linux", "/x/smithy", "/h/.smithy"); b != "/opt/smithy-linux" {
+	legacy := func(f string) bool { return f == "/h/.smithy/bin/smithy-linux-arm64" }
+	if b, _ := ProxyBinary("darwin", "arm64", "", "/x/smithy", "/d", "/h/.smithy", legacy); b != "/h/.smithy/bin/smithy-linux-arm64" {
+		t.Errorf("legacy fallback: %q", b)
+	}
+	both := func(string) bool { return true }
+	if b, _ := ProxyBinary("darwin", "arm64", "", "/x/smithy", "/d", "/h/.smithy", both); b != "/d/smithy-linux-arm64" {
+		t.Errorf("both present: %q", b)
+	}
+	if b, _ := ProxyBinary("darwin", "arm64", "/opt/smithy-linux", "/x/smithy", "/d", "/h/.smithy", nil); b != "/opt/smithy-linux" {
 		t.Errorf("setting: %q", b)
 	}
-	if _, err := ProxyBinary("darwin", "arm64", "relative/smithy", "/x/smithy", "/h"); err == nil {
+	if _, err := ProxyBinary("darwin", "arm64", "relative/smithy", "/x/smithy", "/d", "/h", nil); err == nil {
 		t.Error("relative setting accepted")
 	}
 }

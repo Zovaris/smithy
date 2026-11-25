@@ -7,12 +7,16 @@
 # Asks "harness or skills" on a terminal (default skills); without one it installs skills.
 # --update keeps the kind installed before (~/.smithy/kind).
 # Downloads smithy-<os>-<arch> from the GitHub release, checks it against the release's
-# checksums.txt and its build attestation (gh), and puts it in ~/.smithy/bin/<version>/, with
-# ~/.smithy/bin/smithy pointing at it. Without gh (or a gh too old for `gh attestation`) nothing
+# checksums.txt and its build attestation (gh), and puts it in ~/.local/share/smithy/versions/<version>/
+# ($XDG_DATA_HOME), with ~/.local/bin/smithy ($XDG_BIN_HOME) linking to it; on Windows
+# %LOCALAPPDATA%\smithy\versions and %LOCALAPPDATA%\Programs\smithy. An old ~/.smithy/bin install
+# moves there and keeps links for one release. ~/.smithy keeps data and config. Without gh (or a gh too old for `gh attestation`) nothing
 # is installed unless SMITHY_ALLOW_UNATTESTED=1 (checksum only). The skills never download it.
 set -eu
 repo=Zovaris/smithy
 home=${SMITHY_HOME:-$HOME/.smithy}
+case ${XDG_DATA_HOME:-} in /*) data=$XDG_DATA_HOME/smithy ;; *) data=$HOME/.local/share/smithy ;; esac
+case ${XDG_BIN_HOME:-} in /*) bindir=$XDG_BIN_HOME ;; *) bindir=$HOME/.local/bin ;; esac
 limit=${SMITHY_DOWNLOAD_TIMEOUT:-120}
 update=; kind=; version=
 for a in "$@"; do
@@ -56,6 +60,11 @@ case "$(uname -m)" in
   arm64|aarch64) arch=arm64 ;; x86_64|amd64) arch=amd64 ;; *) die "unsupported CPU $(uname -m)" ;;
 esac
 pre=smithy; [ "$kind" = harness ] && pre=smithy-harness
+if [ "$os" = windows ]; then
+  lad=${LOCALAPPDATA:-$HOME/AppData/Local}; command -v cygpath >/dev/null 2>&1 && lad=$(cygpath -u "$lad")
+  data="$lad/smithy"; bindir="$lad/Programs/smithy"
+fi
+vdir="$data/versions"
 if [ "$os" = windows ]; then asset="$pre-windows-amd64.exe"; exe=smithy.exe; else asset="$pre-$os-$arch.gz"; exe=smithy; fi
 
 case $version in ""|*[!0-9A-Za-z.-]*|.*) [ -z "$version" ] || die "bad version: $version" ;; esac
@@ -109,20 +118,99 @@ fi
 
 case $asset in *.gz) gunzip -f "$tmp/$asset"; src="$tmp/${asset%.gz}" ;; *) src="$tmp/$asset" ;; esac
 chmod +x "$src"
-mkdir -p "$home/bin/$version"; mv "$src" "$home/bin/$version/$exe"
-if [ "$os" = windows ]; then cp -f "$home/bin/$version/$exe" "$home/bin/$exe"; else ln -sfn "$home/bin/$version/$exe" "$home/bin/$exe"; fi
+# Migration: an old ~/.smithy/bin/<version> moves to $vdir and leaves a link behind, so the skills'
+# launchers and PATH entries that point there keep working for one release.
+legacy=
+if [ -d "$home/bin" ] && [ ! -L "$home/bin" ]; then
+  for d in "$home"/bin/*/; do
+    d=${d%/}; n=${d##*/}
+    case $n in dev|"*") continue ;; esac
+    [ -d "$d" ] && [ ! -L "$d" ] || continue
+    mkdir -p "$vdir"
+    # never delete: a version already at the target keeps both copies (the old one stays put)
+    if [ ! -e "$vdir/$n" ]; then mv "$d" "$vdir/$n" && ln -sfn "$vdir/$n" "$d"; fi
+    legacy=1
+  done
+  if [ -d "$home/bin/dev" ] && [ ! -L "$home/bin/dev" ]; then
+    mkdir -p "$data/dev"
+    for d in "$home"/bin/dev/*/; do
+      d=${d%/}; [ -d "$d" ] || continue
+      [ -e "$data/dev/${d##*/}" ] || mv "$d" "$data/dev/${d##*/}"
+    done
+    rmdir "$home/bin/dev" 2>/dev/null || true; legacy=1
+  fi
+  [ -e "$home/bin/$exe" ] || [ -L "$home/bin/$exe" ] && legacy=1
+fi
+mkdir -p "$vdir/$version" "$bindir"; mv "$src" "$vdir/$version/$exe"
+if [ "$os" = windows ]; then cp -f "$vdir/$version/$exe" "$bindir/$exe"; else ln -sfn "$vdir/$version/$exe" "$bindir/$exe"; fi
+if [ -n "$legacy" ]; then
+  { [ -L "$home/bin/$version" ] || [ ! -e "$home/bin/$version" ]; } && { rm -f "$home/bin/$version"; ln -sfn "$vdir/$version" "$home/bin/$version"; }
+  if [ "$os" = windows ]; then cp -f "$vdir/$version/$exe" "$home/bin/$exe"; else rm -f "$home/bin/$exe"; ln -s "$bindir/$exe" "$home/bin/$exe"; fi
+  say "moved the old install from $home/bin to $vdir; $home/bin keeps links to it for one release, so older skills and PATH entries keep working"
+fi
+rgx=; [ "$os" = windows ] && rgx=.exe
+rgasset="smithy-rg-$os-$arch${rgx:-.gz}"
+rgok=
+if have_gh; then
+  watch gh release download "v$version" -R "$repo" -p "$rgasset" -D "$tmp" >/dev/null 2>&1 && rgok=1
+else
+  fetch -o "$tmp/$rgasset" "$url/$rgasset" 2>/dev/null && rgok=1
+fi
+if [ -n "$rgok" ] && [ -s "$tmp/$rgasset" ]; then
+  want=$(awk -v a="$rgasset" '$2 == a || $2 == "*"a {print $1}' "$tmp/checksums.txt")
+  got=$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$tmp/$rgasset" || shasum -a 256 "$tmp/$rgasset") | awk '{print $1}')
+  if [ -z "$want" ] || [ "$want" != "$got" ]; then
+    say "ripgrep checksum mismatch, not installed"
+  elif have_gh && gh attestation verify --help >/dev/null 2>&1 && ! watch gh attestation verify "$tmp/$rgasset" -R "$repo" >/dev/null 2>&1; then
+    say "ripgrep has no valid build attestation, not installed"
+  else
+    case $rgasset in *.gz) gunzip -f "$tmp/$rgasset"; rgsrc="$tmp/${rgasset%.gz}" ;; *) rgsrc="$tmp/$rgasset" ;; esac
+    chmod +x "$rgsrc"; mv "$rgsrc" "$vdir/$version/rg$rgx"
+  fi
+else
+  say "this release ships no ripgrep for $os/$arch; smithy search --code uses git ls-files or rg on PATH"
+fi
+[ -e "$home" ] || { mkdir -p "$home" && : > "$home/.smithy-home"; }  # the marker lets uninstall --purge know the folder is smithy's
 echo "$kind" > "$home/kind"
-say "installed v$version ($kind build) to $home/bin/$version/$exe (add $home/bin to PATH to run smithy yourself)"
+say "installed v$version ($kind build) to $vdir/$version/$exe, command $bindir/$exe"
 tty=${SMITHY_TTY:-/dev/tty}
+ontty() { { [ -n "${SMITHY_TTY:-}" ] || [ -t 2 ]; } && { : < "$tty"; } 2>/dev/null; }
+case ":$PATH:" in
+  *":$bindir:"*) ;;
+  *)
+    if [ "$os" = windows ]; then
+      say "$bindir is not on PATH; add it to your user PATH (System Properties > Environment Variables)"
+    else
+      case ${SHELL##*/} in
+        zsh) rc=$HOME/.zshrc; line="export PATH=\"$bindir:\$PATH\"" ;;
+        bash) rc=$HOME/.bashrc; [ "$os" = darwin ] && rc=$HOME/.bash_profile; line="export PATH=\"$bindir:\$PATH\"" ;;
+        fish) rc=${XDG_CONFIG_HOME:-$HOME/.config}/fish/config.fish; line="fish_add_path $bindir" ;;
+        *) rc=$HOME/.profile; line="export PATH=\"$bindir:\$PATH\"" ;;
+      esac
+      say "$bindir is not on PATH; add this line to $rc:"
+      echo "  $line" >&2
+      if ontty && ! grep -qF "$line" "$rc" 2>/dev/null; then
+        printf 'smithy install: add it to %s now? [y/N] ' "$rc" >&2
+        ans=; read -r ans < "$tty" || true
+        case $ans in
+          y|Y|yes)
+            mkdir -p "$(dirname "$rc")"
+            printf '\n%s\n%s\n' '# smithy: run `smithy` from any terminal' "$line" >> "$rc"
+            grep -qxF "$rc" "$home/path-added" 2>/dev/null || echo "$rc" >> "$home/path-added"
+            say "added to $rc; open a new terminal" ;;
+        esac
+      fi
+    fi ;;
+esac
 if [ -n "$update" ]; then
   if [ -n "${skills_by_bin:-}" ]; then
     say "updating the skills without Node (smithy skills install)"
-    "$home/bin/$exe" skills install >&2 || die "smithy skills install failed"
+    "$vdir/$version/$exe" skills install >&2 || die "smithy skills install failed"
   fi
-elif { [ -n "${SMITHY_TTY:-}" ] || [ -t 2 ]; } && { : < "$tty"; } 2>/dev/null; then
+elif ontty; then
   printf 'smithy install: install the skills now (smithy skills install, no Node needed)? [y/N] ' >&2
   ans=; read -r ans < "$tty" || true
-  case $ans in y|Y|yes) "$home/bin/$exe" skills install >&2 || die "smithy skills install failed" ;; esac
+  case $ans in y|Y|yes) "$vdir/$version/$exe" skills install >&2 || die "smithy skills install failed" ;; esac
 else
-  say "install the skill files with: $home/bin/$exe skills install (or npx skills add Zovaris/smithy -g)"
+  say "install the skill files with: $bindir/$exe skills install (or npx skills add Zovaris/smithy -g)"
 fi

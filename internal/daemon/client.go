@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -88,6 +89,42 @@ func (c *Client) Decide(ctx context.Context, id, answer string) (Outcome, error)
 		return o, fmt.Errorf("daemon decisions: %s", res.Status)
 	}
 	return o, json.NewDecoder(res.Body).Decode(&o)
+}
+
+// Ask records a warden decision (decide:<batch>/<item>/<key>) on the daemon (POST /v1/asks).
+func (c *Client) Ask(ctx context.Context, id, question string, options []string) error {
+	b, _ := json.Marshal(map[string]any{"id": id, "question": question, "options": options})
+	r, err := c.req(ctx, "POST", "/v1/asks", b)
+	if err != nil {
+		return err
+	}
+	res, err := c.http().Do(r)
+	if err != nil {
+		return err
+	}
+	res.Body.Close()
+	if res.StatusCode != 200 {
+		return fmt.Errorf("daemon asks: %s", res.Status)
+	}
+	return nil
+}
+
+// Decision is GET /v1/decisions/{id}; Outcome is nil until someone answers.
+func (c *Client) Decision(ctx context.Context, id string) (Decision, error) {
+	var d Decision
+	r, err := c.req(ctx, "GET", "/v1/decisions/"+url.PathEscape(id), nil)
+	if err != nil {
+		return d, err
+	}
+	res, err := c.http().Do(r)
+	if err != nil {
+		return d, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		return d, fmt.Errorf("daemon decision: %s", res.Status)
+	}
+	return d, json.NewDecoder(res.Body).Decode(&d)
 }
 
 // Follow streams every event after since to out until ctx ends, reconnecting with backoff and

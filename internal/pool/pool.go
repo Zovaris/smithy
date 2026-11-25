@@ -245,6 +245,12 @@ var ErrNone = errors.New("no pool account for this harness")
 // Acquire picks the least recently used matching account that is not limited (skipping skip),
 // marks it used now and returns it. ErrNone when nothing matches; *Limited when all are limited.
 func Acquire(harness string, now time.Time, skip ...string) (Account, error) {
+	return AcquireIn(harness, nil, now, skip...)
+}
+
+// AcquireIn is Acquire with harnesses ranked by order first (unlisted ones last), so a pooled
+// run stays on the first listed harness with a free account and falls back down the list.
+func AcquireIn(harness string, order []string, now time.Time, skip ...string) (Account, error) {
 	as, err := Load()
 	if err != nil {
 		return Account{}, err
@@ -268,7 +274,12 @@ func Acquire(harness string, now time.Time, skip ...string) (Account, error) {
 		if len(cands) == 0 {
 			return
 		}
-		sort.SliceStable(cands, func(i, j int) bool { return st[cands[i].Name].LastUsed.Before(st[cands[j].Name].LastUsed) })
+		sort.SliceStable(cands, func(i, j int) bool {
+			if ri, rj := rank(order, cands[i].Harness), rank(order, cands[j].Harness); ri != rj {
+				return ri < rj
+			}
+			return st[cands[i].Name].LastUsed.Before(st[cands[j].Name].LastUsed)
+		})
 		got = cands[0]
 		s := st[got.Name]
 		s.LastUsed = now
@@ -283,6 +294,28 @@ func Acquire(harness string, now time.Time, skip ...string) (Account, error) {
 		return Account{}, lim
 	}
 	return Account{}, ErrNone
+}
+
+func rank(order []string, h string) int {
+	for i, o := range order {
+		if o == h {
+			return i
+		}
+	}
+	return len(order)
+}
+
+// Preferred is the first harness in order that has a pool account, "" when none does.
+func Preferred(order []string) string {
+	as, _ := Load()
+	for _, h := range order {
+		for _, a := range as {
+			if a.Harness == h {
+				return h
+			}
+		}
+	}
+	return ""
 }
 
 // Earliest is the earliest reset among the matching limited accounts; ok false when one is free.

@@ -13,12 +13,12 @@ import (
 const harnessBuild = false
 
 // harnessOnly are the commands only the harness build carries; here they say how to get it.
-var harnessOnly = []string{"daemon", "attach", "board", "chat", "web"}
+var harnessOnly = []string{"daemon", "attach", "board", "chat", "web", "mcp"}
 
 func init() {
 	for _, name := range harnessOnly {
 		name := name
-		register(name, "", "smithy "+name+" needs the harness build of smithy.", "--", func([]string) int {
+		register(name, harnessSummary[name], "usage: smithy "+name+"\nsmithy "+name+" needs the harness build of smithy.", "--", func([]string) int {
 			return needsHarness(os.Stderr, name)
 		})
 	}
