@@ -5,9 +5,11 @@ package tui
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -18,15 +20,27 @@ import (
 )
 
 // ChatUsage is the text for `smithy chat --help`; `smithy` with no arguments opens it too.
-const ChatUsage = `usage: smithy chat [url]
+const ChatUsage = `usage: smithy chat [url | --standalone]
 A fullscreen chat over a smithy daemon: its events stream into the transcript and the input stays
 pinned at the bottom. A lost connection retries and resumes after the last event seen.
 Keys: enter send; pgup/pgdn, wheel or ctrl+u/ctrl+d scroll; home/end top/bottom; click a tool block
 to open it; v (empty input) cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
 option's first letter (empty input) or a click on it answers the decision pinned at the top;
 /mode /agents /palette /answer /help /quit; esc or ctrl+c quit.
-  url   default: the local daemon (token from ~/.smithy/daemon.token); a tailscale serve URL
-        needs no token (daemon.allow decides)`
+  url           default: the local daemon (token from ~/.smithy/daemon.token), started in the
+                background when none runs; it outlives the chat and exits after daemon.idle_exit
+                (default 30m) with no clients and no running work, or on smithy stop. A
+                tailscale serve URL needs no token (daemon.allow decides)
+  --standalone  run a private daemon inside this process instead; it stops when the chat quits`
+
+// chatWhere is where the daemon the chat talks to runs.
+type chatWhere int
+
+const (
+	whereRemote     chatWhere = iota // a url given: another machine or a daemon someone else runs
+	whereBackground                  // the local background daemon bare smithy starts or reuses
+	whereStandalone                  // inside this process (--standalone)
+)
 
 // chatMsg is one transcript entry; lines caches its render at width and ver, filled only when
 // drawn. kind is "" for text, "thinking" and "turn" (shown only in verbose) or "system".
@@ -60,6 +74,9 @@ type chatView struct {
 	overlay  chatOverlay
 	pal      palette
 	pending  []daemon.Decision
+	where    chatWhere
+	held     []string // notes shown once the history replay reaches heldTo
+	heldTo   int64
 	sessions []chatSession
 	// decide posts an answer to /v1/decisions and returns a chatDecidedMsg.
 	decide func(id, answer string) tea.Cmd
@@ -73,46 +90,139 @@ func newChatView(stream <-chan daemon.ClientMsg, url string, th theme) chatView 
 	return chatView{th: th, url: url, stream: stream, conn: "connecting", input: in, width: 80, height: 24, at: &anchor{}, focus: -1}
 }
 
-// Chat runs `smithy chat` (and bare `smithy` in the harness build).
-func Chat(args []string) int {
-	var url string
-	for _, a := range args {
+// chatArgs is what `smithy chat` was given.
+type chatArgs struct {
+	url        string
+	standalone bool
+}
+
+func parseChatArgs(args []string) (chatArgs, error) {
+	var a chatArgs
+	for _, x := range args {
 		switch {
-		case a == "-h" || a == "--help":
-			fmt.Println(ChatUsage)
-			return 0
-		case strings.HasPrefix(a, "-"):
-			fmt.Fprintln(os.Stderr, "smithy chat: unknown flag", a)
-			return 2
-		case url != "":
-			fmt.Fprintln(os.Stderr, "smithy chat: one url at most")
-			return 2
+		case x == "--standalone":
+			a.standalone = true
+		case strings.HasPrefix(x, "-"):
+			return a, fmt.Errorf("unknown flag %s", x)
+		case a.url != "":
+			return a, errors.New("one url at most")
 		default:
-			url = a
+			a.url = x
 		}
 	}
-	tok, terr := daemon.LoadToken(daemon.TokenFile(), false)
-	if url == "" {
-		i := daemon.Running()
-		if i == nil {
-			fmt.Fprintln(os.Stderr, "smithy chat: no daemon running; start one with: smithy daemon --bg")
+	if a.standalone && a.url != "" {
+		return a, errors.New("--standalone runs its own daemon; it takes no url")
+	}
+	return a, nil
+}
+
+// versionNote warns when the daemon runs another version than this binary; "" when they match.
+func versionNote(daemonV, mine string) string {
+	if daemonV == mine {
+		return ""
+	}
+	if daemonV == "" {
+		daemonV = "an older version"
+	}
+	return fmt.Sprintf("the daemon runs %s, this smithy is %s; to switch: smithy stop, then smithy", daemonV, mine)
+}
+
+// startedNote is the first transcript line after bare smithy started the daemon itself.
+func startedNote(i *daemon.Info, idle time.Duration) string {
+	when := "until smithy stop"
+	if idle > 0 {
+		when = "until " + shortDur(idle) + " with no clients and no running work, or smithy stop"
+	}
+	return fmt.Sprintf("started the smithy daemon in the background (pid %d, %s); it keeps running after you quit, %s", i.PID, i.Addr, when)
+}
+
+// shortDur is d without trailing zero units: 30m, 1h, 1h30m, 90s.
+func shortDur(d time.Duration) string {
+	s := d.String()
+	if strings.HasSuffix(s, "m0s") {
+		s = strings.TrimSuffix(s, "0s")
+	}
+	if strings.HasSuffix(s, "h0m") {
+		s = strings.TrimSuffix(s, "0m")
+	}
+	return s
+}
+
+// Chat runs `smithy chat` (and bare `smithy` in the harness build). With no url it attaches to
+// the local daemon, starting it in the background first when none runs; --standalone runs a
+// private daemon inside this process that stops with it.
+func Chat(args []string) int {
+	for _, a := range args {
+		if a == "-h" || a == "--help" {
+			fmt.Println(ChatUsage)
+			return 0
+		}
+	}
+	a, err := parseChatArgs(args)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "smithy chat:", err)
+		return 2
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	url, tok, where := a.url, "", whereRemote
+	var notes []string
+	switch {
+	case a.standalone:
+		if i := daemon.Running(); i != nil {
+			fmt.Fprintf(os.Stderr, "smithy --standalone: a background daemon runs (pid %d); stop it first with smithy stop, or run smithy to use it\n", i.PID)
 			return 1
 		}
+		ready := make(chan daemon.Info, 1)
+		ended := make(chan int, 1)
+		go func() { ended <- daemon.Standalone(ctx, func(i daemon.Info) { ready <- i }) }()
+		select {
+		case i := <-ready:
+			url = i.URL()
+		case code := <-ended:
+			fmt.Fprintln(os.Stderr, "smithy --standalone: the in-process daemon did not start")
+			return max(code, 1)
+		}
+		defer func() { cancel(); <-ended }()
+		where = whereStandalone
+	case url == "":
+		var idle time.Duration
+		i, fresh, err := daemon.Ensure(daemon.Running, func() (*daemon.Info, error) {
+			port, err := daemon.ConfigPort()
+			if err != nil {
+				return nil, err
+			}
+			if idle, err = daemon.ConfigIdle(); err != nil {
+				return nil, err
+			}
+			fmt.Fprintln(os.Stderr, "smithy: starting the daemon in the background…")
+			return daemon.StartBackground(port, idle, nil)
+		})
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "smithy: could not start the daemon:", err)
+			return 1
+		}
+		if fresh {
+			notes = append(notes, startedNote(i, idle))
+		}
+		url, where = i.URL(), whereBackground
+	}
+	if where != whereRemote || loopbackURL(url) {
+		t, terr := daemon.LoadToken(daemon.TokenFile(), false)
 		if terr != nil {
 			fmt.Fprintln(os.Stderr, "smithy chat: token:", terr)
 			return 1
 		}
-		url = i.URL()
-	} else if !loopbackURL(url) {
-		tok = ""
+		tok = t
 	}
 	c := &daemon.Client{Base: url, Token: tok}
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	st, err := c.State(ctx)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "smithy chat:", err)
 		return 1
+	}
+	if n := versionNote(st.Version, Version); n != "" && where != whereStandalone {
+		notes = append(notes, n)
 	}
 	ch := make(chan daemon.ClientMsg, 256)
 	go c.Follow(ctx, 0, ch)
@@ -121,6 +231,8 @@ func Chat(args []string) int {
 		p = colorprofile.Ascii
 	}
 	m := newChatView(ch, url, newTheme(true, p, utf8Locale()))
+	m.where = where
+	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
 	m.decide = func(id, answer string) tea.Cmd {
 		return func() tea.Msg {
@@ -132,7 +244,25 @@ func Chat(args []string) int {
 		fmt.Fprintln(os.Stderr, "smithy chat:", err)
 		return 1
 	}
+	if where == whereBackground {
+		fmt.Fprintln(os.Stderr, "smithy: the daemon keeps running in the background; smithy stop ends it")
+	}
 	return 0
+}
+
+// hold keeps notes until the replayed history reaches seq, so they land below it, not above.
+func (m *chatView) hold(notes []string, seq int64) {
+	m.held, m.heldTo = append(m.held, notes...), seq
+	if m.last >= seq {
+		m.release()
+	}
+}
+
+func (m *chatView) release() {
+	for _, n := range m.held {
+		m.system(n)
+	}
+	m.held = nil
 }
 
 func (m chatView) Init() tea.Cmd { return tea.Batch(textinput.Blink, m.wait()) }
@@ -171,6 +301,9 @@ func (m chatView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case msg.Event != nil && msg.Event.Seq > m.last:
 			m.last = msg.Event.Seq
 			m.event(msg.Event.Kind, msg.Event.Session, msg.Event.Time.Local().Format("15:04"), msg.Event.Data)
+			if m.last >= m.heldTo {
+				m.release()
+			}
 		}
 		return m, m.wait()
 	case chatDecidedMsg:
@@ -417,10 +550,19 @@ func (m chatView) footer(w int) string {
 	case "reconnecting":
 		right = t.fg(t.err).Render(t.g.fail) + dim.Render(" reconnecting: "+short(m.connErr, 30))
 	}
-	right += dim.Render(" " + t.g.dot + " " + m.url + "  ")
-	gap := w - lipgloss.Width(left) - lipgloss.Width(right)
-	if gap < 1 {
-		return ansi.Truncate(left, w, "")
+	where := ""
+	switch m.where {
+	case whereBackground:
+		where = dim.Render(" "+t.g.dot+" background, ") + key.Render("smithy stop") + dim.Render(" ends it")
+	case whereStandalone:
+		where = dim.Render(" " + t.g.dot + " standalone")
 	}
-	return left + strings.Repeat(" ", gap) + right
+	// Narrow widths drop the url first, then the daemon line; the key hints always stay.
+	for _, r := range []string{right + dim.Render(" "+t.g.dot+" "+m.url) + where, right + where, right} {
+		r += "  "
+		if gap := w - lipgloss.Width(left) - lipgloss.Width(r); gap >= 1 {
+			return left + strings.Repeat(" ", gap) + r
+		}
+	}
+	return ansi.Truncate(left, w, "")
 }

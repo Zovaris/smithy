@@ -1,0 +1,106 @@
+//go:build harness
+
+package tui
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/store"
+	"github.com/charmbracelet/x/ansi"
+)
+
+func TestVersionNote(t *testing.T) {
+	if n := versionNote("v0.23.0", "v0.23.0"); n != "" {
+		t.Fatalf("same version warned: %q", n)
+	}
+	n := versionNote("v0.22.0", "v0.23.0")
+	for _, want := range []string{"v0.22.0", "v0.23.0", "smithy stop"} {
+		if !strings.Contains(n, want) {
+			t.Fatalf("mismatch note %q lacks %q", n, want)
+		}
+	}
+	if n := versionNote("", "v0.23.0"); !strings.Contains(n, "older") {
+		t.Fatalf("a daemon with no version should read as older: %q", n)
+	}
+}
+
+func TestParseChatArgs(t *testing.T) {
+	a, err := parseChatArgs([]string{"--standalone"})
+	if err != nil || !a.standalone || a.url != "" {
+		t.Fatalf("--standalone: %+v %v", a, err)
+	}
+	a, err = parseChatArgs([]string{"http://box.ts.net"})
+	if err != nil || a.standalone || a.url != "http://box.ts.net" {
+		t.Fatalf("url: %+v %v", a, err)
+	}
+	if _, err := parseChatArgs([]string{"--standalone", "http://x"}); err == nil {
+		t.Fatal("--standalone with a url accepted")
+	}
+	if _, err := parseChatArgs([]string{"--nope"}); err == nil {
+		t.Fatal("unknown flag accepted")
+	}
+}
+
+func TestFooterSaysWhereTheDaemonRuns(t *testing.T) {
+	m := newChatTest(0)
+	m.width = 160
+	m.where = whereBackground
+	f := ansi.Strip(m.footer(160))
+	if !strings.Contains(f, "background") || !strings.Contains(f, "smithy stop") {
+		t.Fatalf("footer does not say the daemon runs in the background and how to stop it: %q", f)
+	}
+	m.where = whereStandalone
+	if f := ansi.Strip(m.footer(160)); !strings.Contains(f, "standalone") || strings.Contains(f, "smithy stop") {
+		t.Fatalf("standalone footer: %q", f)
+	}
+	m.where = whereRemote
+	if f := ansi.Strip(m.footer(160)); strings.Contains(f, "smithy stop") {
+		t.Fatalf("remote footer offers smithy stop: %q", f)
+	}
+}
+
+func TestStartedNoteExplainsBackground(t *testing.T) {
+	n := startedNote(&daemon.Info{PID: 42, Addr: "127.0.0.1:7477"}, 30*time.Minute)
+	for _, want := range []string{"pid 42", "background", "smithy stop", "30m"} {
+		if !strings.Contains(n, want) {
+			t.Fatalf("started note %q lacks %q", n, want)
+		}
+	}
+}
+
+func TestShortDur(t *testing.T) {
+	for d, want := range map[time.Duration]string{30 * time.Minute: "30m", time.Hour: "1h", 90 * time.Minute: "1h30m", 90 * time.Second: "1m30s"} {
+		if got := shortDur(d); got != want {
+			t.Errorf("shortDur(%v) = %q, want %q", d, got, want)
+		}
+	}
+}
+
+func TestNarrowFooterKeepsStopHint(t *testing.T) {
+	m := newChatTest(0)
+	m.where = whereBackground
+	f := ansi.Strip(m.footer(110))
+	if !strings.Contains(f, "smithy stop") {
+		t.Fatalf("at 110 columns the footer lost the stop hint: %q", f)
+	}
+}
+
+func TestNotesShowAfterHistoryReplay(t *testing.T) {
+	m := newChatTest(0)
+	m.hold([]string{"the daemon runs v0.22.0"}, 2)
+	for seq := int64(1); seq <= 2; seq++ {
+		m = chatStep(m, daemon.ClientMsg{Event: &store.Event{Seq: seq, Kind: "log", Data: []byte(`{"line":"old"}`)}})
+	}
+	last := m.msgs[len(m.msgs)-1]
+	if !strings.Contains(last.text, "v0.22.0") {
+		t.Fatalf("note not after the replayed history; last message %q", last.text)
+	}
+	m2 := newChatTest(0)
+	m2.hold([]string{"fresh"}, 0)
+	if len(m2.msgs) != 1 || m2.msgs[0].text != "fresh" {
+		t.Fatal("with no history the note does not show at once")
+	}
+}
