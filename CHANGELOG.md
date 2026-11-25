@@ -8,6 +8,8 @@ part above `### Details`.
 
 ## Unreleased
 
+## v0.22.0 — 2026-11-25
+
 ### Highlights
 
 **Your own API keys.** smithy can run its own agent on your Anthropic, OpenAI, Gemini, OpenRouter, DeepSeek or Ollama key, with no CLI needed (harness build).
