@@ -6,6 +6,7 @@ One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skil
 ## Unreleased
 
 - `install.sh` asks "harness or skills" on a terminal (default skills), takes `--harness` / `--skills`, installs skills without a terminal, and `--update` keeps the installed kind.
+- Added: `smithy skills install [--harness <name>...]` installs the skills without Node: it downloads the release's `smithy-skills.tar.gz`, checks it against `checksums.txt` and copies the skills into each detected harness's skills folder (symlinked skills are left alone). The release publishes the archive; `install.sh` offers it after installing the binary (a hint without a terminal); `npx skills add` still works.
 
 ## v0.18.0 — 2026-11-24
 

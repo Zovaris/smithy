@@ -110,3 +110,11 @@ mkdir -p "$home/bin/$version"; mv "$src" "$home/bin/$version/$exe"
 if [ "$os" = windows ]; then cp -f "$home/bin/$version/$exe" "$home/bin/$exe"; else ln -sfn "$home/bin/$version/$exe" "$home/bin/$exe"; fi
 echo "$kind" > "$home/kind"
 say "installed v$version ($kind build) to $home/bin/$version/$exe (add $home/bin to PATH to run smithy yourself)"
+tty=${SMITHY_TTY:-/dev/tty}
+if { [ -n "${SMITHY_TTY:-}" ] || [ -t 2 ]; } && { : < "$tty"; } 2>/dev/null; then
+  printf 'smithy install: install the skills now (smithy skills install, no Node needed)? [y/N] ' >&2
+  ans=; read -r ans < "$tty" || true
+  case $ans in y|Y|yes) "$home/bin/$exe" skills install >&2 || die "smithy skills install failed" ;; esac
+else
+  say "install the skills with: $home/bin/$exe skills install (or npx skills add Zovaris/smithy -g)"
+fi
