@@ -44,7 +44,10 @@ Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list be
 --profile auto (smithy auto serve's orchestrator; never a full bypass): claude runs with
   permission mode dontAsk and an allowed-tools list limited to Read, Edit, Write, Glob, Grep and Bash for
   git, gh, go/npm test and smithy; codex keeps --sandbox workspace-write with approval_policy never;
-  the other CLIs keep their own headless mode above.
+  opencode gets the same allow-list as OPENCODE_PERMISSION rules (also with --readonly: no edits,
+  secret reads denied); the other CLIs keep their own headless mode above. Only claude and opencode
+  can deny reads of ~/.smithy/auth.json and the other secrets: codex, gemini, pi, cursor and dsh
+  can read them unless auto.sandbox is container.
 Effort: --effort, else $AGENT_EFFORT, else the agent.effort setting (default medium). Anything
 above medium is capped at medium. Passed as --effort (claude) or -c model_reasoning_effort
 (codex), and as $AGENT_EFFORT to every CLI; the others keep their own default and say so.
@@ -508,6 +511,9 @@ func Env(base []string, s Spec, o Options) []string {
 	for _, k := range ParentVars {
 		drop[k] = true
 	}
+	if s.Harness == "opencode" && (o.Profile == "auto" || o.ReadOnly) {
+		drop["OPENCODE_CONFIG"], drop["OPENCODE_CONFIG_CONTENT"], drop["OPENCODE_PERMISSION"] = true, true, true
+	}
 	var env []string
 	for _, kv := range Scrub(base) {
 		k, _, _ := strings.Cut(kv, "=")
@@ -526,6 +532,7 @@ func Env(base []string, s Spec, o Options) []string {
 	if o.Inject != nil {
 		env = append(env, o.Inject.Env...)
 	}
+	env = append(env, opencodeEnv(s, o)...)
 	return append(env, "AGENT_PROMPT_FILE="+o.PromptFile, "AGENT_MODEL="+o.Model, "AGENT_EFFORT="+o.Effort, "AGENT_READONLY="+ro, "WARDEN_HARNESS="+s.Harness)
 }
 
