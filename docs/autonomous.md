@@ -32,7 +32,17 @@ In the harness build, the serve loop runs inside `smithy daemon`, which also ser
 and writes every event to `~/.smithy/smithy.db`. `smithy auto serve` starts it in the foreground
 (same flags, same view) or, when one already runs, attaches and prints its events.
 
+Bare `smithy` is the one command: it attaches to the local daemon, or starts it in the
+background first. The daemon outlives the chat so work and the web keep going, and exits on its
+own after `daemon.idle_exit` (default `30m`, `0` never) with no clients and no running work;
+`smithy stop` stops it. `smithy --standalone` runs a private daemon inside the chat process that
+stops with it (tests, CI, one-off). `smithy daemon` stays the foreground server for hosts
+(systemd) and never idle-exits unless given `--idle-exit`. `GET /v1/state` reports the daemon's
+`version`; the chat warns when it differs from its own.
+
 ```
+smithy                                         # attach, or start the daemon in the background
+smithy stop                                    # stop the background daemon
 smithy daemon --bg                             # prints "<pid> <url>"; log ~/.smithy/daemon.log
 curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/state
 ```

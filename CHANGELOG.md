@@ -8,6 +8,16 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- **One command.** `smithy` (harness build) starts the daemon in the background when none runs and attaches; it keeps working after you quit, exits on its own after 30 idle minutes, and `smithy stop` ends it. `smithy --standalone` runs a private daemon that stops with the chat.
+
+### Details
+
+- `smithy chat`/bare `smithy` auto-start the daemon (`daemon.StartBackground`) and show "background, smithy stop ends it" in the footer; `--standalone` runs `daemon.Standalone` in-process on a free port without `daemon.json`.
+- New `daemon.idle_exit` (default `30m`): a `--bg` daemon exits with no open event streams, no API requests, no orchestrator session and no planning for that long; `smithy daemon --idle-exit <d>`.
+- New `smithy stop` (SIGTERM, waits 10s). `GET /v1/state` reports `version`; the chat warns on a mismatch, below the replayed history.
+
 ## v0.22.0 — 2026-11-25
 
 ### Highlights
