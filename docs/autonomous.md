@@ -73,7 +73,8 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   and the decisions still waiting. The daemon posts it on Mondays only when you add the `report`
   kind to a connector's kinds.
 - `smithy web [open]` prints (or opens) the link to the web UI the daemon serves: sessions,
-  decisions, agents and the board in the browser.
+  decisions, agents, the board and the Bench screen (`smithy bench` runs and comparisons) in the
+  browser.
 
 ## Built-in tracker (harness build)
 
@@ -155,6 +156,10 @@ it.
 | `off` (default) | the guard above only | every harness |
 | `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off, so push and `gh` fail; Gemini CLI is refused (its sandbox can't limit hosts) |
 | `container` | docker or podman, read-only root, dropped capabilities; with `auto.sandbox_network proxy`, egress allow-list and secrets | Claude Code and OpenCode in the default image; others with your own `auto.sandbox_image` |
+
+The API backend (`auto.agent api:<provider>/<model>`) runs its tools on the `--profile auto`
+rules only while `auto.sandbox` is `off` (the default); with `auto.sandbox native` its shell tool
+runs inside the OS sandbox.
 
 Container mode notes:
 
