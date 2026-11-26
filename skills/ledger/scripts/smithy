@@ -6,14 +6,14 @@
 #      ~/.local/share/smithy/dev/<checkout id> (one per checkout or worktree) and rebuilds when a
 #      .go file changes (development);
 #   3. ~/.local/share/smithy/versions/<VERSION>/smithy ($XDG_DATA_HOME), put there by the repo's
-#      install.sh (README: Install), else the pre-0.21 ~/.smithy/bin/<VERSION>/smithy;
-#   4. ~/.local/bin/smithy ($XDG_BIN_HOME) or ~/.smithy/bin/smithy (another version), with a
-#      one-line notice to install <VERSION>.
+#      install.sh (README: Install);
+#   4. ~/.local/bin/smithy ($XDG_BIN_HOME) or smithy on PATH (another version), with a one-line
+#      notice naming `smithy update <VERSION>`;
+#   5. none: prints the install line and exits 3.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd -P)
 export SMITHY_SKILL_DIR="$here"
 [ -n "${SMITHY_BIN:-}" ] && exec "$SMITHY_BIN" "$@"
-home=${SMITHY_HOME:-$HOME/.smithy}
 case ${XDG_DATA_HOME:-} in /*) data=$XDG_DATA_HOME/smithy ;; *) data=$HOME/.local/share/smithy ;; esac
 case ${XDG_BIN_HOME:-} in /*) cmd=$XDG_BIN_HOME/smithy ;; *) cmd=$HOME/.local/bin/smithy ;; esac
 repo=Zovaris/smithy
@@ -35,15 +35,14 @@ for root in "$here/../../.." "$here/.."; do
   fi
 done
 
-for bin in "$data/versions/$version/smithy" "$home/bin/$version/smithy"; do
-  [ -x "$bin" ] || [ ! -x "$bin.exe" ] || bin="$bin.exe"  # Git Bash on Windows
-  [ -x "$bin" ] && { link "$bin"; exec "$bin" "$@"; }
-done
-for other in "$cmd" "$home/bin/smithy"; do
-  if [ -x "$other" ]; then
-    echo "smithy: v$version is not installed; using $other. Ask the user whether to install v$version now: curl -fsSL https://raw.githubusercontent.com/$repo/main/install.sh | sh -s $version" >&2
-    exec "$other" "$@"
-  fi
-done
+bin="$data/versions/$version/smithy"
+[ -x "$bin" ] || [ ! -x "$bin.exe" ] || bin="$bin.exe"  # Git Bash on Windows
+[ -x "$bin" ] && { link "$bin"; exec "$bin" "$@"; }
+other=$cmd; [ -x "$other" ] || other=$(command -v smithy 2>/dev/null || true)
+case $other in /*) ;; *) other= ;; esac  # never a relative PATH entry (./smithy in the repo)
+if [ -n "$other" ] && [ -x "$other" ] && [ "$(cd "$(dirname "$other")" && pwd -P)/${other##*/}" != "$here/smithy" ]; then
+  echo "smithy: v$version is not installed; using $other. Ask the user whether to run: smithy update $version" >&2
+  exec "$other" "$@"
+fi
 echo "smithy: the smithy binary v$version is not installed; the smithy skills need it. Ask the user whether you install it or they do: curl -fsSL https://raw.githubusercontent.com/$repo/main/install.sh | sh -s $version" >&2
 exit 3

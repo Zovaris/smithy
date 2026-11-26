@@ -35,7 +35,7 @@ func TestHarnessCommandsInSkillsBuild(t *testing.T) {
 			t.Errorf("%s is not listed as (harness build) in the skills build's help", name)
 		}
 		var b strings.Builder
-		if code := needsHarness(&b, name); code != 2 || !strings.Contains(b.String(), "smithy-harness-") || !strings.Contains(b.String(), "-tags harness") {
+		if code := needsHarness(&b, name); code != 2 || !strings.Contains(b.String(), "smithy update") || !strings.Contains(b.String(), "-tags harness") {
 			t.Fatalf("%s: code %d, %q", name, code, b.String())
 		}
 	}

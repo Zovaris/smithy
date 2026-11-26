@@ -206,6 +206,9 @@ func (r *report) bad(msg, fix string) {
 // BinaryVersion is the running binary's version, set by main.
 var BinaryVersion = "dev"
 
+// UpdateCmd is the line that moves an installed smithy to version v.
+func UpdateCmd(v string) string { return "smithy update " + v }
+
 // InstallCmd is the line the user (or the agent, on the user's yes) runs to install a version.
 func InstallCmd(v string) string {
 	return "curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s " + v
@@ -230,7 +233,7 @@ func VersionHint() string {
 	if sv == "" || sv == "dev" || BinaryVersion == "dev" || sv == BinaryVersion {
 		return ""
 	}
-	return "smithy: binary v" + BinaryVersion + " but skills v" + sv + "; ask the user to install v" + sv + ": " + InstallCmd(sv)
+	return "smithy: binary v" + BinaryVersion + " but skills v" + sv + "; ask the user whether to run: " + UpdateCmd(sv)
 }
 
 func have(name string) bool { _, err := exec.LookPath(name); return err == nil }
@@ -303,7 +306,7 @@ func Doctor(args []string) int {
 		fmt.Println("warden doctor")
 	}
 	if sv := SkillsVersion(); VersionHint() != "" {
-		r.bad("binary v"+BinaryVersion+" does not match skills v"+sv, "ask the user, then: "+InstallCmd(sv))
+		r.bad("binary v"+BinaryVersion+" does not match skills v"+sv, "ask the user, then: "+UpdateCmd(sv))
 	} else if BinaryVersion != "dev" {
 		r.ok("binary v" + BinaryVersion)
 	}

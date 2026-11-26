@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
 )
 
 // harnessBuild is false in the skills build (docs/adr/0009).
@@ -25,11 +24,7 @@ func init() {
 }
 
 func needsHarness(w io.Writer, name string) int {
-	asset := fmt.Sprintf("smithy-harness-%s-%s", runtime.GOOS, runtime.GOARCH)
-	if runtime.GOOS == "windows" {
-		asset += ".exe"
-	}
 	fmt.Fprintf(w, "smithy %s needs the harness build; this is the skills build.\n", name)
-	fmt.Fprintf(w, "Get %s from https://github.com/Zovaris/smithy/releases, or build it: go build -tags harness ./cmd/smithy\n", asset)
+	fmt.Fprintln(w, "Install the release binary with: smithy update, or build it: go build -tags harness ./cmd/smithy")
 	return 2
 }
