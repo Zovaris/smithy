@@ -353,7 +353,7 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m, m.answer(arg)
 	case "detach":
 		return m.detach()
-	case "serve", "set", "unset", "key", "keys", "doctor":
+	case "serve", "set", "unset", "key", "keys", "doctor", "tend":
 		return m.settingsCommand(name, arg)
 	case "quit":
 		return m, tea.Quit
