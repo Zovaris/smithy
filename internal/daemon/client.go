@@ -8,12 +8,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/store"
 )
 
@@ -201,4 +203,97 @@ func (c *Client) stream(ctx context.Context, last *int64, out chan<- ClientMsg) 
 		}
 	}
 	return true, sc.Err()
+}
+
+func (c *Client) call(ctx context.Context, method, path string, body, out any) error {
+	var b []byte
+	if body != nil {
+		b, _ = json.Marshal(body)
+	}
+	r, err := c.req(ctx, method, path, b)
+	if err != nil {
+		return err
+	}
+	if body != nil {
+		r.Header.Set("Content-Type", "application/json")
+	}
+	res, err := c.http().Do(r)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode/100 != 2 {
+		var e struct{ Error string }
+		_ = json.NewDecoder(io.LimitReader(res.Body, 4<<10)).Decode(&e)
+		if e.Error != "" {
+			return fmt.Errorf("daemon %s: %s", path, e.Error)
+		}
+		return fmt.Errorf("daemon %s: %s", path, res.Status)
+	}
+	if out == nil {
+		return nil
+	}
+	return json.NewDecoder(res.Body).Decode(out)
+}
+
+// StartSession is POST /v1/sessions: agent "" is the last used one; msg may be empty.
+func (c *Client) StartSession(ctx context.Context, agent, dir, msg string) (Session, error) {
+	var s Session
+	err := c.call(ctx, "POST", "/v1/sessions", map[string]string{"agent": agent, "dir": dir, "message": msg}, &s)
+	return s, err
+}
+
+// SendSession is POST /v1/sessions/{id}/messages.
+func (c *Client) SendSession(ctx context.Context, id, text string) error {
+	return c.call(ctx, "POST", "/v1/sessions/"+url.PathEscape(id)+"/messages", map[string]string{"text": text}, nil)
+}
+
+// StopSession is POST /v1/sessions/{id}/stop.
+func (c *Client) StopSession(ctx context.Context, id string) error {
+	return c.call(ctx, "POST", "/v1/sessions/"+url.PathEscape(id)+"/stop", map[string]string{}, nil)
+}
+
+// Sessions is GET /v1/sessions.
+func (c *Client) Sessions(ctx context.Context) (SessionList, error) {
+	var l SessionList
+	err := c.call(ctx, "GET", "/v1/sessions", nil, &l)
+	return l, err
+}
+
+// Setup is GET /v1/setup: detected agents, the default agent/model, the kit and skills/MCP.
+func (c *Client) Setup(ctx context.Context) (Setup, error) {
+	var s Setup
+	err := c.call(ctx, "GET", "/v1/setup", nil, &s)
+	return s, err
+}
+
+// Models is GET /v1/agents/{agent}/models: the models agent reports; refresh skips the day's cache.
+func (c *Client) Models(ctx context.Context, agent string, refresh bool) (models.List, error) {
+	var l models.List
+	p := "/v1/agents/" + url.PathEscape(agent) + "/models"
+	if refresh {
+		p += "?refresh=1"
+	}
+	err := c.call(ctx, "GET", p, nil, &l)
+	return l, err
+}
+
+// SetDefault is PUT /v1/setup/default: the agent and model new sessions start with.
+func (c *Client) SetDefault(ctx context.Context, agent, model string) error {
+	return c.call(ctx, "PUT", "/v1/setup/default", AgentChoice{Agent: agent, Model: model}, nil)
+}
+
+// SetKit is PUT /v1/setup/kit: what goes into every driven CLI.
+func (c *Client) SetKit(ctx context.Context, k KitChoice) error {
+	if k.Skills == nil {
+		k.Skills = []string{}
+	}
+	return c.call(ctx, "PUT", "/v1/setup/kit", k, nil)
+}
+
+// InstallSkills is POST /v1/setup/skills/install; harness "" is every detected one.
+func (c *Client) InstallSkills(ctx context.Context, harness string) (string, error) {
+	var out struct{ Output string }
+	err := c.call(ctx, "POST", "/v1/setup/skills/install", map[string]string{"harness": harness}, &out)
+	return out.Output, err
 }

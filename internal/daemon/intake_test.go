@@ -196,7 +196,7 @@ func TestIntakeYesTwiceAddsOnce(t *testing.T) {
 	d := sv.Pending()[0]
 	r := sv.RouteIntake(nil)
 	o := Outcome{ID: d.ID, Answer: "yes"}
-	if r(d, o) != nil || r(d, o) != nil {
+	if r(d, o) != nil || r(d, o) != nil { //nolint:staticcheck // SA4000: routing twice proves it is idempotent
 		t.Fatal("route failed")
 	}
 	if ts, _ := board.New(sv.st).List(""); len(ts) != 2 {

@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha1" //nolint:gosec // RFC 6455 handshake requires SHA-1
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/binary"
@@ -66,7 +66,7 @@ func wsDial(ctx context.Context, u *url.URL) (*wsConn, error) {
 		return nil, err
 	}
 	resp.Body.Close()
-	sum := sha1.Sum([]byte(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))
+	sum := sha1.Sum([]byte(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")) //nolint:gosec // RFC 6455 accept key
 	if resp.StatusCode != http.StatusSwitchingProtocols || resp.Header.Get("Sec-WebSocket-Accept") != base64.StdEncoding.EncodeToString(sum[:]) {
 		c.Close()
 		return nil, errors.New("websocket handshake refused: HTTP " + resp.Status)
@@ -79,15 +79,16 @@ func (w *wsConn) write(op byte, p []byte) error {
 	h := []byte{0x80 | op}
 	switch n := len(p); {
 	case n < 126:
-		h = append(h, 0x80|byte(n))
+		h = append(h, 0x80|byte(n)) //nolint:gosec // n < 126 fits a byte
 	case n < 1<<16:
-		h = append(h, 0x80|126, byte(n>>8), byte(n))
+		h = append(h, 0x80|126, byte(n>>8), byte(n)) //nolint:gosec // n < 1<<16 splits into two bytes
 	default:
-		h = binary.BigEndian.AppendUint64(append(h, 0x80|127), uint64(n))
+		h = binary.BigEndian.AppendUint64(append(h, 0x80|127), uint64(n)) //nolint:gosec // len is never negative
 	}
 	m := make([]byte, 4)
 	_, _ = rand.Read(m)
-	b := append(h, m...)
+	h = append(h, m...)
+	b := h
 	for i, c := range p {
 		b = append(b, c^m[i%4])
 	}
@@ -175,11 +176,6 @@ func (w *wsConn) Read(deadline time.Time) ([]byte, error) {
 }
 
 func (w *wsConn) Close() error { return w.c.Close() }
-
-func isTimeout(err error) bool {
-	var ne net.Error
-	return errors.As(err, &ne) && ne.Timeout()
-}
 
 func wsURLOK(u *url.URL) bool {
 	return u.Scheme == "wss" && (u.Hostname() == "slack.com" || strings.HasSuffix(u.Hostname(), ".slack.com"))

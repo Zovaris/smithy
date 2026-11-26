@@ -1,0 +1,80 @@
+/* Temper: the web's Sephiro theme. Graphite steel surfaces, one ember accent shared with the TUI's
+   Steel; ember marks heat (running, the action that matters), amber marks what needs you. Status
+   always pairs color with a word. Light is the default; dark follows the system or data-mode. */
+[data-sephiro-theme="temper"] {
+  --t-bg: #f7f7f6;
+  --t-side: #efefee;
+  --t-card: #ffffff;
+  --t-raised: #f0f0ef;
+  --t-line: rgb(23 23 23 / 0.09);
+  --t-line-strong: rgb(23 23 23 / 0.16);
+  --t-text: #18181a;
+  --t-text-2: #52525a;
+  --t-text-3: #6f6f78;
+  --t-ember: #c2410c;
+  --t-ember-ink: #b23a0a;
+  --t-wait: #a16207;
+  --t-ok: #15803d;
+  --t-fail: #dc2626;
+  --t-add: rgb(22 163 74 / 0.10);
+  --t-del: rgb(220 38 38 / 0.09);
+  --t-primary: #18181a;
+  --t-on-primary: #fafafa;
+
+  --sph-bg: var(--t-bg);
+  --sph-surface: var(--t-card);
+  --sph-surface-elevated: var(--t-card);
+  --sph-raised: var(--t-raised);
+  --sph-border: var(--t-line);
+  --sph-border-strong: var(--t-line-strong);
+  --sph-text: var(--t-text);
+  --sph-text-muted: var(--t-text-2);
+  --sph-accent: var(--t-ember);
+  --sph-accent-hover: var(--t-ember-ink);
+  --sph-accent-pressed: #9a3412;
+  --sph-accent-strong: var(--t-ember-ink);
+  --sph-accent-soft: color-mix(in srgb, var(--t-ember) 10%, transparent);
+  --sph-on-accent: #ffffff;
+  --sph-success: var(--t-ok);
+  --sph-success-soft: color-mix(in srgb, var(--t-ok) 10%, transparent);
+  --sph-warning: var(--t-wait);
+  --sph-warning-soft: color-mix(in srgb, var(--t-wait) 10%, transparent);
+  --sph-danger: var(--t-fail);
+  --sph-danger-soft: color-mix(in srgb, var(--t-fail) 10%, transparent);
+  --sph-focus: var(--t-ember);
+  --sph-focus-ring: color-mix(in srgb, var(--t-ember) 30%, transparent);
+  --sph-font-sans: "Geist", ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  --sph-font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sph-radius-xs: 4px;
+  --sph-radius-sm: 8px;
+  --sph-radius-md: 12px;
+  --sph-radius-lg: 14px;
+  --sph-shadow-popover: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px rgb(0 0 0 / 0.06);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-sephiro-theme="temper"]:not([data-mode="light"]) {
+    --t-bg: #141415; --t-side: #0f0f10; --t-card: #19191b; --t-raised: #232325;
+    --t-line: rgb(237 237 237 / 0.08); --t-line-strong: rgb(237 237 237 / 0.14);
+    --t-text: #ededed; --t-text-2: #a1a1a6; --t-text-3: #85858b;
+    --t-ember: #f2762e; --t-ember-ink: #ff9a5c; --t-wait: #e3b341; --t-ok: #4cc38a; --t-fail: #e5484d;
+    --t-add: rgb(76 195 138 / 0.12); --t-del: rgb(229 72 77 / 0.12);
+    --t-primary: #ededed; --t-on-primary: #141415;
+    --sph-on-accent: #141415;
+    --sph-shadow-popover: 0 8px 24px rgb(0 0 0 / 0.4);
+    color-scheme: dark;
+  }
+}
+
+[data-sephiro-theme="temper"][data-mode="dark"] {
+  --t-bg: #141415; --t-side: #0f0f10; --t-card: #19191b; --t-raised: #232325;
+  --t-line: rgb(237 237 237 / 0.08); --t-line-strong: rgb(237 237 237 / 0.14);
+  --t-text: #ededed; --t-text-2: #a1a1a6; --t-text-3: #85858b;
+  --t-ember: #f2762e; --t-ember-ink: #ff9a5c; --t-wait: #e3b341; --t-ok: #4cc38a; --t-fail: #e5484d;
+  --t-add: rgb(76 195 138 / 0.12); --t-del: rgb(229 72 77 / 0.12);
+  --t-primary: #ededed; --t-on-primary: #141415;
+  --sph-on-accent: #141415;
+  --sph-shadow-popover: 0 8px 24px rgb(0 0 0 / 0.4);
+  color-scheme: dark;
+}

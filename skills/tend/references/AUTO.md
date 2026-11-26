@@ -12,7 +12,9 @@ supervised short runs.
 Security: tell the user to run serve under a dedicated OS user or machine with a least-privilege
 GitHub token and a test or least-privilege Linear key. The `--profile auto` guard differs per
 harness (`smithy agent --help`) and reduces the risk from injected issue text but cannot remove it;
-where a harness has no guard against sending data out, `auto.sandbox container` with `auto.sandbox_network proxy` is the isolation.
+where a harness has no guard against data egress, `auto.sandbox native` is the isolation where it is supported
+(one harness and the API backend's shell; `smithy doctor` says which), and a
+least-privilege key limits the rest.
 
 ## Once (`tend auto once <dir>`, started by serve)
 Steps 3 and 4 below for that one dir, then warden's batch check (its `references/acting.md`)

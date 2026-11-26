@@ -206,7 +206,7 @@ func (d *Discord) Thread(ctx context.Context, session, title string) (string, er
 }
 
 var mdEsc = strings.NewReplacer(`\`, `\\`, "*", `\*`, "_", `\_`, "~", `\~`, "`", "\\`", "|", `\|`, ">", `\>`,
-	"#", `\#`, "[", `\[`, "]", `\]`, "(", `\(`, ")", `\)`, "<", `\<`, "@", "@​")
+	"#", `\#`, "[", `\[`, "]", `\]`, "(", `\(`, ")", `\)`, "<", `\<`, "@", "@\u200b")
 
 func renderDiscord(n Note) string {
 	head := "**" + mdEsc.Replace(clip(text.Clean(n.Title), 200)) + "**"

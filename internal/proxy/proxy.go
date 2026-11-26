@@ -1,7 +1,7 @@
-// Package proxy is smithy's egress proxy for container workers (auto.sandbox_network proxy): it
-// tunnels CONNECT only to allowed hosts on port 443, and sends stored keys for the worker
-// (http://smithy-proxy:<port>/s/<name>/<path>) to the key's bound hosts over HTTPS, so the worker
-// never holds a key. No TLS interception. Its log keeps kind, host, method, name and status only.
+// Package proxy is smithy's egress proxy, run natively next to the daemon (smithy proxy serve) or
+// in-process by smithy mcp's secret tool: it tunnels CONNECT only to allowed hosts on port 443, and
+// sends stored keys for the worker (http://127.0.0.1:<port>/s/<name>/<path>) to the key's bound
+// hosts over HTTPS, so the worker never holds a key. No TLS interception. Its log keeps kind, host, method, name and status only.
 package proxy
 
 import (
@@ -21,8 +21,11 @@ import (
 	"github.com/Zovaris/smithy/internal/auth"
 )
 
-// Port is where the sidecar listens; workers reach it as smithy-proxy:<Port>.
+// Port is where smithy proxy serve listens by default.
 const Port = 8877
+
+// DefaultAddr is serve's default listen address: loopback only, so the bound keys stay on this machine.
+var DefaultAddr = "127.0.0.1:8877"
 
 // MaxBody caps a secret call's response, read whole so the key can be scrubbed from it.
 const MaxBody = 32 << 20
@@ -48,6 +51,8 @@ type Proxy struct {
 	Dial    func(ctx context.Context, network, addr string) (net.Conn, error)
 	Log     func(Entry)
 	Approve func(context.Context, Ask) bool // an ask secret's write; nil = denied
+	// Guard, when set, decides an allowed tunnel's host (the fetch guard: guard.fetch_block asks).
+	Guard func(ctx context.Context, host string) (bool, string)
 
 	mu      sync.Mutex
 	pending map[string]bool // secrets with an ask waiting: one at a time each
@@ -112,6 +117,13 @@ func (p *Proxy) connect(w http.ResponseWriter, r *http.Request) {
 		deny()
 		return
 	}
+	if p.Guard != nil {
+		if ok, why := p.Guard(r.Context(), host); !ok {
+			p.log(Entry{Kind: "connect", Host: host, Method: "CONNECT", Status: http.StatusForbidden})
+			http.Error(w, "smithy proxy: "+why, http.StatusForbidden)
+			return
+		}
+	}
 	dial := p.Dial
 	if dial == nil {
 		dial = (&net.Dialer{Timeout: 15 * time.Second}).DialContext
@@ -134,16 +146,16 @@ func (p *Proxy) connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p.log(Entry{Kind: "connect", Host: host, Method: "CONNECT", Status: http.StatusOK})
-	io.WriteString(down, "HTTP/1.1 200 Connection established\r\n\r\n")
+	_, _ = io.WriteString(down, "HTTP/1.1 200 Connection established\r\n\r\n")
 	if n := buf.Reader.Buffered(); n > 0 {
-		b, _ := buf.Reader.Peek(n)
-		up.Write(b)
+		b, _ := buf.Peek(n)
+		_, _ = up.Write(b)
 	}
 	done := make(chan struct{}, 2)
 	pipe := func(dst, src net.Conn) {
-		io.Copy(dst, src)
+		_, _ = io.Copy(dst, src)
 		if c, ok := dst.(interface{ CloseWrite() error }); ok {
-			c.CloseWrite()
+			_ = c.CloseWrite()
 		}
 		done <- struct{}{}
 	}
@@ -269,7 +281,7 @@ func (p *Proxy) secret(w http.ResponseWriter, r *http.Request) {
 	}
 	cc := *c
 	cc.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	resp, err := cc.Do(out)
+	resp, err := cc.Do(out) //nolint:gosec // G704: the upstream comes from the proxy config, not the request
 	if err != nil {
 		refuse(http.StatusBadGateway, "upstream request failed")
 		return
@@ -292,7 +304,7 @@ func (p *Proxy) secret(w http.ResponseWriter, r *http.Request) {
 	e.Status = resp.StatusCode
 	p.log(e)
 	w.WriteHeader(resp.StatusCode)
-	w.Write(body)
+	_, _ = w.Write(body) //nolint:gosec // G705: proxied upstream bytes, passed through unchanged
 }
 
 func setPath(u *url.URL, escaped string) error {

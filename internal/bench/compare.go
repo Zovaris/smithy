@@ -236,7 +236,7 @@ func compareMain(dir string, args []string, out, errw io.Writer) int {
 			if asJSON {
 				e := json.NewEncoder(out)
 				e.SetIndent("", "  ")
-				e.Encode(c)
+				_ = e.Encode(c)
 			} else {
 				writeCompare(out, c)
 			}

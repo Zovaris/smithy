@@ -1,4 +1,8 @@
-  ? Merge #142 into release/v0.17?   m merge  l later                                               
+
+  smithy dev
+
+
+    ?   Merge #142 into release/v0.17?   m  merge   l  later                  ● 1 running · TK-29   
 
 
 
@@ -9,24 +13,20 @@
 
 
 
+     › Add usage-limit detection for Pi (TK-6).                                                     
 
+     Pi prints its limit errors from packages/ai/src/errors.ts. I'll match those near the end
+     of a failed run.
 
+     ✓  Read  internal/pool/detect.go                                          134 lines   0.1s     
+     ✓  Grep  "LimitError" in pi                                               2 matches   0.4s     
+     ✓  Edit  internal/pool/detect.go                                              +6 −1   0.2s     
+     ✓  Bash  go test ./internal/pool                                             exit 0   3.8s     
 
+     Done: a Pi limit now marks the account limited until its reset.
 
-  › Add usage-limit detection for Pi (TK-6).                                                        
-
-    Pi prints its limit errors from packages/ai/src/errors.ts.                                      
-
-  ▸ ✓ Read internal/pool/detect.go  0.1s · 134 lines
-  ▸ ✓ Grep "LimitError" in pi  0.4s · 2 matches
-  ▸ ✓ Edit internal/pool/detect.go  0.2s · +6 −1
-  ▸ ✓ Bash go test ./internal/pool  3.8s · exit 0
-
-    Done: a Pi limit now marks the account limited until its reset.                                 
-
-    running TK-29                                                                                   
-
-    failed TES-9                                                                                    
-
-  › Ask, or / for commands                                                                          
-  enter send   v mode: expandable   tab agents   ctrl+k palette
+                                                              ● connecting  http://127.0.0.1:7477   
+     › Ask, or / for commands                                                                       
+                                                                                                    
+                                                                                                    
+   enter send  shift+enter newline  v mode: expandable  tab agents  ctrl+k palette  ? help          

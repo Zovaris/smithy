@@ -3,10 +3,13 @@
 package tui
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"image/color"
+	"math"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -31,6 +34,11 @@ const (
 	overlayNone chatOverlay = iota
 	overlayAgents
 	overlayPalette
+	overlaySetup  // first run: every agent ready or missing
+	overlayPicker // ctrl+l, /agent, /model
+	overlaySkills // /skills
+	overlayHelp   // ? and /help
+	overlayInfo   // /connect, /remote, /web, /log
 )
 
 // chatTool is the data of a "tool" event: one tool call of a session's turn.
@@ -44,7 +52,11 @@ type chatTool struct {
 }
 
 // chatSession is a session seen in the event stream and the state its last event left it in.
-type chatSession struct{ id, kind, state string }
+type chatSession struct {
+	id, kind, state          string
+	title, agent, model, now string
+	since, turn              time.Time
+}
 
 // chatDecidedMsg is the result of posting an answer to /v1/decisions.
 type chatDecidedMsg struct {
@@ -69,8 +81,14 @@ type stripHit struct {
 	answer string
 }
 
-// event adds one daemon event to the transcript, the decision strip and the sessions it tracks.
+// event routes one daemon event: session events to their conversation, decisions to the
+// strip, a turn's tools and thinking to the transcript, everything else to the status line.
 func (m *chatView) event(kind, session, at string, data json.RawMessage) {
+	if strings.HasPrefix(kind, "session_") && session != "" {
+		if m.sessionEvent(kind, session, data) {
+			return
+		}
+	}
 	if session != "" {
 		m.track(session, kind)
 	}
@@ -101,7 +119,7 @@ func (m *chatView) event(kind, session, at string, data json.RawMessage) {
 		}
 	}
 	if t := eventText(kind, session, data); t != "" {
-		m.push(chatMsg{who: "daemon", at: at, text: t})
+		m.status(t)
 	}
 }
 
@@ -112,16 +130,19 @@ func (m *chatView) track(id, kind string) {
 		state = "failed"
 	case "done", "finished", "merged", "turn", "stopped":
 		state = "done"
-	case daemon.KindAsked:
+	case daemon.KindAsked, daemon.StatusNeedsYou:
 		state = "waiting"
 	}
 	for i := range m.sessions {
-		if m.sessions[i].id == id {
-			m.sessions[i].kind, m.sessions[i].state = kind, state
+		if s := &m.sessions[i]; s.id == id {
+			if state == "running" && s.state != "running" {
+				s.turn = time.Now()
+			}
+			s.kind, s.state = kind, state
 			return
 		}
 	}
-	m.sessions = append(m.sessions, chatSession{id: id, kind: kind, state: state})
+	m.sessions = append(m.sessions, chatSession{id: id, kind: kind, state: state, since: time.Now(), turn: time.Now()})
 }
 
 // setPending replaces the decisions waiting on the user, keeping one per id in arrival order.
@@ -229,11 +250,14 @@ func (m chatView) toggle(i int) chatView {
 func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	switch msg.String() {
 	case "tab":
-		m.overlay = overlayAgents
+		m.overlay, m.agentSel = overlayAgents, max(m.current2(), 0)
 		return true, nil
 	case "ctrl+k":
 		m.overlay, m.pal = overlayPalette, palette{}
 		return true, nil
+	case "ctrl+l":
+		m.openPicker(overlayPicker)
+		return true, m.loadSetup(false)
 	}
 	if m.input.Value() != "" || len([]rune(msg.Text)) != 1 {
 		return false, nil
@@ -245,8 +269,12 @@ func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 			}
 		}
 	}
-	if msg.Text == "v" {
+	switch msg.Text {
+	case "v":
 		m.setMode((m.mode + 1) % 3)
+		return true, nil
+	case "?":
+		m.overlay, m.pal = overlayHelp, palette{}
 		return true, nil
 	}
 	return false, nil
@@ -272,10 +300,33 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.setMode(next)
-	case "agents":
-		m.overlay = overlayAgents
+	case "agents", "sessions":
+		m.overlay, m.agentSel = overlayAgents, max(m.current2(), 0)
+	case "new":
+		m.newSession()
+		m.status("new session: your next message starts it with " + m.agentLabel())
+	case "stop":
+		return m.stopSession()
+	case "web":
+		return m.openWeb()
+	case "connect":
+		return m, m.showConnect()
+	case "remote":
+		m.showRemote()
+	case "log":
+		m.showLog()
 	case "palette":
 		m.overlay, m.pal = overlayPalette, palette{}
+	case "agent":
+		return m.agentCommand(arg)
+	case "model":
+		return m.modelCommand(arg)
+	case "skills":
+		m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
+		return m, m.loadSetup(false)
+	case "setup":
+		m.openPicker(overlaySetup)
+		return m, m.loadSetup(false)
 	case "answer":
 		if arg == "" {
 			m.system("usage: /answer <text>")
@@ -285,7 +336,7 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 	case "quit":
 		return m, tea.Quit
 	case "help":
-		m.system("/mode [minimal|expandable|verbose] · /agents · /palette · /answer <text> · /quit")
+		m.overlay, m.pal = overlayHelp, palette{}
 	default:
 		m.system("unknown command /" + name)
 	}
@@ -298,20 +349,24 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	if msg.Button != tea.MouseLeft {
 		return m, nil
 	}
+	const head = headRows
 	strip := m.stripRows()
+	inputY := m.height - 1 - m.input.Height()
 	switch {
-	case msg.Y < strip:
+	case m.overlay != overlayNone:
+		return m, nil
+	case msg.Y == head && strip > 0:
 		_, hits := m.strip(max(m.width, 20))
 		for _, h := range hits {
 			if msg.X >= h.x0 && msg.X < h.x1 {
 				return m, m.answer(h.answer)
 			}
 		}
-	case msg.Y == m.height-2:
+	case msg.Y >= inputY && msg.Y < m.height-1:
 		m.setFocus(-1)
-	case msg.Y < m.height-2 && m.overlay == overlayNone:
+	case msg.Y >= head+strip && msg.Y < head+strip+m.rows():
 		vis, idx := m.visible()
-		j := msg.Y - strip - (m.rows() - len(vis))
+		j := msg.Y - head - strip - (m.rows() - len(vis))
 		if j < 0 || j >= len(idx) {
 			return m, nil
 		}
@@ -327,23 +382,50 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if k == "ctrl+c" {
 		return m, tea.Quit
 	}
-	if m.overlay == overlayAgents {
+	switch m.overlay {
+	case overlaySetup, overlayPicker, overlaySkills:
+		return m.setupKey(msg)
+	case overlayAgents:
+		return m.agentsKey(k)
+	case overlayHelp, overlayInfo:
 		switch k {
-		case "tab", "esc":
+		case "esc", "q", "?":
+			if k == "q" && m.overlay == overlayHelp {
+				break
+			}
 			m.overlay = overlayNone
-		case "ctrl+k":
-			m.overlay, m.pal = overlayPalette, palette{}
+			return m, nil
+		case "up":
+			m.pal.sel = max(m.pal.sel-1, 0)
+		case "down":
+			m.pal.sel++
+		case "backspace":
+			if r := []rune(m.pal.query); len(r) > 0 {
+				m.pal = palette{query: string(r[:len(r)-1])}
+			}
+		default:
+			if m.overlay == overlayHelp && msg.Text != "" {
+				m.pal = palette{query: m.pal.query + msg.Text}
+			}
 		}
 		return m, nil
 	}
 	items := m.palItems()
 	switch k {
 	case "esc", "ctrl+k":
-		m.overlay = overlayNone
+		m.overlay, m.picker = overlayNone, nil
 	case "up":
 		m.pal.sel = max(m.pal.sel-1, 0)
 	case "down":
 		m.pal.sel = min(m.pal.sel+1, max(len(items)-1, 0))
+	case "tab":
+		for i := m.pal.sel + 1; i < len(items); i++ {
+			if items[i].group != items[m.pal.sel].group {
+				m.pal.sel = i
+				return m, nil
+			}
+		}
+		m.pal.sel = 0
 	case "backspace":
 		if r := []rune(m.pal.query); len(r) > 0 {
 			m.pal = palette{query: string(r[:len(r)-1])}
@@ -351,7 +433,11 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		m.overlay = overlayNone
 		if m.pal.sel < len(items) {
-			return m, items[m.pal.sel].run(&m)
+			c := items[m.pal.sel].run(&m)
+			if m.overlay == overlayNone {
+				m.picker = nil
+			}
+			return m, c
 		}
 	default:
 		if msg.Text != "" {
@@ -361,9 +447,45 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// agentsKey is the agents panel: move, open a session, stop it, start a new one.
+func (m chatView) agentsKey(k string) (tea.Model, tea.Cmd) {
+	switch k {
+	case "tab", "esc":
+		m.overlay = overlayNone
+	case "ctrl+k":
+		m.overlay, m.pal = overlayPalette, palette{}
+	case "up", "k":
+		m.agentSel = max(m.agentSel-1, 0)
+	case "down", "j":
+		m.agentSel = min(m.agentSel+1, max(len(m.sessions)-1, 0))
+	case "enter":
+		if m.agentSel < len(m.sessions) {
+			m.open(m.sessions[m.agentSel].id)
+		}
+		m.overlay = overlayNone
+	case "n":
+		m.newSession()
+		m.overlay = overlayNone
+	case "s":
+		if m.agentSel < len(m.sessions) && m.sess != nil {
+			api, id := m.sess, m.sessions[m.agentSel].id
+			return m, func() tea.Msg {
+				if err := api.StopSession(context.Background(), id); err != nil {
+					return sessionErrMsg{what: "stop", err: err}
+				}
+				return nil
+			}
+		}
+	}
+	return m, nil
+}
+
 // palItems are the palette's rows after the query filter, in group order.
 func (m chatView) palItems() []palItem {
 	t := m.th
+	if m.picker != nil {
+		return m.connectItems()
+	}
 	var all []palItem
 	for i, d := range m.pending {
 		all = append(all, palItem{group: "WAITING ON YOU", glyph: t.g.wait, color: t.warn, label: d.Question, hint: strings.Join(d.Options, " "+t.g.dot+" "),
@@ -375,14 +497,27 @@ func (m chatView) palItems() []palItem {
 	cycle := func(m *chatView) tea.Cmd { m.setMode((m.mode + 1) % 3); return nil }
 	agents := func(m *chatView) tea.Cmd { m.overlay = overlayAgents; return nil }
 	all = append(all,
+		palItem{group: "ACTIONS", glyph: "+", color: t.muted, label: "New session", hint: "your next message starts it", key: "/new", run: func(m *chatView) tea.Cmd { m.newSession(); return nil }},
+		palItem{group: "ACTIONS", glyph: t.g.sel, color: t.muted, label: "Agent and model", hint: m.agentLabel(), key: "ctrl+l", run: func(m *chatView) tea.Cmd { m.openPicker(overlayPicker); return m.loadSetup(false) }},
+		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Skills and MCP", hint: "what goes into every session", key: "/skills", run: func(m *chatView) tea.Cmd {
+			m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
+			return m.loadSetup(false)
+		}},
 		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Verbosity: " + m.mode.String(), hint: "minimal · expandable · verbose", key: "v", run: cycle},
 		palItem{group: "ACTIONS", glyph: t.g.on, color: t.muted, label: "Agents panel", hint: "sessions and waiting items", key: "tab", run: agents},
+		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Open the web UI", hint: "same sessions in the browser", key: "/web", run: func(m *chatView) tea.Cmd { _, c := m.openWeb(); return c }},
+		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Connect", hint: strings.TrimPrefix(m.server+" "+t.g.dot+" "+m.url, " "+t.g.dot+" "), key: "/connect", run: func(m *chatView) tea.Cmd { return m.showConnect() }},
+		palItem{group: "ACTIONS", glyph: t.g.dot, color: t.muted, label: "Daemon log", hint: fmt.Sprintf("%d events", len(m.noise)), key: "/log", run: func(m *chatView) tea.Cmd { m.showLog(); return nil }},
 		palItem{group: "ACTIONS", glyph: "↓", color: t.muted, label: "Jump to latest", key: "end", run: func(m *chatView) tea.Cmd { m.offset = 0; return nil }},
 		palItem{group: "ACTIONS", glyph: t.g.fail, color: t.muted, label: "Quit", key: "ctrl+c", run: func(*chatView) tea.Cmd { return tea.Quit }},
 	)
 	for _, s := range m.sessions {
 		g, c := m.sessionGlyph(s.state)
-		all = append(all, palItem{group: "SESSIONS", glyph: g, color: c, label: s.id, hint: s.kind, run: agents})
+		id, label := s.id, short(s.title, 48)
+		if label == "" {
+			label = s.id
+		}
+		all = append(all, palItem{group: "SESSIONS", glyph: g, color: c, label: label, hint: strings.Trim(s.agent+" "+t.g.dot+" "+s.state, " "+t.g.dot), run: func(m *chatView) tea.Cmd { m.open(id); return nil }})
 	}
 	all = append(all,
 		palItem{group: "SETTINGS", glyph: t.g.dot, color: t.muted, label: "chat.mode", hint: m.mode.String(), run: cycle},
@@ -446,104 +581,236 @@ func (m chatView) render(i, w int) []string {
 	return m.toolRows(i, w, true, i == b)
 }
 
-// summary is a run of tools on one line, as in Chat-Minimal: the worst status, then the names.
+// summary is a run of finished tools on one line, as in Chat-Minimal: the worst status, each
+// tool's name (an edit with its file and stat, a command with its first words and result), and
+// the time they took.
 func (m chatView) summary(a, b, w int) []string {
 	t := m.th
-	status, names := "ok", make([]string, 0, b-a+1)
+	status, parts, took := "ok", []string{}, 0.0
+	dim := t.fg(t.dim)
 	for _, c := range m.msgs[a : b+1] {
-		names = append(names, c.tool.Name)
-		if c.tool.Status == "failed" || (c.tool.Status == "running" && status == "ok") {
-			status = c.tool.Status
+		tl := c.tool
+		if tl.Status == "running" {
+			continue
+		}
+		if tl.Status == "failed" {
+			status = "failed"
+		}
+		part := dim.Render(tl.Name)
+		switch tl.Name {
+		case "Edit", "Write", "Diff", "MultiEdit":
+			if f := lastPart(tl.Arg); f != "" {
+				part += dim.Render(" " + f)
+			}
+			if strings.HasPrefix(tl.Stat, "+") {
+				part += " " + t.fg(t.text).Render(tl.Stat)
+			}
+		case "Bash":
+			part += dim.Render(" " + firstWords(tl.Arg, 2))
+			if tl.Status == "failed" {
+				part += " " + t.fg(t.err).Render("failed")
+			} else {
+				part += " " + t.fg(t.ok).Render("ok")
+			}
+		}
+		parts = append(parts, part)
+		var f float64
+		if _, err := fmt.Sscanf(tl.Took, "%fs", &f); err == nil {
+			took += f
 		}
 	}
+	if len(parts) == 0 {
+		return []string{}
+	}
 	g, col := m.toolGlyph(status)
-	line := "  " + t.fg(col).Render(g) + " " + t.fg(t.muted).Render(strings.Join(names, " "+t.g.dot+" "))
-	return []string{m.blockRow(a, w, line), ""}
+	right := ""
+	if took > 0 {
+		right = dim.Render(fmt.Sprintf("%.1fs", took))
+	}
+	p := strings.Repeat(" ", m.pad())
+	line := spread(p+"  "+t.fg(col).Render(g)+"  "+strings.Join(parts, dim.Render(" "+t.g.dot+" ")), right+p+"  ", w)
+	return []string{m.blockRow(a, w, ansi.Truncate(line, w, "…")), ""}
 }
 
-// toolRows is one tool block: a header with its status, arg and stats; its output when open.
+func lastPart(p string) string {
+	if i := strings.LastIndexByte(p, '/'); i >= 0 {
+		return p[i+1:]
+	}
+	return p
+}
+
+func firstWords(s string, n int) string {
+	f := strings.Fields(s)
+	if len(f) > n {
+		f = f[:n]
+	}
+	return strings.Join(f, " ")
+}
+
+// toolLine colors one line of a tool's output: added lines ok, removed lines failed, hunk
+// headers and notes dim.
+func (m chatView) toolLine(l string) string {
+	t := m.th
+	switch {
+	case strings.HasPrefix(l, "+++"), strings.HasPrefix(l, "---"), strings.HasPrefix(l, "@@"), strings.HasPrefix(l, "diff "), strings.HasPrefix(l, "index "), strings.HasPrefix(l, "…"):
+		return t.fg(t.dim).Render(l)
+	case strings.HasPrefix(l, "+"):
+		return t.fg(t.ok).Render(l)
+	case strings.HasPrefix(l, "-"):
+		return t.fg(t.err).Render(l)
+	}
+	return t.fg(t.text).Render(l)
+}
+
+// toolRows is one tool block: status glyph, name, argument, stat and time on one row, its
+// output below when open. A running tool spins and shimmers instead.
 func (m chatView) toolRows(i, w int, open, last bool) []string {
 	t := m.th
 	tl := m.msgs[i].tool
+	p := strings.Repeat(" ", m.pad())
+	dim := t.fg(t.dim)
 	g, col := m.toolGlyph(tl.Status)
-	arrow := ""
-	if m.mode != modeVerbose {
-		arrow = t.g.sel + " "
-		if open {
-			arrow = t.g.open + " "
+	arg := t.fg(t.text).Render(tl.Arg)
+	if tl.Status == "running" {
+		spin := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		if t.g.unicode {
+			g = spin[m.frame%len(spin)]
 		}
+		n := ansi.StringWidth(tl.Arg)
+		arg = t.shimmer(tl.Arg, math.Mod(float64(m.frame)*0.6, float64(n+12))-6)
 	}
-	var meta []string
-	for _, s := range []string{tl.Took, tl.Stat} {
-		if s != "" {
-			meta = append(meta, s)
-		}
+	name := tl.Name
+	if ansi.StringWidth(name) < 5 {
+		name += strings.Repeat(" ", 5-ansi.StringWidth(name))
 	}
-	head := "  " + t.fg(t.dim).Render(arrow) + t.fg(col).Render(g) + " " + t.fg(t.strong).Render(tl.Name)
-	if tl.Arg != "" {
-		head += " " + t.fg(t.text).Render(tl.Arg)
-	}
-	if len(meta) > 0 {
-		head += t.fg(t.dim).Render("  " + strings.Join(meta, " "+t.g.dot+" "))
-	}
-	rows := []string{m.blockRow(i, w, ansi.Truncate(head, w-1, "…"))}
-	if open {
-		for _, l := range tl.Lines {
-			for _, wl := range strings.Split(ansi.Wrap(clean(l), max(w-10, 10), ""), "\n") {
-				rows = append(rows, m.blockRow(i, w, "      "+t.fg(t.dim).Render(wl)))
+	left := p + "  " + t.fg(col).Render(g) + "  " + t.fg(t.strong).Bold(true).Render(name) + " " + arg
+	var right string
+	if m.mode == modeVerbose {
+		var meta []string
+		for _, s := range []string{tl.Took, tl.Stat} {
+			if s != "" {
+				meta = append(meta, s)
 			}
 		}
+		right = dim.Render(strings.Join(meta, " "+t.g.dot+" "))
+	} else {
+		took := tl.Took
+		if n := ansi.StringWidth(took); n < 5 {
+			took = strings.Repeat(" ", 5-n) + took
+		}
+		right = dim.Render(tl.Stat + "  " + took)
 	}
-	if last {
+	head := spread(ansi.Truncate(left, w-ansi.StringWidth(right)-m.pad()-4, "…"), right+p+"  ", w)
+	tier := t.focus
+	if m.mode == modeVerbose {
+		tier = t.raised
+	}
+	if !open {
+		tier = nil
+	}
+	rows := []string{m.tierRow(i, w, tier, head)}
+	if open {
+		ind := p + strings.Repeat(" ", 11)
+		for _, l := range tl.Lines {
+			for _, wl := range strings.Split(ansi.Wrap(clean(l), max(w-2*m.pad()-14, 10), ""), "\n") {
+				rows = append(rows, m.tierRow(i, w, tier, ind+m.toolLine(wl)))
+			}
+		}
+		rows = append(rows, m.tierRow(i, w, tier, ""))
+	}
+	if last || (open && m.mode == modeVerbose) {
 		rows = append(rows, "")
 	}
 	return rows
 }
 
-// blockRow lays one row of message i: the focused block sits on the focus tier behind a border.
-func (m chatView) blockRow(i, w int, s string) string {
+// tierRow lays a block row on background c between the gutters; the focused block also gets
+// the border mark at its left edge.
+func (m chatView) tierRow(i, w int, c color.Color, s string) string {
 	t := m.th
-	if i != m.focus {
+	if i == m.focus && c == nil {
+		c = t.focus
+	}
+	if c == nil {
 		return s
 	}
-	row := lipgloss.NewStyle()
-	if t.focus != nil {
-		row = row.Background(t.focus)
+	p := m.pad()
+	bw := w - 2*p
+	inner := ansi.Cut(s, p, w-p)
+	if i == m.focus {
+		inner = t.fg(t.accent).Render("▎") + ansi.Cut(inner, 1, bw)
 	}
-	return row.Width(w).MaxWidth(w).Render(t.fg(t.border).Render(t.g.pipe) + ansi.Cut(s, 1, w))
+	return strings.Repeat(" ", p) + fill(lipgloss.NewStyle().Background(c), bw, inner) + strings.Repeat(" ", p)
 }
+
+// blockRow lays one row of message i: the focused block sits on the focus tier.
+func (m chatView) blockRow(i, w int, s string) string { return m.tierRow(i, w, nil, s) }
 
 func (m chatView) stripRows() int {
 	if len(m.pending) == 0 {
 		return 0
 	}
-	return 1
+	return 2
 }
 
-// strip is the sticky top row for the first decision waiting on the user, and where each of
-// its options sits so a click can answer it.
+// strip is the sticky top row for the first decision waiting on the user, as in the Chat
+// mockups: the ? badge, the question, the first option as the ember button and the rest on the
+// focus tier, what runs on the right; and where each option sits so a click can answer it.
 func (m chatView) strip(w int) (string, []stripHit) {
 	t := m.th
 	d := m.pending[0]
 	row := lipgloss.NewStyle()
-	if t.overlay != nil {
-		row = row.Background(t.overlay)
+	if t.raised != nil {
+		row = row.Background(t.raised)
 	}
-	s := "  " + t.fg(t.warn).Render(t.g.wait) + " " + t.fg(t.strong).Render(short(d.Question, max(w/2, 20))) + "   "
+	bg := func(fg, b color.Color) lipgloss.Style {
+		st := lipgloss.NewStyle()
+		if fg != nil {
+			st = st.Foreground(fg)
+		}
+		if b != nil {
+			st = st.Background(b)
+		}
+		return st
+	}
+	p := strings.Repeat(" ", m.pad())
+	s := p + bg(t.surface, t.warn).Bold(true).Render(" "+t.g.wait+" ") + "  " + t.fg(t.strong).Render(short(d.Question, max(w/2, 20))) + "  "
 	var hits []stripHit
-	for _, o := range d.Options {
+	for n, o := range d.Options {
 		x := ansi.StringWidth(s)
-		s += t.fg(t.text).Render(firstRune(o)) + " " + t.fg(t.dim).Render(o)
+		label := " " + firstRune(o) + "  " + o + " "
+		if n == 0 {
+			s += bg(t.surface, t.accent).Bold(true).Render(label)
+		} else {
+			s += bg(t.text, t.focus).Render(label)
+		}
 		hits = append(hits, stripHit{x0: x, x1: ansi.StringWidth(s), answer: o})
-		s += "  "
+		s += " "
 	}
 	if len(d.Options) == 0 {
-		s += t.fg(t.dim).Render("/answer <text>  ")
+		s += t.fg(t.dim).Render("/answer <text>")
 	}
 	if n := len(m.pending) - 1; n > 0 {
-		s += t.fg(t.dim).Render(fmt.Sprintf("+%d more", n))
+		s += t.fg(t.dim).Render(fmt.Sprintf(" +%d more", n))
 	}
-	return row.Width(w).MaxWidth(w).Render(ansi.Truncate(s, w, "")), hits
+	var run []string
+	for _, x := range m.sessions {
+		if x.state == "running" {
+			name := x.title
+			if name == "" {
+				name = x.id
+			}
+			run = append(run, name)
+		}
+	}
+	right := ""
+	if len(run) > 0 {
+		right = t.fg(t.accent).Render(t.g.on) + t.fg(t.dim).Render(fmt.Sprintf(" %d running %s %s", len(run), t.g.dot, strings.Join(run, " "+t.g.dot+" ")))
+	}
+	if room := w - ansi.StringWidth(s) - m.pad() - 2; room > 12 && right != "" {
+		s = spread(s, ansi.Truncate(right, room, "…")+p, w)
+	}
+	return fill(row, w, s), hits
 }
 
 func (m chatView) panel(w int, rows []string) []string {
@@ -569,79 +836,10 @@ func (m chatView) panel(w int, rows []string) []string {
 func spread(left, right string, w int) string {
 	gap := w - ansi.StringWidth(left) - ansi.StringWidth(right)
 	if gap < 1 {
+		if rw := ansi.StringWidth(right); rw+10 < w {
+			return ansi.Truncate(left, w-rw-1, "…") + " " + right
+		}
 		return left
 	}
 	return left + strings.Repeat(" ", gap) + right
-}
-
-// agentsPanel is the tab overlay, as in the Board mockup: the sessions seen and what waits on you.
-func (m chatView) agentsPanel(w int) []string {
-	t := m.th
-	running := 0
-	for _, s := range m.sessions {
-		if s.state == "running" {
-			running++
-		}
-	}
-	dim := t.fg(t.dim)
-	rows := []string{
-		"",
-		spread("  "+t.fg(t.strong).Render("Agents"), dim.Render("tab close  "), w),
-		"  " + dim.Render(fmt.Sprintf("%d running %s %d sessions", running, t.g.dot, len(m.sessions))),
-		"",
-	}
-	for _, s := range m.sessions {
-		g, c := m.sessionGlyph(s.state)
-		rows = append(rows, "  "+t.fg(c).Render(g)+" "+t.fg(t.strong).Render(fmt.Sprintf("%-12s", s.id))+" "+dim.Render(s.kind))
-	}
-	if len(m.sessions) == 0 {
-		rows = append(rows, "  "+dim.Render("no sessions yet"))
-	}
-	if len(m.pending) > 0 {
-		rows = append(rows, "", "  "+t.fg(t.muted).Render("Waiting on you"))
-		for _, d := range m.pending {
-			rows = append(rows, "  "+t.fg(t.warn).Render(t.g.wait)+" "+t.fg(t.strong).Render(fmt.Sprintf("%-12s", d.ID))+" "+t.fg(t.text).Render(d.Question))
-		}
-	}
-	return m.panel(w, rows)
-}
-
-// palettePanel is the ctrl+k overlay, as in the Palette mockup: a query and grouped results.
-func (m chatView) palettePanel(w int) []string {
-	t := m.th
-	dim := t.fg(t.dim)
-	q := m.pal.query
-	if q == "" {
-		q = dim.Render("Search actions, sessions and settings")
-	}
-	rows := []string{"", spread("  "+t.fg(t.accent).Render(t.g.prompt)+" "+q, dim.Render("esc  "), w), ""}
-	group := ""
-	sel := lipgloss.NewStyle()
-	if t.border != nil {
-		sel = sel.Background(t.border)
-	}
-	for n, it := range m.palItems() {
-		if it.group != group {
-			group = it.group
-			rows = append(rows, "  "+t.fg(t.muted).Render(group))
-		}
-		lead, label := "  ", t.fg(t.text)
-		if n == m.pal.sel {
-			lead, label = t.g.sel+" ", t.fg(t.strong)
-		}
-		r := spread("  "+lead+t.fg(it.color).Render(it.glyph)+" "+label.Render(it.label)+"  "+dim.Render(it.hint), t.fg(t.text).Render(it.key)+"  ", w)
-		if n == m.pal.sel {
-			r = sel.Width(w).MaxWidth(w).Render(r)
-		}
-		rows = append(rows, r)
-	}
-	foot := dim.Render("  ↑↓ move   enter run   esc close")
-	n := m.rows()
-	if len(rows) >= n {
-		rows = rows[:n-1]
-	}
-	for len(rows) < n-1 {
-		rows = append(rows, "")
-	}
-	return m.panel(w, append(rows, foot))
 }

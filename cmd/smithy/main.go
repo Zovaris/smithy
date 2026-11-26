@@ -255,6 +255,9 @@ func main() {
 	if len(os.Args) < 2 {
 		os.Exit(bare(noArgs, terminal(os.Stdin) && terminal(os.Stdout)))
 	}
+	if os.Args[1] == "--standalone" {
+		os.Args = append([]string{os.Args[0], "chat"}, os.Args[1:]...)
+	}
 	switch os.Args[1] {
 	case "help", "--help", "-h":
 		os.Exit(helpMain(os.Args[2:]))

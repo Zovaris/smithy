@@ -28,117 +28,8 @@ func withVersion(p Probe, v string, err error) Probe {
 	return p
 }
 
-func withCred(p Probe) Probe {
-	p.Secret = func(svc string) string {
-		if svc == "claude" {
-			return "tok"
-		}
-		return ""
-	}
-	return p
-}
-
-func setNetwork(t *testing.T, n string) {
-	t.Helper()
-	t.Setenv("SMITHY_CONFIG", filepath.Join(t.TempDir(), "c.json"))
-	if n != "" {
-		if err := config.Set(config.UserFile(), "auto.sandbox_network", n); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
-func TestContainerCheckNetworkAndCredential(t *testing.T) {
-	for _, n := range []string{"", "none"} {
-		setNetwork(t, n)
-		if err := SandboxCheck("container", "claude", withCred(probe("linux", "docker"))); err == nil || err.Error() != ContainerNoNetwork {
-			t.Errorf("network %q: want refusal, got %v", n, err)
-		}
-	}
-	setNetwork(t, "bridge")
-	if err := SandboxCheck("container", "claude", probe("linux", "docker")); err == nil || !strings.Contains(err.Error(), "claude setup-token, then smithy auth set claude") {
-		t.Errorf("no credential: %v", err)
-	}
-	p := probe("linux", "docker")
-	p.Getenv = func(k string) string {
-		if k == "ANTHROPIC_API_KEY" {
-			return "k"
-		}
-		return ""
-	}
-	if err := SandboxCheck("container", "claude", p); err != nil {
-		t.Errorf("env credential: %v", err)
-	}
-}
-
-func TestContainerSecrets(t *testing.T) {
-	sec := func(svc string) string { return map[string]string{"claude": "c", "anthropic": "a", "openai": "o"}[svc] }
-	host := []string{"PATH=/bin", "ANTHROPIC_API_KEY=env", "OPENAI_API_KEY=hostopenai"}
-	cases := []struct {
-		kind, model string
-		want        []string
-	}{
-		{"claude", "", []string{"PATH=/bin", "ANTHROPIC_API_KEY=env", "CLAUDE_CODE_OAUTH_TOKEN=c"}},
-		{"codex", "", []string{"PATH=/bin", "OPENAI_API_KEY=hostopenai"}},
-		{"opencode", "opencode/big-pickle", []string{"PATH=/bin"}},
-		{"opencode", "anthropic/claude-x", []string{"PATH=/bin", "ANTHROPIC_API_KEY=env"}},
-		{"gemini", "", []string{"PATH=/bin"}},
-	}
-	for _, c := range cases {
-		if got := ContainerSecrets(host, ContainerCreds(c.kind, c.model), sec); !slices.Equal(got, c.want) {
-			t.Errorf("%s %s: env = %v, want %v", c.kind, c.model, got, c.want)
-		}
-	}
-	if got := ContainerSecrets([]string{"OPENAI_API_KEY="}, ContainerCreds("codex", ""), sec); !slices.Equal(got, []string{"OPENAI_API_KEY=", "OPENAI_API_KEY=o"}) {
-		t.Errorf("empty env value is filled from smithy auth: %v", got)
-	}
-	got := ContainerSecrets([]string{"PATH=/bin"}, ContainerCreds("claude", ""), sec)
-	env, names := ContainerEnv(got)
-	c := Container{Engine: "docker", Image: "i", Cwd: "/w", Env: names}
-	argv := strings.Join(c.Argv([]string{"claude"}), " ")
-	if strings.Contains(argv, "=c") || strings.Contains(argv, "=o") || !strings.Contains(argv, "-e CLAUDE_CODE_OAUTH_TOKEN ") {
-		t.Errorf("secret values must stay off argv: %s", argv)
-	}
-	if !slices.Contains(env, "CLAUDE_CODE_OAUTH_TOKEN=c") {
-		t.Errorf("value must be in the engine env: %v", env)
-	}
-}
-
-func TestContainerEngineKiri(t *testing.T) {
-	p := probe("darwin")
-	p.Home = "/h"
-	p.Exists = func(f string) bool { return f == "/h/.kiri/bin/docker" }
-	if e := ContainerEngine(p); e != "/h/.kiri/bin/docker" {
-		t.Errorf("engine = %q", e)
-	}
-}
-
-func TestDockerHost(t *testing.T) {
-	socks := map[string]bool{}
-	p := Probe{Home: "/h", Exists: func(f string) bool { return socks[f] }, Getenv: func(string) string { return "" },
-		Context: func(string) string { return "unix:///h/.orbstack/run/docker.sock" }}
-	if set, ep := DockerHost("docker", p); set != "" || ep != "" {
-		t.Errorf("no socket anywhere: %q %q", set, ep)
-	}
-	socks["/h/.kiri/run/docker.sock"], socks["/var/run/docker.sock"] = true, true
-	if set, _ := DockerHost("docker", p); set != "unix:///h/.kiri/run/docker.sock" {
-		t.Errorf("dead context falls back to kiri first: %q", set)
-	}
-	socks["/h/.orbstack/run/docker.sock"] = true
-	if set, ep := DockerHost("docker", p); set != "" || ep != "unix:///h/.orbstack/run/docker.sock" {
-		t.Errorf("live context is kept: %q %q", set, ep)
-	}
-	p.Getenv = func(string) string { return "tcp://x" }
-	if set, ep := DockerHost("docker", p); set != "" || ep != "tcp://x" {
-		t.Errorf("DOCKER_HOST wins: %q %q", set, ep)
-	}
-	if set, _ := DockerHost("podman", p); set != "" {
-		t.Errorf("podman unchanged: %q", set)
-	}
-}
-
 func TestSandboxCheck(t *testing.T) {
-	setNetwork(t, "bridge")
+	t.Setenv("SMITHY_CONFIG", filepath.Join(t.TempDir(), "c.json"))
 	cases := []struct {
 		mode, cli string
 		p         Probe
@@ -154,11 +45,8 @@ func TestSandboxCheck(t *testing.T) {
 		{"native", "codex", probe("darwin"), true},
 		{"native", "opencode", probe("darwin", "/usr/bin/sandbox-exec"), false},
 		{"native", "custom", probe("darwin", "/usr/bin/sandbox-exec"), false},
-		{"container", "claude", withCred(probe("linux", "podman")), true},
-		{"container", "claude", probe("linux", "podman"), false},
-		{"container", "codex", probe("linux", "podman"), false},
-		{"container", "opencode", probe("linux", "podman"), true},
-		{"container", "claude", probe("linux"), false},
+		{"container", "claude", probe("linux", "docker", "podman"), false},
+		{"container", "opencode", probe("linux", "docker", "podman"), false},
 		{"bogus", "claude", probe("linux"), false},
 		{"native", "claude", withVersion(probe("darwin", "/usr/bin/sandbox-exec"), "2.1.330 (Claude Code)", nil), false},
 		{"native", "claude", withVersion(probe("darwin", "/usr/bin/sandbox-exec"), "2.2.0 (Claude Code)", nil), true},
@@ -170,18 +58,6 @@ func TestSandboxCheck(t *testing.T) {
 		if err := SandboxCheck(c.mode, c.cli, c.p); (err == nil) != c.ok {
 			t.Errorf("SandboxCheck(%s, %s, %s) = %v, want ok=%v", c.mode, c.cli, c.p.GOOS, err, c.ok)
 		}
-	}
-}
-
-func TestContainerEngine(t *testing.T) {
-	if e := ContainerEngine(probe("linux", "docker", "podman")); e != "docker" {
-		t.Errorf("engine = %q, want docker first", e)
-	}
-	if e := ContainerEngine(probe("linux", "podman")); e != "podman" {
-		t.Errorf("engine = %q, want podman", e)
-	}
-	if e := ContainerEngine(probe("linux")); e != "" {
-		t.Errorf("engine = %q, want none", e)
 	}
 }
 
@@ -278,22 +154,6 @@ func TestNativeSettingsPoolDirs(t *testing.T) {
 	}
 }
 
-func TestOverlaps(t *testing.T) {
-	dirs := []string{"/h/.smithy/accounts", "/acct/b"}
-	for d, want := range map[string]bool{"/acct/b": true, "/acct/b/x": true, "/acct": true, "/acct/bb": false, "/w": false} {
-		if overlaps(d, dirs) != want {
-			t.Errorf("overlaps(%s) = %v", d, !want)
-		}
-	}
-}
-
-func TestContainerEnvNoPoolLogin(t *testing.T) {
-	_, names := ContainerEnv([]string{"CLAUDE_CONFIG_DIR=/acct/a", "CODEX_HOME=/acct/b", "AGENT_MODEL=m"})
-	if slices.Contains(names, "CLAUDE_CONFIG_DIR") || slices.Contains(names, "CODEX_HOME") {
-		t.Errorf("pool account dirs never pass into a container: %v", names)
-	}
-}
-
 func TestNativeDirs(t *testing.T) {
 	add, ro := NativeDirs([]string{"/h/.smithy", "/skills", "/w"}, "/h/.smithy", "/h/.smithy/plans", "/h/.smithy/warden", "/w")
 	if !slices.Equal(add, []string{"/h/.smithy/plans", "/h/.smithy/warden", "/skills"}) || !slices.Equal(ro, []string{"/skills"}) {
@@ -324,54 +184,6 @@ func TestBuildNativeSandbox(t *testing.T) {
 	s, _ = Build("codex", o, "p", nil, "", env)
 	if !slices.Contains(s.Argv, "sandbox_workspace_write.network_access=true") {
 		t.Errorf("codex off keeps network: %v", s.Argv)
-	}
-}
-
-func TestContainerArgv(t *testing.T) {
-	c := Container{Engine: "docker", Image: "smithy-sandbox", Cwd: "/w/repo-feat", User: "501:20",
-		Mounts: []string{"/w/repo-feat", "/w/repo/.git", "/h/.smithy/plans"}, ReadOnly: []string{"/w/repo/.git/hooks", "/w/repo/.git/config"},
-		Env: []string{"AGENT_MODEL", "GH_TOKEN"}}
-	got := c.Argv([]string{"claude", "-p", "--output-format", "json"})
-	want := []string{"docker", "run", "--rm", "-i", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
-		"--read-only", "--tmpfs", "/tmp", "--pids-limit", "512", "--memory", "4g", "--network", "none", "--user", "501:20",
-		"-w", "/w/repo-feat", "-v", "/w/repo-feat:/w/repo-feat", "-v", "/w/repo/.git:/w/repo/.git", "-v", "/h/.smithy/plans:/h/.smithy/plans",
-		"-v", "/w/repo/.git/hooks:/w/repo/.git/hooks:ro", "-v", "/w/repo/.git/config:/w/repo/.git/config:ro",
-		"-e", "HOME=/tmp", "-e", "AGENT_MODEL", "-e", "GH_TOKEN", "smithy-sandbox", "claude", "-p", "--output-format", "json"}
-	if !slices.Equal(got, want) {
-		t.Errorf("argv =\n%v\nwant\n%v", got, want)
-	}
-	c.Engine, c.Network, c.Memory = "podman", "bridge", "8g"
-	got = c.Argv([]string{"claude"})
-	for _, pair := range [][2]string{{"--network", "bridge"}, {"--memory", "8g"}} {
-		if i := slices.Index(got, pair[0]); i < 0 || got[i+1] != pair[1] {
-			t.Errorf("%s: %v", pair[0], got)
-		}
-	}
-	if !slices.Contains(got, "--userns=keep-id") || slices.Contains(got, "--user") {
-		t.Errorf("podman keeps the host uid with --userns=keep-id: %v", got)
-	}
-}
-
-func TestContainerEnv(t *testing.T) {
-	base := []string{"PATH=/bin", "AGENT_MODEL=m", "GH_TOKEN=host-token", "LINEAR_API_KEY=k", "AWS_SECRET_ACCESS_KEY=s", "HTTPS_PROXY=http://p:3128",
-		"ANTHROPIC_API_KEY=a", ProfileEnv + "=auto", "SMITHY_SANDBOX_GH_TOKEN=scoped"}
-	env, names := ContainerEnv(base)
-	for _, n := range []string{"AGENT_MODEL", "HTTPS_PROXY", "ANTHROPIC_API_KEY", ProfileEnv, "GH_TOKEN"} {
-		if !slices.Contains(names, n) {
-			t.Errorf("names misses %s: %v", n, names)
-		}
-	}
-	for _, n := range []string{"PATH", "LINEAR_API_KEY", "AWS_SECRET_ACCESS_KEY", "SMITHY_SANDBOX_GH_TOKEN"} {
-		if slices.Contains(names, n) {
-			t.Errorf("names must not pass %s: %v", n, names)
-		}
-	}
-	if !slices.Contains(env, "GH_TOKEN=scoped") || slices.Contains(env, "GH_TOKEN=host-token") {
-		t.Errorf("GH_TOKEN must be the scoped token: %v", env)
-	}
-	_, names = ContainerEnv([]string{"GH_TOKEN=host-token", "GITHUB_TOKEN=x"})
-	if slices.Contains(names, "GH_TOKEN") || slices.Contains(names, "GITHUB_TOKEN") {
-		t.Errorf("host GitHub tokens never pass without SMITHY_SANDBOX_GH_TOKEN: %v", names)
 	}
 }
 
@@ -506,7 +318,7 @@ func TestSandboxCheckGeminiNativeRefused(t *testing.T) {
 		if err == nil {
 			t.Fatalf("%s: gemini native must be refused", goos)
 		}
-		for _, want := range []string{"gemini", "host", "auto.sandbox container"} {
+		for _, want := range []string{"gemini", "host"} {
 			if !strings.Contains(err.Error(), want) {
 				t.Errorf("%s: refusal %q lacks %q", goos, err, want)
 			}
@@ -514,94 +326,12 @@ func TestSandboxCheckGeminiNativeRefused(t *testing.T) {
 	}
 }
 
-func TestSandboxCheckAgentPoolContainer(t *testing.T) {
-	t.Setenv("SMITHY_HOME", t.TempDir())
-	setNetwork(t, "bridge")
-	if err := os.WriteFile(pool.File(), []byte(`{"accounts":[{"name":"a","harness":"claude","dir":"/acct/a"},{"name":"b","harness":"codex","dir":"/acct/b"}]}`), 0o600); err != nil {
+func TestSandboxModeContainerRemoved(t *testing.T) {
+	t.Setenv("SMITHY_CONFIG", filepath.Join(t.TempDir(), "c.json"))
+	if err := config.Set(config.UserFile(), "auto.sandbox", "container"); err != nil {
 		t.Fatal(err)
 	}
-	p := probe("linux", "docker")
-	if err := SandboxCheckAgent("container", "pool", p); err == nil || !strings.Contains(err.Error(), "smithy auth set claude:a") {
-		t.Errorf("a claude account needs its own token: %v", err)
-	}
-	p.Secret = func(svc string) string {
-		if svc == "claude" {
-			return "shared"
-		}
-		return ""
-	}
-	if err := SandboxCheckAgent("container", "pool", p); err == nil {
-		t.Error("the shared claude token is not the account's login")
-	}
-	p.Secret = func(svc string) string {
-		if svc == "claude:a" {
-			return "tok"
-		}
-		return ""
-	}
-	if err := SandboxCheckAgent("container", "pool", p); err != nil {
-		t.Errorf("every account can run: %v", err)
-	}
-	setNetwork(t, "none")
-	if err := SandboxCheckAgent("container", "pool", p); err == nil || err.Error() != ContainerNoNetwork {
-		t.Errorf("network still checked: %v", err)
-	}
-}
-
-func TestPoolContainerCreds(t *testing.T) {
-	if got := PoolContainerCreds(pool.Account{Name: "w", Harness: "claude"}); !slices.Equal(got, [][2]string{{"claude:w", "CLAUDE_CODE_OAUTH_TOKEN"}}) {
-		t.Errorf("claude = %v", got)
-	}
-	if got := PoolContainerCreds(pool.Account{Name: "w", Harness: "codex"}); got != nil {
-		t.Errorf("codex logs in from its dir: %v", got)
-	}
-}
-
-func TestContainerMountsPoolAccount(t *testing.T) {
-	t.Setenv("SMITHY_HOME", t.TempDir())
-	setNetwork(t, "bridge")
-	cwd, a, b := t.TempDir(), t.TempDir(), t.TempDir()
-	body := `{"accounts":[{"name":"a","harness":"codex","dir":"` + a + `"},{"name":"b","harness":"codex","dir":"` + b + `"}]}`
-	if err := os.WriteFile(pool.File(), []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	c, err := container(cwd, "", pool.Account{Name: "a", Harness: "codex", Dir: a})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !slices.Contains(c.Mounts, a) || slices.Contains(c.Mounts, b) {
-		t.Errorf("only the run's account dir is mounted: %v", c.Mounts)
-	}
-	if !slices.Contains(c.Env, "CODEX_HOME") {
-		t.Errorf("the account's env var passes in: %v", c.Env)
-	}
-	for _, bad := range []string{filepath.Dir(a), os.Getenv("SMITHY_HOME")} {
-		if _, err := container(cwd, "", pool.Account{Name: "x", Harness: "codex", Dir: bad}); err == nil {
-			t.Errorf("a dir holding other accounts or smithy home must refuse: %s", bad)
-		}
-	}
-	c, err = container(cwd, "", pool.Account{})
-	if err != nil || slices.Contains(c.Mounts, a) || len(c.Env) != 0 {
-		t.Errorf("no account, no account dir: %v %v %v", c.Mounts, c.Env, err)
-	}
-}
-
-func TestContainerCheckDefaultImageHarnesses(t *testing.T) {
-	setNetwork(t, "bridge")
-	p := withCred(probe("linux", "docker"))
-	for _, cli := range []string{"codex", "gemini", "cursor", "pi", "dsh"} {
-		if err := SandboxCheck("container", cli, p); err == nil || !strings.Contains(err.Error(), "auto.sandbox_image") {
-			t.Errorf("%s on the default image: want refusal naming auto.sandbox_image, got %v", cli, err)
-		}
-	}
-	if err := SandboxCheck("container", "opencode", p); err != nil {
-		t.Errorf("opencode is in the default image: %v", err)
-	}
-}
-
-func TestContainerRefusesHostNetwork(t *testing.T) {
-	setNetwork(t, "host")
-	if err := SandboxCheck("container", "opencode", withCred(probe("linux", "docker"))); err == nil || !strings.Contains(err.Error(), "host") {
-		t.Errorf("host network shares the host's: want refusal, got %v", err)
+	if m, err := SandboxMode(); !errors.Is(err, ErrContainerRemoved) || m != "" {
+		t.Fatalf("SandboxMode() = %q, %v; want ErrContainerRemoved", m, err)
 	}
 }

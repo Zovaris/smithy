@@ -16,6 +16,7 @@ import (
 	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/guard"
 	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/usage"
 )
@@ -59,7 +60,7 @@ func (s apiSink) event(kind, detail string) {
 	_ = events.Append(e)
 }
 
-func (s apiSink) Text(t string) { io.WriteString(s.out, t) }
+func (s apiSink) Text(t string) { _, _ = io.WriteString(s.out, t) }
 
 func (s apiSink) Tool(c apiloop.ToolCall, r apiloop.ToolResult) {
 	st := "completed"
@@ -91,9 +92,6 @@ func runAPI(o Options, cli string) int {
 		return needsHarness("agent --backend api")
 	}
 	mode, err := SandboxMode()
-	if err == nil && mode == "container" {
-		err = errAPIContainer
-	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
 		return 1
@@ -196,6 +194,8 @@ func runAPI(o Options, cli string) int {
 func apiTools(o Options, model, mode string, p Probe) (*tools.Set, error) {
 	extra, _ := SandboxSetting("auto.sandbox_domains", "")
 	s := &tools.Set{Cwd: o.Cwd, Model: model, Allow: AutoTools(o.SmithyBins), Deny: AutoDenied(o.SmithyBins), Hosts: SandboxDomains(extra), ReadOnly: o.ReadOnly}
+	s.Guard = func(cmd string) (bool, string) { return guard.HookGuard().Check(context.Background(), cmd) }
+	s.FetchGuard = func(host string) (bool, string) { return guard.HookGuard().CheckFetch(context.Background(), host) }
 	if v := os.Getenv("HTTPS_PROXY"); v != "" {
 		if u, err := url.Parse(v); err == nil && u.Host != "" {
 			s.Proxy = u

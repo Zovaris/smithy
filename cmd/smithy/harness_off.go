@@ -13,7 +13,7 @@ import (
 const harnessBuild = false
 
 // harnessOnly are the commands only the harness build carries; here they say how to get it.
-var harnessOnly = []string{"daemon", "attach", "board", "chat", "web", "mcp"}
+var harnessOnly = []string{"daemon", "attach", "board", "chat", "web", "mcp", "stop", "pair", "servers"}
 
 func init() {
 	for _, name := range harnessOnly {

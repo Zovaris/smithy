@@ -166,6 +166,7 @@ func TestBackoffGrowsAndIsCapped(t *testing.T) {
 }
 
 func TestCost(t *testing.T) {
+	useFeed(t, func() ([]byte, error) { return []byte(feed), nil })
 	u := usage.Usage{Input: 1_000_000, Output: 1_000_000, CacheRead: 1_000_000, CacheWrite: 1_000_000}
 	c := Cost("anthropic", "claude-sonnet-4-5-20250929", u)
 	if c == nil || *c < 22.049 || *c > 22.051 {

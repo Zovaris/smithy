@@ -9,18 +9,18 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/guard"
 )
 
 // Usage is the text for `smithy proxy --help`.
-const Usage = `usage: smithy proxy serve [--addr :8877] [--allow host,...] [--ask-timeout 5m] | approve <id> | deny <id>
-serve is the egress proxy a container worker uses under auto.sandbox_network proxy (smithy agent
-starts it as the smithy-proxy sidecar, which sees only auth.json and auth.key read-only and ~/.smithy/proxy): CONNECT only to --allow hosts on 443, and
+const Usage = `usage: smithy proxy serve [--addr 127.0.0.1:8877] [--allow host,...] [--ask-timeout 5m] | approve <id> | deny <id>
+serve runs the egress proxy natively on this machine (loopback by default; no container needed):
+CONNECT only to --allow hosts on 443, and
 /s/<secret>/<path> sends a key bound with smithy auth bind to its host. A write held by an ask
 secret is logged as a secret_ask event; approve or deny it by id, else it is denied after --ask-timeout.`
 
@@ -50,7 +50,7 @@ func EventsApprover(timeout, poll time.Duration) func(context.Context, Ask) bool
 			}
 			select {
 			case <-ctx.Done():
-				events.AppendProxy(events.Event{Kind: "secret_denied", ID: id, Detail: "timed out"})
+				_ = events.AppendProxy(events.Event{Kind: "secret_denied", ID: id, Detail: "timed out"})
 				return false
 			case <-t.C:
 			}
@@ -86,7 +86,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, kind, args[1])
 		return 0
 	case len(args) >= 1 && args[0] == "serve":
-		addr, allow, timeout := ":"+strconv.Itoa(Port), DefaultDomains, 5*time.Minute
+		addr, allow, timeout := DefaultAddr, DefaultDomains, 5*time.Minute
 		for rest := args[1:]; len(rest) > 0; rest = rest[2:] {
 			if len(rest) < 2 {
 				return fail(2, fmt.Errorf("%s needs a value", rest[0]))
@@ -112,11 +112,12 @@ func Main(args []string, stdout, stderr io.Writer) int {
 			}
 		}
 		p := &Proxy{Allow: allow, Secrets: auth.Secret, Approve: EventsApprover(timeout, time.Second),
+			Guard: func(ctx context.Context, host string) (bool, string) { return guard.HookGuard().CheckFetch(ctx, host) },
 			Log: func(e Entry) {
 				line := fmt.Sprintf("%s %s %s %s %d", e.Kind, e.Name, e.Method, e.Host, e.Status)
 				fmt.Fprintln(stderr, time.Now().UTC().Format(time.RFC3339), line)
 				if e.Status >= 400 {
-					events.AppendProxy(events.Event{Kind: "proxy_denied", Detail: line})
+					_ = events.AppendProxy(events.Event{Kind: "proxy_denied", Detail: line})
 				}
 			}}
 		fmt.Fprintf(stderr, "smithy proxy: listening on %s, %d allowed hosts\n", addr, len(allow))

@@ -13,10 +13,10 @@ func StripEscapes(s string, keepTab bool) string {
 		c := r[i]
 		switch {
 		case c == 0x1b && i+1 < len(r) && r[i+1] == '[':
-			for i += 2; i < len(r) && (r[i] < 0x40 || r[i] > 0x7e); i++ {
+			for i += 2; i < len(r) && (r[i] < 0x40 || r[i] > 0x7e); i++ { //revive:disable-line:empty-block skips the CSI body
 			}
 		case c == 0x1b && i+1 < len(r) && r[i+1] == ']':
-			for i += 2; i < len(r) && r[i] != 0x07 && !(r[i] == 0x1b && i+1 < len(r) && r[i+1] == '\\'); i++ {
+			for i += 2; i < len(r) && r[i] != 0x07 && !(r[i] == 0x1b && i+1 < len(r) && r[i+1] == '\\'); i++ { //revive:disable-line:empty-block skips the OSC body
 			}
 			if i < len(r) && r[i] == 0x1b {
 				i++

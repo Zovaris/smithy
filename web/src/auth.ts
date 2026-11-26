@@ -23,6 +23,31 @@ export function authHeaders(token: string): Record<string, string> {
 }
 
 let current = "";
+let server = "";
+const SERVER = "smithy.server";
+
+// serverPath sends a picked server's API through this daemon's /v1/servers/<name> proxy, which
+// adds that server's token; "" is this machine. The server list itself is always this machine's.
+export function serverPath(path: string, srv: string): string {
+  if (!srv || !path.startsWith("/v1/") || path === "/v1/servers" || path.startsWith("/v1/servers/")) return path;
+  return `/v1/servers/${encodeURIComponent(srv)}${path}`;
+}
+
+export function currentServer(): string {
+  return server;
+}
+
+// pickServer remembers the server for this tab and reloads into it ("" is this machine).
+export function pickServer(srv: string, hash = "#/new"): void {
+  try {
+    if (srv) sessionStorage.setItem(SERVER, srv);
+    else sessionStorage.removeItem(SERVER);
+  } catch {
+    /* no storage: the pick lasts until the reload */
+  }
+  location.hash = hash;
+  location.reload();
+}
 
 export function initAuth(): void {
   let store: Store;
@@ -34,9 +59,10 @@ export function initAuth(): void {
   }
   const r = takeToken(location.hash, store);
   current = r.token;
+  server = store.getItem(SERVER) ?? "";
   if (r.hash !== location.hash) history.replaceState(null, "", location.pathname + location.search + r.hash);
 }
 
 export function api(path: string, init: RequestInit = {}): Promise<Response> {
-  return fetch(path, { ...init, headers: { ...authHeaders(current), ...(init.headers as Record<string, string>) } });
+  return fetch(serverPath(path, server), { ...init, headers: { ...authHeaders(current), ...(init.headers as Record<string, string>) } });
 }

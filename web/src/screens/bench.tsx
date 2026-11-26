@@ -19,35 +19,39 @@ export default function Bench() {
   useEffect(() => {
     api("/v1/bench").then((r) => (r.ok ? r.json() : [])).then((rs: Run[]) => {
       setRuns(rs);
-      if (rs.length > 1) (setA(rs[1].id), setB(rs[0].id));
+      if (rs.length > 1) {
+        setA(rs[1].id);
+        setB(rs[0].id);
+      }
     });
   }, []);
   useEffect(() => {
     if (!a || !b) return;
     api(`/v1/bench/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`).then((r) => (r.ok ? r.json() : null)).then(setCmp);
   }, [a, b]);
-  if (!runs) return <p class="dim">loading…</p>;
+  if (!runs) return <section class="page"><p class="t3">Reading the runs…</p></section>;
   const pick = (v: string, set: (s: string) => void) => (
-    <select value={v} onChange={(e) => set((e.target as HTMLSelectElement).value)}>
+    <select class="btn sm" value={v} onChange={(e) => set((e.target as HTMLSelectElement).value)}>
       {runs.map((r) => <option value={r.id}>{r.id}</option>)}
     </select>
   );
   return (
-    <section aria-label="Bench">
-      <h1 class="h">Bench <span class="dim">{runs.length} runs</span></h1>
-      {!runs.length && <p class="dim">no runs yet: <code>smithy bench run --agent claude</code></p>}
-      <ul class="list">
-        {runs.map((r) => (
-          <li>
-            <span class="strong id">{r.id}</span> {r.passed}/{r.total} ({Math.round(r.pass_rate * 100)}%) · {Math.round(r.seconds)}s · {cost(r.usage)}
-            <span class="right dim">{[r.agent, r.model, r.skills && "skills " + r.skills].filter(Boolean).join(" ")}</span>
-          </li>
-        ))}
-      </ul>
+    <section class="page" aria-label="Bench">
+      <header><h2>Bench</h2><p>{runs.length ? `${runs.length} saved runs` : <>No runs yet: <code>smithy bench run --agent claude</code></>}</p></header>
+      {!!runs.length && (
+        <div class="card">
+          {runs.map((r) => (
+            <div class="row2">
+              <div class="top2"><span class="mono" style="font-weight:500">{r.id}</span><span class="sp" /><span class="mono">{r.passed}/{r.total} · {Math.round(r.pass_rate * 100)}%</span></div>
+              <span class="t3" style="font-size:12px">{[r.agent, r.model, r.skills && "skills " + r.skills].filter(Boolean).join(" · ")} · {Math.round(r.seconds)}s · {cost(r.usage)}</span>
+            </div>
+          ))}
+        </div>
+      )}
       {runs.length > 1 && (
         <>
-          <h2 class="h2 muted">Compare</h2>
-          <p>a {pick(a, setA)} b {pick(b, setB)}</p>
+          <div class="lbl">Compare</div>
+          <p class="btns" style="align-items:center">a {pick(a, setA)} b {pick(b, setB)}</p>
           {cmp && (
             <>
               <p>
@@ -56,14 +60,14 @@ export default function Bench() {
               </p>
               {!!cmp.regressed.length && <p>regressed: {cmp.regressed.join(", ")}</p>}
               {!!cmp.fixed.length && <p>fixed: {cmp.fixed.join(", ")}</p>}
-              <table>
+              <div class="card scrollx"><table class="tbl">
                 <thead><tr><th>task</th><th>kind</th><th>a</th><th>b</th></tr></thead>
                 <tbody>
                   {cmp.rows.map((r) => (
-                    <tr><td>{r.id}</td><td class="dim">{r.kind}</td><td>{mark(r.a)}</td><td>{mark(r.b)}</td></tr>
+                    <tr><td>{r.id}</td><td class="t3">{r.kind}</td><td>{mark(r.a)}</td><td>{mark(r.b)}</td></tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </>
           )}
         </>

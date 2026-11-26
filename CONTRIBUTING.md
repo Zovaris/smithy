@@ -10,8 +10,10 @@
 - `web/` is the one Node toolchain (ADR 0010): the web UI (Preact, Vite). Run
   `npm ci && npm run build` in `web/` to embed it in the harness build; the output
   (`internal/web/dist/app`) is not committed (ADR 0011), and without it the binary serves a
-  placeholder page. The CI `web` job runs tests, typecheck and the size budget.
-- Pull requests run `check` (gofmt, vet, `go test`, every offline test through the binary, a
+  placeholder page. The CI `web` job runs tests, typecheck, `bun check` (type check), Oxlint
+  (`npm run lint`, warnings fail) and the size budget; run `bun check` and `npm run lint` in `web/`
+  to check locally.
+- Pull requests run `check` (gofmt, vet, golangci-lint, `bun check` and Oxlint on `web/`, `go test`, every offline test through the binary, a
   build per release target). A `v*` tag runs `release`: it checks the tag matches
   `shared/VERSION`, builds darwin, linux (arm64, amd64) and windows binaries, skills and harness builds each, gzips them,
   writes `checksums.txt`, attests the build and publishes the GitHub release with the
@@ -37,5 +39,6 @@
 - Pull requests follow `.github/pull_request_template.md`.
 
 Commits are atomic and conventional (`smithy commit style` shows the rules); every change lands under
-**Unreleased** in [CHANGELOG.md](CHANGELOG.md) first, as a technical bullet. At release time, write
-the version's plain notes for people above `### Details` (see the top of the CHANGELOG).
+**Unreleased** in [CHANGELOG.md](CHANGELOG.md) first: a plain line for people under `### Highlights`,
+`### New` or `### Fixed`, and the technical bullet under the one `### Details` at the bottom (see
+the top of the CHANGELOG).

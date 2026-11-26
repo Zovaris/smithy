@@ -7,7 +7,7 @@ import (
 )
 
 func init() {
-	register("proxy", "egress proxy for container workers (auto.sandbox_network proxy): serve, approve, deny", proxy.Usage, "",
+	register("proxy", "egress proxy with bound secrets, run natively: serve, approve, deny", proxy.Usage, "",
 		func(args []string) int { return proxy.Main(args, os.Stdout, os.Stderr) })
 	registerSub("proxy", "serve", "--addr= --allow= --ask-timeout=")
 	registerSub("proxy", "approve", "")

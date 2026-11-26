@@ -65,18 +65,6 @@ func TestBuildsNoSymlinkKeepsNewestTwo(t *testing.T) {
 	}
 }
 
-func TestImagesStaleOnlySmithyNotConfigured(t *testing.T) {
-	ls := "smithy-sandbox\tlatest\taaa\t1.2GB\nsmithy-sandbox\talias\taaa\t1.2GB\nsmithy-sandbox\told\tbbb\t900MB\nsmithy-sandbox\told2\tbbb\t900MB\nubuntu\tlatest\tccc\t70MB\n<none>\t<none>\tddd\t5MB\nsmithy-sandbox-gemini\tv1\teee\t1GB\n"
-	got := Images(ls, "smithy-sandbox:latest")
-	var ids []string
-	for _, i := range got {
-		ids = append(ids, i.Target+"="+i.Size)
-	}
-	if s := strings.Join(ids, ","); s != "smithy-sandbox:old=900MB,smithy-sandbox:old2=900MB,smithy-sandbox-gemini:v1=1GB" {
-		t.Fatalf("stale images = %q", s)
-	}
-}
-
 func run(t *testing.T, dir string, args ...string) string {
 	t.Helper()
 	c := exec.Command("git", args...)
@@ -122,7 +110,6 @@ func TestMainDryRunDeletesNothingYesDeletes(t *testing.T) {
 	for _, v := range []string{"0.1.0", "0.2.0", "0.3.0"} {
 		mkbin(t, bin, v, 2048)
 	}
-	engine = func(args ...string) (string, error) { return "", os.ErrNotExist }
 	t.Chdir(t.TempDir())
 	if code := Main(nil); code != 0 {
 		t.Fatalf("dry run exit %d", code)

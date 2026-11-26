@@ -103,7 +103,7 @@ func TestBuild(t *testing.T) {
 
 func TestClampEffort(t *testing.T) {
 	for in, want := range map[string][2]any{
-		"": {"medium", false}, "low": {"low", false}, "minimal": {"low", false}, " Medium ": {"medium", false},
+		"": {"medium", false}, "low": {"low", false}, "minimal": {"low", false}, " Medium ": {"medium", false}, //nolint:gocritic // mapKey: the padded key is the case under test
 		"high": {"medium", true}, "xhigh": {"medium", true}, "max": {"medium", true}, "bogus": {"medium", true},
 	} {
 		if e, c := ClampEffort(in); e != want[0] || c != want[1] {

@@ -4,6 +4,7 @@ package board
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -145,7 +146,7 @@ func run(b *Board, sub string, pos []string, f map[string]string, out io.Writer)
 			return err
 		}
 		if len(f) == 0 {
-			return fmt.Errorf("usage: smithy board set <id> --state <state> ...")
+			return errors.New("usage: smithy board set <id> --state <state>")
 		}
 		return b.Set(id, f)
 	case "claim":

@@ -464,8 +464,8 @@ var FinalWait = 15 * time.Second
 func (n *Notifier) Final(now time.Time) {
 	done := make(chan struct{})
 	go func() {
-		n.mu.Lock()
-		n.mu.Unlock()
+		n.mu.Lock()   //nolint:staticcheck // SA2001: barrier that waits for a running flush
+		n.mu.Unlock() //nolint:staticcheck // same barrier
 		n.Flush(now)
 		close(done)
 	}()

@@ -1,38 +1,67 @@
 import { useLive } from "../live";
-import { G } from "../ui";
-import "./chat.css";
+import { href } from "../router";
+import { agentName, ago, sessions } from "../store";
+import { St } from "../ui";
 
-// Agents mirrors the TUI's tab panel: every session with its state, then what waits on you.
+// Agents is every session at a glance with its agent, model and state, and the detected agents.
 export default function Agents() {
   const l = useLive();
-  const running = l.sessions.filter((s) => s.state === "running").length;
+  const ss = sessions(l.store);
+  const working = ss.filter((s) => s.status === "working").length;
+  const ready = l.setup?.agents ?? [];
   return (
-    <section aria-label="Agents">
-      <h1 class="h">Agents <span class="dim">{running} running · {l.sessions.length} sessions</span></h1>
-      <ul class="list">
-        {l.sessions.map((s) => (
-          <li class={s.state === "running" ? "on" : ""}>
-            <a href={"#/sessions?s=" + encodeURIComponent(s.id)}>
-              <G s={s.state} /> <span class="strong id">{s.id}</span> <span class="dim">{s.kind}</span>
-              <span class="right dim">{s.at}</span>
+    <section class="page" aria-label="Agents">
+      <header>
+        <h2>Agents</h2>
+        <p>{working} working · {ss.length} sessions</p>
+      </header>
+      <div>
+        <div class="lbl">Sessions</div>
+        <div class="card">
+          {!ss.length && <p class="hint" style="padding:12px">No sessions yet. <a href="#/new">Start one</a>.</p>}
+          {ss.map((s) => (
+            <a class="row2" href={href({ name: "session", id: s.id })}>
+              <div class="top2">
+                <span style="font-weight:500">{agentName(s.agent)}</span>
+                <span class="mono t3">{s.model}</span>
+                <span class="sp" />
+                <St s={s.status} />
+              </div>
+              <div class="top2 t3" style="font-size:12px">
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{s.title}</span>
+                <span class="sp" />
+                <span class="mono">{ago(s.updated)}</span>
+              </div>
             </a>
-          </li>
-        ))}
-      </ul>
-      {!l.sessions.length && <p class="dim">no sessions yet</p>}
-      {!!l.pending.length && (
-        <>
-          <h2 class="h2 muted">Waiting on you</h2>
-          <ul class="list">
-            {l.pending.map((d) => (
-              <li>
-                <a href="#/decisions">
-                  <G s="waiting" /> <span class="strong id">{d.id}</span> {d.question}
-                </a>
-              </li>
+          ))}
+        </div>
+      </div>
+      {!!ready.length && (
+        <div>
+          <div class="lbl">Detected on this machine<span class="sp" /><a class="t3" href="#/setup">Settings</a></div>
+          <div class="card">
+            {ready.map((r) => (
+              <div class="row2">
+                <div class="top2">
+                  <span style="font-weight:500">{agentName(r.name)}</span>
+                  <span class="mono t3" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{r.ready ? r.detail : r.fix}</span>
+                  <span class="sp" />
+                  <St s={r.ready ? "ready" : "missing"} />
+                </div>
+              </div>
             ))}
-          </ul>
-        </>
+          </div>
+        </div>
+      )}
+      {!!l.auto.sessions.length && (
+        <div>
+          <div class="lbl">Background runs</div>
+          <div class="card">
+            {l.auto.sessions.map((s) => (
+              <div class="row2"><div class="top2"><span class="mono">{s.id}</span><span class="t3">{s.kind}</span><span class="sp" /><span class="mono t3">{s.at}</span></div></div>
+            ))}
+          </div>
+        </div>
       )}
     </section>
   );

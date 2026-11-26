@@ -1,35 +1,36 @@
 import { CommandPalette, type CommandItem } from "@zovaris/sephiro/command-palette";
 import "@zovaris/sephiro/css/command-palette.css";
-import { glyph, MODES } from "./model";
-import { live, setMode } from "./live";
-import { ROUTES } from "./router";
+import { ACTIONS } from "./commands";
+import { live } from "./live";
+import { go, PAGES } from "./router";
+import { open, sessions, STATUS_WORD } from "./store";
+import { split } from "./ui";
 
 type Item = CommandItem & { run: () => void };
 
-// items mirrors the TUI palette: waiting on you, actions, sessions, settings.
-export function items(): Item[] {
+// items mirrors the TUI palette: what waits on you, actions, pages, sessions.
+export function items(onAction: (a: string) => void): Item[] {
   const l = live();
-  const go = (h: string) => () => void (location.hash = h);
-  const cycle = () => setMode(MODES[(MODES.indexOf(l.mode) + 1) % 3]);
   return [
-    ...l.pending.map((d) => ({ id: "d:" + d.id, group: "Waiting on you", icon: "?", label: d.question, hint: (d.options ?? []).join(" · "), run: go("#/decisions") })),
-    { id: "a:mode", group: "Actions", icon: "≡", label: "Verbosity: " + l.mode, hint: "minimal · expandable · verbose", shortcut: ["v"], run: cycle },
-    ...ROUTES.map((r) => ({ id: "r:" + r.id, group: "Actions", icon: "→", label: "Go to " + r.label, shortcut: ["alt", r.key], run: go("#/" + r.id) })),
-    ...l.sessions.map((s) => ({ id: "s:" + s.id, group: "Sessions", icon: glyph(s.state), label: s.id, hint: s.kind, run: go("#/sessions?s=" + encodeURIComponent(s.id)) })),
-    { id: "set:mode", group: "Settings", icon: "·", label: "chat.mode", hint: l.mode, run: cycle },
-    { id: "set:daemon", group: "Settings", icon: "·", label: "daemon", hint: location.host, run: () => {} },
+    ...open(l.store).map((d) => ({
+      id: "d:" + d.id, group: "Waiting on you", icon: "?", label: split(d.question).code || d.question, hint: d.options.join(" · "),
+      run: () => (d.session ? go({ name: "session", id: d.session }) : go({ name: "decisions" })),
+    })),
+    ...ACTIONS.filter((a) => !PAGES.some((p) => p.id === a.name) && a.name !== "settings").map((a) => ({ id: "a:" + a.name, group: "Actions", icon: "/", label: a.hint.replace(/^\w/, (c) => c.toUpperCase()), hint: "/" + a.name, run: () => onAction(a.name) })),
+    ...PAGES.map((p) => ({ id: "p:" + p.id, group: "Go to", icon: "→", label: p.label, shortcut: ["alt", p.key], run: () => go({ name: p.id }) })),
+    ...sessions(l.store).map((s) => ({ id: "s:" + s.id, group: "Sessions", icon: "·", label: s.title, hint: STATUS_WORD[s.status], run: () => go({ name: "session", id: s.id }) })),
   ];
 }
 
-export default function Palette({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const all = items();
+export default function Palette({ open: isOpen, onOpenChange, onAction }: { open: boolean; onOpenChange: (o: boolean) => void; onAction: (a: string) => void }) {
+  const all = items(onAction);
   return (
     <CommandPalette
-      open={open}
+      open={isOpen}
       onOpenChange={onOpenChange}
       items={all}
       hotkey={false}
-      placeholder="Search actions, sessions and settings"
+      placeholder="Search actions, pages and sessions"
       ariaLabel="Command palette"
       onSelect={(it) => {
         all.find((x) => x.id === it.id)?.run();

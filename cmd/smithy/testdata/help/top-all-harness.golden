@@ -17,8 +17,11 @@ Daily
                 report back, serve the loop
   board         built-in tracker: add, list, show, set, claim, sync (harness
                 build)
-  chat          fullscreen chat over a daemon (also bare smithy) (harness build)
+  chat          fullscreen chat over a daemon (also bare smithy, which starts
+                the daemon) (harness build)
   daemon        run the auto loop with a local API (events, decisions) (harness
+                build)
+  pair          one-time code another machine trades for a device token (harness
                 build)
   receipt       run a command and record it as evidence for a claim
   report        weekly report: shipped, failed, time and cost per harness, open
@@ -26,6 +29,9 @@ Daily
   scan          check a change's added lines and files for secrets
   search        search ADRs, glossary and docs, best sources first (--code: the
                 whole repo)
+  servers       the daemons this machine talks to: list, add, use, discover
+                (harness build)
+  stop          stop the local background daemon (harness build)
   tasks         the shared task list (smithy tasks board --all)
   tui           live dashboard of the forge: agents, incoming issues, what needs
                 you, activity
@@ -62,6 +68,8 @@ Used by the skills
   decide        optional decision model: rule flags and question impact
   decisions     the log of the user's decisions taken without them
   drift         doc-drift report against a base (smithy drift [base])
+  guard         dangerous-command guard: check a command, Claude Code hook, list
+                the rules
   guard-tests   pre-edit hook: blocks test edits in the green phase
   harness       "<harness> <adapter>" for this shell
   mcp           MCP server (stdio) for driven CLIs: board, ask, secret calls,
@@ -69,8 +77,8 @@ Used by the skills
   names         branch and worktree names
   pr            pull requests that follow the repo's PR template
   pr-state      compact JSON state of one PR (tend)
-  proxy         egress proxy for container workers (auto.sandbox_network proxy):
-                serve, approve, deny
+  proxy         egress proxy with bound secrets, run natively: serve, approve,
+                deny
   route         pick the model tier for a task
   stack         the repo's test tooling as key: value lines
   task-dir      resolve and create the task dir for a plan slug

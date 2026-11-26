@@ -56,6 +56,10 @@ type Set struct {
 	ReadOnly bool
 	// Wrap, when set, turns a shell argv into one run under the OS sandbox (auto.sandbox native).
 	Wrap func(argv []string) []string
+	// Guard, when set, decides a shell command the rules allowed (the dangerous-command guard).
+	Guard func(cmd string) (bool, string)
+	// FetchGuard, when set, decides a fetch host (and each redirect's) after the https check.
+	FetchGuard func(host string) (bool, string)
 	// Proxy is the egress proxy fetch dials through; without one fetch refuses private addresses.
 	Proxy *url.URL
 
@@ -189,18 +193,30 @@ func (s *Set) Permit(c apiloop.ToolCall) (bool, string) {
 		}
 		return s.permitPath("Read", a.Path)
 	case "shell":
-		return s.permitShell(a.Command)
+		if ok, why := s.permitShell(a.Command); !ok || s.Guard == nil {
+			return ok, why
+		}
+		return s.Guard(a.Command)
 	case "fetch":
 		u, err := url.Parse(a.URL)
 		if err != nil || u.Scheme != "https" || u.Host == "" {
 			return false, "fetch takes an https URL"
 		}
-		if !proxy.Allowed(s.Hosts, u.Hostname()) {
-			return false, u.Hostname() + " is not on the egress allow-list (auto.sandbox_domains)"
-		}
-		return true, ""
+		return s.permitHost(u.Hostname())
 	}
 	return false, "unknown tool " + c.Name
+}
+
+// permitHost: fetch is open (the fetch guard decides) except under the OS sandbox, where the
+// egress allow-list (auto.sandbox_domains) still bounds it.
+func (s *Set) permitHost(host string) (bool, string) {
+	if s.Wrap != nil && !proxy.Allowed(s.Hosts, host) {
+		return false, host + " is not on the egress allow-list (auto.sandbox_domains)"
+	}
+	if s.FetchGuard != nil {
+		return s.FetchGuard(host)
+	}
+	return true, ""
 }
 
 func (s *Set) bare(kind string) bool {
@@ -666,8 +682,11 @@ func (s *Set) fetch(ctx context.Context, raw string) (string, error) {
 		if len(via) >= 5 {
 			return errors.New("too many redirects")
 		}
-		if r.URL.Scheme != "https" || !proxy.Allowed(s.Hosts, r.URL.Hostname()) {
-			return fmt.Errorf("redirect to %s is not on the egress allow-list", r.URL.Host)
+		if r.URL.Scheme != "https" {
+			return fmt.Errorf("redirect to %s is not https", r.URL.Host)
+		}
+		if ok, why := s.permitHost(r.URL.Hostname()); !ok {
+			return fmt.Errorf("redirect to %s: %s", r.URL.Host, why)
 		}
 		return nil
 	}

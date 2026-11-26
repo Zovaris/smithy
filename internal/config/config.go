@@ -47,6 +47,11 @@ var Known = []Setting{
 	{"tend.watch", "prs", "tend", "what /tend watch follows: a comma list of prs, issues, actions, base, alerts, or all"},
 	{"tend.label", "agent", "tend", "label of issues tend may queue for warden"},
 	{"stack.test", "", "smelt warden", "this repo's test command when smithy stack can't detect it (also stack.single, stack.lint, stack.typecheck, stack.dev, …); set with --repo"},
+	{"guard.enabled", "true", "smithy agent", "the dangerous-command guard: a shell command matching guard.block (or the built-in list) asks the user; nothing else asks"},
+	{"guard.block", "", "smithy agent", "regexes the guard also blocks, added to its defaults (smithy guard list): a JSON list or one per line"},
+	{"guard.allow", "", "smithy agent", "regexes that skip the guard; \"always allow this pattern\" adds to it"},
+	{"guard.fetch_block", "", "smithy agent", "comma list of domain globs (*.example.com) whose fetches ask you first; fetch is otherwise open (HTTPS only)"},
+	{"guard.fetch_allow", "", "smithy agent", "comma list of domain globs fetch reaches without asking; smithy guard suggest --add adds GitHub, model APIs, package registries and docs sites"},
 	{"decide.url", "", "smithy decide", "decision model endpoint; set with decide.model to turn smithy decide on (a path ending in /scores uses the behavior format, else System One)"},
 	{"decide.model", "", "smithy decide", "decision model id, e.g. span-01-free, jev-latest, kev-latest"},
 	{"decide.key_env", "", "smithy decide", "name of the env var holding the key (never the key); empty for a local model"},
@@ -62,18 +67,16 @@ var Known = []Setting{
 	{"auto.retry_stronger", "true", "smithy auto", "a launched issue reported blocked goes back to the queue once on the next model tier (cheap→mid→strong; unlabeled→strong) instead of being reported blocked; recorded as a retry_stronger event"},
 	{"auto.hours", "", "smithy auto", "launch window HH:MM-HH:MM in local time (22:00-07:00 wraps midnight); empty = always"},
 	{"auto.every", "60", "smithy auto", "seconds between polls of each source"},
-	{"daemon.port", "7477", "smithy daemon", "loopback port of the daemon's API (harness build); it never listens beyond 127.0.0.1"},
+	{"daemon.port", "7477", "smithy daemon", "loopback-only port (127.0.0.1) of the daemon's API (harness build); daemon.listen adds a second listener on a Tailscale address only"},
+	{"daemon.idle_exit", "30m", "smithy daemon", "how long the background daemon bare smithy starts stays up with no clients (TUI, web, attach) and no running work before it exits on its own; a duration like 30m or 2h, 0 or off never"},
+	{"daemon.listen", "", "smithy daemon", "this machine's Tailscale ip:port (e.g. 100.x.y.z:7478; any other address is refused, the listener is plain HTTP) the background daemon also listens on for other machines; every request there needs a paired device's token (smithy pair), never the daemon token or the Tailscale login header; empty: loopback only"},
 	{"daemon.allow", "", "smithy daemon", "comma list of Tailscale logins (Tailscale-User-Login via tailscale serve) allowed to use the daemon's API; empty: only the local token. Set, it trusts any local user on this machine (the header is not authenticated past tailscale serve), so smithy doctor warns"},
 	{"auto.paused", "false", "smithy auto", "true holds smithy auto take: nothing launches until it is false again (p in smithy tui)"},
 	{"auto.agent", "", "smithy auto serve", "agent CLI for serve's orchestrator (claude, codex, opencode…, pool: any smithy pool account, or api:<provider>/<model>: smithy's own loop on your key, harness build, read from the user settings only); empty = the one smithy agent detects"},
 	{"pool.order", "", "smithy agent", "comma list of harnesses a pool run (AGENT_CLI or auto.agent pool) tries in order, e.g. claude,codex: it stays on the first with a free account, falls back when all of that harness's accounts are limited (logged as pool_fallback) and goes back once a limit resets; empty = least recently used account of any harness"},
 	{"auto.session_hours", "3", "smithy auto serve", "hours one orchestrator session may run before smithy agent ends it (its workers keep going)"},
-	{"auto.sandbox", "off", "smithy agent", "isolation for unattended workers (--profile auto) on top of the allow-list: off, native (claude/codex OS sandbox) or container (docker/podman); fails closed: a worker whose sandbox can't start is not started; auto.sandbox* are read from the user settings only, never a repo's"},
-	{"auto.sandbox_domains", "", "smithy agent", "comma list of extra hosts a worker may reach: native (github.com, api.github.com, api.anthropic.com, api.linear.app always) or the container egress proxy (GitHub, model APIs and package registries always)"},
-	{"auto.sandbox_image", "smithy-sandbox:latest", "smithy agent", "container image for auto.sandbox container (build it from sandbox/Dockerfile)"},
-	{"auto.sandbox_network", "", "smithy agent", "docker/podman --network for auto.sandbox container; required: empty or none refuses to start workers (no network for the API or push); proxy = internal network whose only exit is the smithy-proxy sidecar (allow-list, secrets via smithy auth bind); bridge = open egress with no domain allow-list"},
-	{"auto.sandbox_proxy_binary", "", "smithy agent", "absolute path of the linux smithy binary the smithy-proxy sidecar runs; empty = this binary on linux, else ~/.local/share/smithy/smithy-linux-<arch> ($XDG_DATA_HOME), or the legacy ~/.smithy/bin/smithy-linux-<arch> if only it exists"},
-	{"auto.sandbox_memory", "4g", "smithy agent", "docker/podman --memory for auto.sandbox container"},
+	{"auto.sandbox", "off", "smithy agent", "isolation for unattended workers (--profile auto) on top of the allow-list: off or native (the OS sandbox: Seatbelt on macOS, bubblewrap on Linux; claude, codex and the api loop shell); fails closed: a worker whose sandbox can't start is not started; auto.sandbox* are read from the user settings only, never a repo's"},
+	{"auto.sandbox_domains", "", "smithy agent", "comma list of extra hosts a native-sandboxed worker may reach (github.com, api.github.com, api.anthropic.com, api.linear.app always)"},
 	{"auto.sandbox_weaker_net", "true", "smithy agent", "macOS native sandbox: enableWeakerNetworkIsolation so gh and other Go CLIs can verify TLS (opens the system TLS trust service to the worker); false turns it off and gh then fails inside workers"},
 	{"auto.merge", "manual", "tend auto", "merge mode for auto batches (production stays the user's, always)"},
 	{"notify.telegram.chat", "", "smithy auto serve", "Telegram chat id serve notifies (bot token: smithy auth set telegram); empty = no notifications"},
@@ -95,6 +98,10 @@ var Known = []Setting{
 	{"linear.cycle", "", "smithy auto", "Linear cycle filter: current or a cycle number"},
 	{"linear.initiative", "", "smithy auto", "Linear initiative name filter (via the issue's project)"},
 	{"linear.states", "unstarted,backlog", "smithy auto", "Linear workflow state types that count as new work"},
+	{"session.agent", "", "smithy daemon", "agent a new session starts with when none is named (a CLI name, acp:<cli> or api:<provider>/<model>); the agent picker (ctrl+l, /agent) sets it; empty = the last used, else the first installed CLI"},
+	{"session.model", "", "smithy daemon", "model a new CLI session passes to its agent (--model); the picker (/model) sets it; empty = the agent's own default"},
+	{"kit.mcp", "true", "smithy agent", "false: driven CLIs don't get smithy's own MCP server (smithy mcp); /skills in the TUI and the web Setup screen toggle it"},
+	{"kit.skills", "", "smithy agent", "comma list of installed skills linked into every driven CLI that takes skills (claude, codex, opencode, gemini, pi); /skills toggles them"},
 	{"tui.reduce_motion", "false", "smithy tui", "true draws every frame still: no sparks, shimmer or sliding bars (like --no-anim or SMITHY_REDUCE_MOTION)"},
 }
 
@@ -413,7 +420,7 @@ func writeJSON(file string, m map[string]any) error {
 		return err
 	}
 	if fi, err := os.Stat(file); err == nil {
-		f.Chmod(fi.Mode().Perm())
+		_ = f.Chmod(fi.Mode().Perm())
 	}
 	if _, err := f.Write(append(b, '\n')); err != nil {
 		f.Close()

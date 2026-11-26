@@ -254,7 +254,7 @@ func acquire(path string, held func([]byte) bool) error {
 	for try := 0; ; try++ {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 		if err == nil {
-			f.WriteString("{}\n")
+			_, _ = f.WriteString("{}\n")
 			return f.Close()
 		}
 		if !errors.Is(err, os.ErrExist) {
@@ -355,10 +355,12 @@ func (sv *Server) Run(ctx context.Context) error {
 		select {
 		case every = <-res:
 		case <-ctx.Done():
+			sv.finishCycle(res)
 			sv.stopped()
 			return nil
 		case <-deadline:
 			sv.logf("serve: --max-hours reached")
+			sv.finishCycle(res)
 			sv.stopped()
 			return nil
 		}
@@ -379,13 +381,26 @@ func (sv *Server) Run(ctx context.Context) error {
 	}
 }
 
+// cycleGrace is how long Run waits for a cycle still in flight when it stops.
+var cycleGrace = 30 * time.Second
+
+// finishCycle waits for the cycle in flight so Run never returns while it still reads settings
+// or sources; a cycle stuck longer than cycleGrace is left behind and logged.
+func (sv *Server) finishCycle(res <-chan time.Duration) {
+	select {
+	case <-res:
+	case <-time.After(cycleGrace):
+		sv.logf("serve: a cycle was still running %s after stop; leaving it", cycleGrace)
+	}
+}
+
 func (sv *Server) stopped() {
 	msg := "serve stopped"
 	if sv.hb.SessionRunning() {
 		msg += fmt.Sprintf("; orchestrator pid %d keeps running (log %s; smithy tui or smithy cards board shows its workers)", sv.hb.SessionPID, sv.hb.SessionLog)
 	}
 	sv.logf("%s", msg)
-	events.Append(events.Event{Kind: "serve_down", Detail: "serve stopped"})
+	_ = events.Append(events.Event{Kind: "serve_down", Detail: "serve stopped"})
 	if sv.note != nil {
 		sv.note.Final(now())
 	}
@@ -438,7 +453,7 @@ func (sv *Server) Cycle() time.Duration {
 			}
 			for _, id := range gaveUp {
 				sv.logf("giving up on %s: orchestrators started nothing %d times; it stays launched", id, MaxRequeues+1)
-				events.Append(events.Event{Kind: "orchestrator_failed", ID: id, Detail: "orchestrators started nothing; gave up"})
+				_ = events.Append(events.Event{Kind: "orchestrator_failed", ID: id, Detail: "orchestrators started nothing; gave up"})
 			}
 			sv.hb.SessionPID, sv.hb.SessionDir = 0, ""
 		}
@@ -465,7 +480,7 @@ func (sv *Server) Cycle() time.Duration {
 			}
 			if day := now().Format("2006-01-02"); strings.HasPrefix(r.Why, "daily cap") && sv.capDay != day {
 				sv.capDay = day
-				events.Append(events.Event{Kind: "cap_reached", Detail: r.Why})
+				_ = events.Append(events.Event{Kind: "cap_reached", Detail: r.Why})
 			}
 		default:
 			if err := sv.launch(r.Dir); err != nil {
@@ -475,7 +490,7 @@ func (sv *Server) Cycle() time.Duration {
 				}
 				os.RemoveAll(r.Dir)
 				sv.logf("serve: orchestrator did not start, %d issue(s) back in the queue: %v", r.Count, err)
-				events.Append(events.Event{Kind: "orchestrator_failed", Detail: fmt.Sprintf("did not start, %d issue(s) back in the queue", r.Count)})
+				_ = events.Append(events.Event{Kind: "orchestrator_failed", Detail: fmt.Sprintf("did not start, %d issue(s) back in the queue", r.Count)})
 			} else {
 				sv.hb.State = "orchestrating"
 				sv.logf("orchestrator started: pid %d, %d issue(s), %s, log %s", sv.hb.SessionPID, r.Count, r.Dir, sv.hb.SessionLog)
@@ -499,7 +514,7 @@ func (sv *Server) recordOutcomes() {
 	}
 	for _, e := range Outcomes(es, prOutcome) {
 		sv.logf("outcome %s/%s %s %s", e.Batch, e.Item, e.Detail, e.PR)
-		events.Append(e)
+		_ = events.Append(e)
 	}
 }
 
@@ -632,6 +647,10 @@ type View func(done <-chan struct{}, sv *Server, logs <-chan string) error
 type Hooks struct {
 	Tap     func(line string)
 	Started func(sv *Server) (stop func(), err error)
+	// Ctx, when set, is the loop's parent context: cancelling it stops serve like a signal does.
+	Ctx context.Context
+	// Quiet drops the plain log lines printed when there is no view (an in-process daemon under a TUI).
+	Quiet bool
 }
 
 // ServeMain runs `smithy auto serve`. view is used when stdout is a terminal; otherwise (or with
@@ -687,7 +706,9 @@ func ServeMainHooks(name string, args []string, view View, h Hooks) int {
 		last = l
 		mu.Unlock()
 		if !tty {
-			fmt.Println(now().Format("2006-01-02 15:04:05"), l)
+			if !h.Quiet {
+				fmt.Println(now().Format("2006-01-02 15:04:05"), l)
+			}
 			return
 		}
 		select {
@@ -695,7 +716,11 @@ func ServeMainHooks(name string, args []string, view View, h Hooks) int {
 		default:
 		}
 	}
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	parent := h.Ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	sv, err := NewServer(o, log)
 	if err != nil {
