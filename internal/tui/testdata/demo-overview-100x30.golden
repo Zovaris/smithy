@@ -1,24 +1,24 @@
  ◆ smithy dev · smithy                                                      DEMO  ● watching  14:30 
   1 Overview   2   3   4 ? 8   5   6   7   8   9   10                                               
-╭─ Work per hour · last 24 h ────────────────────╮   Agents now · 13 live                           
+                                                                                                    
+┌─ Work per hour · last 24 h ────────────────────┐   Agents now · 13 live                           
+│                                                │                                                  
 │ launched ▇ 104   ready/merged ▇ 162            │  ██████████████████████████████████████████████  
 │ up   ▃▄▂▂▅▂▃▂▃▃▅▃▃▃▁▄▃▃▃▂▃█▇▁                  │                                                  
 │ down ▄▂▃▄▅▆▃▃▆▅▃▅▆█▂▄▃▅▄▅▃▅▄▃                  │  ● 2 queued   ● 3 building   ● 2 checking        
 │      -24h                         now          │  ● 2 pr_open   ● 2 ready   ● 2 blocked           
 │                                                │                                                  
-│                                                │  ● orchestrator  claude pid 5150 · 38m           
-│                                                │  ● TES-202 Rate-limit the …  building · 42s ago  
-╰────────────────────────────────────────────────╯                                                  
+└────────────────────────────────────────────────┘                                                  
    Daily cap · 86%                                   CI health · 20 runs                            
+                                                                                                    
   69 / 80 launched today                            ■ ■ ■ ■ □ ■ ■ ■ □ ■ ■ ■ ■ ■ □ ■ ■ □ □ □         
   ████████████████████████████████████████▓▒░░░░                                                    
                                                     70% green over the last 20 runs                 
   7 days  ▄▄▃▃▄▃█  36 33 20 20 32 26 69             median CI time 9m   p90 14m                     
   hours   any time                                                                                  
                                                                                                     
-  spend   $82.58 today · cap $120.00                                                                
-                                                                                                    
    How long it takes · last 7 days                   Needs you · 8                                  
+                                                                                                    
   issue → PR ready: median 1h57m (slowest 10%: …    8 items wait for you                            
     spread, fast → slow  ▁▁▁▂▃▅▆█▅▄▆▃  98 items                                                     
                                                     ? Keep this decision? Retry the export with b…  

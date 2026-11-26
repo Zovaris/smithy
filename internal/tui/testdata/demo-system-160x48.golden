@@ -1,6 +1,8 @@
  ◆ smithy dev · smithy                                                                                                                  DEMO  ● watching  14:30 
   1 Overview   2 Agents   3 Incoming   4 Needs you ? 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System   0 History                                     
-   Health · read-only                                                           ╭─ Settings · 90 · enter edits ────────────────────────────────────────────────╮
+                                                                                                                                                                
+   Health · read-only                                                           ┌─ Settings · 90 · enter edits ────────────────────────────────────────────────┐
+                                                                                │                                                                              │
   Versions                                                                      │ auto.*                                                                       │
   binary  0.15.0                                                                │ ▸ auto.sources           github,linear  user    comma list of issue sources… │
   skills  0.15.0  ✓ match                                                       │   auto.mode              labeled        default labeled: only issues with t… │
@@ -40,9 +42,7 @@
   ok   sandbox: native (claude, hosts github.com,api.github.com,api.anthropic…  │ notify.*                                                                     │
   warn 2 orphaned worktrees (smithy warden cleanup)                             │   notify.telegram.chat   123456789      user    Telegram chat id serve noti… │
                                                                                 │   notify.style           plain          default Telegram message look: emoj… │
-                                                                                │   notify.kinds           pr_ready,bloc… default comma list of notification … │
-                                                                                │                                                                              │
                                                                                 │                                                                              │
                                                                                 │ enter edits · u unsets · key.* rows are API keys, typed masked               │
-                                                                                ╰──────────────────────────────────────────────────────────────────────────────╯
+                                                                                └──────────────────────────────────────────────────────────────────────────────┘
  ↑↓ move  enter edit  u unset setting  r refresh  l log                                                                               tab views  ? help  q quit 

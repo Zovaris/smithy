@@ -19,7 +19,7 @@ func (m Model) overview() []*lipgloss.Layer {
 	t := m.th
 	var out []*lipgloss.Layer
 	for i, r := range m.cardRects() {
-		w, h := r.w-4, r.h-2
+		w, h := r.w-4, r.h-3
 		var lines []string
 		badge := ""
 		var border color.Color

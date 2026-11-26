@@ -1,6 +1,8 @@
  ◆ smithy dev · smithy                                                                                                                  DEMO  ● watching  14:30 
   1 Overview   2 Agents   3 Incoming   4 Needs you ? 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System   0 History                                     
-╭─ Done · 117 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+                                                                                                                                                                
+┌─ Done · 117 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                                                              │
 │   issue       title                                                                                        PR       result    took      cost     when        │
 │ ▸ TES-1118    Split the billing service                                                                    #1118    ready     1h07m     $0.22    3m ago      │
 │   #520        Drop the legacy CSV importer                                                                 #1120    closed    56m       $2.03    7m ago      │
@@ -42,7 +44,5 @@
 │   #490        Speed up cold start                                                                          #1090    closed    1h03m     $1.81    6h ago      │
 │   TES-1082    Rate-limit the export API                                                                    #1082    merged    3h13m     $0.22    7h ago      │
 │   #475        Typed config loader                                                                          #1075    merged    4h36m     $0.36    7h ago      │
-│   TES-1076    Show CI time per PR                                                                          #1076    merged    3h34m     $1.78    8h ago      │
-│   #478        Make search fuzzy                                                                            #1078    merged    3h28m     $1.71    8h ago      │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
  ↑↓ move  enter details  o open  c copy  / filter                                                                                     tab views  ? help  q quit 

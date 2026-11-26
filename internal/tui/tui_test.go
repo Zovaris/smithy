@@ -391,7 +391,7 @@ func TestMouse(t *testing.T) {
 		t.Fatalf("tab click -> %v", m.view)
 	}
 	r := m.panes()["main"]
-	y := r.y + 2 + 3
+	y := r.y + 3 + 3 // border, blank row under the title, column header, then rows
 	nm, _ = m.Update(tea.MouseClickMsg{X: r.x + 5, Y: y})
 	if m = nm.(Model); m.sel[vAgents] != 3 || m.modal {
 		t.Fatalf("row click sel=%d", m.sel[vAgents])
