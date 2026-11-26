@@ -47,8 +47,8 @@ func TestPairCodeIsOneTimeAndShortLived(t *testing.T) {
 	}
 }
 
-func TestPairFailuresBurnCodes(t *testing.T) {
-	p, _ := newPairing(t)
+func TestPairFailuresLockOutPerAddress(t *testing.T) {
+	p, now := newPairing(t)
 	code, _ := p.NewCode()
 	for i := 0; i < PairMaxFails; i++ {
 		if _, err := p.RedeemFrom("1.2.3.4", "ZZZZ-ZZZZ", "x"); err == nil {
@@ -58,22 +58,20 @@ func TestPairFailuresBurnCodes(t *testing.T) {
 	if _, err := p.RedeemFrom("1.2.3.4", code, "late"); err == nil {
 		t.Fatal("an address with too many wrong codes is locked out")
 	}
+	p.NewCode()
+	if _, err := p.RedeemFrom("1.2.3.4", code, "late"); err == nil {
+		t.Fatal("a new code does not lift the lockout")
+	}
+	for i := 0; i < 20*PairMaxFails; i++ {
+		p.RedeemFrom(fmt.Sprint("10.0.", i/250, ".", i%250), "ZZZZ-ZZZZ", "x")
+	}
 	if _, err := p.RedeemFrom("5.6.7.8", code, "other"); err != nil {
-		t.Fatalf("another address still pairs: %v", err)
+		t.Fatalf("failures elsewhere never burn an open code: %v", err)
 	}
-	code, _ = p.NewCode()
-	for i := 0; i < 10*PairMaxFails; i++ {
-		p.RedeemFrom(fmt.Sprint("10.0.0.", i), "ZZZZ-ZZZZ", "x")
-	}
-	if _, err := p.RedeemFrom("9.9.9.9", code, "late"); err == nil {
-		t.Fatal("a flood from many addresses burns every open code")
-	}
-	if _, err := p.Redeem(code, "dup"); err == nil {
-		t.Fatal("burned")
-	}
+	*now = now.Add(PairFailWindow + time.Second)
 	c2, _ := p.NewCode()
-	if _, err := p.Redeem(c2, "fresh"); err != nil {
-		t.Fatalf("a new code starts over: %v", err)
+	if _, err := p.RedeemFrom("1.2.3.4", c2, "later"); err != nil {
+		t.Fatalf("the lockout ends after the window: %v", err)
 	}
 }
 
@@ -101,14 +99,18 @@ func TestPairDevicesAndRevoke(t *testing.T) {
 }
 
 func TestCheckRemoteListen(t *testing.T) {
-	for _, ok := range []string{"100.64.0.1:7478", "0.0.0.0:7478", "[fd7a::1]:7478"} {
+	for _, ok := range []string{"100.64.0.1:7478", "100.127.255.254:7478", "[fd7a:115c:a1e0::1]:7478"} {
 		if err := CheckRemoteListen(ok); err != nil {
 			t.Fatalf("%s: %v", ok, err)
 		}
 	}
-	for _, bad := range []string{"", "127.0.0.1:7478", "localhost:1", "nope", "1.2.3.4"} {
+	for _, bad := range []string{"", "127.0.0.1:7478", "localhost:1", "nope", "1.2.3.4", "0.0.0.0:7478", "[::]:7478", ":7478",
+		"192.168.1.5:7478", "100.128.0.1:7478", "[fd7a::1]:7478", "[fd7a:115c:a1e1::1]:7478"} {
 		if err := CheckRemoteListen(bad); err == nil {
 			t.Fatalf("%q accepted", bad)
+		}
+		if bad == "192.168.1.5:7478" && !strings.Contains(CheckRemoteListen(bad).Error(), "tailscale serve") {
+			t.Fatalf("the error names the way out: %v", CheckRemoteListen(bad))
 		}
 	}
 }

@@ -4,7 +4,6 @@ package daemon
 
 import (
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -372,7 +371,7 @@ func (sv *Server) Handler() http.Handler {
 	})
 }
 
-// RemoteHandler is the daemon.listen API: a bearer token (the daemon's or a paired device's) on
+// RemoteHandler is the daemon.listen API: a paired device's bearer token (never the daemon's) on
 // every route but hello and pair, whatever the Host, and the Tailscale login header is ignored
 // (anyone on the network could send it). Codes are minted only on the loopback listener.
 func (sv *Server) RemoteHandler() http.Handler {
@@ -385,13 +384,7 @@ func (sv *Server) RemoteHandler() http.Handler {
 		if sv.public(w, r) {
 			return
 		}
-		who, ok := "", false
-		if got, has := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); has &&
-			subtle.ConstantTimeCompare([]byte(strings.TrimSpace(got)), []byte(sv.token)) == 1 {
-			who, ok = "local", true
-		} else {
-			who, ok = sv.device(r)
-		}
+		who, ok := sv.device(r)
 		if !ok {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="smithy"`)
 			http.Error(w, "unauthorized", http.StatusUnauthorized)

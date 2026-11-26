@@ -48,9 +48,6 @@ func TestPairFlowOverTheRemoteListener(t *testing.T) {
 	if code, _ := pairCode(t, local.URL, map[string]string{LoginHeader: "me@example.com"}); code != 403 {
 		t.Fatalf("a tailnet login cannot mint codes: %d", code)
 	}
-	if code, _ := pairCode(t, remote.URL, auth); code != 404 {
-		t.Fatalf("codes are minted on the loopback listener only: %d", code)
-	}
 	st, c := pairCode(t, local.URL, auth)
 	if st != 200 || c == "" {
 		t.Fatalf("%d %q", st, c)
@@ -68,11 +65,14 @@ func TestPairFlowOverTheRemoteListener(t *testing.T) {
 		t.Fatalf("%d %+v", res.StatusCode, p)
 	}
 	dev := map[string]string{"Authorization": "Bearer " + p.Token}
+	if code, _ := pairCode(t, remote.URL, dev); code != 404 {
+		t.Fatalf("codes are minted on the loopback listener only: %d", code)
+	}
 	if res := do(t, "GET", remote.URL+"/v1/state", "", dev); res.StatusCode != 200 {
 		t.Fatalf("device token on the remote listener: %d", res.StatusCode)
 	}
-	if res := do(t, "GET", remote.URL+"/v1/state", "", auth); res.StatusCode != 200 {
-		t.Fatalf("the daemon token works there too: %d", res.StatusCode)
+	if res := do(t, "GET", remote.URL+"/v1/state", "", auth); res.StatusCode != 401 {
+		t.Fatalf("the daemon token never leaves loopback: %d", res.StatusCode)
 	}
 	if code, _ := pairCode(t, local.URL, dev); code != 403 {
 		t.Fatalf("a device cannot mint more codes: %d", code)
@@ -92,8 +92,8 @@ func TestRemoteListenerWithoutPairing(t *testing.T) {
 	if res := do(t, "POST", remote.URL+"/v1/pair", `{"code":"AAAA-AAAA","name":"x"}`, nil); res.StatusCode != 403 {
 		t.Fatalf("%d", res.StatusCode)
 	}
-	if res := do(t, "GET", remote.URL+"/v1/state", "", auth); res.StatusCode != 200 {
-		t.Fatalf("%d", res.StatusCode)
+	if res := do(t, "GET", remote.URL+"/v1/state", "", auth); res.StatusCode != 401 {
+		t.Fatalf("only device tokens: %d", res.StatusCode)
 	}
 }
 
@@ -101,11 +101,17 @@ func TestServersProxy(t *testing.T) {
 	other, otherHS := newTest(t, filepath.Join(t.TempDir(), "o.db"))
 	other.Version = "9.9.9"
 	_ = otherHS
+	other.Pair = &Pairing{File: filepath.Join(t.TempDir(), "devices.json")}
+	oc, _ := other.Pair.NewCode()
+	devTok, err := other.Pair.Redeem(oc, "this")
+	if err != nil {
+		t.Fatal(err)
+	}
 	otherRemote := httptest.NewServer(other.RemoteHandler())
 	defer otherRemote.Close()
 	sv, local, remote := newRemoteTest(t)
 	sv.Servers = func() ([]RemoteServer, error) {
-		return []RemoteServer{{Name: "home", URL: otherRemote.URL, Token: testToken}}, nil
+		return []RemoteServer{{Name: "home", URL: otherRemote.URL, Token: devTok}}, nil
 	}
 	res := do(t, "GET", local.URL+"/v1/servers", "", auth)
 	var l struct {
@@ -131,10 +137,37 @@ func TestServersProxy(t *testing.T) {
 	if res := do(t, "GET", local.URL+"/v1/servers/home/v1/state", "", map[string]string{LoginHeader: "me@example.com"}); res.StatusCode != 403 {
 		t.Fatalf("a tailnet login cannot use this machine's saved tokens: %d", res.StatusCode)
 	}
-	if res := do(t, "GET", remote.URL+"/v1/servers/home/v1/state", "", auth); res.StatusCode != 404 {
+	sc, _ := sv.Pair.NewCode()
+	myTok, _ := sv.Pair.Redeem(sc, "laptop")
+	if res := do(t, "GET", remote.URL+"/v1/servers/home/v1/state", "", map[string]string{"Authorization": "Bearer " + myTok}); res.StatusCode != 404 {
 		t.Fatalf("no proxy on the remote listener: %d", res.StatusCode)
 	}
 	if res := do(t, "GET", local.URL+"/v1/servers/home/etc/passwd", "", auth); res.StatusCode != 404 {
 		t.Fatalf("only /v1 paths go through: %d", res.StatusCode)
+	}
+}
+
+func TestDevicesCannotChangeLocalSettings(t *testing.T) {
+	t.Chdir(t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("SMITHY_CONFIG", filepath.Join(t.TempDir(), "config"))
+	sv, _, remote := newRemoteTest(t)
+	c, _ := sv.Pair.NewCode()
+	tok, err := sv.Pair.Redeem(c, "laptop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dev := map[string]string{"Authorization": "Bearer " + tok, "Origin": remote.URL}
+	for _, r := range []struct{ method, path, body string }{
+		{"POST", "/v1/guard/suggested", "{}"},
+		{"PUT", "/v1/setup/kit", `{"mcp":false}`},
+		{"POST", "/v1/setup/skills/install", "{}"},
+	} {
+		res := do(t, r.method, remote.URL+r.path, r.body, dev)
+		var e struct{ Error string }
+		json.NewDecoder(res.Body).Decode(&e)
+		if res.StatusCode != 403 || !strings.Contains(e.Error, "daemon token") {
+			t.Fatalf("%s %s from a device: %d %q", r.method, r.path, res.StatusCode, e.Error)
+		}
 	}
 }

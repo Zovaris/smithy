@@ -23,8 +23,11 @@ import (
 // PairTTL is how long a pairing code works.
 const PairTTL = 5 * time.Minute
 
-// PairMaxFails is how many wrong codes burn every open code.
+// PairMaxFails is how many wrong codes lock one address out for PairFailWindow.
 const PairMaxFails = 5
+
+// PairFailWindow is how long an address's wrong codes count against it.
+const PairFailWindow = 15 * time.Minute
 
 // codeAlphabet has no 0/O or 1/I/L, so a code read aloud survives.
 const codeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
@@ -46,8 +49,12 @@ type Pairing struct {
 
 	mu    sync.Mutex
 	codes map[string]time.Time
-	fails map[string]int // wrong codes per remote address since the last new code
-	total int
+	fails map[string]failCount // wrong codes per remote address
+}
+
+type failCount struct {
+	n     int
+	since time.Time
 }
 
 func (p *Pairing) now() time.Time {
@@ -74,7 +81,7 @@ func randomCode() string {
 	return string(out)
 }
 
-// NewCode makes a code that works once until it expires; it also resets the failure count.
+// NewCode makes a code that works once until it expires.
 func (p *Pairing) NewCode() (string, time.Time) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -88,7 +95,7 @@ func (p *Pairing) NewCode() (string, time.Time) {
 		}
 	}
 	c, exp := randomCode(), now.Add(PairTTL)
-	p.codes[c], p.fails, p.total = exp, nil, 0
+	p.codes[c] = exp
 	return c, exp
 }
 
@@ -97,8 +104,8 @@ var errBadCode = errors.New("unknown or expired code; make a new one with smithy
 // Redeem trades code for a new device token saved under name.
 func (p *Pairing) Redeem(code, name string) (string, error) { return p.RedeemFrom("", code, name) }
 
-// RedeemFrom is Redeem for a caller at addr: PairMaxFails wrong codes lock that address out until
-// the next new code, and ten times as many from anywhere burn every open code.
+// RedeemFrom is Redeem for a caller at addr: PairMaxFails wrong codes within PairFailWindow lock
+// that address out until the window ends; other addresses and open codes are untouched.
 func (p *Pairing) RedeemFrom(addr, code, name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || len(name) > 64 || strings.ContainsFunc(name, func(r rune) bool { return r < 0x20 || r == 0x7f }) {
@@ -107,7 +114,12 @@ func (p *Pairing) RedeemFrom(addr, code, name string) (string, error) {
 	code = strings.ToUpper(strings.TrimSpace(code))
 	p.mu.Lock()
 	now := p.now()
-	if p.fails[addr] >= PairMaxFails {
+	for a, f := range p.fails {
+		if now.Sub(f.since) >= PairFailWindow {
+			delete(p.fails, a)
+		}
+	}
+	if p.fails[addr].n >= PairMaxFails {
 		p.mu.Unlock()
 		return "", errBadCode
 	}
@@ -119,12 +131,14 @@ func (p *Pairing) RedeemFrom(addr, code, name string) (string, error) {
 	}
 	if hit == "" {
 		if p.fails == nil {
-			p.fails = map[string]int{}
+			p.fails = map[string]failCount{}
 		}
-		p.fails[addr]++
-		if p.total++; p.total >= 10*PairMaxFails {
-			p.codes = nil
+		f, seen := p.fails[addr]
+		if !seen {
+			f.since = now
 		}
+		f.n++
+		p.fails[addr] = f
 		p.mu.Unlock()
 		return "", errBadCode
 	}
@@ -222,8 +236,20 @@ func (p *Pairing) Revoke(name string) error {
 	})
 }
 
-// CheckRemoteListen accepts daemon.listen: a host:port that is not loopback. That listener takes
-// only bearer tokens (the daemon token or a paired device's), never the Tailscale login header.
+// tailnet holds the address ranges Tailscale hands out: CGNAT IPv4 and its ULA IPv6 prefix.
+var tailnet = []*net.IPNet{mustCIDR("100.64.0.0/10"), mustCIDR("fd7a:115c:a1e0::/48")}
+
+func mustCIDR(s string) *net.IPNet {
+	_, n, err := net.ParseCIDR(s)
+	if err != nil {
+		panic(err)
+	}
+	return n
+}
+
+// CheckRemoteListen accepts daemon.listen: a Tailscale ip:port. That listener is plain HTTP, so
+// only the tailnet's own encryption keeps pairing codes and device tokens off the wire; it takes
+// only paired devices' bearer tokens, never the daemon token or the Tailscale login header.
 func CheckRemoteListen(addr string) error {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil || port == "" {
@@ -232,8 +258,9 @@ func CheckRemoteListen(addr string) error {
 	if CheckLoopback(addr) == nil {
 		return fmt.Errorf("daemon.listen %q is loopback; the daemon already listens there", addr)
 	}
-	if host != "" && net.ParseIP(host) == nil {
-		return fmt.Errorf("daemon.listen takes an IP address, not %q", host)
+	ip := net.ParseIP(host)
+	if ip != nil && slices.ContainsFunc(tailnet, func(n *net.IPNet) bool { return n.Contains(ip) }) {
+		return nil
 	}
-	return nil
+	return fmt.Errorf("daemon.listen %q is not a Tailscale IP; the listener is plain HTTP, so use this machine's Tailscale IP (100.64.0.0/10 or fd7a:115c:a1e0::/48), or leave daemon.listen empty and put a TLS proxy such as tailscale serve in front of the loopback port", addr)
 }
