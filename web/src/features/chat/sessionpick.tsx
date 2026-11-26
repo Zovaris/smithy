@@ -2,13 +2,12 @@ import { Dialog } from "@zovaris/sephiro/dialog";
 import { SegmentedControl } from "@zovaris/sephiro/segmented-control";
 import "@zovaris/sephiro/css/dialog.css";
 import "@zovaris/sephiro/css/segmented-control.css";
-import "./screens/settings.css";
+import "../../screens/settings.css";
 import { useState } from "preact/hooks";
-import { setSessionModel } from "./actions";
+import { setSessionModel } from "../../lib/actions";
 import { ModelSelect } from "./modelselect";
-import { effortOptions, modelEditable } from "./parity";
-import { agentName, type Sess } from "./store";
-import { Keys } from "./keys";
+import { effortOptions, modelEditable } from "../../lib/parity";
+import { agentName, type Sess } from "../../lib/store";
 
 // SessionPick is /model and /effort: the open session's model and reasoning effort, for its next
 // turns. Effort shows only for agents that take one (claude, codex), capped at medium as in the TUI.
@@ -36,13 +35,12 @@ export default function SessionPick({ s, open, onClose }: { s: Sess; open: boole
       onClose={onClose}
       title={"Model for " + agentName(s.agent)}
       description="This session's next turns; new sessions keep the default from Settings."
+      keys={[{ key: "enter", label: "save" }, { key: "esc", label: "cancel" }]}
       footer={
-        <div class="dlg-foot">
-          <Keys k={[["enter", "save"], ["esc", "cancel"]]} />
-          <span class="sp" />
+        <>
           <button class="btn" onClick={onClose}>Cancel</button>
           <button class="btn primary" disabled={busy || !editable} onClick={save}>{busy ? "Saving…" : "Save"}</button>
-        </div>
+        </>
       }
     >
       <form class="pick" onSubmit={(e) => (e.preventDefault(), save())}>

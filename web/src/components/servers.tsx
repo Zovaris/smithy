@@ -2,9 +2,9 @@
 // status, ready agents and sessions. Picking one points this tab's API at it through the
 // daemon's /v1/servers proxy; the choice lasts for the tab.
 import { useEffect, useState } from "preact/hooks";
-import { api, currentServer, pickServer } from "./auth";
+import { api, currentServer, pickServer } from "../lib/auth";
 import { I } from "./icons";
-import { agentName, type Status } from "./store";
+import { agentName, type Status } from "../lib/store";
 import { St } from "./ui";
 
 export type ServerRow = {

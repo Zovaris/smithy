@@ -1,10 +1,10 @@
 import { useEffect, useState } from "preact/hooks";
 import { SegmentedControl } from "@zovaris/sephiro/segmented-control";
 import "@zovaris/sephiro/css/segmented-control.css";
-import { api } from "../auth";
-import { useLive } from "../live";
-import { agentName } from "../store";
-import { St } from "../ui";
+import { api } from "../lib/auth";
+import { useLive } from "../lib/live";
+import { agentName } from "../lib/store";
+import { St } from "../components/ui";
 
 type Usage = { cost_usd?: number };
 type Run = { id: string; agent: string; model?: string; skills?: string; started: string; seconds: number; passed: number; total: number; pass_rate: number; usage: Usage };

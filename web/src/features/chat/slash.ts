@@ -1,11 +1,11 @@
 // The smithy commands the composer and the palette run here, loaded on first use: the TUI's
 // /model, /effort, /theme, /ask, /answer, /serve, /set, /unset and the ones that open Settings.
-import { runShell, sampleAsk, setServe, setSetting, unsetSetting } from "./actions";
-import { api } from "./auth";
-import { decide, stopSession } from "./live";
-import { go } from "./router";
-import type { Dec, Sess } from "./store";
-import { saveAccent, toggleTheme, type ThemeName } from "./theme";
+import { runShell, sampleAsk, setServe, setSetting, unsetSetting } from "../../lib/actions";
+import { api } from "../../lib/auth";
+import { decide, stopSession } from "../../lib/live";
+import { go } from "../../lib/router";
+import type { Dec, Sess } from "../../lib/store";
+import { saveAccent, toggleTheme, type ThemeName } from "../../lib/theme";
 
 type Ctx = { s?: Sess; pend: Dec[]; setPick: (o: boolean) => void; setNote: (n: string) => void; setAccent: (t: ThemeName) => void };
 

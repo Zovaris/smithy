@@ -1,4 +1,5 @@
 import { api } from "./auth";
+import { type EffortRules, setEffortRules } from "./parity";
 
 export type Ready = { name: string; kind: "cli" | "api"; ready: boolean; detail: string; fix?: string };
 export type Choice = { agent: string; model?: string };
@@ -7,7 +8,7 @@ export type Harness = {
   harness: string; present: boolean; skills_dir: string; smithy: string[]; missing: string[]; other: string[];
   mcp: string[]; mcp_file?: string; mcp_error?: string;
 };
-export type Setup = { agents: Ready[]; default: Choice; chosen: boolean; kit: Kit; skills: string[]; harnesses: Harness[] };
+export type Setup = { agents: Ready[]; default: Choice; chosen: boolean; kit: Kit; skills: string[]; harnesses: Harness[]; effort?: EffortRules };
 
 // choice is what PUT /v1/setup/default gets for row r and a typed model; an API agent needs one.
 export function choice(r: Ready, model: string): { agent: string; model: string } | null {
@@ -63,7 +64,9 @@ async function send(method: string, path: string, body: unknown): Promise<any> {
 export async function loadSetup(): Promise<Setup> {
   const r = await api("/v1/setup");
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
+  const s: Setup = await r.json();
+  setEffortRules(s.effort);
+  return s;
 }
 export const setDefault = (c: { agent: string; model: string }) => send("PUT", "/v1/setup/default", c);
 export const setKit = (k: Kit) => send("PUT", "/v1/setup/kit", k);

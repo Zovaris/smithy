@@ -1,13 +1,13 @@
 import { useEffect, useState } from "preact/hooks";
 import { Composer } from "./composer";
 import { lazy, Suspense } from "preact/compat";
-import { I } from "./icons";
-import { startSession } from "./live";
-import { effortOptions } from "./parity";
-import { addProject, loadProjects, startDir, type ProjectList } from "./projects";
-import { go } from "./router";
-import { choice, isDefault, type Ready, type Setup } from "./setup";
-import { agentName, type Sess } from "./store";
+import { I } from "../../components/icons";
+import { startSession } from "../../lib/live";
+import { effortOptions } from "../../lib/parity";
+import { addProject, loadProjects, startDir, type ProjectList } from "../../lib/projects";
+import { go } from "../../lib/router";
+import { choice, isDefault, type Ready, type Setup } from "../../lib/setup";
+import { agentName, type Sess } from "../../lib/store";
 
 const STARTERS: Record<string, string> = {
   smelt: "Fix the failing CI on this branch",
@@ -17,7 +17,7 @@ const STARTERS: Record<string, string> = {
   warden: "Run the tasks in tasks/ in parallel",
 };
 const DIR = "smithy.dir";
-const FolderPicker = lazy(() => import("./folderpicker"));
+const FolderPicker = lazy(() => import("../../components/folderpicker"));
 const ModelSelect = lazy(() => import("./modelselect").then((m) => ({ default: m.ModelSelect })));
 
 function remembered(): string {
@@ -32,7 +32,7 @@ const modelOf = (r: Ready, s: Setup) => (!s.chosen || !isDefault(r, s.default) ?
 
 // NewSession is where a session starts: the project it belongs to, the agent, its model and
 // effort, and the first message.
-const Splash = lazy(() => import("./splash"));
+const Splash = lazy(() => import("../../components/splash"));
 
 export function NewSession({ setup, recent, host, onAction }: { setup: Setup | null; recent: Sess[]; host: string; onAction: (a: string) => void }) {
   const [projects, setProjects] = useState<ProjectList | null>(null);

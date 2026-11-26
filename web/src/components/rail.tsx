@@ -1,8 +1,8 @@
 import { useMemo, useState } from "preact/hooks";
-import { parse, short, totals, type Comment, type File } from "./diff";
+import { parse, short, totals, type Comment, type File } from "../lib/diff";
 import { I } from "./icons";
-import { href } from "./router";
-import { ago, type Dec, type Diff, type Sess } from "./store";
+import { href } from "../lib/router";
+import { ago, type Dec, type Diff, type Sess } from "../lib/store";
 import { label, St, split } from "./ui";
 
 function Note({ c, onDrop }: { c: Comment; onDrop: () => void }) {

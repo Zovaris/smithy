@@ -3,19 +3,19 @@ import { lazy, Suspense } from "preact/compat";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import "./theme/temper.css";
 import "./app.css";
-import { api, currentServer, initAuth } from "./auth";
-import { Composer } from "./composer";
-import { Conversation } from "./conversation";
-import { parse, totals, withComments, type Comment } from "./diff";
-import { Anvil, I } from "./icons";
-import { sendMessage, start, stopSession, useLive } from "./live";
-import { clock, headerLine } from "./parity";
-import { NewSession } from "./newsession";
-import { Changes, Decisions } from "./rail";
-import { go, href, PAGES, type Page, useView } from "./router";
-import { agentName, ago, open, sessions as list, type Sess } from "./store";
-import { initTheme, toggleTheme, current, loadAccent, type ThemeName } from "./theme";
-import { St } from "./ui";
+import { api, currentServer, initAuth } from "./lib/auth";
+import { Composer } from "./features/chat/composer";
+import { Conversation } from "./features/chat/conversation";
+import { parse, totals, withComments, type Comment } from "./lib/diff";
+import { Anvil, I } from "./components/icons";
+import { sendMessage, start, stopSession, useLive } from "./lib/live";
+import { clock, headerLine } from "./lib/parity";
+import { NewSession } from "./features/chat/newsession";
+import { Changes, Decisions } from "./components/rail";
+import { go, href, PAGES, type Page, useView } from "./lib/router";
+import { agentName, ago, open, sessions as list, type Sess } from "./lib/store";
+import { initTheme, toggleTheme, current, loadAccent, type ThemeName } from "./lib/theme";
+import { St } from "./components/ui";
 
 const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
   decisions: lazy(() => import("./screens/decisions")),
@@ -24,11 +24,11 @@ const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
   bench: lazy(() => import("./screens/bench")),
   setup: lazy(() => import("./screens/setup")),
 };
-const Palette = lazy(() => import("./palette"));
-const AgentsPanel = lazy(() => import("./panel"));
-const Splash = lazy(() => import("./splash"));
-const SideServers = lazy(() => import("./servers").then((m) => ({ default: () => <m.Servers rows={m.useServers()} /> })));
-const SessionPick = lazy(() => import("./sessionpick"));
+const Palette = lazy(() => import("./components/palette"));
+const AgentsPanel = lazy(() => import("./components/panel"));
+const Splash = lazy(() => import("./components/splash"));
+const SideServers = lazy(() => import("./components/servers").then((m) => ({ default: () => <m.Servers rows={m.useServers()} /> })));
+const SessionPick = lazy(() => import("./features/chat/sessionpick"));
 type Shell = { cmd: string; output: string; code: number };
 
 const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", setup: "gear" };
@@ -155,7 +155,7 @@ function App() {
 
   const onAction = (a: string, arg = "") => {
     if (a === "new") go({ name: "new" });
-    else import("./slash").then((m) => m.run(a, arg, { s, pend, setPick, setNote, setAccent }));
+    else import("./features/chat/slash").then((m) => m.run(a, arg, { s, pend, setPick, setNote, setAccent }));
   };
 
   useEffect(() => {
@@ -230,10 +230,10 @@ function App() {
           onStop={() => stopSession(s.id).catch(() => {})}
           onAction={onAction}
           onShell={currentServer() ? undefined : async (cmd) => {
-            const x = await (await import("./slash")).shell(s.id, cmd);
+            const x = await (await import("./features/chat/slash")).shell(s.id, cmd);
             setShells((m) => ({ ...m, [s.id]: [...(m[s.id] ?? []), x] }));
           }}
-          onImage={currentServer() ? undefined : async (f) => (await import("./actions")).uploadImage(f)}
+          onImage={currentServer() ? undefined : async (f) => (await import("./lib/actions")).uploadImage(f)}
           above={!!mine.length && <div class="cmts"><span class="tag"><I n="pen" />{mine.length} diff comment{mine.length > 1 ? "s" : ""} go with this message</span></div>}
           onSend={async (text) => {
             await sendMessage(s.id, withComments(text, mine));

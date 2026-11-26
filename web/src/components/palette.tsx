@@ -1,10 +1,10 @@
 import { CommandPalette, type CommandItem } from "@zovaris/sephiro/command-palette";
 import "@zovaris/sephiro/css/command-palette.css";
-import { ACTIONS } from "./commands";
-import { live } from "./live";
-import { go, PAGES } from "./router";
-import { open, sessions, STATUS_WORD } from "./store";
-import { THEMES } from "./theme";
+import { ACTIONS } from "../lib/commands";
+import { live } from "../lib/live";
+import { go, PAGES } from "../lib/router";
+import { open, sessions, STATUS_WORD } from "../lib/store";
+import { THEMES } from "../lib/theme";
 import { split } from "./ui";
 
 type Item = CommandItem & { run: () => void };

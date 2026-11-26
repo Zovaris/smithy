@@ -3,8 +3,8 @@ import "@zovaris/sephiro/css/segmented-control.css";
 import { TaskBoard as Tasks } from "@zovaris/sephiro/task-board";
 import "@zovaris/sephiro/css/task-board.css";
 import { useEffect, useState } from "preact/hooks";
-import { api } from "../auth";
-import { blocked, COLUMNS, loadTasks, moved, moveTask, rel, type TaskBoard, type TaskCard, type TaskList } from "../tasks";
+import { api } from "../lib/auth";
+import { blocked, COLUMNS, loadTasks, moved, moveTask, rel, type TaskBoard, type TaskCard, type TaskList } from "../lib/tasks";
 
 type Project = { dir: string; name: string };
 

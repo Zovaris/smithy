@@ -131,7 +131,7 @@ describe("diff", () => {
   });
 });
 
-import { split } from "./ui";
+import { split } from "../components/ui";
 describe("guard questions", () => {
   it("pull the command or host out as code", () => {
     expect(split("Run this command? git reset --hard origin/main")).toEqual({ title: "Run a command that matches the guard?", code: "git reset --hard origin/main" });
@@ -147,7 +147,7 @@ describe("prose", () => {
   });
 });
 
-import { blocks } from "./md";
+import { blocks } from "../components/md";
 describe("md blocks", () => {
   it("splits paragraphs, lists and fences", () => {
     expect(blocks("Done.\n\n- one\n- two\n1. a\n```\nx := 1\n```\nend").map((b) => [b.t, b.lines.length])).toEqual([["p", 1], ["ul", 2], ["ol", 1], ["pre", 1], ["p", 1]]);

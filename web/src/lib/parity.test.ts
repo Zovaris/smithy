@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clock, controlOf, effortOptions, groupSettings, headerLine, intent, modelEditable, withImages } from "./parity";
+import { clock, controlOf, effortOptions, setEffortRules, groupSettings, headerLine, intent, modelEditable, withImages } from "./parity";
 
 describe("effort, the same rules as the TUI", () => {
   it("offers default, low and medium only to agents with an effort flag", () => {
@@ -8,6 +8,14 @@ describe("effort, the same rules as the TUI", () => {
     expect(effortOptions("acp:claude")).toEqual(["", "low", "medium"]);
     expect(effortOptions("opencode")).toEqual([]);
     expect(effortOptions("api:anthropic/claude-x")).toEqual([]);
+  });
+  it("reads the effort rules from the daemon, with the fallback for older daemons", () => {
+    setEffortRules({ agents: ["gemini"], levels: ["low", "medium", "high"], max: "high" });
+    expect(effortOptions("gemini")).toEqual(["", "low", "medium", "high"]);
+    expect(effortOptions("claude")).toEqual([]);
+    setEffortRules(undefined);
+    expect(effortOptions("claude")).toEqual(["", "low", "medium"]);
+    expect(effortOptions("gemini")).toEqual([]);
   });
   it("keeps an API session's model fixed: it is part of its agent", () => {
     expect(modelEditable("claude")).toBe(true);
