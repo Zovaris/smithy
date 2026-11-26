@@ -506,8 +506,8 @@ func (sv *Server) decision(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 
-// ask is POST /v1/asks: smithy mcp's ask tool records a warden decision (decide:<batch>/<item>/<key>)
-// here, so its answer comes only from the daemon's own record, never from a file the worker can write.
+// ask is POST /v1/asks: smithy mcp's ask tool records a warden decision (decide:<batch>/<item>/<key>),
+// or a plain chat question outside warden (ask:<key>), here, so its answer comes only from the daemon's own record, never from a file the worker can write.
 func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
 	if code, msg := sameOrigin(r); code != 0 {
 		writeJSON(w, code, map[string]string{"error": msg})
@@ -524,8 +524,9 @@ func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
 	}
 	parts := strings.Split(strings.TrimPrefix(req.ID, "decide:"), "/")
 	guardID := strings.HasPrefix(req.ID, "guard:") && cardID(strings.TrimPrefix(req.ID, "guard:"))
-	if !guardID && (!strings.HasPrefix(req.ID, "decide:") || len(parts) != 3 || !cardID(parts[0]) || !cardID(parts[1]) || !cardID(parts[2])) {
-		writeJSON(w, 400, map[string]string{"error": "id must be decide:<batch>/<item>/<key> or guard:<key>"})
+	chatID := strings.HasPrefix(req.ID, "ask:") && cardID(strings.TrimPrefix(req.ID, "ask:"))
+	if !guardID && !chatID && (!strings.HasPrefix(req.ID, "decide:") || len(parts) != 3 || !cardID(parts[0]) || !cardID(parts[1]) || !cardID(parts[2])) {
+		writeJSON(w, 400, map[string]string{"error": "id must be decide:<batch>/<item>/<key>, guard:<key> or ask:<key>"})
 		return
 	}
 	opts := make([]string, 0, len(req.Options))
