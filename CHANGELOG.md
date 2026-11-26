@@ -8,6 +8,10 @@ part above `### Details`.
 
 ## Unreleased
 
+### Fixed
+
+- `smithy auto serve` no longer prints `poll: github: failed to run git` into the chat when it runs outside a git checkout: it skips the github source there quietly.
+
 ## v0.23.1 — 2026-11-25
 
 ### Highlights
