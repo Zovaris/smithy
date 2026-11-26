@@ -312,16 +312,10 @@ func TestNativeGitEnvUsesHTTPS(t *testing.T) {
 	}
 }
 
-func TestSandboxCheckGeminiNativeRefused(t *testing.T) {
+func TestSandboxCheckAgyNativeRefused(t *testing.T) {
 	for _, goos := range []string{"darwin", "linux"} {
-		err := SandboxCheck("native", "gemini", probe(goos, "/usr/bin/sandbox-exec", "gemini"))
-		if err == nil {
-			t.Fatalf("%s: gemini native must be refused", goos)
-		}
-		for _, want := range []string{"gemini", "host"} {
-			if !strings.Contains(err.Error(), want) {
-				t.Errorf("%s: refusal %q lacks %q", goos, err, want)
-			}
+		if err := SandboxCheck("native", "agy", probe(goos, "/usr/bin/sandbox-exec", "agy")); err == nil || !strings.Contains(err.Error(), "agy") {
+			t.Fatalf("%s: agy native must be refused, got %v", goos, err)
 		}
 	}
 }

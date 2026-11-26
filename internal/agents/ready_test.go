@@ -34,9 +34,18 @@ func TestDetectReadyFindsCLIsOnPathAndInKnownFolders(t *testing.T) {
 	if c := m["codex"]; !c.Ready || c.Detail != "/usr/bin/codex" {
 		t.Fatalf("codex on PATH: %+v", c)
 	}
-	g := m["gemini"]
-	if g.Ready || g.Fix != "npm install -g @google/gemini-cli" {
-		t.Fatalf("missing gemini needs its install hint: %+v", g)
+	g := m["agy"]
+	if g.Ready || g.Fix != "curl -fsSL https://antigravity.google/cli/install.sh | bash" {
+		t.Fatalf("missing agy needs its install hint: %+v", g)
+	}
+	if _, ok := m["gemini"]; ok {
+		t.Fatal("Gemini CLI is gone; agy replaces it")
+	}
+	if c := m["copilot"]; c.Ready || c.Fix != "npm install -g @github/copilot" {
+		t.Fatalf("missing copilot: %+v", c)
+	}
+	if c := m["grok"]; c.Ready || c.Fix != "curl -fsSL https://x.ai/cli/install.sh | bash" {
+		t.Fatalf("missing grok: %+v", c)
 	}
 	if rs[0].Name != "claude" {
 		t.Fatalf("Claude Code comes first, got %s", rs[0].Name)

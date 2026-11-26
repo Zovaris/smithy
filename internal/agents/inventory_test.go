@@ -22,7 +22,7 @@ func TestInventoryPerHarness(t *testing.T) {
 	write(t, filepath.Join(home, ".claude.json"), `{"mcpServers":{"linear":{},"github":{}},"projects":{}}`)
 	write(t, filepath.Join(home, ".codex", "config.toml"), "model = \"o3\"\n[mcp_servers.figma]\ncommand = \"x\"\n[mcp_servers.figma.env]\nA = \"b\"\n[mcp_servers.\"my docs\"]\n")
 	write(t, filepath.Join(home, ".config", "opencode", "opencode.json"), `{"mcp":{"ctx":{}}}`)
-	write(t, filepath.Join(home, ".gemini", "settings.json"), `not json`)
+	write(t, filepath.Join(home, ".gemini", "config", "mcp_config.json"), `not json`)
 	env := map[string]string{}
 	inv := Inventory(home, func(k string) string { return env[k] })
 	by := map[string]HarnessInventory{}
@@ -48,8 +48,8 @@ func TestInventoryPerHarness(t *testing.T) {
 	if o := by["opencode"]; !slices.Equal(o.MCP, []string{"ctx"}) {
 		t.Fatalf("opencode: %+v", o)
 	}
-	if g := by["gemini"]; !g.Present || g.MCPError == "" {
-		t.Fatalf("gemini with a broken settings file says so: %+v", g)
+	if g := by["agy"]; !g.Present || g.MCPError == "" {
+		t.Fatalf("agy with a broken MCP file says so: %+v", g)
 	}
 	if p := by["pi"]; p.Present {
 		t.Fatalf("pi is not installed: %+v", p)

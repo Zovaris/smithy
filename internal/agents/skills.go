@@ -16,7 +16,7 @@ harness can read the file.
   smithy skills install [--harness <name>...]
                            download this release's skills (checksum-checked) into each detected
                            harness's skills folder, or only the named ones; no Node needed.
-                           Harnesses: claude, codex, opencode, gemini, cursor, pi, dsh`
+                           Harnesses: claude, codex, opencode, agy, copilot, grok, cursor, pi, dsh`
 
 // Known are the skills of this repo, in the order --list prints them.
 var Known = []string{"use-smithy", "smelt", "warden", "ledger", "scout", "tend", "hush", "simple"}
@@ -44,6 +44,8 @@ func SkillCandidates(name, skillDir, top, home string, getenv func(string) strin
 		filepath.Join(home, ".codex", "skills"),
 		filepath.Join(envOr(getenv, "XDG_CONFIG_HOME", filepath.Join(home, ".config")), "opencode", "skills"),
 		filepath.Join(home, ".gemini", "skills"),
+		filepath.Join(envOr(getenv, "COPILOT_HOME", filepath.Join(home, ".copilot")), "skills"),
+		filepath.Join(envOr(getenv, "GROK_HOME", filepath.Join(home, ".grok")), "skills"),
 		filepath.Join(home, ".cursor", "skills"),
 		filepath.Join(envOr(getenv, "PI_CODING_AGENT_DIR", filepath.Join(home, ".pi", "agent")), "skills"),
 		filepath.Join(envOr(getenv, "DSH_HOME", filepath.Join(home, ".dsh")), "skills"),
@@ -118,8 +120,12 @@ func HarnessSkillDirs(h, top, home string, getenv func(string) string) []string 
 	case "opencode":
 		user = []string{filepath.Join(envOr(getenv, "XDG_CONFIG_HOME", filepath.Join(home, ".config")), "opencode", "skills"), filepath.Join(home, ".claude", "skills"), agents}
 		repo = []string{".opencode", ".claude", ".agents"}
-	case "gemini":
-		user, repo = []string{filepath.Join(home, ".gemini", "skills"), agents}, []string{".gemini", ".agents"}
+	case "agy":
+		user, repo = []string{filepath.Join(home, ".gemini", "skills"), filepath.Join(home, ".gemini", "antigravity-cli", "skills"), agents}, []string{".agents"}
+	case "copilot":
+		user, repo = []string{filepath.Join(envOr(getenv, "COPILOT_HOME", filepath.Join(home, ".copilot")), "skills"), agents}, []string{".github", ".agents", ".claude"}
+	case "grok":
+		user, repo = []string{filepath.Join(envOr(getenv, "GROK_HOME", filepath.Join(home, ".grok")), "skills"), agents}, []string{".grok", ".agents"}
 	case "cursor":
 		user, repo = []string{filepath.Join(home, ".cursor", "skills"), agents}, []string{".cursor", ".agents"}
 	case "pi":

@@ -47,14 +47,14 @@ func ConsultCLI(h string, have func(string) bool) string {
 	switch {
 	case strings.HasPrefix(h, "claude-"):
 		cli = "claude"
-	case h == "codex", h == "opencode", h == "gemini", h == "pi", h == "dsh", h == "cursor":
+	case h == "codex", h == "opencode", h == "agy", h == "copilot", h == "grok", h == "pi", h == "dsh", h == "cursor":
 		cli = h
 	}
 	if cli != "" && !have(Bin(cli)) {
 		cli = ""
 	}
 	if cli == "" {
-		for _, c := range []string{"claude", "codex", "opencode", "gemini", "pi", "dsh"} {
+		for _, c := range []string{"claude", "codex", "opencode", "agy", "copilot", "grok", "pi", "dsh"} {
 			if have(c) {
 				return c
 			}

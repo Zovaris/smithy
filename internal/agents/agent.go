@@ -37,12 +37,14 @@ Agent CLI: $AGENT_CLI picks one by name; else the first installed of the list be
   codex       codex exec --sandbox workspace-write, the repo's git dir writable and network on
               (so workers can commit, push and open PRs); read-only sandbox when read-only
   opencode    opencode run --standalone --auto (plan agent when read-only); -m provider/model
-  gemini      gemini -p --approval-mode yolo (plan when read-only)
+  agy         agy --mode auto --dangerously-skip-permissions -p (Antigravity; --mode plan when read-only)
+  copilot     copilot --allow-all-tools --no-ask-user -p (GitHub Copilot CLI; --plan when read-only)
+  grok        grok --always-approve -p (xAI Grok Build; no auto-approve when read-only)
   cursor      agent -p --force (Cursor CLI)
   pi          pi -p (--tools read when read-only)
   dsh         dsh headless --approval-policy never (DeepSeek Harness; model from its profile)
-AGENT_PROTOCOL=acp drives the CLI over the Agent Client Protocol instead: gemini --experimental-acp,
-  opencode acp, or an AGENT_CMD that speaks ACP. The prompt goes over the protocol; the answer goes
+AGENT_PROTOCOL=acp drives the CLI over the Agent Client Protocol instead: agy acp, copilot --acp,
+  grok agent stdio, opencode acp, or an AGENT_CMD that speaks ACP. The prompt goes over the protocol; the answer goes
   to the log; finished tool calls and permission answers become events (tool, permission); usage
   goes to <log>.usage.json and a usage event. smithy allows each permission request, and rejects
   it on a read-only run with an entry in the decisions log.
@@ -56,7 +58,7 @@ AGENT_PROTOCOL=acp drives the CLI over the Agent Client Protocol instead: gemini
   git, gh, go/npm test and smithy; codex keeps --sandbox workspace-write with approval_policy never;
   opencode gets the same allow-list as OPENCODE_PERMISSION rules (also with --readonly: no edits,
   secret reads denied); the other CLIs keep their own headless mode above. Only claude and opencode
-  can deny reads of ~/.smithy/auth.json and the other secrets: codex, gemini, pi, cursor and dsh
+  can deny reads of ~/.smithy/auth.json and the other secrets: codex, agy, copilot, grok, pi, cursor and dsh
   can read them.
 Effort: --effort, else $AGENT_EFFORT, else the agent.effort setting (default medium). Anything
 above medium is capped at medium. Passed as --effort (claude) or -c model_reasoning_effort
@@ -76,13 +78,13 @@ and exits with its code (output goes through a file, so a server the CLI leaves 
 keep the caller waiting).`
 
 // CLIs is the order in which installed agent CLIs are picked when AGENT_CLI and AGENT_CMD are unset.
-var CLIs = []string{"claude", "codex", "opencode", "gemini", "cursor", "pi", "dsh"}
+var CLIs = []string{"claude", "codex", "opencode", "agy", "copilot", "grok", "cursor", "pi", "dsh"}
 
 // ParentVars are the harness variables removed from a worker's environment.
 var ParentVars = []string{"CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_THREAD_ID", "OPENCODE", "OPENCODE_SESSION_ID", "GEMINI_CLI", "PI_CODING_AGENT", "DSH_SESSION_ID", "AI_AGENT"}
 
 // ErrNoCLI means no agent CLI is installed and AGENT_CMD is unset.
-var ErrNoCLI = errors.New("no agent CLI found: install claude, codex, opencode, gemini, cursor (agent), pi or dsh, or set AGENT_CMD")
+var ErrNoCLI = errors.New("no agent CLI found: install claude, codex, opencode, agy, copilot, grok, cursor (agent), pi or dsh, or set AGENT_CMD")
 
 // Options are the flags of one agent run.
 type Options struct {
@@ -449,12 +451,25 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 		}
 		opt("-m")
 		a = append(append(append(a, kit...), extra...), prompt)
-	case "gemini":
-		mode := "yolo"
-		if o.ReadOnly {
-			mode = "plan"
+	case "agy":
+		a = []string{"agy", "--mode", "plan"}
+		if !o.ReadOnly {
+			a = []string{"agy", "--mode", "auto", "--dangerously-skip-permissions"}
 		}
-		a = []string{"gemini", "--approval-mode", mode}
+		opt("--model")
+		a = append(append(append(a, kit...), extra...), "-p", prompt)
+	case "copilot":
+		a = []string{"copilot", "--allow-all-tools", "--no-ask-user"}
+		if o.ReadOnly {
+			a = []string{"copilot", "--plan", "--no-ask-user"}
+		}
+		opt("--model")
+		a = append(append(append(a, kit...), extra...), "-p", prompt)
+	case "grok":
+		a = []string{"grok"}
+		if !o.ReadOnly {
+			a = append(a, "--always-approve")
+		}
 		opt("-m")
 		a = append(append(append(a, kit...), extra...), "-p", prompt)
 	case "cursor":
@@ -482,7 +497,7 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 }
 
 // ACPCLIs are the CLIs smithy can drive over the Agent Client Protocol, with their ACP command.
-var ACPCLIs = map[string][]string{"gemini": {"gemini", "--experimental-acp"}, "opencode": {"opencode", "acp"}}
+var ACPCLIs = map[string][]string{"agy": {"agy", "acp"}, "copilot": {"copilot", "--acp"}, "grok": {"grok", "agent", "stdio"}, "opencode": {"opencode", "acp"}}
 
 func buildACP(cli string, o Options, path string, extra []string, getenv func(string) string) (Spec, error) {
 	if cli == "custom" {
@@ -494,17 +509,9 @@ func buildACP(cli string, o Options, path string, extra []string, getenv func(st
 	}
 	base, ok := ACPCLIs[cli]
 	if !ok {
-		return Spec{}, fmt.Errorf("smithy agent: %s does not speak ACP (AGENT_PROTOCOL=acp drives gemini, opencode or an AGENT_CMD that does)", cli)
+		return Spec{}, fmt.Errorf("smithy agent: %s does not speak ACP (AGENT_PROTOCOL=acp drives agy, copilot, grok, opencode or an AGENT_CMD that does)", cli)
 	}
 	a := slices.Clone(base)
-	if cli == "gemini" {
-		if o.ReadOnly {
-			a = append(a, "--approval-mode", "plan")
-		}
-		if o.Model != "" {
-			a = append(a, "-m", o.Model)
-		}
-	}
 	a = append(a, extra...)
 	return Spec{Argv: withPath(a, path), Harness: cli, ACP: true}, nil
 }
@@ -1084,7 +1091,7 @@ const AutoNote = "Unattended run: shell access is limited by policy. If a comman
 	"is denied in its simplest form."
 
 // tierHarness names the harness whose models.<harness>.<tier> settings a headless CLI uses.
-var tierHarness = map[string]string{"claude": "claude-cli", "codex": "codex", "opencode": "opencode", "gemini": "gemini", "cursor": "cursor", "pi": "pi", "dsh": "dsh"}
+var tierHarness = map[string]string{"claude": "claude-cli", "codex": "codex", "opencode": "opencode", "agy": "agy", "copilot": "copilot", "grok": "grok", "cursor": "cursor", "pi": "pi", "dsh": "dsh"}
 
 // ResolveTier turns a tier name (cheap, mid, strong, judge) into the user's model for that CLI's
 // harness; an unset tier gives "" (the CLI's default model) with one warning. Any other value is a
