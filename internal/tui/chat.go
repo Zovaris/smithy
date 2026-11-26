@@ -126,6 +126,7 @@ type chatView struct {
 	effort   string                // agent.effort
 	clock    func() time.Time      // the header clock; nil: time.Now
 	splashOn bool                  // play the entry animation at the first window size
+	still    bool                  // reduced motion: the welcome field and anvil hold still
 	splash   []string              // the entry animation's frames left; nil once it ends
 	noise    []noise               // daemon events kept out of the transcript
 	dir      string                // the folder sessions start in and @ lists
@@ -402,6 +403,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	}
 	m := newChatView(ch, url, newTheme(true, p, utf8Locale()))
 	m.splashOn = splashWanted(isTTY(os.Stdout), os.Getenv("NO_COLOR"), os.Getenv("SMITHY_REDUCE_MOTION"), config.Get("ui.splash", "true"), config.Get("tui.reduce_motion", "false"))
+	m.still = os.Getenv("SMITHY_REDUCE_MOTION") != "" || config.Get("tui.reduce_motion", "false") == "true"
 	m.where = where
 	m.server = serverName
 	m.connectLoad = defaultConnectLoad(func() (string, string) {

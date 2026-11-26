@@ -4,10 +4,13 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/charmbracelet/colorprofile"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type welcomeSettings struct{ fakeSettings }
@@ -120,5 +123,55 @@ func TestWelcomeFlagOpensIt(t *testing.T) {
 	m = run(m, m.loadSetup(true))
 	if m.overlay != overlayWelcome {
 		t.Fatalf("a chat opened with --welcome shows it even when set up: %v", m.overlay)
+	}
+}
+
+func litWelcome(name string) chatView {
+	m := newChatView(nil, "http://127.0.0.1:7477", namedTheme(name, true, colorprofile.TrueColor, true))
+	m.width, m.height = 120, 40
+	m.openWelcome()
+	return m
+}
+
+func rgb(c interface{ RGBA() (r, g, b, a uint32) }) string {
+	r, g, b, _ := c.RGBA()
+	return fmt.Sprintf("%d;%d;%d", r>>8, g>>8, b>>8)
+}
+
+func TestWelcomeShowsTheLitAnvilInEveryTheme(t *testing.T) {
+	for _, name := range Themes {
+		m := litWelcome(name)
+		lit := false
+		for _, r := range m.welcomeView(m.width, m.height) {
+			if strings.Trim(ansi.Strip(r), "▀ ") == "" && strings.Contains(r, rgb(m.th.strong)) {
+				lit = true
+			}
+		}
+		if !lit {
+			t.Fatalf("%s: no lit anvil on the welcome's field", name)
+		}
+	}
+}
+
+func TestSplashAndWelcomeShareTheAnvil(t *testing.T) {
+	th := namedTheme("frost", true, colorprofile.TrueColor, true)
+	a := th.anvilField(anvilScene{s: bigPlate, rise: 1, fade: 1}, 60, 20)
+	b := th.anvilField(anvilScene{s: bigPlate, rise: 0, fade: 1}, 60, 20)
+	if strings.Join(a, "\n") == strings.Join(b, "\n") || !strings.Contains(strings.Join(a, ""), rgb(th.strong)) {
+		t.Fatal("the shared renderer does not draw a lit anvil")
+	}
+}
+
+func TestWelcomeAnvilHoldsStillUnderReducedMotion(t *testing.T) {
+	m := litWelcome("steel")
+	m.still = true
+	a := strings.Join(m.welcomeView(m.width, m.height), "\n")
+	m.frame = 37
+	if b := strings.Join(m.welcomeView(m.width, m.height), "\n"); a != b {
+		t.Fatal("reduced motion: the welcome still moves")
+	}
+	m.still = false
+	if b := strings.Join(m.welcomeView(m.width, m.height), "\n"); a == b {
+		t.Fatal("with motion the welcome field should drift")
 	}
 }
