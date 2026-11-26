@@ -125,7 +125,8 @@ func (m chatView) clockNow() time.Time {
 	return time.Now()
 }
 
-// pill is "idle", or "● N running" with the dot breathing between dim and the accent.
+// pill is "idle", "● waiting" while a decision waits on you and nothing runs, or "● N running"
+// with the dot breathing between dim and the accent.
 func (m chatView) pill(bar lipgloss.Style) string {
 	t := m.th
 	n := 0
@@ -133,6 +134,9 @@ func (m chatView) pill(bar lipgloss.Style) string {
 		if s.state == "running" {
 			n++
 		}
+	}
+	if n == 0 && len(m.pending) > 0 {
+		return bar.Foreground(t.warn).Render(t.g.on) + bar.Foreground(t.text).Render(" waiting")
 	}
 	if n == 0 {
 		return bar.Foreground(t.dim).Render("idle")
@@ -204,8 +208,13 @@ func (m chatView) statusLine(w int) string {
 	}
 	right += where
 	left := ""
-	if n := len(m.noise); n > 0 && time.Since(m.noise[n-1].at) < noiseShown {
-		left = dim.Render(m.noise[n-1].text)
+	for i := len(m.noise) - 1; i >= 0; i-- {
+		if n := m.noise[i]; !n.quiet {
+			if time.Since(n.at) < noiseShown {
+				left = dim.Render(n.text)
+			}
+			break
+		}
 	}
 	if m.offset > 0 {
 		left = t.fg(t.info).Render(fmt.Sprintf("→ %d rows up · end jumps back", m.offset))
@@ -227,7 +236,7 @@ func (m chatView) footer(w int) string {
 	dim, key := t.fg(t.dim), t.fg(t.text)
 	hint := func(k, what string) string { return key.Render(k) + dim.Render(" "+what) }
 	p := strings.Repeat(" ", m.pad())
-	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("v", "mode: "+m.mode.String()), hint("tab", "agents"), hint("ctrl+k", "palette"), hint("?", "help")}
+	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode: "+m.mode.String()), hint("tab", "agents"), hint("ctrl+k", "palette"), hint("?", "help")}
 	var info []string
 	if a := m.agentLabel(); a != "" {
 		info = append(info, a)
@@ -316,7 +325,7 @@ func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem,
 		q = t.fg(t.text).Render(placeholder)
 	}
 	out := []string{line(g.tl, g.tr), row(spread(" "+t.fg(t.accent).Render(t.g.prompt)+" "+q, dim.Render("esc")+" ", in)), line(g.lt, g.rt)}
-	body := max(h-6, 1)
+	body := max(h-8, 1)
 	rows := make([]string, 0, len(items))
 	selRow := 0
 	n := 0
@@ -325,7 +334,9 @@ func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem,
 			if len(rows) > 0 {
 				rows = append(rows, row(""))
 			}
-			rows = append(rows, row("   "+t.fg(t.muted).Bold(true).Render(ansi.Truncate(it.group, max(in-4, 1), "…"))))
+			for _, l := range strings.Split(ansi.Wordwrap(it.group, max(in-4, 1), ""), "\n") {
+				rows = append(rows, row("   "+t.fg(t.muted).Bold(true).Render(ansi.Truncate(l, max(in-4, 1), "…"))))
+			}
 			continue
 		}
 		mark, label := "  ", t.fg(t.text)
@@ -366,7 +377,8 @@ func frameGlyphs(uni bool) boxFrame {
 	return boxFrame{"+", "+", "+", "+", "+", "+", "-", "|", ">"}
 }
 
-// overBox centers box over the dimmed screen rows, 15% from the top as in the mockup.
+// overBox centers box over the dimmed screen rows, 15% from the top as in the mockup, or higher
+// when a tall box would otherwise run past the last row.
 func (m chatView) overBox(screen []string, box []string, w int) []string {
 	out := make([]string, len(screen))
 	for i, r := range screen {
@@ -379,7 +391,7 @@ func (m chatView) overBox(screen []string, box []string, w int) []string {
 	if len(box) > 0 {
 		bw = ansi.StringWidth(box[0])
 	}
-	x, y := (w-bw)/2, max(len(screen)*120/800, 1)
+	x, y := (w-bw)/2, max(min(len(screen)*120/800, len(screen)-len(box)), 1)
 	for i, b := range box {
 		if y+i < len(out) {
 			out[y+i] = splice(out[y+i], b, x, w)
@@ -389,7 +401,7 @@ func (m chatView) overBox(screen []string, box []string, w int) []string {
 }
 
 func (m chatView) boxSize(w, h int) (int, int) {
-	return max(min(88, w-6, w*9/10), min(w, 20)), max(min(h-4, 30), 10)
+	return max(min(88, w-6, w*9/10), min(w, 20)), max(min(h-2, 32), 12)
 }
 
 func keyHints(t theme, pairs ...string) string {
@@ -431,7 +443,8 @@ func (m chatView) helpBox(screen []string, w, h int) []string {
 	for _, k := range [][2]string{
 		{"enter", "send; shift+enter or alt+enter for a new line"}, {"/", "commands"}, {"@", "a file from this folder"},
 		{"tab", "agents and sessions"}, {"ctrl+k", "palette"}, {"ctrl+l", "agent and model"},
-		{"v", "minimal · expandable · verbose (empty input)"}, {"pgup pgdn", "scroll; wheel too, home and end"}, {"click", "open a tool block or answer a decision"},
+		{"ctrl+o", "minimal · expandable · verbose"}, {"? enter", "this help (or /help)"}, {"pgup pgdn", "scroll; wheel too, home and end"}, {"click", "open a tool block or answer a decision"},
+		{"letter, enter", "an option's first letter alone answers the decision; typing is a message"},
 		{"/name or $name", "run an installed skill on the rest of the line"}, {"ctrl+c", "quit"},
 	} {
 		items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: k[0], hint: k[1]})

@@ -20,7 +20,11 @@ type settingsAPI interface {
 	Doctor(ctx context.Context) ([]string, error)
 }
 
-type settingsDoneMsg struct{ lines []string }
+// settingsDoneMsg is a settings command's result: lines for the transcript, or a panel to open.
+type settingsDoneMsg struct {
+	lines []string
+	panel *infoPanel
+}
 
 // detach quits and leaves the daemon running; a standalone daemon lives in this process, so it stays.
 func (m chatView) detach() (tea.Model, tea.Cmd) {
@@ -59,17 +63,18 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 		run = func(ctx context.Context) ([]string, error) {
 			return []string{"removed the " + f[1] + " key"}, api.RemoveKey(ctx, f[1])
 		}
-	case name == "keys" || (name == "serve" && arg == ""):
+	case name == "keys":
+		return m, func() tea.Msg {
+			s, err := api.Settings(context.Background())
+			if err != nil {
+				return sessionErrMsg{what: "/keys", err: err}
+			}
+			return settingsDoneMsg{panel: keysPanel(s)}
+		}
+	case name == "serve" && arg == "":
 		run = func(ctx context.Context) ([]string, error) {
 			s, err := api.Settings(ctx)
-			out := []string{map[bool]string{true: "serve on", false: "serve off (auto.paused)"}[s.Serve]}
-			if len(s.Keys) == 0 {
-				out = append(out, "no API keys stored; set one in smithy tui, Settings (or smithy auth set <service>)")
-			}
-			for _, k := range s.Keys {
-				out = append(out, k.Service+" "+k.Masked)
-			}
-			return out, err
+			return []string{map[bool]string{true: "serve on", false: "serve off (auto.paused)"}[s.Serve]}, err
 		}
 	case name == "doctor":
 		m.system("running smithy doctor…")
@@ -83,6 +88,21 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 		if err != nil {
 			return sessionErrMsg{what: "/" + name, err: err}
 		}
-		return settingsDoneMsg{lines}
+		return settingsDoneMsg{lines: lines}
 	}
+}
+
+// keysPanel is /keys: the stored keys masked, each with the command that removes it, and how
+// to add one (a secret is typed in a terminal, never into the chat).
+func keysPanel(s daemon.Settings) *infoPanel {
+	lines := []string{"#STORED API KEYS"}
+	for _, k := range s.Keys {
+		lines = append(lines, "ok "+k.Service+" "+k.Masked+"\t/key rm "+k.Service+" removes it")
+	}
+	if len(s.Keys) == 0 {
+		lines = append(lines, "none yet")
+	}
+	lines = append(lines, "#ADD OR REPLACE ONE", "-> smithy auth set <service>\tin a terminal; the key is read without echo",
+		"#SERVE", map[bool]string{true: "ok serve on\t/serve off pauses new work", false: "serve off (auto.paused)\t/serve on resumes it"}[s.Serve])
+	return &infoPanel{title: "API keys", lines: lines}
 }

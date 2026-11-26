@@ -31,9 +31,9 @@ const ChatUsage = `usage: smithy chat [url | --server <name|url> | --standalone]
 A fullscreen chat over a smithy daemon: its events stream into the transcript and the input stays
 pinned at the bottom. A lost connection retries and resumes after the last event seen.
 Keys: enter send; pgup/pgdn, wheel or ctrl+u/ctrl+d scroll; home/end top/bottom; click a tool block
-to open it; v (empty input) cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
-option's first letter (empty input) or a click on it answers the decision pinned at the top;
-/ opens every command, /name or $name runs an installed skill, @ a file, ? help; !cmd runs a shell
+to open it; ctrl+o cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
+option's first letter alone then enter, or a click on it, answers the decision pinned at the top;
+/ opens every command, /name or $name runs an installed skill, @ a file, ? then enter help; !cmd runs a shell
 command in the session folder; ctrl+v attaches a clipboard image; esc clears the input; ctrl+c quits.
   url           default: the local daemon (token from ~/.smithy/daemon.token), started in the
                 background when none runs; it outlives the chat and exits after daemon.idle_exit
@@ -115,6 +115,7 @@ type chatView struct {
 
 	welcome      welcomeStep
 	welcomeAgent string
+	welcomeNote  string // the walk's last saved pick, printed once when it ends
 	welcomeSet   *daemon.Settings
 
 	sess     sessionAPI            // the daemon's sessions endpoints; nil: offline
@@ -553,6 +554,10 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dirsMsg:
 		return m.dirsLoaded(msg)
 	case settingsDoneMsg:
+		if msg.panel != nil {
+			m.info, m.overlay, m.pal = *msg.panel, overlayInfo, palette{}
+			return m, nil
+		}
 		for _, l := range msg.lines {
 			m.system(l)
 		}
@@ -568,7 +573,7 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.conn, m.connErr = "reconnecting", msg.Err.Error()
 		case msg.Event != nil && msg.Event.Seq > m.last:
 			m.last = msg.Event.Seq
-			m.event(msg.Event.Kind, msg.Event.Session, msg.Event.Time.Local().Format("15:04"), msg.Event.Data)
+			m.event(msg.Event.Kind, msg.Event.Session, msg.Event.Time, msg.Event.Data)
 			if m.last >= m.heldTo {
 				m.release()
 			}
@@ -663,6 +668,13 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.input.SetValue("")
 			m.popSel = 0
+			if o, ok := m.optionFor(t); ok && len(m.images) == 0 {
+				return m, m.answer(o)
+			}
+			if t == "?" && len(m.images) == 0 {
+				m.overlay, m.pal = overlayHelp, palette{}
+				return m, nil
+			}
 			if strings.HasPrefix(t, "/") {
 				return m.command(t)
 			}
@@ -704,6 +716,8 @@ func eventText(kind, session string, data json.RawMessage) string {
 			return ""
 		}
 		return "answered: " + o.Answer + by(o.By)
+	case daemon.KindRouted:
+		return "" // bookkeeping: the answered line already said it
 	case "log":
 		var d struct {
 			Line string `json:"line"`
@@ -719,9 +733,10 @@ func eventText(kind, session string, data json.RawMessage) string {
 }
 
 // rows is the transcript height: the screen less the header, the decision strip, the status
-// line, the composer, the footer and the spinner row while the open session works.
+// line and the gap under it, the composer, the footer and the spinner row while the open
+// session works.
 func (m chatView) rows() int {
-	n := m.height - headRows - m.stripRows() - 1 - m.input.Height() - 1
+	n := m.height - headRows - m.stripRows() - 2 - m.input.Height() - 1
 	if m.working() {
 		n -= 2
 	}
@@ -904,7 +919,7 @@ func (m chatView) View() tea.View {
 		}
 	}
 	out = append(out, body...)
-	out = append(out, m.statusLine(w))
+	out = append(out, m.statusLine(w), "")
 	out = append(out, m.composer(w)...)
 	out = append(out, m.footer(w))
 	if m.welcome != welcomeOff {

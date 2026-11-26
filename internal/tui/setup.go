@@ -135,7 +135,9 @@ func (m chatView) setupUpdate(msg tea.Msg) (chatView, tea.Cmd, bool) {
 		if m.overlay == overlaySetup || m.overlay == overlayPicker {
 			m.overlay = overlayNone
 		}
-		if msg.note != "" {
+		if msg.note != "" && m.welcome != welcomeOff {
+			m.welcomeNote = msg.note
+		} else if msg.note != "" {
 			m.system(msg.note)
 		}
 		if m.welcome != welcomeOff {

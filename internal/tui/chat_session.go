@@ -36,8 +36,9 @@ type sessionErrMsg struct {
 // noise is one daemon event kept out of the transcript: the status line shows the latest, /log
 // all of them.
 type noise struct {
-	at   time.Time
-	text string
+	at    time.Time
+	text  string
+	quiet bool // only in /log: what another part of the screen already shows
 }
 
 const maxNoise = 500
@@ -353,13 +354,16 @@ func diffStat(patch string) string {
 }
 
 // status puts text on the status line and in the log.
-func (m *chatView) status(text string) {
-	for _, n := range m.noise {
-		if n.text == text {
+func (m *chatView) status(text string) { m.logNoise(noise{at: time.Now(), text: text}) }
+
+// logNoise keeps n for /log, once per text; the status line shows it unless it is quiet.
+func (m *chatView) logNoise(n noise) {
+	for _, o := range m.noise {
+		if o.text == n.text {
 			return
 		}
 	}
-	m.noise = append(m.noise, noise{at: time.Now(), text: text})
+	m.noise = append(m.noise, n)
 	if len(m.noise) > maxNoise {
 		m.noise = m.noise[len(m.noise)-maxNoise:]
 	}
