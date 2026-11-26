@@ -165,6 +165,8 @@ examples for one (`smithy help --all` adds the commands the skills call).
 
 ## Chat and TUI
 
+![How the smithy harness works](docs/harness.svg)
+
 Run `smithy` to open a chat with any agent CLI above. A local daemon runs the sessions, and the
 TUI and the web are two views of it, so you can leave and come back, or open the same sessions
 from your phone.

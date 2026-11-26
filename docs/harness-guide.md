@@ -3,6 +3,8 @@
 `smithy` opens a chat with any agent CLI. A local daemon runs the sessions; the TUI and the web
 are two views of it. For the agent CLIs it can drive, see [Harnesses](harnesses.md).
 
+![How the smithy harness works](harness.svg)
+
 ```bash
 smithy                 # the chat (starts a background daemon if none runs)
 smithy web             # the same daemon in a browser
