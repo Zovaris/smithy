@@ -21,20 +21,6 @@ export function groupAgents(agents: Ready[], sessions: Sess[]) {
   };
 }
 
-// crumbs is a folder path as clickable parts, root first; Windows drives keep their letter.
-export function crumbs(dir: string): { label: string; path: string }[] {
-  const win = /^[A-Za-z]:\\/.exec(dir);
-  const sep = win ? "\\" : "/";
-  const root = win ? win[0] : "/";
-  const out = [{ label: root, path: root }];
-  let p = root;
-  for (const part of dir.slice(root.length).split(sep).filter(Boolean)) {
-    p = p === root ? root + part : p + sep + part;
-    out.push({ label: part, path: p });
-  }
-  return out;
-}
-
 export const projectOf = (l: ProjectList, dir: string) => l.projects.find((p) => p.dir === dir)?.name ?? dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
 
 export function startDir(l: ProjectList, remembered: string): string {
