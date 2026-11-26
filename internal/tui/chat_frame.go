@@ -523,16 +523,6 @@ func (m chatView) listedAt(id string) int {
 	return -1
 }
 
-// current2 is the index of the open session in m.sessions, -1 when none.
-func (m chatView) current2() int {
-	for i, s := range m.sessions {
-		if s.id == m.current && m.current != "" {
-			return i
-		}
-	}
-	return -1
-}
-
 func (m chatView) totalCost() float64 {
 	c := 0.0
 	for _, v := range m.cost {
