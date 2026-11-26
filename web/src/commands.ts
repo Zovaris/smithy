@@ -5,11 +5,22 @@ export type Cmd = { name: string; hint: string; kind: "action" | "skill" };
 export const ACTIONS: Cmd[] = [
   { name: "new", hint: "start a new session", kind: "action" },
   { name: "stop", hint: "stop this session's turn", kind: "action" },
+  { name: "model", hint: "the model this session runs", kind: "action" },
+  { name: "effort", hint: "this session's reasoning effort", kind: "action" },
+  { name: "skills", hint: "skills and MCP injected into every session", kind: "action" },
+  { name: "theme", hint: "steel, frost or plum", kind: "action" },
+  { name: "connect", hint: "servers: add one, switch", kind: "action" },
   { name: "agents", hint: "every agent and session", kind: "action" },
   { name: "board", hint: "sessions by state", kind: "action" },
   { name: "decisions", hint: "what waits on you", kind: "action" },
-  { name: "settings", hint: "agents, model, skills, MCP", kind: "action" },
-  { name: "theme", hint: "light or dark", kind: "action" },
+  { name: "ask", hint: "pin a sample question, to try decisions", kind: "action" },
+  { name: "answer", hint: "answer the open decision in your words", kind: "action" },
+  { name: "serve", hint: "serve on or off (auto.paused)", kind: "action" },
+  { name: "set", hint: "save a setting: /set <key> <value>", kind: "action" },
+  { name: "unset", hint: "put a setting back to its default", kind: "action" },
+  { name: "keys", hint: "stored API keys, masked", kind: "action" },
+  { name: "doctor", hint: "run smithy doctor", kind: "action" },
+  { name: "settings", hint: "every setting, keys, servers", kind: "action" },
 ];
 
 // suggest lists the commands matching a message that is only `/word` so far.
