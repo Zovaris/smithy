@@ -229,6 +229,7 @@ type options struct {
 	motion  bool
 	seed    uint64
 	toast   bool
+	theme   string // ui.theme
 	now     func() time.Time
 	load    func(time.Time) Snapshot
 }
@@ -242,7 +243,7 @@ func newModel(o options) Model {
 	m.reason.Placeholder = "one line the agent will read"
 	m.input.Prompt = "/ "
 	m.input.Placeholder = "filter this view"
-	m.th = newTheme(m.dark, m.profile, m.unicode)
+	m.th = namedTheme(o.theme, m.dark, m.profile, m.unicode)
 	m.snap = m.load(m.now())
 	m.capPos = capPercent(m.snap.Watcher)
 	if o.toast {
@@ -274,7 +275,7 @@ func New(noAnim, demo bool) Model {
 		load = Demo
 	}
 	motion := motionOn(noAnim, os.Getenv("SMITHY_REDUCE_MOTION"), config.Get("tui.reduce_motion", "false"), p)
-	m := newModel(options{profile: p, dark: true, unicode: utf8Locale(), motion: motion, toast: first || demo,
+	m := newModel(options{profile: p, dark: true, unicode: utf8Locale(), motion: motion, toast: first || demo, theme: config.Get("ui.theme", "steel"),
 		seed: uint64(time.Now().UnixNano()), now: time.Now, load: load})
 	if demo {
 		m.pauser = func(bool) error { return fmt.Errorf("demo: intake is not real") }
@@ -385,11 +386,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sizeText()
 	case tea.BackgroundColorMsg:
 		m.dark = msg.IsDark()
-		m.th = newTheme(m.dark, m.profile, m.unicode)
+		m.th = namedTheme(m.th.name, m.dark, m.profile, m.unicode)
 	case tea.ColorProfileMsg:
 		if os.Getenv("NO_COLOR") == "" {
 			m.profile = msg.Profile
-			m.th = newTheme(m.dark, m.profile, m.unicode)
+			m.th = namedTheme(m.th.name, m.dark, m.profile, m.unicode)
 		}
 	case tickMsg:
 		m.ticks++
@@ -456,6 +457,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case systemMsg:
 		s := System(msg)
 		m.sys, m.sysBusy = &s, false
+		for _, r := range s.Settings {
+			if r.Key == "ui.theme" {
+				m.th = m.th.renamed(r.Value)
+			}
+		}
 	case pausedMsg:
 		if msg.err != nil {
 			m.status = "pause: " + msg.err.Error()

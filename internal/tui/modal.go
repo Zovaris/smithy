@@ -36,6 +36,9 @@ func (m chatView) pickerBox(screen []string, w, h int) []string {
 	if m.setupStep == stepEffort {
 		return m.effortBox(screen, w, h)
 	}
+	if m.setupStep == stepTheme {
+		return m.themeBox(screen, w, h)
+	}
 	title := "Pick an agent"
 	esc := "close"
 	var items []boxItem

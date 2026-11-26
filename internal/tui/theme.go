@@ -3,6 +3,7 @@ package tui
 import (
 	"image/color"
 	"os"
+	"slices"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -18,7 +19,37 @@ type theme struct {
 	ramp                                    []color.Color // steel ramp for dither, dark → light
 	plain                                   bool          // no color: lean on bold and reverse
 	g                                       glyphs
+	name                                    string // one of Themes
+	dark, uni                               bool
+	prof                                    colorprofile.Profile
 }
+
+// Themes are the ui.theme choices; steel is the default. A theme swaps the ember for its own accent.
+var Themes = []string{"steel", "frost", "plum"}
+
+// namedTheme is newTheme with the accent of theme n; an unknown or empty name is steel.
+func namedTheme(n string, dark bool, p colorprofile.Profile, unicode bool) theme {
+	t := newTheme(dark, p, unicode)
+	if slices.Contains(Themes, n) {
+		t.name = n
+	}
+	if t.plain {
+		return t
+	}
+	c := lipgloss.Color
+	full := lipgloss.Complete(p)
+	ld := lipgloss.LightDark(dark)
+	switch n {
+	case "frost":
+		t.accent = ld(full(c("14"), c("44"), c("#0E7C86")), full(c("14"), c("44"), c("#3DD6D0")))
+	case "plum":
+		t.accent = ld(full(c("13"), c("170"), c("#9333EA")), full(c("13"), c("170"), c("#C084FC")))
+	}
+	return t
+}
+
+// renamed is t in theme n, same background, profile and glyphs.
+func (t theme) renamed(n string) theme { return namedTheme(n, t.dark, t.prof, t.uni) }
 
 type glyphs struct {
 	sel, open, on, half, off, pass, fail, wait, dot, tee, elbow, pipe, bar, prompt string
@@ -67,6 +98,7 @@ func newTheme(dark bool, p colorprofile.Profile, unicode bool) theme {
 		overlay: tok("0", "236", "#D8E0E9", "#222B37"),
 		border:  tok("8", "237", "#C3CDD9", "#2C3746"),
 		g:       asciiGlyphs,
+		name:    "steel", dark: dark, uni: unicode, prof: p,
 	}
 	if unicode {
 		t.g = uniGlyphs
