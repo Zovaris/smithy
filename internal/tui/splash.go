@@ -65,12 +65,14 @@ func splashFrames(t theme, w, h int) []string {
 	nameY := (ay+s.h())/2 + 1
 	nameW := len([]rune(wordB[0]))
 	nx := (w - nameW) / 2
+	cx, cy := ax+s.w()/2, ay+s.h()/2
+	steel := []color.Color{t.ramp[len(t.ramp)/2], t.ramp[len(t.ramp)-1], t.muted, t.text, t.strong}
 	f := newFX(7)
 	out := make([]string, splashLen)
 	for k := range out {
 		fade := min(1, float64(k+1)/5)
-		rise := min(1, math.Max(0, float64(k-2)/4))
-		if k == 6 {
+		rise := min(1, math.Max(0, float64(k-1)/4))
+		if k == 5 {
 			f.strike(s, 14, nameW)
 		}
 		sp := map[[2]int]float64{}
@@ -82,10 +84,12 @@ func splashFrames(t theme, w, h int) []string {
 			if age, ok := sp[[2]int{lx, ly}]; ok && !s.on(lx, ly) {
 				return dpick([]color.Color{t.accent, t.ramp[len(t.ramp)-1]}, age, x, y)
 			}
-			if s.on(lx, ly) && float64(s.h()-ly) <= rise*float64(s.h())+0.5 {
-				return dpick(t.ramp, s.shade(lx, ly)*min(1, rise+0.3), x, y)
+			if s.on(lx, ly) && rise > 0 {
+				return dpick(steel, s.shade(lx, ly)*rise, x, y)
 			}
-			v := (0.22 + 0.14*math.Sin(float64(x)*0.07+float64(y)*0.4) + 0.08*math.Sin(float64(x)*0.023-float64(k)*0.3)) * fade
+			dx, dy := float64(x-cx)/float64(w), float64(y-cy)/float64(2*h)
+			near := clamp01(math.Hypot(dx, dy) * 4)
+			v := (0.22 + 0.14*math.Sin(float64(x)*0.07+float64(y)*0.4) + 0.08*math.Sin(float64(x)*0.023-float64(k)*0.3)) * fade * (0.25 + 0.75*near)
 			return dpick(t.ramp, clamp01(v), x, y)
 		}
 		rows := make([]string, h)
@@ -93,7 +97,7 @@ func splashFrames(t theme, w, h int) []string {
 			var b strings.Builder
 			for x := 0; x < w; x++ {
 				top, bot := px(x, row*2), px(x, row*2+1)
-				if k >= 8 && row >= nameY && row < nameY+len(wordB) && x >= nx && x < nx+nameW {
+				if k >= 7 && row >= nameY && row < nameY+len(wordB) && x >= nx && x < nx+nameW {
 					r := []rune(wordB[row-nameY])[x-nx]
 					b.WriteString(lipgloss.NewStyle().Foreground(t.strong).Background(bot).Bold(true).Render(string(r)))
 					continue
