@@ -18,7 +18,7 @@ export function items(onAction: (a: string) => void, theme = "steel"): Item[] {
       run: () => (d.session ? go({ name: "session", id: d.session }) : go({ name: "decisions" })),
     })),
     ...ACTIONS.filter((a) => !PAGES.some((p) => p.id === a.name) && !["settings", "set", "unset", "answer"].includes(a.name)).map((a) => ({ id: "a:" + a.name, group: "Actions", icon: "/", label: a.hint.replace(/^\w/, (c) => c.toUpperCase()), hint: "/" + a.name, run: () => onAction(a.name) })),
-    { id: "a:mode", group: "Actions", icon: "/", label: "Light or dark", hint: "mode", run: () => onAction("mode") },
+    { id: "t:toggle", group: "Theme", icon: "◐", label: "Theme: light or dark", hint: "/theme light|dark", run: () => onAction("theme:toggle") },
     ...THEMES.map((t) => ({ id: "t:" + t.name, group: "Theme", icon: t.name === theme ? "●" : "○", label: "Theme: " + t.name, hint: t.hint, run: () => onAction("theme:" + t.name) })),
     ...PAGES.map((p) => ({ id: "p:" + p.id, group: "Go to", icon: "→", label: p.label, shortcut: ["alt", p.key], run: () => go({ name: p.id }) })),
     ...sessions(l.store).map((s) => ({ id: "s:" + s.id, group: "Sessions", icon: "·", label: s.title, hint: STATUS_WORD[s.status], run: () => go({ name: "session", id: s.id }) })),

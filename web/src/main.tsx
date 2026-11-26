@@ -16,6 +16,17 @@ import { go, href, PAGES, type Page, useView } from "./lib/router";
 import { agentName, ago, open, sessions as list, type Sess } from "./lib/store";
 import { initTheme, toggleTheme, current, loadAccent, type ThemeName } from "./lib/theme";
 import { St } from "./components/ui";
+import type { Info } from "./components/info";
+import type { Detail } from "./lib/commands";
+
+// The transcript detail /mode picks, kept per browser like the TUI keeps it per run.
+function savedDetail(): Detail {
+  try {
+    const d = localStorage.getItem("smithy.detail");
+    if (d === "minimal" || d === "expandable" || d === "verbose") return d;
+  } catch {}
+  return "expandable";
+}
 
 const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
   decisions: lazy(() => import("./screens/decisions")),
@@ -29,6 +40,7 @@ const AgentsPanel = lazy(() => import("./components/panel"));
 const Splash = lazy(() => import("./components/splash"));
 const SideServers = lazy(() => import("./components/servers").then((m) => ({ default: () => <m.Servers rows={m.useServers()} /> })));
 const SessionPick = lazy(() => import("./features/chat/sessionpick"));
+const InfoPanel = lazy(() => import("./components/info"));
 type Shell = { cmd: string; output: string; code: number };
 
 const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", setup: "gear" };
@@ -129,6 +141,14 @@ function App() {
   const [sheet, setSheet] = useState<"" | "side" | "rail">("");
   const [collapsed, setCollapsed] = useState(false);
   const [notes, setNotes] = useState<Record<string, Comment[]>>({});
+  const [info, setInfo] = useState<Info | null>(null);
+  const [detail, setDetailState] = useState<Detail>(savedDetail);
+  const setDetail = (d: Detail) => {
+    setDetailState(d);
+    try {
+      localStorage.setItem("smithy.detail", d);
+    } catch {}
+  };
   const ss = list(l.store);
   const sid = v.name === "session" ? v.id : "";
   const s = sid ? l.store.sessions[sid] : undefined;
@@ -152,10 +172,14 @@ function App() {
       api("/v1/setup").then((r) => (r.ok ? r.json() : null)).then((x) => x && !x.chosen && (location.hash = "#/setup")).catch(() => {});
   }, [auth.state]);
   useEffect(() => (setSheet(""), setNote("")), [v]);
+  const showTend = () => {
+    setSheet("rail");
+    setTimeout(() => document.querySelectorAll<HTMLElement>(".rail #tend").forEach((e) => e.scrollIntoView({ block: "start" })), 300);
+  };
 
   const onAction = (a: string, arg = "") => {
     if (a === "new") go({ name: "new" });
-    else import("./features/chat/slash").then((m) => m.run(a, arg, { s, pend, setPick, setNote, setAccent }));
+    else import("./features/chat/slash").then((m) => m.run(a, arg, { s, pend, log: l.store.log, detail, setPick, setNote, setAccent, setDetail, setInfo, showTend }));
   };
 
   useEffect(() => {
@@ -216,7 +240,7 @@ function App() {
   else if (v.name === "session")
     center = s ? (
       <>
-        <Conversation s={s} items={l.store.convo[s.id] ?? []} decisions={decs} loose={s.status === "working" || s.status === "needs_you" ? pend.filter((d) => !d.session) : []}
+        <Conversation s={s} detail={detail} items={l.store.convo[s.id] ?? []} decisions={decs} loose={s.status === "working" || s.status === "needs_you" ? pend.filter((d) => !d.session) : []}
           extra={(shells[s.id] ?? []).map((x) => (
             <div class="shell" role="group" aria-label={"Shell: " + x.cmd}>
               <div class="mono"><span class="t3">$</span> {x.cmd}{x.code !== 0 && <span class="st fail">exit {x.code}</span>}</div>
@@ -296,6 +320,11 @@ function App() {
       {pick && s && (
         <Suspense fallback={null}>
           <SessionPick s={s} open={pick} onClose={() => setPick(false)} />
+        </Suspense>
+      )}
+      {info && (
+        <Suspense fallback={null}>
+          <InfoPanel info={info} onClose={() => setInfo(null)} />
         </Suspense>
       )}
       {palUsed && (

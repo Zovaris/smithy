@@ -9,6 +9,12 @@ const run = (...es: Ev[]): Store => es.reduce(fold, blank());
 const started = (id = "s-1", title = "Add retry") => ev("session_started", { id, agent: "claude", model: "sonnet", dir: "/r", title, status: "done" }, id);
 
 describe("fold", () => {
+  it("keeps the daemon's log lines for /log, newest last and at most 200", () => {
+    const lines = Array.from({ length: 205 }, (_, i) => ev("log", { line: "daemon: " + i }, ""));
+    const s = run(...lines);
+    expect(s.log.length).toBe(200);
+    expect(s.log[199]).toBe("daemon: 204");
+  });
   it("keeps a session's model and effort when /model or /effort changes them", () => {
     const s = run(started(), ev("session_model", { model: "opus", effort: "low" }));
     expect([s.sessions["s-1"].model, s.sessions["s-1"].effort]).toEqual(["opus", "low"]);

@@ -21,9 +21,10 @@ export type Store = {
   convo: Record<string, Item[]>;
   diffs: Record<string, Diff>;
   decisions: Dec[];
+  log: string[];
 };
 
-export const blank = (): Store => ({ last: 0, order: [], sessions: {}, convo: {}, diffs: {}, decisions: [] });
+export const blank = (): Store => ({ last: 0, order: [], sessions: {}, convo: {}, diffs: {}, decisions: [], log: [] });
 
 const obj = (d: unknown): Record<string, any> => (d && typeof d === "object" ? (d as Record<string, any>) : {});
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -153,6 +154,10 @@ export function fold(s: Store, e: Ev): Store {
         turn.parts.push({ kind: "decision", id: did });
         next.convo = { ...s.convo, [sid]: items };
       }
+      return next;
+    }
+    case "log": {
+      if (str(d.line)) next.log = [...s.log, str(d.line)].slice(-200);
       return next;
     }
     case "decision_answered": {

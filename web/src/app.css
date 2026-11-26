@@ -309,3 +309,6 @@ a.row1:hover, button.row1:hover, .pick .row1:hover { background: var(--t-raised)
 .shell pre { margin: 0; padding: 8px 10px; font-size: 12px; max-height: 320px; overflow: auto; white-space: pre-wrap; }
 .composer.bang { border-color: var(--t-wait); }
 
+.info { display: grid; gap: 6px; max-height: 60vh; overflow: auto; font-size: 13px; }
+.info .top2 { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.info .lbl { margin-top: 8px; }
