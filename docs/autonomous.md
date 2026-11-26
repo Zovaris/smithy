@@ -68,7 +68,7 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   must be installed smithy skills) and `POST /v1/setup/skills/install` (`{"harness"}`, empty for
   every detected one) change them. `GET /v1/agents/{id}/models[?refresh=1]` lists the models
   agent `id` (a CLI or `api:<provider>`) reports, default first, cached for a day. The TUI's first run, `ctrl+l`, `/agent`, `/model`, `/skills`
-  and the web's Setup screen use these.
+  and the web's Settings screen use these.
 - It tails `~/.smithy/events.jsonl` and the proxy's log into its store (once per line, across
   rotation and restarts) and turns them into decisions: a proxy `secret_ask` is `secret:<id>`
   (approve/deny, handed back as `smithy proxy approve|deny` would), a ready item is
@@ -80,7 +80,7 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   with a loopback `Host`, the login only with a `*.ts.net` one, so a DNS-rebound web page can't
   use the API.
 - Remote access: `tailscale serve --bg 7477` puts it on your tailnet over HTTPS with the
-  identity header; smithy has no Tailscale code. Any local process can send that header, so set
+  identity header; smithy itself only reads `tailscale status --json` (for `smithy servers discover`). Any local process can send that header, so set
   `daemon.allow` only on a machine where every local user is trusted (the dedicated OS user above).
 - Another machine without tailscale serve: set `daemon.listen` to a non-loopback `ip:port`, run
   `smithy pair` here and `smithy servers add <name> http://<ip>:<port> --code <code>` there. That
@@ -161,10 +161,10 @@ machine, with a fine-grained, repo-scoped GitHub token and a test or least-privi
 
 - **What each harness gets under `--profile auto`:**
 
-  | Harness | Guard |
+  | Harness | Allow-list |
   |---|---|
   | Claude Code | smithy's allow-list: explicit git/gh subcommands; config edits, credential and network commands, and secret files denied |
-  | Codex | its workspace-write sandbox, network on (push needs it), approvals off |
+  | Codex | its workspace-write sandbox, network on (push needs it), approvals off; `auto.sandbox native` turns its network off |
   | OpenCode | smithy's allow-list as `OPENCODE_PERMISSION` rules: bash allow-list, web fetch and outside directories denied, secret files denied for read and edit (also for `--readonly` runs such as the intake planner) |
   | Any CLI over ACP (`AGENT_PROTOCOL=acp`) | each permission request goes through the same allow-list: a command must match an allowed rule and no denied one (no `;`, `&&`, pipes, redirects or `$`), edits stay inside the worktree and off denied paths, reads off secret paths; fetch, delete, move and anything smithy can't classify are rejected |
   | Others (gemini, pi, cursor, dsh) | their own headless mode, no smithy allow-list |
@@ -178,6 +178,17 @@ machine, with a fine-grained, repo-scoped GitHub token and a test or least-privi
 
   None of these removes the risk. Nothing stops Codex or the others sending data out, so
   least-privilege tokens matter most there.
+- **Guards.** Workers run without permission prompts by default; the guard is the only thing
+  that asks. The dangerous-command guard is on by default (`guard.enabled`): a shell command
+  matching its built-in list or `guard.block` (`rm -rf /`, a force push to main,
+  `git reset --hard`, a disk format, `curl | sh`, `chmod -R 777`, deleting `~/.smithy`) asks you
+  in the TUI, web or chat to run it once, always allow the pattern (added to `guard.allow`) or
+  deny. With no daemon, or no answer within `ask.timeout`, the command is denied. The fetch
+  guard leaves fetch open (HTTPS only) except for domains in `guard.fetch_block`, which ask the
+  same way; `guard.fetch_allow` skips the question. `smithy guard check` tests a command,
+  `smithy guard fetch-check <host>` prints the `guard.fetch_block` glob a host matches (exit 1) or nothing, `smithy guard list`
+  shows the rules and `smithy guard suggest --add` allows common hosts. `guard.enabled`,
+  `guard.allow` and `guard.fetch_allow` are read from your user config only.
 - **Not sandboxed.** The orchestrator itself is not sandboxed and may run repo tests.
 - **Credentials workers keep.** Workers sign commits through your ssh-agent, so use a dedicated
   signing key. They still get your `GH_TOKEN`.
@@ -189,8 +200,8 @@ it.
 
 | Mode | Isolation | Works with |
 |---|---|---|
-| `off` (default) | the guard above only | every harness |
-| `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off, so push and `gh` fail; Gemini CLI is refused (its sandbox can't limit hosts) |
+| `off` (default) | the allow-list above and the dangerous-command guard only, no OS sandbox | every harness |
+| `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off here (on under `off`), so push and `gh` fail; Gemini CLI is refused (its sandbox can't limit hosts) |
 
 The API backend (`auto.agent api:<provider>/<model>`) runs its tools on the `--profile auto`
 rules only while `auto.sandbox` is `off` (the default); with `auto.sandbox native` its shell tool
