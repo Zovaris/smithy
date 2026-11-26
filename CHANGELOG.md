@@ -11,11 +11,17 @@ part above `### Details`.
 ### New
 
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
+- Each server keeps a list of projects. A new session asks which one it works in, and the
+  project stays fixed for that session. Add projects with a folder picker that browses the
+  server's machine.
 
 ### Details
 
 - `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),
   for the web UI.
+- `GET/POST/DELETE /v1/projects` keeps the daemon's projects and default in
+  `~/.smithy/projects.json`; `GET /v1/fs?dir=` lists a folder's subfolders for the picker. A
+  session started with no `dir` uses the default project.
 - **One modal for every picker.** Agent and model (ctrl+l, `/agent`, `/model`, first run), `/skills` and the agents list (tab) open as the same centered box as the ctrl+k palette: filter or title on top, ↑↓ enter esc at the bottom, no per-cell background blocks.
 ### Highlights
 
