@@ -5,6 +5,7 @@ package tui
 import (
 	"fmt"
 	"image/color"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -182,8 +183,13 @@ func (m chatView) agentsBox(screen []string, w, h int) []string {
 	if c := m.totalCost(); c > 0 {
 		sum += fmt.Sprintf(" · $%.2f", c)
 	}
-	items := []boxItem{{group: "SESSIONS"}}
-	for i, s := range m.sessions {
+	items := []boxItem{{group: "THIS PROJECT"}}
+	list, shownOther := m.listed(), false
+	for _, s := range list {
+		if !m.here(s) && !shownOther {
+			shownOther = true
+			items = append(items, boxItem{group: "OTHER PROJECTS"})
+		}
 		g, c := m.sessionGlyph(s.state)
 		title := s.title
 		if title == "" {
@@ -196,7 +202,11 @@ func (m chatView) agentsBox(screen []string, w, h int) []string {
 			}
 		}
 		var parts []string
-		for _, x := range []string{s.agent, s.model, s.id} {
+		where := ""
+		if !m.here(s) {
+			where = filepath.Base(s.dir)
+		}
+		for _, x := range []string{where, s.agent, s.model, s.id} {
 			if x != "" {
 				parts = append(parts, x)
 			}
@@ -208,13 +218,16 @@ func (m chatView) agentsBox(screen []string, w, h int) []string {
 		if now != "" {
 			parts = append(parts, now)
 		}
-		if i == m.current2() {
+		if s.id == m.current && m.current != "" {
 			title = t.g.prompt + " " + title
 		}
 		items = append(items, boxItem{glyph: g, color: c, label: title, hint: strings.Join(parts, " "+t.g.dot+" "), key: when})
 	}
-	if len(m.sessions) == 0 {
-		items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: "no sessions yet: type a message to start one", static: true})
+	if len(list) == 0 {
+		items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: "no sessions in this folder yet: type a message to start one", static: true})
+	}
+	if other := len(m.sessions) - len(list); other > 0 {
+		items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: fmt.Sprintf("%d in other projects", other), hint: "a shows them", static: true})
 	}
 	if len(m.pending) > 0 {
 		items = append(items, boxItem{group: fmt.Sprintf("WAITING ON YOU  %d", len(m.pending))})
@@ -222,6 +235,6 @@ func (m chatView) agentsBox(screen []string, w, h int) []string {
 			items = append(items, boxItem{glyph: t.g.wait, color: t.warn, label: d.Question, hint: strings.Join(d.Options, " "+t.g.dot+" "), static: true})
 		}
 	}
-	foot := "  " + keyHints(t, "↑↓", "move", "enter", "open", "s", "stop", "n", "new session", "tab", "close")
+	foot := "  " + keyHints(t, "↑↓", "move", "enter", "open", "s", "stop", "n", "new session", "a", projHint(m.allProj), "tab", "close")
 	return m.overBox(screen, m.floatBox(bw, bh, "", sum, items, m.agentSel, foot), w)
 }

@@ -55,6 +55,7 @@ type chatTool struct {
 type chatSession struct {
 	id, kind, state          string
 	title, agent, model, now string
+	dir                      string // the folder it started in; "" for batch events
 	since, turn              time.Time
 }
 
@@ -250,7 +251,7 @@ func (m chatView) toggle(i int) chatView {
 func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	switch msg.String() {
 	case "tab":
-		m.overlay, m.agentSel = overlayAgents, max(m.current2(), 0)
+		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
 		return true, nil
 	case "ctrl+k":
 		m.overlay, m.pal = overlayPalette, palette{}
@@ -301,7 +302,7 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		}
 		m.setMode(next)
 	case "agents", "sessions":
-		m.overlay, m.agentSel = overlayAgents, max(m.current2(), 0)
+		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
 	case "new":
 		m.newSession()
 		m.status("new session: your next message starts it with " + m.agentLabel())
@@ -457,18 +458,21 @@ func (m chatView) agentsKey(k string) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		m.agentSel = max(m.agentSel-1, 0)
 	case "down", "j":
-		m.agentSel = min(m.agentSel+1, max(len(m.sessions)-1, 0))
+		m.agentSel = min(m.agentSel+1, max(len(m.listed())-1, 0))
+	case "a":
+		m.allProj = !m.allProj
+		m.agentSel = min(m.agentSel, max(len(m.listed())-1, 0))
 	case "enter":
-		if m.agentSel < len(m.sessions) {
-			m.open(m.sessions[m.agentSel].id)
+		if l := m.listed(); m.agentSel < len(l) {
+			m.open(l[m.agentSel].id)
 		}
 		m.overlay = overlayNone
 	case "n":
 		m.newSession()
 		m.overlay = overlayNone
 	case "s":
-		if m.agentSel < len(m.sessions) && m.sess != nil {
-			api, id := m.sess, m.sessions[m.agentSel].id
+		if l := m.listed(); m.agentSel < len(l) && m.sess != nil {
+			api, id := m.sess, l[m.agentSel].id
 			return m, func() tea.Msg {
 				if err := api.StopSession(context.Background(), id); err != nil {
 					return sessionErrMsg{what: "stop", err: err}

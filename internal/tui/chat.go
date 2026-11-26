@@ -10,6 +10,7 @@ import (
 	neturl "net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -104,6 +105,8 @@ type chatView struct {
 	cost     map[string]float64    // spend per session
 	noise    []noise               // daemon events kept out of the transcript
 	dir      string                // the folder sessions start in and @ lists
+	root     string                // dir with symlinks resolved, as the daemon records it
+	allProj  bool                  // the agents panel lists every project, not only dir
 	branch   string                // its git branch, for the footer
 	webURL   string                // the web UI with its token; "" when unknown
 	files    *fileCache            // the @ popup's file list
@@ -382,6 +385,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	m.setPending(st.Pending)
 	m.setup, m.sess = c, c
 	m.dir, _ = os.Getwd()
+	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
 	if tok != "" {
 		m.webURL = url + "/#token=" + neturl.QueryEscape(tok)
