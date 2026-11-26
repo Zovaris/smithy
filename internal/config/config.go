@@ -102,6 +102,7 @@ var Known = []Setting{
 	{"session.model", "", "smithy daemon", "model a new CLI session passes to its agent (--model); the picker (/model) sets it; empty = the agent's own default"},
 	{"kit.mcp", "true", "smithy agent", "false: driven CLIs don't get smithy's own MCP server (smithy mcp); /skills in the TUI and the web Setup screen toggle it"},
 	{"kit.skills", "", "smithy agent", "comma list of installed skills linked into every driven CLI that takes skills (claude, codex, opencode, gemini, pi); /skills toggles them"},
+	{"ui.theme", "steel", "smithy tui, web", "color theme the TUI and web share: steel (ember accent), frost or plum; /theme and the web palette pick it"},
 	{"tui.reduce_motion", "false", "smithy tui", "true draws every frame still: no sparks, shimmer or sliding bars (like --no-anim or SMITHY_REDUCE_MOTION)"},
 }
 
