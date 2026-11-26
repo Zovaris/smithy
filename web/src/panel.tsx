@@ -1,4 +1,5 @@
-import { spark } from "./charts";
+import { GlyphSparkline } from "@zovaris/sephiro/glyph-chart";
+import "@zovaris/sephiro/css/glyph-chart.css";
 import { href } from "./router";
 import { count, stats, usd } from "./stats";
 import { agentName, kindOf, open, sessions, type Sess, type Store } from "./store";
@@ -63,7 +64,7 @@ export default function AgentsPanel({ store, project, cur, host }: { store: Stor
         <h2>Cost<span class="sp" /><span class="mono">{usd(st.cost)}</span></h2>
         <div class="card pad">
           <div class="top2 t3" style="font-size:12px"><span>{count(st.input + st.output)} tokens</span><span class="sp" /><span>{st.tps == null ? "" : st.tps.toFixed(0) + " tok/s"}</span></div>
-          <span class="gs" role="img" aria-label="Runs per hour, last 24 h">{spark(st.hourly)}</span>
+          <GlyphSparkline label="Runs per hour, last 24 h" values={st.hourly} />
         </div>
       </section>
     </>
