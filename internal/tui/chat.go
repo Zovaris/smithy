@@ -554,6 +554,10 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dirsMsg:
 		return m.dirsLoaded(msg)
 	case settingsDoneMsg:
+		if msg.panel != nil {
+			m.info, m.overlay, m.pal = *msg.panel, overlayInfo, palette{}
+			return m, nil
+		}
 		for _, l := range msg.lines {
 			m.system(l)
 		}

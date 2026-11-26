@@ -134,6 +134,29 @@ func TestWelcomeDefaultNotePrintedOnce(t *testing.T) {
 	}
 }
 
+func TestKeysOpensAModalWithInChatCommands(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 100, 30
+	m.cfg = &fakeSettings{}
+	m = sendKey(typeIn(m, "/keys"), ckey("enter"))
+	out := screen(m)
+	if m.overlay != overlayInfo || !strings.Contains(out, "linear") || !strings.Contains(out, "/key rm linear") {
+		t.Fatalf("/keys modal:\n%s", out)
+	}
+	if strings.Contains(out, "smithy tui") {
+		t.Fatalf("/keys points at another screen:\n%s", out)
+	}
+	if strings.Contains(strings.Join(func() []string {
+		var d []string
+		for _, c := range slashCommands {
+			d = append(d, c.desc)
+		}
+		return d
+	}(), "\n"), "smithy tui") {
+		t.Fatal("a command description points at smithy tui")
+	}
+}
+
 // evNow is ev stamped now: an event that happens while the chat is open, not one replayed.
 
 func evNow(seq int64, kind string, data any) daemon.ClientMsg {
