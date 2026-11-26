@@ -17,6 +17,7 @@ part above `### Details`.
 
 ### Details
 
+- web: the folder picker, Settings rows and the model dialog's key hints are Sephiro 1.5.0 FileBrowser, SettingsList and Dialog `keys`/`escHint`; the toggle is square through `--sph-radius-full`; `web/src` is split into `lib/`, `components/` and `features/chat/`.
 - web: @zovaris/sephiro 1.2.0 → 1.4.0; Temper sets every `--sph-radius-*` token to 0; chat, composer and new-session width 720 → 960px; compact controls at 28px. Palette empty-state workaround until Zovaris/Sephiro#37 ships.
 - daemon: `POST /v1/servers` (pair and save), `DELETE /v1/servers/{name}`, `POST /v1/sessions/{id}/shell` and `POST /v1/images`, all for this machine's daemon token only. web: `/` lists every TUI command, Sephiro Dialog, SegmentedControl, Select and Toggle; first-load budget 30 → 31 KB gzip.
 ### New
