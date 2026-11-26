@@ -32,7 +32,8 @@ pinned at the bottom. A lost connection retries and resumes after the last event
 Keys: enter send; pgup/pgdn, wheel or ctrl+u/ctrl+d scroll; home/end top/bottom; click a tool block
 to open it; v (empty input) cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
 option's first letter (empty input) or a click on it answers the decision pinned at the top;
-/ opens every command, @ a file, ? help; esc clears the input; ctrl+c quits.
+/ opens every command, /name or $name runs an installed skill, @ a file, ? help; !cmd runs a shell
+command in the session folder; ctrl+v attaches a clipboard image; esc clears the input; ctrl+c quits.
   url           default: the local daemon (token from ~/.smithy/daemon.token), started in the
                 background when none runs; it outlives the chat and exits after daemon.idle_exit
                 (default 30m) with no clients and no running work, or on smithy stop. A
@@ -127,6 +128,11 @@ type chatView struct {
 	connectUse  func(string) error        // saves the default server
 	connectAdd  func(remote.Server) error // saves a discovered server
 	switchTo    *chatSwitch               // set when /connect picked another server
+
+	shell    func(ctx context.Context, dir, line string) (string, error) // runs !cmd; nil: runShell
+	clip     func() ([]byte, error)                                      // reads a clipboard image; nil: readClipImage
+	pasteDir string                                                      // where pasted images are saved; "": temp dir
+	images   []string                                                    // pasted images waiting for the next message
 }
 
 // infoPanel is what a read-only box shows: /connect, /remote, /web, /log.
@@ -532,6 +538,12 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case chatDecidedMsg:
 		m.decided(msg)
 		return m, nil
+	case shellDoneMsg:
+		m.shellDone(msg)
+		return m, nil
+	case clipMsg:
+		m.clipped(msg)
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.input.SetWidth(max(m.width-2*m.pad()-4, 1))
@@ -563,7 +575,13 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
+		case "ctrl+v":
+			return m, m.pasteImage()
 		case "esc":
+			if len(m.images) > 0 && m.input.Value() == "" {
+				m.images = nil
+				return m, nil
+			}
 			if m.input.Value() != "" {
 				m.input.SetValue("")
 				return m, nil
@@ -595,7 +613,16 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.HasPrefix(t, "/") {
 				return m.command(t)
 			}
-			if t != "" {
+			if strings.HasPrefix(t, "!") {
+				return m.bang(strings.TrimSpace(t[1:]))
+			}
+			if name, arg, _ := strings.Cut(t, " "); strings.HasPrefix(name, "$") {
+				if p := m.skillPrompt(name[1:], strings.TrimSpace(arg)); p != "" {
+					return m.send(p)
+				}
+			}
+			if t != "" || len(m.images) > 0 {
+				t, m.images = withImages(t, m.images), nil
 				return m.send(t)
 			}
 			return m, nil
@@ -858,6 +885,9 @@ func (m chatView) composer(w int) []string {
 	p := strings.Repeat(" ", m.pad())
 	bw := w - 2*m.pad()
 	var out []string
+	if c := m.chips(); c != "" {
+		out = append(out, p+fill(raised, bw, "  "+c+"  esc drops")+p)
+	}
 	for _, l := range strings.Split(m.input.View(), "\n") {
 		out = append(out, p+fill(raised, bw, "  "+l)+p)
 	}
