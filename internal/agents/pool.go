@@ -12,6 +12,7 @@ import (
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/pool"
 )
 
@@ -185,7 +186,7 @@ func cardOf(log, cwd string) (string, string) {
 		log = filepath.Join(cwd, log)
 	}
 	dir := filepath.Dir(log)
-	if realPath(filepath.Dir(dir)) != realPath(cards.Home()) {
+	if realPath(filepath.Dir(dir)) != realPath(layout.WardenHome()) {
 		return "", ""
 	}
 	return filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log")

@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -37,7 +37,7 @@ var vendor = map[string]string{
 type price struct{ in, out, read, write float64 }
 
 var (
-	feedPath  = func() string { return filepath.Join(ghx.Home(), "cache", "model-prices.json") }
+	feedPath  = func() string { return filepath.Join(layout.Home(), "cache", "model-prices.json") }
 	fetchFeed = fetchOpenRouter
 
 	pricesMu sync.Mutex

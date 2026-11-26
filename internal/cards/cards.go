@@ -15,7 +15,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	tok "github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -26,14 +26,6 @@ var RaiseImpact func(question, impact string) (string, bool)
 var States = []string{"waiting", "working", "needs_decision", "blocked", "failed", "pr_open", "ready", "merged", "dropped", "reported"}
 
 var idRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
-
-// Home is $WARDEN_HOME, else <smithy home>/warden.
-func Home() string {
-	if h := os.Getenv("WARDEN_HOME"); h != "" {
-		return h
-	}
-	return filepath.Join(ghx.Home(), "warden")
-}
 
 // staleMin is the minutes without a heartbeat before a working item is stuck:
 // $WARDEN_STALE_MIN, else warden.stuck_minutes, else 15.
@@ -55,7 +47,7 @@ func Beat(batch, id string) error {
 	if !idRe.MatchString(batch) || !idRe.MatchString(id) {
 		return fmt.Errorf("batch and id must match [A-Za-z0-9._-]+")
 	}
-	file := filepath.Join(Home(), batch, id+".json")
+	file := filepath.Join(layout.WardenHome(), batch, id+".json")
 	if read(file) == nil {
 		return fmt.Errorf("no card %s in batch %s (%s)", id, batch, file)
 	}
@@ -76,7 +68,7 @@ func Launch(batch, id string, pid int) error {
 	if !idRe.MatchString(batch) || !idRe.MatchString(id) {
 		return fmt.Errorf("batch and id must match [A-Za-z0-9._-]+")
 	}
-	file := filepath.Join(Home(), batch, id+".json")
+	file := filepath.Join(layout.WardenHome(), batch, id+".json")
 	return config.WithLock(file, func() error {
 		cur := read(file)
 		if cur == nil {
@@ -97,7 +89,7 @@ func Launch(batch, id string, pid int) error {
 // reporting. alive reports whether a pid runs; log is the worker's log file. It returns true
 // when it changed the card.
 func Dead(batch, id string, alive func(int) bool, log string) bool {
-	file := filepath.Join(Home(), batch, id+".json")
+	file := filepath.Join(layout.WardenHome(), batch, id+".json")
 	changed := false
 	_ = config.WithLock(file, func() error {
 		cur := read(file)
@@ -183,7 +175,7 @@ func Set(batch, id string, pairs []string) (map[string]any, error) {
 	if !idRe.MatchString(batch) || !idRe.MatchString(id) {
 		return nil, fmt.Errorf("batch and id must match [A-Za-z0-9._-]+")
 	}
-	dir := filepath.Join(Home(), batch)
+	dir := filepath.Join(layout.WardenHome(), batch)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
@@ -350,7 +342,7 @@ func Stage(card, item map[string]any) string {
 
 // Batches lists batch names, newest first.
 func Batches() []string {
-	entries, _ := os.ReadDir(Home())
+	entries, _ := os.ReadDir(layout.WardenHome())
 	type bt struct {
 		name string
 		mod  time.Time
@@ -373,9 +365,9 @@ func Batches() []string {
 
 // Rows reads a batch: the plan's items plus any card files, each with its stage.
 func Rows(batch string) ([]Row, error) {
-	dir := filepath.Join(Home(), batch)
+	dir := filepath.Join(layout.WardenHome(), batch)
 	if _, err := os.Stat(dir); err != nil {
-		return nil, fmt.Errorf("no batch %s in %s", batch, Home())
+		return nil, fmt.Errorf("no batch %s in %s", batch, layout.WardenHome())
 	}
 	plan := read(filepath.Join(dir, "batch.json"))
 	items := map[string]map[string]any{}
@@ -568,7 +560,7 @@ func Main(args []string) int {
 			fmt.Fprintln(os.Stderr, usage)
 			return 2
 		}
-		f := filepath.Join(Home(), args[0], args[1]+".json")
+		f := filepath.Join(layout.WardenHome(), args[0], args[1]+".json")
 		if _, err := os.Stat(f); err != nil {
 			fmt.Fprintf(os.Stderr, "no card %s in batch %s (%s)\n", args[1], args[0], f)
 			return 1
@@ -603,7 +595,7 @@ func Main(args []string) int {
 			if b := Batches(); len(b) > 0 {
 				batch = b[0]
 			} else {
-				fmt.Fprintf(os.Stderr, "no batches in %s\n", Home())
+				fmt.Fprintf(os.Stderr, "no batches in %s\n", layout.WardenHome())
 				return 1
 			}
 		}
@@ -653,7 +645,7 @@ func Main(args []string) int {
 
 // Gate refuses a risky item (batch.json) whose card lacks security=ran.
 func Gate(batch, id string) error {
-	bt := read(filepath.Join(Home(), batch, "batch.json"))
+	bt := read(filepath.Join(layout.WardenHome(), batch, "batch.json"))
 	if bt == nil {
 		return fmt.Errorf("no batch.json in batch %s", batch)
 	}
@@ -666,7 +658,7 @@ func Gate(batch, id string) error {
 		if it["risky"] != true {
 			return nil
 		}
-		sec := s(read(filepath.Join(Home(), batch, id+".json")), "security")
+		sec := s(read(filepath.Join(layout.WardenHome(), batch, id+".json")), "security")
 		if sec == "ran" {
 			return nil
 		}

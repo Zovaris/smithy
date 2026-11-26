@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/agents/catalog"
 	"github.com/Zovaris/smithy/internal/layout"
 )
 
@@ -28,11 +29,11 @@ const maxSkillsArchive = 64 << 20
 // BinaryVersion is set by main; `skills install` downloads the skills of this release.
 var BinaryVersion = "dev"
 
-var installHarnesses = []string{"claude", "codex", "opencode", "agy", "copilot", "grok", "cursor", "pi", "dsh"}
+var installHarnesses = catalog.Names(func(a catalog.Agent) bool { return a.Skills })
 
 func harnessName(h string) string {
-	if h == "claude" {
-		return "claude-cli"
+	if a, ok := catalog.Lookup(h); ok {
+		return a.Tier
 	}
 	return h
 }
@@ -316,10 +317,7 @@ func skillsInstallMain(args []string) int {
 		fmt.Fprintln(os.Stderr, "smithy skills install: a dev build has no release to download; install a release binary (install.sh)")
 		return 1
 	}
-	home := os.Getenv("HOME")
-	if home == "" {
-		home, _ = os.UserHomeDir()
-	}
+	home := layout.UserHome()
 	err = InstallSkills(SkillsInstall{
 		BaseURL: "https://github.com/Zovaris/smithy/releases/download/v" + strings.TrimPrefix(BinaryVersion, "v"),
 		Client: &http.Client{Timeout: 2 * time.Minute, CheckRedirect: func(r *http.Request, via []*http.Request) error {

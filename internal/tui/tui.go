@@ -19,7 +19,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/decisions"
 	"github.com/Zovaris/smithy/internal/events"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/harmonica"
 )
@@ -260,7 +260,7 @@ func New(noAnim, demo bool) Model {
 	}
 	first := false
 	if !demo {
-		seen := filepath.Join(ghx.Home(), "tui.seen")
+		seen := filepath.Join(layout.Home(), "tui.seen")
 		_, err := os.Stat(seen)
 		if first = os.IsNotExist(err); first {
 			_ = os.MkdirAll(filepath.Dir(seen), 0o700)
@@ -783,7 +783,7 @@ func (m Model) openLog() (tea.Model, tea.Cmd) {
 			m.status = "no log yet at " + p
 			return m, nil
 		}
-		m.showText("log "+home(p), lines)
+		m.showText("log "+layout.Tilde(p), lines)
 		m.text.GotoBottom()
 		return m, nil
 	}
@@ -800,7 +800,7 @@ func (m Model) openLog() (tea.Model, tea.Cmd) {
 		m.status = "no log yet at " + r.logPath
 		return m, nil
 	}
-	m.showText("log "+home(r.logPath), lines)
+	m.showText("log "+layout.Tilde(r.logPath), lines)
 	m.text.GotoBottom()
 	return m, nil
 }
@@ -868,18 +868,6 @@ func openURL(u string) error {
 	return exec.Command(name, u).Start()
 }
 
-func ago(d time.Duration) string {
-	switch {
-	case d < time.Minute:
-		return fmt.Sprintf("%ds ago", max(int(d.Seconds()), 0))
-	case d < time.Hour:
-		return fmt.Sprintf("%dm ago", int(d.Minutes()))
-	case d < 48*time.Hour:
-		return fmt.Sprintf("%dh ago", int(d.Hours()))
-	}
-	return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-}
-
 func dur(d time.Duration) string {
 	switch {
 	case d < time.Minute:
@@ -888,13 +876,6 @@ func dur(d time.Duration) string {
 		return fmt.Sprintf("%dm", int(d.Minutes()))
 	}
 	return fmt.Sprintf("%dh%02dm", int(d.Hours()), int(d.Minutes())%60)
-}
-
-func plural(n int, one, many string) string {
-	if n == 1 {
-		return "1 " + one
-	}
-	return fmt.Sprintf("%d %s", n, many)
 }
 
 func shortPR(pr string) string {

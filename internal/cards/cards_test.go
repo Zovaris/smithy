@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/layout"
 	tok "github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -88,13 +89,13 @@ func stamp(d time.Duration) string {
 
 func TestHome(t *testing.T) {
 	t.Setenv("WARDEN_HOME", "/w")
-	if Home() != "/w" {
-		t.Fatal(Home())
+	if layout.WardenHome() != "/w" {
+		t.Fatal(layout.WardenHome())
 	}
 	t.Setenv("WARDEN_HOME", "")
 	t.Setenv("SMITHY_HOME", "/s")
-	if Home() != filepath.Join("/s", "warden") {
-		t.Fatal(Home())
+	if layout.WardenHome() != filepath.Join("/s", "warden") {
+		t.Fatal(layout.WardenHome())
 	}
 }
 

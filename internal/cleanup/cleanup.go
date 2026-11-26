@@ -14,6 +14,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/layout"
+	"github.com/Zovaris/smithy/internal/text"
 )
 
 const Usage = "usage: smithy cleanup builds [--yes]\n  lists old smithy builds in ~/.local/share/smithy and the old ~/.smithy/bin (keeps the current one and one previous; dev builds\n  after 14 days) and stale worktrees of\n  the repo it runs in (clean including ignored files, not locked, with no commits beyond the base branch, not the folder it runs in), with the\n  space each takes; --yes deletes them. Worktrees with uncommitted changes are never touched."
@@ -113,7 +114,7 @@ func BuildsIn(bin, dev, link string) []Item {
 			continue
 		}
 		b := duSize(p)
-		out = append(out, Item{Kind: "build", Target: p, Bytes: b, Size: human(b)})
+		out = append(out, Item{Kind: "build", Target: p, Bytes: b, Size: text.Bytes(b)})
 	}
 	return out
 }
@@ -167,21 +168,9 @@ func Worktrees(repo, base, cwd string) []Item {
 			}
 		}
 		b := duSize(path)
-		out = append(out, Item{Kind: "worktree", Target: path, Bytes: b, Size: human(b)})
+		out = append(out, Item{Kind: "worktree", Target: path, Bytes: b, Size: text.Bytes(b)})
 	}
 	return out
-}
-
-func human(b int64) string {
-	switch {
-	case b >= 1<<30:
-		return fmt.Sprintf("%.1fGB", float64(b)/(1<<30))
-	case b >= 1<<20:
-		return fmt.Sprintf("%.1fMB", float64(b)/(1<<20))
-	case b >= 1<<10:
-		return fmt.Sprintf("%.1fKB", float64(b)/(1<<10))
-	}
-	return fmt.Sprintf("%dB", b)
 }
 
 // Main runs `smithy cleanup builds [--yes]`.
@@ -240,7 +229,7 @@ func Main(args []string) int {
 	if yes {
 		verb = "freed"
 	}
-	fmt.Printf("%s %s on disk; %d item(s)\n", verb, human(total), len(items))
+	fmt.Printf("%s %s on disk; %d item(s)\n", verb, text.Bytes(total), len(items))
 	if !yes {
 		fmt.Println("run smithy cleanup builds --yes to delete them")
 	}

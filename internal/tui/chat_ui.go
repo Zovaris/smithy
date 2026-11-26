@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"image/color"
 	"math"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -18,6 +17,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -389,7 +389,7 @@ func (m chatView) skillPrompt(name, arg string) string {
 // skillDir is where a skill lives, for its hint: the folder holding it, with ~ for home.
 func skillDir(path string) string {
 	d := filepath.Dir(filepath.Dir(path))
-	if h, err := os.UserHomeDir(); err == nil && h != "" {
+	if h := layout.UserHome(); h != "" {
 		if r, ok := strings.CutPrefix(d, h+string(filepath.Separator)); ok {
 			return "~/" + r
 		}

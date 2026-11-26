@@ -18,6 +18,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/decisions"
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/tasks"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -160,7 +161,7 @@ func Load(now time.Time) Snapshot {
 		}
 		meta, repo := itemMeta(name)
 		b := Batch{Name: name}
-		dir := filepath.Join(cards.Home(), name)
+		dir := filepath.Join(layout.WardenHome(), name)
 		for _, r := range rows {
 			m := meta[r.ID]
 			model := m.Model
@@ -520,7 +521,7 @@ func tail(file string, n int) []string {
 
 func itemMeta(batch string) (map[string]meta, string) {
 	out := map[string]meta{}
-	b, err := os.ReadFile(filepath.Join(cards.Home(), batch, "batch.json"))
+	b, err := os.ReadFile(filepath.Join(layout.WardenHome(), batch, "batch.json"))
 	if err != nil {
 		return out, ""
 	}

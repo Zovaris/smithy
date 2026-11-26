@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/testkit"
 )
 
 func write(t *testing.T, root, rel, body string) {
@@ -100,9 +102,7 @@ func gitRepo(t *testing.T) string {
 	os.RemoveAll(filepath.Join(root, ".git"))
 	write(t, root, ".gitignore", "ignored/\n")
 	write(t, root, "ignored/c.txt", "Needle ignored\n")
-	if out, err := exec.Command("git", "-C", root, "init", "-q").CombinedOutput(); err != nil {
-		t.Fatal(string(out))
-	}
+	testkit.Git(t, root, "init", "-q")
 	return root
 }
 

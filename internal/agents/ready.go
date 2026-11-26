@@ -33,17 +33,13 @@ func DefaultReadyDeps() ReadyDeps {
 }
 
 // InstallHint is the one command that installs each CLI.
-var InstallHint = map[string]string{
-	"claude":   "npm install -g @anthropic-ai/claude-code",
-	"codex":    "npm install -g @openai/codex",
-	"opencode": "npm install -g opencode-ai",
-	"agy":      "curl -fsSL https://antigravity.google/cli/install.sh | bash",
-	"copilot":  "npm install -g @github/copilot",
-	"grok":     "curl -fsSL https://x.ai/cli/install.sh | bash",
-	"cursor":   "curl https://cursor.com/install -fsS | bash",
-	"pi":       "npm install -g @mariozechner/pi-coding-agent",
-	"dsh":      "see github.com/deepseek-ai/dsh-superagent-prototype",
-}
+var InstallHint = func() map[string]string {
+	m := map[string]string{}
+	for _, a := range KnownCLIs {
+		m[a.Name] = a.Install
+	}
+	return m
+}()
 
 var apiKeyEnv = map[string]string{
 	"anthropic":  "ANTHROPIC_API_KEY",

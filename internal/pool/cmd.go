@@ -5,8 +5,10 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/agents/catalog"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/usage"
 )
@@ -53,17 +55,11 @@ func Rows(now time.Time) ([]Row, error) {
 
 // loginArgs is the interactive command that signs an account in.
 func loginArgs(harness string) []string {
-	switch harness {
-	case "codex":
-		return []string{"codex", "login"}
-	case "opencode":
-		return []string{"opencode", "auth", "login"}
-	case "cursor":
-		return []string{"agent", "login"}
-	case "copilot", "grok", "pi", "dsh":
-		return []string{harness}
+	if a, ok := catalog.Lookup(harness); ok && a.Login != nil {
+		return slices.Clone(a.Login)
 	}
-	return []string{"claude", "/login"}
+	c, _ := catalog.Lookup("claude")
+	return slices.Clone(c.Login)
 }
 
 // Main runs `smithy pool` and returns the exit code.

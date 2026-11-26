@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/testkit"
 )
 
 func capture(t *testing.T, f func() int) (string, int) {
@@ -33,11 +35,11 @@ func repoWithOddNames(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gitIn(t, dir, "init", "-q")
-	commitFile(t, dir, "a.txt", "a\n")
+	testkit.Git(t, dir, "init", "-q")
+	testkit.CommitFile(t, dir, "a.txt", "a\n")
 	bad := "package b\n\nfunc helper() int {\n\t// internal note\n\treturn 1\n}\n"
-	commitFile(t, dir, "with space.go", bad)
-	commitFile(t, dir, "ñandú.go", bad)
+	testkit.CommitFile(t, dir, "with space.go", bad)
+	testkit.CommitFile(t, dir, "ñandú.go", bad)
 	return dir
 }
 

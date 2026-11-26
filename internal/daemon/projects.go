@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // Project is one folder new sessions on this daemon can start in.
@@ -37,7 +37,7 @@ type DirList struct {
 
 var projMu sync.Mutex
 
-func projectsFile() string { return filepath.Join(ghx.Home(), "projects.json") }
+func projectsFile() string { return filepath.Join(layout.Home(), "projects.json") }
 
 // Projects reads this daemon's saved projects; a missing file is an empty list.
 func Projects() ProjectList {
@@ -107,7 +107,7 @@ func RemoveProject(dir string) (ProjectList, error) {
 // ListDirs is the file picker's view of dir on this machine ("" is the home folder).
 func ListDirs(dir string) (DirList, error) {
 	if dir == "" {
-		dir = home()
+		dir = layout.UserHome()
 	}
 	d, err := cleanDir(dir)
 	if err != nil {

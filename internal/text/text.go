@@ -1,5 +1,5 @@
 // Package text is the one cleaner for outside text (issue titles, API errors, card fields)
-// before it reaches a terminal or a log line.
+// before it reaches a terminal or a log line, plus the shared count, age and size formats.
 package text
 
 import "strings"

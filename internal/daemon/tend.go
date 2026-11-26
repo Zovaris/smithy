@@ -22,8 +22,8 @@ import (
 	"github.com/Zovaris/smithy/internal/auto"
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
-	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/gitx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/text"
 )
 
@@ -227,7 +227,7 @@ func TendSources() []TendRef {
 				Worktree string `json:"worktree"`
 			} `json:"items"`
 		}
-		if raw, err := os.ReadFile(filepath.Join(cards.Home(), b, "batch.json")); err == nil && json.Unmarshal(raw, &plan) == nil {
+		if raw, err := os.ReadFile(filepath.Join(layout.WardenHome(), b, "batch.json")); err == nil && json.Unmarshal(raw, &plan) == nil {
 			for _, it := range plan.Items {
 				dirs[it.ID] = it.Worktree
 			}
@@ -380,7 +380,7 @@ func launchTend(r TendRef, action string) (int, string, error) {
 	if err != nil {
 		return 0, "", fmt.Errorf("auto.sandbox: %v; no tend session starts until it is fixed (smithy doctor)", err)
 	}
-	dir := filepath.Join(ghx.Home(), "tend", "daemon")
+	dir := filepath.Join(layout.Home(), "tend", "daemon")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return 0, "", err
 	}

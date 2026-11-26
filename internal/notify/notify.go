@@ -25,7 +25,7 @@ import (
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/text"
 )
 
@@ -62,7 +62,7 @@ var (
 )
 
 // File is the state file.
-func File() string { return filepath.Join(ghx.Home(), "notify.json") }
+func File() string { return filepath.Join(layout.Home(), "notify.json") }
 
 type state struct {
 	Cursor   time.Time            `json:"cursor"`
@@ -345,7 +345,7 @@ func enrich(it *item, evs []events.Event, now time.Time) {
 			At                           time.Time
 		} `json:"launched"`
 	}
-	if b, err := os.ReadFile(filepath.Join(ghx.Home(), "auto", "state.json")); err == nil && json.Unmarshal(b, &st) == nil {
+	if b, err := os.ReadFile(filepath.Join(layout.Home(), "auto", "state.json")); err == nil && json.Unmarshal(b, &st) == nil {
 		for _, day := range st.Launched {
 			for _, l := range day {
 				if l.Batch == it.batch && l.Item == it.key {
@@ -361,7 +361,7 @@ func enrich(it *item, evs []events.Event, now time.Time) {
 		}
 	}
 	var card map[string]any
-	if b, err := os.ReadFile(filepath.Join(cards.Home(), it.batch, it.key+".json")); err == nil && json.Unmarshal(b, &card) == nil {
+	if b, err := os.ReadFile(filepath.Join(layout.WardenHome(), it.batch, it.key+".json")); err == nil && json.Unmarshal(b, &card) == nil {
 		str := func(k string) string { s, _ := card[k].(string); return s }
 		it.model, it.speed = str("model"), str("speed")
 		if it.kind == "decision" {

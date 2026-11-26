@@ -3,14 +3,16 @@ package plan
 import (
 	"path/filepath"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/testkit"
 )
 
 func TestStackBaseWithoutOriginHead(t *testing.T) {
 	remote := t.TempDir()
-	git(t, remote, "init", "-q", "--bare")
+	testkit.Git(t, remote, "init", "-q", "--bare")
 	dir := newRepo(t)
-	git(t, dir, "remote", "add", "origin", remote)
-	git(t, dir, "push", "-q", "origin", "HEAD:main")
+	testkit.Git(t, dir, "remote", "add", "origin", remote)
+	testkit.Git(t, dir, "push", "-q", "origin", "HEAD:main")
 	if got := stackMap(Stack(dir))["base"]; got != "main" {
 		t.Errorf("base = %q, want main", got)
 	}

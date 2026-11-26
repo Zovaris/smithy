@@ -9,7 +9,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
-	"github.com/Zovaris/smithy/internal/tasks"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 const taskDirUsage = `usage: smithy task-dir <slug> [--default]
@@ -117,7 +117,7 @@ func LocalTaskDir(slug string) (string, error) {
 	if err != nil || top == "" {
 		return "", ErrNotRepo
 	}
-	dir := filepath.Join(tasks.PlansHome(), filepath.Base(top), slug)
+	dir := filepath.Join(layout.PlansHome(), filepath.Base(top), slug)
 	return dir, os.MkdirAll(dir, 0o755)
 }
 

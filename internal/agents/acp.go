@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/acp"
-	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/decisions"
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -74,7 +74,7 @@ func (s acpSink) Permit(p acp.Permission) string {
 
 func wardenItem(log string) events.Event {
 	var e events.Event
-	if dir := filepath.Dir(log); log != "" && realPath(filepath.Dir(dir)) == realPath(cards.Home()) {
+	if dir := filepath.Dir(log); log != "" && realPath(filepath.Dir(dir)) == realPath(layout.WardenHome()) {
 		e.Batch, e.Item = filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log")
 	}
 	return e
