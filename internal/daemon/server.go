@@ -337,6 +337,8 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("GET /v1/doctor", sv.doctor)
 	mux.HandleFunc("GET /v1/tend", sv.tendView)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
+	mux.HandleFunc("GET /v1/tasks", sv.listTasks)
+	mux.HandleFunc("PUT /v1/tasks/status", sv.moveTask)
 	return mux
 }
 
