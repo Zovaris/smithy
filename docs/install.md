@@ -4,7 +4,7 @@
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh                  # latest
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.24.0        # pinned
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.25.0        # pinned
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --no-skills  # binary only
 ```
 
@@ -17,7 +17,7 @@ and ignored (ADR 0014). `npx skills add Zovaris/smithy -g` still works if you pr
 
 ```bash
 smithy update            # binary + skills to the latest release
-smithy update 0.24.0     # pin a version
+smithy update 0.25.0     # pin a version
 smithy update --check    # print the current and latest version, change nothing
 ```
 

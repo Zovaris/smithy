@@ -8,6 +8,8 @@ part above `### Details`.
 
 ## Unreleased
 
+## v0.25.0 — 2026-11-26
+
 ### Highlights
 
 - The web does everything the TUI does, with the same flat look and themes, and installs as an app.
