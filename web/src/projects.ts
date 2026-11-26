@@ -6,9 +6,6 @@ export type Project = { dir: string; name: string };
 export type ProjectList = { projects: Project[]; default?: string };
 export type DirList = { dir: string; parent?: string; dirs: string[] };
 
-// The daemon's agents.Efforts and agents.EffortFlags: smithy caps effort at medium.
-const EFFORT_AGENTS = new Set(["claude", "codex"]);
-export const efforts = (agent: string): string[] => (EFFORT_AGENTS.has(agent) ? ["", "low", "medium"] : []);
 
 const RANK: Record<string, number> = { working: 0, needs_you: 1 };
 

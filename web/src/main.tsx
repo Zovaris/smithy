@@ -12,7 +12,6 @@ import { sendMessage, start, stopSession, useLive } from "./live";
 import { clock, headerLine } from "./parity";
 import { NewSession } from "./newsession";
 import { Agents, Changes, Decisions } from "./rail";
-import { Servers, useServers } from "./servers";
 import { go, href, PAGES, type Page, useView } from "./router";
 import { agentName, ago, open, sessions as list, type Sess } from "./store";
 import { initTheme, toggleTheme, current, loadAccent, type ThemeName } from "./theme";
@@ -26,6 +25,7 @@ const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
   setup: lazy(() => import("./screens/setup")),
 };
 const Palette = lazy(() => import("./palette"));
+const SideServers = lazy(() => import("./servers").then((m) => ({ default: () => <m.Servers rows={m.useServers()} /> })));
 const SessionPick = lazy(() => import("./sessionpick"));
 type Shell = { cmd: string; output: string; code: number };
 
@@ -64,7 +64,6 @@ function Sidebar({ ss, cur, pending, conn, sheet, onClose, onPalette, onCollapse
   ss: Sess[]; cur: string; pending: number; conn: string; sheet: boolean; onClose: () => void; onPalette: () => void; onCollapse: () => void;
 }) {
   const [mode, setMode] = useState(current);
-  const servers = useServers();
   return (
     <aside class={"side" + (sheet ? " sheet" : "")} aria-label="Sessions" onClick={(e) => (e.target as HTMLElement).closest("a") && onClose()}>
       <div class="grab" />
@@ -83,7 +82,7 @@ function Sidebar({ ss, cur, pending, conn, sheet, onClose, onPalette, onCollapse
           </a>
         ))}
       </div>
-      <Servers rows={servers} />
+      <Suspense fallback={null}><SideServers /></Suspense>
       <nav class="nav" aria-label="Pages">
         {PAGES.map((p) => (
           <a href={"#/" + p.id} aria-current={cur === p.id ? "page" : undefined} aria-keyshortcuts={"Alt+" + p.key}>

@@ -3,7 +3,8 @@
 // header line.
 import { ACTIONS } from "./commands";
 
-// EFFORT_AGENTS are the CLIs that take an effort flag (agents.EffortFlags); smithy caps at medium.
+// The one place the web keeps which agents take an effort and the levels (new session and
+// the session picker). EFFORT_AGENTS are the CLIs that take an effort flag (agents.EffortFlags); smithy caps at medium.
 const EFFORT_AGENTS = ["claude", "codex"];
 export const EFFORTS = ["low", "medium"];
 
