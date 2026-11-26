@@ -2,10 +2,11 @@ package warden
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/testkit"
 )
 
 func TestRender(t *testing.T) {
@@ -36,15 +37,6 @@ func TestChannelLine(t *testing.T) {
 	}
 }
 
-func git(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-}
-
 type briefEnv struct{ repo, wt, dir string }
 
 func newBrief(t *testing.T, batchJSON string) briefEnv {
@@ -56,12 +48,12 @@ func newBrief(t *testing.T, batchJSON string) briefEnv {
 	t.Setenv("WARDEN_TEST_SKILL_ROOT", skills)
 	os.MkdirAll(filepath.Join(e.repo, "docs", "specs"), 0o755)
 	os.MkdirAll(e.dir, 0o755)
-	git(t, e.repo, "init", "-q", "-b", "main")
+	testkit.Git(t, e.repo, "init", "-q", "-b", "main")
 	writeFile(t, filepath.Join(e.repo, "docs", "specs", "01-a.md"), "spec")
-	git(t, e.repo, "add", ".")
-	git(t, e.repo, "commit", "-qm", "init")
-	git(t, e.repo, "update-ref", "refs/remotes/origin/main", "HEAD")
-	git(t, e.repo, "worktree", "add", "-q", "-b", "feat/a", e.wt)
+	testkit.Git(t, e.repo, "add", ".")
+	testkit.Git(t, e.repo, "commit", "-qm", "init")
+	testkit.Git(t, e.repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+	testkit.Git(t, e.repo, "worktree", "add", "-q", "-b", "feat/a", e.wt)
 	r := strings.NewReplacer("REPO", e.repo, "WT", e.wt)
 	writeFile(t, filepath.Join(e.dir, "batch.json"), r.Replace(batchJSON))
 	return e
@@ -117,7 +109,7 @@ func TestBriefRenders(t *testing.T) {
 
 func TestBriefWaitRelaunchStack(t *testing.T) {
 	e := newBrief(t, oneItem)
-	git(t, e.repo, "worktree", "add", "-q", "-b", "feat/b", e.wt+"2")
+	testkit.Git(t, e.repo, "worktree", "add", "-q", "-b", "feat/b", e.wt+"2")
 	t.Setenv("WARDEN_HARNESS", "claude-cli")
 	if _, er, c := brief(t, "b1", "b"); c != 2 || !strings.Contains(er, "--to") {
 		t.Errorf("claude-cli without --to: %d %s", c, er)
@@ -153,7 +145,7 @@ func skillsDir(t *testing.T) string {
 
 func TestBriefWaitBackground(t *testing.T) {
 	e := newBrief(t, oneItem)
-	git(t, e.repo, "worktree", "add", "-q", "-b", "feat/b", e.wt+"2")
+	testkit.Git(t, e.repo, "worktree", "add", "-q", "-b", "feat/b", e.wt+"2")
 	t.Setenv("WARDEN_HARNESS", "codex")
 	o, er, c := brief(t, "b1", "b")
 	b, _ := os.ReadFile(o)

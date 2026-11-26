@@ -6,11 +6,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os/exec"
 	"strings"
 	"testing"
 
 	"github.com/Zovaris/smithy/internal/gitx"
+	"github.com/Zovaris/smithy/internal/testkit"
 )
 
 type fakeTend struct {
@@ -174,11 +174,8 @@ func TestTendPRURLOnlyTakesGitHubPullURLs(t *testing.T) {
 func gitRepo(t *testing.T, origin string) string {
 	t.Helper()
 	dir := t.TempDir()
-	for _, args := range [][]string{{"init", "-q"}, {"remote", "add", "origin", origin}} {
-		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v %s", args, err, out)
-		}
-	}
+	testkit.Git(t, dir, "init", "-q")
+	testkit.Git(t, dir, "remote", "add", "origin", origin)
 	return dir
 }
 

@@ -8,28 +8,18 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-)
 
-func git(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.email=t@t", "-c", "user.name=t", "-c", "init.defaultBranch=main"}, args...)...)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-}
+	"github.com/Zovaris/smithy/internal/testkit"
+)
 
 func newRepo(t *testing.T) string {
 	t.Helper()
-	dir, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	git(t, dir, "init", "-q")
+	dir := testkit.Repo(t)
 	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("a\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	git(t, dir, "add", "a.txt")
-	git(t, dir, "commit", "-q", "-m", "init")
+	testkit.Git(t, dir, "add", "a.txt")
+	testkit.Git(t, dir, "commit", "-q", "-m", "init")
 	return dir
 }
 
@@ -227,8 +217,8 @@ func TestScanRejectsOptionBaseAndCoversHistoryWithoutOrigin(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "k.txt"), []byte("-----BEGIN RSA PRIVATE KEY-----\n"), 0o644); err != nil { // smithy:allow
 		t.Fatal(err)
 	}
-	git(t, dir, "add", "k.txt")
-	git(t, dir, "commit", "-q", "-m", "key")
+	testkit.Git(t, dir, "add", "k.txt")
+	testkit.Git(t, dir, "commit", "-q", "-m", "key")
 	if c := ScanMain(nil); c != 1 {
 		t.Fatalf("committed key without origin passed: exit %d", c)
 	}
@@ -320,8 +310,8 @@ func TestUntrackedFileMakesReceiptDirtyButIgnoredAndSmeltDoNot(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("ignored.txt\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	git(t, dir, "add", ".gitignore")
-	git(t, dir, "commit", "-q", "-m", "ignore")
+	testkit.Git(t, dir, "add", ".gitignore")
+	testkit.Git(t, dir, "commit", "-q", "-m", "ignore")
 	os.WriteFile(filepath.Join(dir, "ignored.txt"), []byte("x\n"), 0o644)
 	os.MkdirAll(filepath.Join(dir, ".smelt"), 0o755)
 	os.WriteFile(filepath.Join(dir, ".smelt", "notes.md"), []byte("x\n"), 0o644)
@@ -382,8 +372,8 @@ func TestScanMainReportsBinaryFile(t *testing.T) {
 	dir := newRepo(t)
 	os.WriteFile(filepath.Join(dir, "p.pyc"), []byte("text\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "z.dat"), []byte{0, 1, 2}, 0o644)
-	git(t, dir, "add", "p.pyc", "z.dat")
-	git(t, dir, "commit", "-q", "-m", "bin")
+	testkit.Git(t, dir, "add", "p.pyc", "z.dat")
+	testkit.Git(t, dir, "commit", "-q", "-m", "bin")
 	old, _ := os.Getwd()
 	defer os.Chdir(old)
 	os.Chdir(dir)
@@ -423,8 +413,8 @@ func TestMarkdownEditsNeitherDirtyNorStale(t *testing.T) {
 	if r.Dirty {
 		t.Fatalf("a Markdown edit made the receipt dirty: %+v", r)
 	}
-	git(t, dir, "add", "docs/specs/01-task.md")
-	git(t, dir, "commit", "-q", "-m", "done")
+	testkit.Git(t, dir, "add", "docs/specs/01-task.md")
+	testkit.Git(t, dir, "commit", "-q", "-m", "done")
 	head := strings.TrimSpace(gitOut(t, dir, "rev-parse", "HEAD"))
 	if !docsOnlySince(dir, r.Commit, head) {
 		t.Fatal("docs-only commit should keep the receipt current")
@@ -432,7 +422,7 @@ func TestMarkdownEditsNeitherDirtyNorStale(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "a.txt"), []byte("c\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	git(t, dir, "commit", "-qam", "code")
+	testkit.Git(t, dir, "commit", "-qam", "code")
 	head = strings.TrimSpace(gitOut(t, dir, "rev-parse", "HEAD"))
 	if docsOnlySince(dir, r.Commit, head) {
 		t.Fatal("a code commit must make the receipt stale")
@@ -455,7 +445,7 @@ func TestCheckRedNeedsFailingReproBeforeTheFix(t *testing.T) {
 	if c := ReceiptMain([]string{"run", "--claim", "repro", "--", "true"}); c != 0 {
 		t.Fatalf("run exit %d", c)
 	}
-	git(t, dir, "commit", "-q", "--allow-empty", "-m", "next")
+	testkit.Git(t, dir, "commit", "-q", "--allow-empty", "-m", "next")
 	rs, _ := Load(dir)
 	if miss := CheckRed(dir, rs, "repro"); !strings.Contains(miss, "passed on the unfixed code") {
 		t.Fatalf("a repro passing on old code must say so: %q", miss)
@@ -469,8 +459,8 @@ func TestCheckRedNeedsFailingReproBeforeTheFix(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "fixed"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	git(t, dir, "add", "fixed")
-	git(t, dir, "commit", "-q", "-m", "fix")
+	testkit.Git(t, dir, "add", "fixed")
+	testkit.Git(t, dir, "commit", "-q", "-m", "fix")
 	if c := ReceiptMain([]string{"check-red"}); c != 1 {
 		t.Fatalf("no green on HEAD must fail, got %d", c)
 	}
@@ -507,29 +497,20 @@ func listMD(t *testing.T) string {
 	return string(b)
 }
 
-func commitFile(t *testing.T, dir, name string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte("package x\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	git(t, dir, "add", name)
-	git(t, dir, "commit", "-q", "-m", name)
-}
-
 func TestListKeepsTheNewestHoldoutFromAnEarlierCommit(t *testing.T) {
 	dir := newRepo(t)
 	t.Chdir(dir)
 	ReceiptMain([]string{"run", "--claim", "holdout", "--", "true"})
-	commitFile(t, dir, "a.go")
+	testkit.CommitFile(t, dir, "a.go", "package x\n")
 	ReceiptMain([]string{"run", "--claim", "holdout", "--", "false"})
 	ReceiptMain([]string{"run", "--claim", "other", "--", "true"})
-	commitFile(t, dir, "b.go")
+	testkit.CommitFile(t, dir, "b.go", "package x\n")
 	out := listMD(t)
 	if strings.Count(out, "| holdout |") != 1 || !strings.Contains(out, "(holdout failed)") || strings.Contains(out, "| other |") {
 		t.Fatalf("want only the newest holdout, shown as failed:\n%s", out)
 	}
 	ReceiptMain([]string{"run", "--claim", "holdout", "--", "true"})
-	commitFile(t, dir, "c.go")
+	testkit.CommitFile(t, dir, "c.go", "package x\n")
 	if out := listMD(t); strings.Count(out, "| holdout |") != 1 || !strings.Contains(out, "(holdout commit)") {
 		t.Fatalf("passing holdout:\n%s", out)
 	}

@@ -11,26 +11,13 @@ import (
 	"testing"
 
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/testkit"
 )
-
-func git(t *testing.T, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.email=t@t", "-c", "user.name=t", "-c", "init.defaultBranch=main"}, args...)...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return strings.TrimSpace(string(out))
-}
 
 func newRepo(t *testing.T) string {
 	t.Helper()
-	dir, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	git(t, dir, "init", "-q")
-	git(t, dir, "commit", "-q", "--allow-empty", "-m", "init")
+	dir := testkit.Repo(t)
+	testkit.Git(t, dir, "commit", "-q", "--allow-empty", "-m", "init")
 	return dir
 }
 
@@ -153,11 +140,11 @@ func TestStack(t *testing.T) {
 
 func TestStackBase(t *testing.T) {
 	remote := t.TempDir()
-	git(t, remote, "init", "-q", "--bare")
+	testkit.Git(t, remote, "init", "-q", "--bare")
 	dir := newRepo(t)
-	git(t, dir, "remote", "add", "origin", remote)
-	git(t, dir, "push", "-q", "origin", "HEAD:main")
-	git(t, dir, "remote", "set-head", "origin", "main")
+	testkit.Git(t, dir, "remote", "add", "origin", remote)
+	testkit.Git(t, dir, "push", "-q", "origin", "HEAD:main")
+	testkit.Git(t, dir, "remote", "set-head", "origin", "main")
 	if got := stackMap(Stack(dir))["base"]; got != "main" {
 		t.Errorf("base = %q, want main", got)
 	}
@@ -177,15 +164,15 @@ func TestSource(t *testing.T) {
 
 func TestChanged(t *testing.T) {
 	dir := newRepo(t)
-	base := git(t, dir, "rev-parse", "HEAD")
+	base := testkit.Git(t, dir, "rev-parse", "HEAD")
 	for _, f := range []string{"src/a.ts", "src/a.test.ts", "docs/x.md", "dist/b.js"} {
 		write(t, filepath.Join(dir, f), "1\n")
 	}
-	git(t, dir, "add", "-A")
-	git(t, dir, "commit", "-q", "-m", "x")
+	testkit.Git(t, dir, "add", "-A")
+	testkit.Git(t, dir, "commit", "-q", "-m", "x")
 	write(t, filepath.Join(dir, "src/b.go"), "1\n")
-	git(t, dir, "add", "src/b.go")
-	git(t, dir, "commit", "-q", "-m", "y")
+	testkit.Git(t, dir, "add", "src/b.go")
+	testkit.Git(t, dir, "commit", "-q", "-m", "y")
 	write(t, filepath.Join(dir, "src/b.go"), "2\n")
 	write(t, filepath.Join(dir, "src/untracked.go"), "1\n")
 	t.Chdir(dir)
