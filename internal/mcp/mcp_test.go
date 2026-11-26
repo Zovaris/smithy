@@ -296,9 +296,6 @@ func TestAskRefusesWithoutDaemon(t *testing.T) {
 func TestAskWithoutCardOrTimeout(t *testing.T) {
 	t.Setenv("WARDEN_HOME", t.TempDir())
 	t.Setenv("SMITHY_HOME", t.TempDir())
-	if _, err := AskTool("", time.Millisecond, nil).Call(context.Background(), Args{"question": "q"}); err == nil {
-		t.Fatal("ask without a card accepted")
-	}
 	if _, err := AskTool("../x/y", time.Millisecond, nil).Call(context.Background(), Args{"question": "q"}); err == nil {
 		t.Fatal("bad card accepted")
 	}
@@ -307,5 +304,45 @@ func TestAskWithoutCardOrTimeout(t *testing.T) {
 	fa := &fakeAsker{asked: map[string]string{}, answers: map[string]string{}}
 	if _, err := AskTool("b2/i2", time.Millisecond, func() (Asker, error) { return fa, nil }).Call(ctx, Args{"question": "q"}); err == nil {
 		t.Fatal("ask without answer returned no error")
+	}
+}
+
+func TestAskWithoutCardAsksTheDaemon(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("WARDEN_HOME", home)
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	fa := &fakeAsker{asked: map[string]string{}, answers: map[string]string{}}
+	done := make(chan string, 1)
+	go func() {
+		s, err := AskTool("", time.Millisecond, func() (Asker, error) { return fa, nil }).Call(context.Background(), Args{"question": "Which db?"})
+		if err != nil {
+			s = "ERR " + err.Error()
+		}
+		done <- s
+	}()
+	var id string
+	for deadline := time.Now().Add(5 * time.Second); id == "" && time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
+		fa.mu.Lock()
+		for k := range fa.asked {
+			id = k
+		}
+		fa.mu.Unlock()
+	}
+	if !strings.HasPrefix(id, "ask:") {
+		t.Fatalf("daemon not asked with an ask: id: %q", id)
+	}
+	fa.mu.Lock()
+	fa.answers[id] = "sqlite"
+	fa.mu.Unlock()
+	select {
+	case s := <-done:
+		if s != "sqlite" {
+			t.Fatalf("answer %q", s)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("ask never returned")
+	}
+	if ents, _ := os.ReadDir(home); len(ents) != 0 {
+		t.Fatalf("ask without a card wrote warden files: %v", ents)
 	}
 }

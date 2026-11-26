@@ -88,6 +88,8 @@ type chatView struct {
 	sessions []chatSession
 	// decide posts an answer to /v1/decisions and returns a chatDecidedMsg.
 	decide func(id, answer string) tea.Cmd
+	// ask posts a question to /v1/asks (the /ask demo); nil without a daemon.
+	ask func(id, question string, options []string) tea.Cmd
 
 	setup     setupAPI      // the daemon's setup endpoints; nil: none
 	cfg       settingsAPI   // the daemon's settings endpoints; nil: none
@@ -99,6 +101,8 @@ type chatView struct {
 	modelIn   string       // the filter typed over the model list
 	modelSel  int          // the selected row of modelRows
 	modelList *models.List // what the agent reported; nil while it loads
+	modelSess string
+	effortSel int
 
 	sess     sessionAPI            // the daemon's sessions endpoints; nil: offline
 	current  string                // the open session, "" before the first message
@@ -400,6 +404,14 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 		return func() tea.Msg {
 			_, err := c.Decide(ctx, id, answer)
 			return chatDecidedMsg{id: id, err: err}
+		}
+	}
+	m.ask = func(id, question string, options []string) tea.Cmd {
+		return func() tea.Msg {
+			if err := c.Ask(ctx, id, question, options); err != nil {
+				return chatDecidedMsg{id: id, err: err}
+			}
+			return nil
 		}
 	}
 	fm, err := tea.NewProgram(m).Run()

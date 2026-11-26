@@ -253,6 +253,13 @@ func (c *Client) StopSession(ctx context.Context, id string) error {
 	return c.call(ctx, "POST", "/v1/sessions/"+url.PathEscape(id)+"/stop", map[string]string{}, nil)
 }
 
+// SetSessionModel is PUT /v1/sessions/{id}/model: the model and effort its next turns run with.
+func (c *Client) SetSessionModel(ctx context.Context, id, model, effort string) (Session, error) {
+	var s Session
+	err := c.call(ctx, "PUT", "/v1/sessions/"+url.PathEscape(id)+"/model", map[string]string{"model": model, "effort": effort}, &s)
+	return s, err
+}
+
 // Sessions is GET /v1/sessions.
 func (c *Client) Sessions(ctx context.Context) (SessionList, error) {
 	var l SessionList
