@@ -45,8 +45,9 @@ type Settings struct {
 
 func loadSettings() (Settings, error) {
 	out := Settings{Settings: []SettingRow{}, Keys: []KeyRow{}}
+	eff := config.Snapshot()
 	for _, k := range config.Known {
-		v, src, err := config.Effective(k.Key)
+		v, src, err := eff(k.Key)
 		if err != nil {
 			v, src = "", "unset"
 		}
@@ -67,7 +68,8 @@ func loadSettings() (Settings, error) {
 		out.Keys = append(out.Keys, KeyRow{Service: svc, Masked: masked})
 	}
 	sort.Slice(out.Keys, func(i, j int) bool { return out.Keys[i].Service < out.Keys[j].Service })
-	out.Serve = config.Get("auto.paused", "false") != "true"
+	paused, _, err := eff("auto.paused")
+	out.Serve = err != nil || paused != "true"
 	return out, nil
 }
 

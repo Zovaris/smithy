@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	authstore "github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/config"
@@ -102,5 +103,25 @@ func TestDoctorRunsThroughTheDaemon(t *testing.T) {
 	lines, err := c.Doctor(context.Background())
 	if err != nil || len(lines) != 2 || lines[0] != "ok   git found" {
 		t.Fatalf("doctor: %v %v", lines, err)
+	}
+}
+
+// loadSettings finds the repo settings file once per call, not once per key (it runs git).
+func TestLoadSettingsIsFast(t *testing.T) {
+	settingsClient(t)
+	start := time.Now()
+	if _, err := loadSettings(); err != nil {
+		t.Fatal(err)
+	}
+	if d := time.Since(start); d > 500*time.Millisecond {
+		t.Fatalf("loadSettings took %v, want under 500ms", d)
+	}
+}
+
+func BenchmarkLoadSettings(b *testing.B) {
+	for b.Loop() {
+		if _, err := loadSettings(); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
