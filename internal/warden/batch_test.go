@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/testkit"
 )
 
 func TestBatchInitAdd(t *testing.T) {
@@ -16,14 +18,14 @@ func TestBatchInitAdd(t *testing.T) {
 	repo := filepath.Join(root, "repo")
 	td := filepath.Join(repo, "docs", "specs", "notes")
 	os.MkdirAll(td, 0o755)
-	git(t, repo, "init", "-q", "-b", "main")
+	testkit.Git(t, repo, "init", "-q", "-b", "main")
 	writeFile(t, filepath.Join(td, "01-pagination.md"), "# 01 · Add pagination\nStatus: todo\nBlocked by: none\nSpeed: normal\nPR: -\n")
 	writeFile(t, filepath.Join(td, "02-reset.md"), "# 02 · Password reset\nStatus: todo\nBlocked by: 01\nSpeed: fast\nPR: -\n")
 	writeFile(t, filepath.Join(td, "03-old.md"), "# 03 · Old\nStatus: done\nBlocked by: none\nPR: -\n")
 	writeFile(t, filepath.Join(td, "04-list.md"), "# 04 · List view\nStatus: todo\nBlocked by: 03\nPR: -\n")
-	git(t, repo, "add", "-A")
-	git(t, repo, "commit", "-q", "-m", "tasks")
-	git(t, repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+	testkit.Git(t, repo, "add", "-A")
+	testkit.Git(t, repo, "commit", "-q", "-m", "tasks")
+	testkit.Git(t, repo, "update-ref", "refs/remotes/origin/main", "HEAD")
 	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo, "--merge", "auto"}) })
 	dir := strings.TrimSpace(o)
 	if c != 0 || filepath.Base(dir) != "repo-notes" {
@@ -80,11 +82,11 @@ func TestBatchInitIntentCommitted(t *testing.T) {
 	repo := filepath.Join(root, "repo")
 	td := filepath.Join(repo, "notes")
 	os.MkdirAll(td, 0o755)
-	git(t, repo, "init", "-q", "-b", "main")
+	testkit.Git(t, repo, "init", "-q", "-b", "main")
 	writeFile(t, filepath.Join(repo, "README.md"), "x")
-	git(t, repo, "add", "-A")
-	git(t, repo, "commit", "-q", "-m", "init")
-	git(t, repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+	testkit.Git(t, repo, "add", "-A")
+	testkit.Git(t, repo, "commit", "-q", "-m", "init")
+	testkit.Git(t, repo, "update-ref", "refs/remotes/origin/main", "HEAD")
 	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · A thing\nStatus: todo\nBlocked by: none\nPR: -\n")
 	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo}) })
 	if c != 0 {
@@ -105,7 +107,7 @@ func TestBatchInitRisky(t *testing.T) {
 	repo := filepath.Join(root, "repo")
 	td := filepath.Join(repo, "notes")
 	os.MkdirAll(td, 0o755)
-	git(t, repo, "init", "-q", "-b", "main")
+	testkit.Git(t, repo, "init", "-q", "-b", "main")
 	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · Alpha\nStatus: todo\nBlocked by: none\nPR: -\n")
 	writeFile(t, filepath.Join(td, "02-b.md"), "# 02 · Beta\nStatus: todo\nBlocked by: none\nPR: -\n")
 	writeFile(t, filepath.Join(td, "03-c.md"), "# 03 · Gamma\nStatus: todo\nBlocked by: none\nPR: -\n")
@@ -132,11 +134,11 @@ func TestBatchInitIntentRepoSubdir(t *testing.T) {
 	sub := filepath.Join(top, "pkg")
 	td := filepath.Join(sub, "notes")
 	os.MkdirAll(td, 0o755)
-	git(t, top, "init", "-q", "-b", "main")
+	testkit.Git(t, top, "init", "-q", "-b", "main")
 	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · A thing\nStatus: todo\nBlocked by: none\nPR: -\n")
-	git(t, top, "add", "-A")
-	git(t, top, "commit", "-q", "-m", "init")
-	git(t, top, "update-ref", "refs/remotes/origin/main", "HEAD")
+	testkit.Git(t, top, "add", "-A")
+	testkit.Git(t, top, "commit", "-q", "-m", "init")
+	testkit.Git(t, top, "update-ref", "refs/remotes/origin/main", "HEAD")
 	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", sub}) })
 	if c != 0 {
 		t.Fatalf("%d %s", c, er)
@@ -156,7 +158,7 @@ func TestBatchInitRiskyEmpty(t *testing.T) {
 	repo := filepath.Join(root, "repo")
 	td := filepath.Join(repo, "notes")
 	os.MkdirAll(td, 0o755)
-	git(t, repo, "init", "-q", "-b", "main")
+	testkit.Git(t, repo, "init", "-q", "-b", "main")
 	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · Alpha\nStatus: todo\nBlocked by: none\nPR: -\n")
 	for _, a := range [][]string{{"--risky="}, {"--risky", ""}} {
 		args := append([]string{"init", td, "--repo", repo}, a...)
@@ -173,7 +175,7 @@ func TestBatchInitSettingsDefaults(t *testing.T) {
 	repo := filepath.Join(root, "repo")
 	td := filepath.Join(repo, "notes")
 	os.MkdirAll(td, 0o755)
-	git(t, repo, "init", "-q", "-b", "main")
+	testkit.Git(t, repo, "init", "-q", "-b", "main")
 	writeFile(t, filepath.Join(td, "01-a.md"), "# 01 · Add a\nStatus: todo\nBlocked by: none\nPR: -\n")
 	read := func(dir string) map[string]any {
 		var m map[string]any
@@ -224,9 +226,9 @@ func autoRepo(t *testing.T) (root, repo, td string) {
 	td = filepath.Join(root, "plans", "repo", "auto-2026-01-01-1")
 	os.MkdirAll(td, 0o755)
 	os.MkdirAll(repo, 0o755)
-	git(t, repo, "init", "-q", "-b", "main")
-	git(t, repo, "commit", "-q", "--allow-empty", "-m", "x")
-	git(t, repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+	testkit.Git(t, repo, "init", "-q", "-b", "main")
+	testkit.Git(t, repo, "commit", "-q", "--allow-empty", "-m", "x")
+	testkit.Git(t, repo, "update-ref", "refs/remotes/origin/main", "HEAD")
 	writeFile(t, filepath.Join(td, "01-tes-1-add-pagination.md"), "# 01 · Add pagination\nStatus: todo\nBlocked by: none\nSpeed: full\nModel: cheap\nPR: -\nSource: https://linear.app/x/TES-1\nKey: TES-1\nRef: linear:uuid-1\n")
 	writeFile(t, filepath.Join(td, "02-tes-2-list-view.md"), "# 02 · List view\nStatus: todo\nBlocked by: none\nSpeed: route\nModel: route\nPR: -\nKey: TES-2\nRef: linear:uuid-2\n")
 	return root, repo, td
@@ -237,8 +239,8 @@ func TestBatchInitAutoTaskDir(t *testing.T) {
 	cfg := filepath.Join(root, "config.json")
 	t.Setenv("SMITHY_CONFIG", cfg)
 	writeFile(t, cfg, `{"auto":{"merge":"auto"}}`)
-	git(t, repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
-	git(t, repo, "update-ref", "refs/remotes/origin/release/x", "HEAD")
+	testkit.Git(t, repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+	testkit.Git(t, repo, "update-ref", "refs/remotes/origin/release/x", "HEAD")
 	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo, "--base", "release/x"}) })
 	if c != 0 {
 		t.Fatalf("%d %s", c, er)
@@ -264,7 +266,7 @@ func TestBatchInitAutoTaskDir(t *testing.T) {
 func TestBatchInitAutoOnProductionBase(t *testing.T) {
 	root, repo, td := autoRepo(t)
 	t.Setenv("SMITHY_CONFIG", filepath.Join(root, "none.json"))
-	git(t, repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+	testkit.Git(t, repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
 	o, er, c := capture(t, func() int { return Batch([]string{"init", td, "--repo", repo}) })
 	if c != 0 {
 		t.Fatalf("%d %s", c, er)

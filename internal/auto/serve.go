@@ -22,6 +22,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/notify"
 	"github.com/Zovaris/smithy/internal/pool"
 	"github.com/Zovaris/smithy/internal/usage"
@@ -57,10 +58,10 @@ type Heartbeat struct {
 }
 
 // ServeFile is the heartbeat's path.
-func ServeFile() string { return filepath.Join(ghx.Home(), "auto", "serve.json") }
+func ServeFile() string { return filepath.Join(layout.Home(), "auto", "serve.json") }
 
 // SessionsDir holds each orchestrator's prompt and log.
-func SessionsDir() string { return filepath.Join(ghx.Home(), "auto", "sessions") }
+func SessionsDir() string { return filepath.Join(layout.Home(), "auto", "sessions") }
 
 // ReadServe reads the heartbeat; nil when serve is not running.
 func ReadServe() (*Heartbeat, error) {
@@ -279,7 +280,7 @@ func writeAtomic(path string, b []byte) error {
 }
 
 // LockFile is the orchestrator lock's path.
-func LockFile() string { return filepath.Join(ghx.Home(), "auto", "orchestrator.json") }
+func LockFile() string { return filepath.Join(layout.Home(), "auto", "orchestrator.json") }
 
 // ReadLock reads the orchestrator lock; nil when there is none.
 func ReadLock() *Session {

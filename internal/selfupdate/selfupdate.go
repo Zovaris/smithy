@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // Usage is the help text of `smithy update`.
@@ -114,7 +116,7 @@ func installedPath() string {
 	if d := os.Getenv("XDG_BIN_HOME"); filepath.IsAbs(d) {
 		return filepath.Join(d, "smithy")
 	}
-	home, _ := os.UserHomeDir()
+	home := layout.UserHome()
 	return filepath.Join(home, ".local", "bin", "smithy")
 }
 

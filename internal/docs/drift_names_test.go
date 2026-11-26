@@ -3,6 +3,8 @@ package docs
 import (
 	"strings"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/testkit"
 )
 
 func TestDriftBadBase(t *testing.T) {
@@ -16,7 +18,7 @@ func TestDriftBadBase(t *testing.T) {
 
 func TestDriftOddNames(t *testing.T) {
 	dir := repoWithOddNames(t)
-	commitFile(t, dir, "README.md", "see with space.go and ñandú.go\n")
+	testkit.CommitFile(t, dir, "README.md", "see with space.go and ñandú.go\n")
 	t.Chdir(dir)
 	out, code := capture(t, func() int { return Drift([]string{"HEAD~3"}) })
 	if code != 0 || !strings.Contains(out, "- with space.go") || !strings.Contains(out, "- ñandú.go") {

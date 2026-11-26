@@ -17,23 +17,6 @@ func fakeGH(t *testing.T, script string) {
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
-func TestHome(t *testing.T) {
-	t.Run("env", func(t *testing.T) {
-		t.Setenv("SMITHY_HOME", "/custom/home")
-		if got := Home(); got != "/custom/home" {
-			t.Fatalf("got %q", got)
-		}
-	})
-	t.Run("default", func(t *testing.T) {
-		h := t.TempDir()
-		t.Setenv("SMITHY_HOME", "")
-		t.Setenv("HOME", h)
-		if got, want := Home(), filepath.Join(h, ".smithy"); got != want {
-			t.Fatalf("got %q want %q", got, want)
-		}
-	})
-}
-
 func TestSkillDir(t *testing.T) {
 	t.Setenv("SMITHY_SKILL_DIR", "")
 	if SkillDir() != "" {

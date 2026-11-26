@@ -18,7 +18,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/names"
 	"github.com/Zovaris/smithy/internal/tasks"
 	"github.com/Zovaris/smithy/internal/text"
@@ -300,7 +300,7 @@ func dash(s string) string {
 }
 
 // StateFile is the state file path.
-func StateFile() string { return filepath.Join(ghx.Home(), "auto", "state.json") }
+func StateFile() string { return filepath.Join(layout.Home(), "auto", "state.json") }
 
 // Load reads the state; a missing file is an empty state.
 func Load() (*State, error) {
@@ -871,7 +871,7 @@ func bodyLines(s string) []string {
 // batchStarted reports whether a warden batch over dir has a card past queued: its workers
 // started even if nobody moved the task files off todo.
 func batchStarted(dir string) bool {
-	home := ghx.Home()
+	home := layout.Home()
 	want, _ := filepath.EvalSymlinks(dir)
 	batches, _ := os.ReadDir(filepath.Join(home, "warden"))
 	for _, b := range batches {

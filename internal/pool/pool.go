@@ -16,8 +16,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/agents/catalog"
 	"github.com/Zovaris/smithy/internal/config"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // Usage is the text for `smithy pool --help`.
@@ -39,16 +40,15 @@ reruns once on the next account; any other exits 75 and blocks its warden card s
 relaunches it in the same worktree. With every account limited it exits 75 at once. Files: ~/.smithy/pool.json, ~/.smithy/pool-state.json.`
 
 // Harnesses are the CLIs a pool account can use, with the env var that points at its config dir.
-var Harnesses = map[string]string{
-	"claude":   "CLAUDE_CONFIG_DIR",
-	"codex":    "CODEX_HOME",
-	"opencode": "XDG_DATA_HOME",
-	"copilot":  "COPILOT_HOME",
-	"grok":     "GROK_HOME",
-	"cursor":   "CURSOR_CONFIG_DIR",
-	"pi":       "PI_CODING_AGENT_DIR",
-	"dsh":      "DSH_HOME",
-}
+var Harnesses = func() map[string]string {
+	m := map[string]string{}
+	for _, a := range catalog.Known {
+		if a.PoolEnv != "" {
+			m[a.Name] = a.PoolEnv
+		}
+	}
+	return m
+}()
 
 // DefaultLimit is how long an account stays limited when the CLI gives no reset time.
 const DefaultLimit = 5 * time.Hour
@@ -70,8 +70,8 @@ type Status struct {
 }
 
 // File is ~/.smithy/pool.json; StateFile is ~/.smithy/pool-state.json.
-func File() string      { return filepath.Join(ghx.Home(), "pool.json") }
-func StateFile() string { return filepath.Join(ghx.Home(), "pool-state.json") }
+func File() string      { return filepath.Join(layout.Home(), "pool.json") }
+func StateFile() string { return filepath.Join(layout.Home(), "pool-state.json") }
 
 var nameRe = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]*$`)
 
@@ -142,10 +142,10 @@ func Add(name, harness, dir string) (Account, error) {
 		}
 	}
 	if dir == "" {
-		dir = filepath.Join(ghx.Home(), "accounts", name)
+		dir = filepath.Join(layout.Home(), "accounts", name)
 	}
 	if strings.HasPrefix(dir, "~/") {
-		h, _ := os.UserHomeDir()
+		h := layout.UserHome()
 		dir = filepath.Join(h, dir[2:])
 	}
 	dir, err := filepath.Abs(dir)

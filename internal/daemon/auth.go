@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // LoginHeader is the identity header tailscale serve adds to proxied requests.
@@ -28,10 +28,10 @@ const LoginHeader = "Tailscale-User-Login"
 const DefaultPort = 7477
 
 // TokenFile is <smithy home>/daemon.token.
-func TokenFile() string { return filepath.Join(ghx.Home(), "daemon.token") }
+func TokenFile() string { return filepath.Join(layout.Home(), "daemon.token") }
 
 // InfoFile is <smithy home>/daemon.json, written while the daemon runs.
-func InfoFile() string { return filepath.Join(ghx.Home(), "daemon.json") }
+func InfoFile() string { return filepath.Join(layout.Home(), "daemon.json") }
 
 // LoadToken reads the token at path. With create, a missing file gets a new random token (0600).
 // A file readable by group or others is refused.

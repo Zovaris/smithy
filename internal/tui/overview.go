@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/Zovaris/smithy/internal/text"
 	"github.com/Zovaris/smithy/internal/usage"
 	"github.com/charmbracelet/colorprofile"
 )
@@ -450,7 +451,7 @@ func (m Model) cardNeeds(w, h int) ([]string, string) {
 	if len(rs) == 0 {
 		return []string{"", t.fg(t.ok).Render(t.g.pass + " Nothing needs you."), t.fg(t.muted).Italic(true).Render("Decisions, PRs to review and blocked work land here.")}, "0"
 	}
-	lines := []string{t.fg(t.warn).Bold(!t.plain).Render(plural(len(rs), "item waits", "items wait") + " for you"), ""}
+	lines := []string{t.fg(t.warn).Bold(!t.plain).Render(text.Plural(len(rs), "item waits", "items wait") + " for you"), ""}
 	for k, r := range rs {
 		if k >= 3 || len(lines)+1 >= h {
 			break

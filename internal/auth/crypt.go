@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // sealed is auth.json at rest: AES-256-GCM over the JSON map, keyed by auth.key. "$enc" is no
@@ -26,7 +26,7 @@ type sealed struct {
 }
 
 // KeyFile holds the data key (hex, mode 0600). Only smithy and its proxy read it; agent sandboxes deny it.
-func KeyFile() string { return filepath.Join(ghx.Home(), "auth.key") }
+func KeyFile() string { return filepath.Join(layout.Home(), "auth.key") }
 
 // EnsureKey creates the data key in home when it is missing. The key is written to a temp file
 // and linked into place, so no reader sees a partial key and an existing key is never replaced.
@@ -94,7 +94,7 @@ func dataKey() (cipher.AEAD, error) {
 }
 
 func seal(plain []byte) ([]byte, error) {
-	if err := EnsureKey(ghx.Home()); err != nil {
+	if err := EnsureKey(layout.Home()); err != nil {
 		return nil, err
 	}
 	g, err := dataKey()

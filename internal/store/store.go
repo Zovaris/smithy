@@ -13,8 +13,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/Zovaris/smithy/internal/ghx"
 	_ "modernc.org/sqlite" // registers the sqlite driver for database/sql
+
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // Event is one row of the events log. Seq and Time are set by Append.
@@ -71,7 +72,7 @@ var migrations = []string{
 }
 
 // DefaultPath is <smithy home>/smithy.db.
-func DefaultPath() string { return filepath.Join(ghx.Home(), "smithy.db") }
+func DefaultPath() string { return filepath.Join(layout.Home(), "smithy.db") }
 
 // Open opens (creating if needed) the database at path in WAL mode and applies pending migrations.
 func Open(path string) (*Store, error) {

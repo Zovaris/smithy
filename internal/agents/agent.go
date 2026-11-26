@@ -17,10 +17,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Zovaris/smithy/internal/cards"
+	"github.com/Zovaris/smithy/internal/agents/catalog"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/pool"
 	"github.com/Zovaris/smithy/internal/usage"
 )
@@ -77,8 +78,11 @@ parent harness's variables removed, so their own scripts detect the right harnes
 and exits with its code (output goes through a file, so a server the CLI leaves running can't
 keep the caller waiting).`
 
+// KnownCLIs is the one table of agent CLIs; CLIs, EffortFlags, ACPCLIs and the rest derive from it.
+var KnownCLIs = catalog.Known
+
 // CLIs is the order in which installed agent CLIs are picked when AGENT_CLI and AGENT_CMD are unset.
-var CLIs = []string{"claude", "codex", "opencode", "agy", "copilot", "grok", "cursor", "pi", "dsh"}
+var CLIs = catalog.Names(nil)
 
 // ParentVars are the harness variables removed from a worker's environment.
 var ParentVars = []string{"CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_THREAD_ID", "OPENCODE", "OPENCODE_SESSION_ID", "GEMINI_CLI", "PI_CODING_AGENT", "DSH_SESSION_ID", "AI_AGENT"}
@@ -194,7 +198,7 @@ func AutoDenied(smithy []string) []string {
 		d = append(d, "Edit("+f+")") // Edit rules cover every file-editing tool, Write included
 	}
 	// warden cards change only through smithy's own commands, never the worker's edit tools
-	if h := cards.Home(); filepath.IsAbs(h) {
+	if h := layout.WardenHome(); filepath.IsAbs(h) {
 		d = append(d, "Edit(/"+filepath.ToSlash(h)+"/**/*.json)")
 	}
 	return append(d, poolDenied()...)
@@ -297,6 +301,19 @@ func ClampEffort(e string) (effort string, capped bool) {
 	return MaxEffort, true
 }
 
+// EffortRules are the effort rules clients show: the CLIs that take an effort flag, the levels a
+// session may set, and the cap smithy lowers anything higher to.
+type EffortRules struct {
+	Agents []string `json:"agents"`
+	Levels []string `json:"levels"`
+	Max    string   `json:"max"`
+}
+
+// Effort is the one set of effort rules, from KnownCLIs and Efforts.
+func Effort() EffortRules {
+	return EffortRules{Agents: catalog.Names(func(a catalog.Agent) bool { return a.Effort }), Levels: slices.Clone(Efforts), Max: MaxEffort}
+}
+
 // DefaultEffort is the effort from $AGENT_EFFORT, else the agent.effort setting, clamped.
 func DefaultEffort() string {
 	e := os.Getenv("AGENT_EFFORT")
@@ -308,12 +325,20 @@ func DefaultEffort() string {
 }
 
 // EffortFlags are the CLIs that take an effort flag; the rest only get $AGENT_EFFORT.
-var EffortFlags = map[string]bool{"claude": true, "codex": true}
+var EffortFlags = func() map[string]bool {
+	m := map[string]bool{}
+	for _, a := range KnownCLIs {
+		if a.Effort {
+			m[a.Name] = true
+		}
+	}
+	return m
+}()
 
 // Bin is the executable name of an agent CLI.
 func Bin(cli string) string {
-	if cli == "cursor" {
-		return "agent"
+	if a, ok := catalog.Lookup(cli); ok {
+		return a.Bin
 	}
 	return cli
 }
@@ -497,7 +522,15 @@ func Build(cli string, o Options, prompt string, extra []string, gitDir string, 
 }
 
 // ACPCLIs are the CLIs smithy can drive over the Agent Client Protocol, with their ACP command.
-var ACPCLIs = map[string][]string{"agy": {"agy", "acp"}, "copilot": {"copilot", "--acp"}, "grok": {"grok", "agent", "stdio"}, "opencode": {"opencode", "acp"}}
+var ACPCLIs = func() map[string][]string {
+	m := map[string][]string{}
+	for _, a := range KnownCLIs {
+		if a.ACP != nil {
+			m[a.Name] = a.ACP
+		}
+	}
+	return m
+}()
 
 func buildACP(cli string, o Options, path string, extra []string, getenv func(string) string) (Spec, error) {
 	if cli == "custom" {
@@ -549,7 +582,7 @@ func finish(log string, named bool, account string) {
 	e := events.Event{Kind: "usage", Usage: &u, Account: account}
 	if named {
 		e.Detail = filepath.Base(log)
-		if dir := filepath.Dir(log); realPath(filepath.Dir(dir)) == realPath(cards.Home()) {
+		if dir := filepath.Dir(log); realPath(filepath.Dir(dir)) == realPath(layout.WardenHome()) {
 			e.Batch, e.Item = filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log")
 		}
 	}
@@ -1069,7 +1102,7 @@ func AutoDirs(bins []string) []string {
 			}
 		}
 	}
-	add(ghx.Home())
+	add(layout.Home())
 	for _, b := range bins {
 		if filepath.Base(filepath.Dir(b)) == "scripts" {
 			add(filepath.Dir(filepath.Dir(filepath.Dir(b))))
@@ -1090,9 +1123,6 @@ const AutoNote = "Unattended run: shell access is limited by policy. If a comman
 	"where they exist. Report blocked only when a git, gh, test or smithy step your task needs " +
 	"is denied in its simplest form."
 
-// tierHarness names the harness whose models.<harness>.<tier> settings a headless CLI uses.
-var tierHarness = map[string]string{"claude": "claude-cli", "codex": "codex", "opencode": "opencode", "agy": "agy", "copilot": "copilot", "grok": "grok", "cursor": "cursor", "pi": "pi", "dsh": "dsh"}
-
 // ResolveTier turns a tier name (cheap, mid, strong, judge) into the user's model for that CLI's
 // harness; an unset tier gives "" (the CLI's default model) with one warning. Any other value is a
 // model name and passes through.
@@ -1102,9 +1132,9 @@ func ResolveTier(cli, model string) string {
 	default:
 		return model
 	}
-	h := tierHarness[filepath.Base(cli)]
-	if h == "" {
-		h = filepath.Base(cli)
+	h := filepath.Base(cli)
+	if a, ok := catalog.Lookup(h); ok {
+		h = a.Tier
 	}
 	m, err := config.ModelFor(h, model)
 	if err != nil || m == "" {

@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/Zovaris/smithy/internal/auto"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/charmbracelet/colorprofile"
 )
 
@@ -184,7 +185,7 @@ func (m serveView) lines() []string {
 	sess := mut.Render("none")
 	if hb.SessionRunning() {
 		sess = val.Render(fmt.Sprintf("pid %d", hb.SessionPID)) + dot + val.Render(hb.Agent) + dot +
-			mut.Render(dur(now.Sub(hb.SessionAt))) + dot + mut.Render(short(home(hb.SessionLog), max(w-40, 20)))
+			mut.Render(dur(now.Sub(hb.SessionAt))) + dot + mut.Render(short(layout.Tilde(hb.SessionLog), max(w-40, 20)))
 	}
 	out = append(out, label("session")+sess)
 	working, waiting, stuck, ready, ci := Model{snap: m.snap}.counts()

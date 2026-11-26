@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/testkit"
 )
 
 func advPut(t *testing.T, dir, name, text string) {
@@ -17,8 +19,8 @@ func advPut(t *testing.T, dir, name, text string) {
 	if err := os.WriteFile(p, []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	gitIn(t, dir, "add", name)
-	gitIn(t, dir, "commit", "-q", "-m", name)
+	testkit.Git(t, dir, "add", name)
+	testkit.Git(t, dir, "commit", "-q", "-m", name)
 }
 
 func advSection(out string) string {
@@ -100,7 +102,7 @@ func TestAdvMissingFilesNotListed(t *testing.T) {
 
 func TestAdvEmptyFile(t *testing.T) {
 	dir := staleCloneOnFeature(t)
-	gitIn(t, dir, "commit", "-q", "--allow-empty", "-m", "e")
+	testkit.Git(t, dir, "commit", "-q", "--allow-empty", "-m", "e")
 	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}

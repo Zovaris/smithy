@@ -12,6 +12,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/harness"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 const setupUsage = `use-smithy setup: what is installed, model settings, and the agent instructions block.
@@ -121,10 +122,7 @@ func blockFile() (string, error) {
 
 func defaultFile() string {
 	h, _ := harness.Detect()
-	home := os.Getenv("HOME")
-	if home == "" {
-		home, _ = os.UserHomeDir()
-	}
+	home := layout.UserHome()
 	cwd, _ := os.Getwd()
 	return DefaultFile(h, home, cwd, os.Getenv)
 }

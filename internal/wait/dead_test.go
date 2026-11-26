@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/Zovaris/smithy/internal/cards"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 func TestBatchWatcherWakesOnDeadWorker(t *testing.T) {
@@ -18,7 +19,7 @@ func TestBatchWatcherWakesOnDeadWorker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log := filepath.Join(cards.Home(), "b1", "a.log")
+	log := filepath.Join(layout.WardenHome(), "b1", "a.log")
 	out, err := os.Create(log)
 	if err != nil {
 		t.Fatal(err)

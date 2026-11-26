@@ -19,6 +19,7 @@ import (
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 var allEvents = []string{"checks", "merged", "closed", "conflict", "review", "comment", "push", "new", "updated"}
@@ -342,7 +343,7 @@ func newList(kind, label string, o opts) (*listWatcher, error) {
 	}
 	dir := os.Getenv("TEND_HOME")
 	if dir == "" {
-		dir = filepath.Join(ghx.Home(), "tend")
+		dir = filepath.Join(layout.Home(), "tend")
 	}
 	scope := "issues"
 	if kind == "pr" {
@@ -364,13 +365,13 @@ func newList(kind, label string, o opts) (*listWatcher, error) {
 func batchBranches() map[string]bool {
 	out := map[string]bool{}
 	for _, b := range cards.Batches() {
-		entries, _ := os.ReadDir(filepath.Join(cards.Home(), b))
+		entries, _ := os.ReadDir(filepath.Join(layout.WardenHome(), b))
 		for _, e := range entries {
 			if !cards.IsCardFile(e.Name()) {
 				continue
 			}
 			var c struct{ Branch string }
-			if raw, err := os.ReadFile(filepath.Join(cards.Home(), b, e.Name())); err == nil && json.Unmarshal(raw, &c) == nil && c.Branch != "" {
+			if raw, err := os.ReadFile(filepath.Join(layout.WardenHome(), b, e.Name())); err == nil && json.Unmarshal(raw, &c) == nil && c.Branch != "" {
 				out[c.Branch] = true
 			}
 		}
@@ -556,7 +557,7 @@ func (w *batchWatcher) record(id string, pw *prWatcher, lines []string) []string
 }
 
 // seenFile is not a .json file, so the card listing never takes it for a card.
-func seenFile(name string) string { return filepath.Join(cards.Home(), name, ".wait-seen") }
+func seenFile(name string) string { return filepath.Join(layout.WardenHome(), name, ".wait-seen") }
 
 // loadSeen reads the reported keys, one per line, into w.reported.
 func (w *batchWatcher) loadSeen() {
@@ -613,7 +614,7 @@ func mergeModes(name string) map[string]string {
 		Items []struct{ ID, Merge string }
 	}
 	out := map[string]string{}
-	if b, err := os.ReadFile(filepath.Join(cards.Home(), name, "batch.json")); err == nil && json.Unmarshal(b, &bt) == nil {
+	if b, err := os.ReadFile(filepath.Join(layout.WardenHome(), name, "batch.json")); err == nil && json.Unmarshal(b, &bt) == nil {
 		out[""] = bt.Merge
 		for _, it := range bt.Items {
 			out[it.ID] = it.Merge
@@ -653,7 +654,7 @@ func newBatch(name string, all bool) (*batchWatcher, error) {
 	if name == "" {
 		b := cards.Batches()
 		if len(b) == 0 {
-			return nil, fmt.Errorf("no batches in %s", cards.Home())
+			return nil, fmt.Errorf("no batches in %s", layout.WardenHome())
 		}
 		name = b[0]
 	}
@@ -710,7 +711,7 @@ func (w *batchWatcher) reapDead(rows []cards.Row) bool {
 		if final[r.State] || r.State == "pr_open" || r.State == "ready" || r.State == "failed" {
 			continue
 		}
-		if cards.Dead(w.name, r.ID, running, filepath.Join(cards.Home(), w.name, r.ID+".log")) {
+		if cards.Dead(w.name, r.ID, running, filepath.Join(layout.WardenHome(), w.name, r.ID+".log")) {
 			changed = true
 		}
 	}

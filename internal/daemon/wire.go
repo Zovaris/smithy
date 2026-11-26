@@ -19,6 +19,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/text"
 )
@@ -166,7 +167,7 @@ func readCard(batch, item string) map[string]any {
 	if !cardID(batch) || !cardID(item) {
 		return nil
 	}
-	b, err := os.ReadFile(filepath.Join(cards.Home(), batch, item+".json"))
+	b, err := os.ReadFile(filepath.Join(layout.WardenHome(), batch, item+".json"))
 	var c map[string]any
 	if err != nil || json.Unmarshal(b, &c) != nil {
 		return nil

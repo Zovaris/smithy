@@ -16,7 +16,7 @@ import (
 	"github.com/Zovaris/smithy/internal/acp"
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/auth"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 const probeTimeout = 30 * time.Second
@@ -24,7 +24,7 @@ const probeTimeout = 30 * time.Second
 // DefaultDeps runs the real commands, probes and requests, caching under smithy's home.
 func DefaultDeps() Deps {
 	return Deps{
-		Dir:         filepath.Join(ghx.Home(), "cache", "models"),
+		Dir:         filepath.Join(layout.Home(), "cache", "models"),
 		Now:         time.Now,
 		Output:      output,
 		ACP:         probeACP,
@@ -134,8 +134,8 @@ func get(ctx context.Context, u string, h http.Header) ([]byte, error) {
 
 // claudeModel is the model set in Claude Code's user settings, "" when none.
 func claudeModel() string {
-	h, err := os.UserHomeDir()
-	if err != nil {
+	h := layout.UserHome()
+	if h == "" {
 		return ""
 	}
 	b, err := os.ReadFile(filepath.Join(h, ".claude", "settings.json"))

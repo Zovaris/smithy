@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // apiShellSandbox is the auto.sandbox wrapper for an API run's shell commands: nil when the
@@ -60,16 +60,16 @@ func apiShellSandbox(mode string, p Probe, paths SandboxPaths) (func([]string) [
 // apiSandboxPaths are the native sandbox's paths for an API run in cwd: the same writable and
 // secret dirs a claude worker's sandbox gets.
 func apiSandboxPaths(cwd string) (SandboxPaths, error) {
-	home, _ := os.UserHomeDir()
+	home := layout.UserHome()
 	secret, err := PoolDirs()
 	if err != nil {
 		return SandboxPaths{}, err
 	}
-	gocache := GoCacheDir(realPath(cards.Home()), cwd)
+	gocache := GoCacheDir(realPath(layout.WardenHome()), cwd)
 	if err := os.MkdirAll(gocache, 0o700); err != nil {
 		return SandboxPaths{}, err
 	}
-	p := SandboxPaths{Cwd: realPath(cwd), Home: home, SmithyHome: ghx.Home(), Warden: cards.Home(), GoCache: gocache, Secret: secret}
+	p := SandboxPaths{Cwd: realPath(cwd), Home: home, SmithyHome: layout.Home(), Warden: layout.WardenHome(), GoCache: gocache, Secret: secret}
 	if g, err := ghx.Run("git", "-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"); err == nil && g != "" {
 		p.GitDir = realPath(g)
 	}

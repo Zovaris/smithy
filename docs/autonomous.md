@@ -65,7 +65,8 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   At most 16 sessions working at once and 8 queued messages each (429 past that); a permission question shows the whole call, and tool output and text are redacted before they are stored.
 - Setup: `GET /v1/setup` lists every agent CLI and API key as ready or missing with its fix, the
   default agent and model (`chosen` is false until one is picked or used: first run), the kit
-  (`kit.mcp`, `kit.skills`) and the skills and MCP servers each harness has installed;
+  (`kit.mcp`, `kit.skills`), the skills and MCP servers each harness has installed, and the
+  effort rules (`effort.agents`: the CLIs that take effort, `effort.levels`, `effort.max`);
   `PUT /v1/setup/default` (`{"agent","model"}`), `PUT /v1/setup/kit` (`{"mcp","skills"}`, skills
   must be installed smithy skills) and `POST /v1/setup/skills/install` (`{"harness"}`, empty for
   every detected one) change them. `GET /v1/agents/{id}/models[?refresh=1]` lists the models

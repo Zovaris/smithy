@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/apiloop"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/proc"
 	"github.com/Zovaris/smithy/internal/proxy"
 	"github.com/Zovaris/smithy/internal/search"
@@ -231,7 +232,7 @@ func (s *Set) bare(kind string) bool {
 func (s *Set) homes() []string {
 	h := s.Home
 	if h == "" {
-		h, _ = os.UserHomeDir()
+		h = layout.UserHome()
 	}
 	out := []string{h}
 	if r, err := filepath.EvalSymlinks(h); err == nil && r != h {

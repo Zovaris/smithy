@@ -1,42 +1,26 @@
 package gitx
 
 import (
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/testkit"
 )
-
-func gitIn(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	cmd := exec.Command("git", append([]string{"-C", dir, "-c", "user.email=t@t", "-c", "user.name=t", "-c", "init.defaultBranch=main"}, args...)...)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-}
-
-func commitFile(t *testing.T, dir, name string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(name+"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	gitIn(t, dir, "add", name)
-	gitIn(t, dir, "commit", "-q", "-m", name)
-}
 
 func TestResolveBasePrefersOrigin(t *testing.T) {
 	up, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	gitIn(t, up, "init", "-q")
-	commitFile(t, up, "a.txt")
+	testkit.Git(t, up, "init", "-q")
+	testkit.CommitFile(t, up, "a.txt", "a.txt\n")
 	dir := filepath.Join(t.TempDir(), "c")
-	gitIn(t, up, "clone", "-q", up, dir)
-	commitFile(t, up, "b.txt")
-	gitIn(t, dir, "fetch", "-q")
-	gitIn(t, dir, "switch", "-q", "-c", "feat", "origin/main")
+	testkit.Git(t, up, "clone", "-q", up, dir)
+	testkit.CommitFile(t, up, "b.txt", "b.txt\n")
+	testkit.Git(t, dir, "fetch", "-q")
+	testkit.Git(t, dir, "switch", "-q", "-c", "feat", "origin/main")
 	sha, label := ResolveBase(dir, "main")
 	want, _ := exec.Command("git", "-C", dir, "rev-parse", "origin/main").Output()
 	if sha != strings.TrimSpace(string(want)) || !strings.HasPrefix(label, "origin/main (merge-base ") {
@@ -55,8 +39,8 @@ func TestResolveBaseWithoutRemoteIsWholeHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gitIn(t, dir, "init", "-q")
-	commitFile(t, dir, "a.txt")
+	testkit.Git(t, dir, "init", "-q")
+	testkit.CommitFile(t, dir, "a.txt", "a.txt\n")
 	if sha, _ := ResolveBase(dir, ""); sha != EmptyTree {
 		t.Fatalf("no origin, no upstream: %s", sha)
 	}
@@ -67,8 +51,8 @@ func TestResolveBaseRejectsOptionLikeBase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gitIn(t, dir, "init", "-q")
-	commitFile(t, dir, "a.txt")
+	testkit.Git(t, dir, "init", "-q")
+	testkit.CommitFile(t, dir, "a.txt", "a.txt\n")
 	if sha, label := ResolveBase(dir, "--output=x"); strings.HasPrefix(sha, "-") || !strings.Contains(label, "not a revision") {
 		t.Fatalf("option-like base passed through: %s %q", sha, label)
 	}
@@ -79,10 +63,10 @@ func TestResolveBaseLocalBranchWithoutOrigin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gitIn(t, dir, "init", "-q")
-	commitFile(t, dir, "a.txt")
-	gitIn(t, dir, "switch", "-q", "-c", "feat")
-	commitFile(t, dir, "b.txt")
+	testkit.Git(t, dir, "init", "-q")
+	testkit.CommitFile(t, dir, "a.txt", "a.txt\n")
+	testkit.Git(t, dir, "switch", "-q", "-c", "feat")
+	testkit.CommitFile(t, dir, "b.txt", "b.txt\n")
 	want, _ := exec.Command("git", "-C", dir, "rev-parse", "main").Output()
 	if sha, label := ResolveBase(dir, "main"); sha != strings.TrimSpace(string(want)) || !strings.HasPrefix(label, "main (merge-base ") {
 		t.Fatalf("local branch: %s %q", sha, label)
@@ -94,12 +78,12 @@ func TestResolveBaseFallsBackToUpstream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gitIn(t, up, "init", "-q")
-	commitFile(t, up, "a.txt")
+	testkit.Git(t, up, "init", "-q")
+	testkit.CommitFile(t, up, "a.txt", "a.txt\n")
 	dir := filepath.Join(t.TempDir(), "c")
-	gitIn(t, up, "clone", "-q", up, dir)
-	gitIn(t, dir, "remote", "set-head", "origin", "--delete")
-	commitFile(t, dir, "b.txt")
+	testkit.Git(t, up, "clone", "-q", up, dir)
+	testkit.Git(t, dir, "remote", "set-head", "origin", "--delete")
+	testkit.CommitFile(t, dir, "b.txt", "b.txt\n")
 	if _, label := ResolveBase(dir, ""); !strings.HasPrefix(label, "origin/main (merge-base ") {
 		t.Fatalf("upstream fallback: %q", label)
 	}

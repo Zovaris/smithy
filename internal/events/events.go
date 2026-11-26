@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/text"
 	"github.com/Zovaris/smithy/internal/usage"
@@ -60,7 +60,7 @@ var Off = os.Getenv("SMITHY_EVENTS") == "off"
 var mu sync.Mutex
 
 // File is the log's path.
-func File() string { return filepath.Join(ghx.Home(), "events.jsonl") }
+func File() string { return filepath.Join(layout.Home(), "events.jsonl") }
 
 // flat keeps one short line (text.Clean), at most n runes.
 func flat(s string, n int) string {
@@ -73,7 +73,7 @@ func flat(s string, n int) string {
 
 // ProxyFile is the egress proxy's own log (asks, approvals, refusals): the only part of the smithy
 // home the proxy sidecar can write. Read merges it in.
-func ProxyFile() string { return filepath.Join(ghx.Home(), "proxy", "events.jsonl") }
+func ProxyFile() string { return filepath.Join(layout.Home(), "proxy", "events.jsonl") }
 
 // Tap, when set, receives every event Append writes in this process (smithy daemon mirrors them
 // into its store).

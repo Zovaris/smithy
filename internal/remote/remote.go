@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/config"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // Local is the reserved name of the daemon on this machine.
@@ -39,7 +39,7 @@ type List struct {
 }
 
 // File is <smithy home>/servers.json (0600: it holds device tokens).
-func File() string { return filepath.Join(ghx.Home(), "servers.json") }
+func File() string { return filepath.Join(layout.Home(), "servers.json") }
 
 var nameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,39}$`)
 
@@ -277,7 +277,7 @@ func DefaultCandidates(p Peer) []string {
 // Discover lists the peers running smithy, from the cache while it is fresh.
 func (d Discoverer) Discover(ctx context.Context) ([]Found, error) {
 	if d.Cache == "" {
-		d.Cache = filepath.Join(ghx.Home(), "cache", "tailscale-peers.json")
+		d.Cache = filepath.Join(layout.Home(), "cache", "tailscale-peers.json")
 	}
 	if d.TTL == 0 {
 		d.TTL = 5 * time.Minute
