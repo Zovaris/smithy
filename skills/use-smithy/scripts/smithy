@@ -39,6 +39,7 @@ bin="$data/versions/$version/smithy"
 [ -x "$bin" ] || [ ! -x "$bin.exe" ] || bin="$bin.exe"  # Git Bash on Windows
 [ -x "$bin" ] && { link "$bin"; exec "$bin" "$@"; }
 other=$cmd; [ -x "$other" ] || other=$(command -v smithy 2>/dev/null || true)
+case $other in /*) ;; *) other= ;; esac  # never a relative PATH entry (./smithy in the repo)
 if [ -n "$other" ] && [ -x "$other" ] && [ "$(cd "$(dirname "$other")" && pwd -P)/${other##*/}" != "$here/smithy" ]; then
   echo "smithy: v$version is not installed; using $other. Ask the user whether to run: smithy update $version" >&2
   exec "$other" "$@"
