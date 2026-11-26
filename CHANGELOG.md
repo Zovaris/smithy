@@ -10,6 +10,8 @@ part above `### Details`.
 
 ### New
 
+- The TUI header is one calm bar: smithy, its version and the project on the left, an idle or "N running" pill that breathes slowly and the clock on the right; model, branch, tokens and cost stay in the footer, so nothing shows twice.
+- smithy opens with a short dither-and-anvil splash (under a second); any key skips it, and `ui.splash = false` turns it off.
 - Pick a color theme (steel, frost or plum) with `/theme` in the TUI or from the web's command palette; both read the same `ui.theme` setting, and steel stays the default.
 - Antigravity CLI (`agy`) replaces Gemini CLI as an agent, and GitHub Copilot CLI and xAI's Grok Build are new agents.
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
