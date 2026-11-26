@@ -63,6 +63,7 @@ var helpDocs = map[string]helpDoc{
 
 	"cleanup":   {groupMaint, []string{"smithy cleanup . feat/42-login", "smithy cleanup . feat/42-login ../wt/login --force"}, []string{"worktree"}},
 	"uninstall": {groupMaint, []string{"smithy uninstall", "smithy uninstall --yes"}, []string{"cleanup", "skills"}},
+	"update":    {groupMaint, []string{"smithy update", "smithy update --check", "smithy update 0.23.0"}, []string{"version", "uninstall"}},
 	"skills":    {groupMaint, []string{"smithy skills --list", "smithy skills smelt"}, []string{"setup"}},
 
 	"adr":         {groupSkills, []string{`smithy adr "Use SQLite for the board"`}, []string{"search"}},
