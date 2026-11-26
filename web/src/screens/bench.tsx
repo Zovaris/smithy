@@ -5,6 +5,7 @@ import { api } from "../lib/auth";
 import { useLive } from "../lib/live";
 import { agentName } from "../lib/store";
 import { St } from "../components/ui";
+import { plural, tail } from "../lib/text";
 
 type Usage = { cost_usd?: number };
 type Run = { id: string; agent: string; model?: string; skills?: string; started: string; seconds: number; passed: number; total: number; pass_rate: number; usage: Usage };
@@ -68,7 +69,7 @@ export default function Bench() {
       </div>
       <p class="t3" style="font-size:12px">Runs every task in a fresh temp repo, one headless run each; takes a few minutes and spends tokens. Same as <code>smithy bench run --agent {pick0 || "<cli>"}</code>.</p>
       {(err || st.error) && <p class="err">{err || "Last run: " + st.error}</p>}
-      {st.log && (st.running || st.error) && <pre class="out" style="max-height:160px;overflow:auto">{st.log.split("\n").slice(-8).join("\n")}</pre>}
+      {st.log && (st.running || st.error) && <pre class="out" style="max-height:160px;overflow:auto">{tail(st.log, 8)}</pre>}
     </div>
   );
   useEffect(() => {
@@ -83,7 +84,7 @@ export default function Bench() {
   );
   return (
     <section class="page" aria-label="Bench">
-      <header><h2>Bench</h2><p>{runs.length ? `${runs.length} saved runs` : "No runs yet. Start one below; its result shows here when it ends."}</p></header>
+      <header><h2>Bench</h2><p>{runs.length ? plural(runs.length, "saved run", "saved runs") : "No runs yet. Start one below; its result shows here when it ends."}</p></header>
       {runner}
       {!!runs.length && (
         <div class="card">

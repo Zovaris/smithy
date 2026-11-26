@@ -1,11 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { action, suggest } from "./commands";
+import popup from "../../../internal/tui/chat_popup.go?raw";
+import slash from "../features/chat/slash.ts?raw";
+import { ACTIONS, action, suggest } from "./commands";
+import { nextDetail } from "./detail";
+
+// The TUI commands the web leaves out on purpose: it has no terminal to detach from or quit, and
+// it already is the web UI.
+const TUI_ONLY = ["detach", "quit", "web"];
+
+const names = ACTIONS.map((a) => a.name);
 
 describe("commands", () => {
   it("suggests actions and skills for a bare /word, prefix matches first", () => {
     expect(suggest("/st", ["smelt", "tend"]).map((c) => c.name)).toEqual(["stop"]);
-    expect(suggest("/s", ["smelt", "scout"]).map((c) => c.name)).toEqual(["stop", "skills", "serve", "set", "settings", "smelt", "scout", "agents", "decisions", "ask", "answer", "unset", "keys"]);
-    expect(suggest("/", []).length).toBe(18);
+    expect(suggest("/se", ["smelt", "scout"]).map((c) => c.name)).toEqual(["sessions", "setup", "serve", "set", "settings", "unset"]);
+    expect(suggest("/", []).length).toBe(ACTIONS.length);
   });
   it("stops suggesting once the message goes on", () => {
     expect(suggest("/smelt fix", ["smelt"])).toEqual([]);
@@ -16,5 +25,23 @@ describe("commands", () => {
     expect(action("/smelt fix ci")).toBe("");
     expect(action("/smelt")).toBe("");
     expect(action("stop")).toBe("");
+  });
+
+  it("has every TUI chat command except the ones that only make sense in a terminal", () => {
+    const tui = [...popup.matchAll(/^\t\{"(\w+)",/gm)].map((m) => m[1]);
+    expect(tui.length).toBeGreaterThan(20);
+    expect(tui.filter((c) => !TUI_ONLY.includes(c) && !names.includes(c))).toEqual([]);
+    expect(names.filter((c) => TUI_ONLY.includes(c))).toEqual([]);
+  });
+  it("lists every command slash.ts handles, so none goes to the agent as text", () => {
+    const handled = [...slash.matchAll(/\ba === "(\w+)"/g)].map((m) => m[1]);
+    expect(handled).toContain("bench");
+    expect(handled.filter((h) => !names.includes(h))).toEqual([]);
+  });
+  it("/mode picks the transcript detail the way the TUI does", () => {
+    expect(nextDetail("expandable", "verbose")).toBe("verbose");
+    expect(nextDetail("minimal", "")).toBe("expandable");
+    expect(nextDetail("verbose", "")).toBe("minimal");
+    expect(nextDetail("minimal", "dark")).toBe("expandable");
   });
 });

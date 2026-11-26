@@ -607,11 +607,23 @@ const usage = `usage: smithy tasks <command>
   next  [dir]                       first todo task whose blockers are done (exit 3 if none)
   ready [dir]                       every todo task whose blockers are done
   set   <file> key=value...         update header lines (Status, PR, Owner...)
-  add   [dir] "<title>" [--blocked-by 01,02] [--key PROJ-12] [--speed fast|normal|full]   next NN file from the full template
+  add   "<title>" [dir] [--blocked-by 01,02] [--key PROJ-12] [--speed fast|normal|full]   next NN file from the full template
   import <file> [dir]               split a list of "## NN · Title" sections into task files (default dir: the file's folder; never overwrites)
   board [--all]                     one line per task list and warden batch: this repo, or every repo
   where                             task dirs found for this repo
 Status: todo | doing | done | dropped. Blocked by: 01, 03 | none. PR: <url> | -`
+
+// addArgs is `tasks add`'s title and folder: "<title>" [dir], or the old [dir] "<title>" when the
+// first argument is a folder that exists.
+func addArgs(rest []string) (title, dir string) {
+	if len(rest) < 2 {
+		return rest[0], ""
+	}
+	if fi, err := os.Stat(rest[0]); err == nil && fi.IsDir() {
+		return rest[len(rest)-1], rest[0]
+	}
+	return rest[0], rest[1]
+}
 
 // Main runs `smithy tasks`.
 func Main(args []string) int {
@@ -713,14 +725,14 @@ func Main(args []string) int {
 			}
 		}
 		if len(rest) == 0 {
-			fmt.Fprintln(os.Stderr, `usage: smithy tasks add [dir] "<title>" [--blocked-by 01,02] [--key K] [--speed fast|normal|full]`)
+			fmt.Fprintln(os.Stderr, `usage: smithy tasks add "<title>" [dir] [--blocked-by 01,02] [--key K] [--speed fast|normal|full]`)
 			return 2
 		}
-		title := rest[len(rest)-1]
+		title, where := addArgs(rest)
 		var dir string
 		var err error
-		if len(rest) > 1 {
-			dir, err = filepath.Abs(rest[0])
+		if where != "" {
+			dir, err = filepath.Abs(where)
 		} else {
 			dir, err = resolve("")
 		}

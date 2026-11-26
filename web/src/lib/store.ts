@@ -21,9 +21,10 @@ export type Store = {
   convo: Record<string, Item[]>;
   diffs: Record<string, Diff>;
   decisions: Dec[];
+  log: string[];
 };
 
-export const blank = (): Store => ({ last: 0, order: [], sessions: {}, convo: {}, diffs: {}, decisions: [] });
+export const blank = (): Store => ({ last: 0, order: [], sessions: {}, convo: {}, diffs: {}, decisions: [], log: [] });
 
 const obj = (d: unknown): Record<string, any> => (d && typeof d === "object" ? (d as Record<string, any>) : {});
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -155,6 +156,10 @@ export function fold(s: Store, e: Ev): Store {
       }
       return next;
     }
+    case "log": {
+      if (str(d.line)) next.log = [...s.log, str(d.line)].slice(-200);
+      return next;
+    }
     case "decision_answered": {
       const did = str(d.id);
       next.decisions = s.decisions.map((x) => (x.id === did ? { ...x, answer: str(d.answer), by: str(d.by) } : x));
@@ -187,12 +192,17 @@ export function kindOf(d: Dec): string {
 // primary is the option the ↵ key answers: deny for the guard (the safe one), else the first.
 export const primary = (d: Dec) => (d.options.includes("deny") ? "deny" : d.options[0]);
 
-// agentName is how a session's agent reads in the UI.
+let names: Record<string, string> = {};
+
+// setNames keeps the display names the daemon serves in /v1/setup (from its agent catalog).
+export function setNames(agents: { name: string; display?: string }[]): void {
+  names = Object.fromEntries(agents.filter((a) => a.display).map((a) => [a.name, a.display!]));
+}
+
+// agentName is how a session's agent reads in the UI: the daemon's display name, else the raw name.
 export function agentName(agent: string): string {
   const a = agent.replace(/^acp:/, "");
-  const NAMES: Record<string, string> = { claude: "Claude Code", codex: "Codex", opencode: "OpenCode", agy: "Antigravity", grok: "Grok", cursor: "Cursor", amp: "Amp", goose: "Goose", copilot: "Copilot", qwen: "Qwen" };
-  if (a.startsWith("api:")) return a.slice(4).split("/")[0].replace(/^\w/, (c) => c.toUpperCase()) + " API";
-  return NAMES[a] ?? (a || "agent");
+  return names[a] ?? (a.startsWith("api:") ? names[a.split("/")[0]] : undefined) ?? (a || "agent");
 }
 
 export function initials(agent: string): string {

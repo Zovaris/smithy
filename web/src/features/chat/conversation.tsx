@@ -4,14 +4,24 @@ import { I, toolIcon } from "../../components/icons";
 import { prose, agentName, argLine, initials, type Dec, type Item, type Sess, type Tool } from "../../lib/store";
 import { Md } from "../../components/md";
 import { Decision, St } from "../../components/ui";
+import type { Detail } from "../../lib/detail";
 
 const cost = (s: Sess) => (s.usage?.cost_usd != null ? " · $" + s.usage.cost_usd.toFixed(2) : "");
 
-function Tools({ tools }: { tools: Tool[] }) {
+// Tools is a run of tool calls in the /mode detail: minimal folds the run into one line, expandable
+// shows a header per tool, verbose opens every one.
+function Tools({ tools, detail }: { tools: Tool[]; detail: Detail }) {
+  if (detail === "minimal")
+    return (
+      <details class="tool">
+        <summary><I n="term" /><span class="k">{tools.length} tools</span><span class="a">{tools.map((t) => t.name).join(", ")}</span></summary>
+        <Tools tools={tools} detail="expandable" />
+      </details>
+    );
   return (
     <div class="tools">
       {tools.map((t) => (
-        <details class={"tool" + (t.is_error ? " err" : "")}>
+        <details class={"tool" + (t.is_error ? " err" : "")} open={detail === "verbose"}>
           <summary>
             <I n={toolIcon(t.name)} />
             <span class="k">{t.name}</span>
@@ -29,7 +39,7 @@ function Tools({ tools }: { tools: Tool[] }) {
 // (folded, open on click) and decisions inline, and a live "working" line while a turn runs.
 // loose are open decisions no session claims (the command guard asks through the daemon with no
 // session id); they show in every session that is working, since any of them may have asked.
-export function Conversation({ s, items, decisions, loose, extra }: { s: Sess; items: Item[]; decisions: Record<string, Dec>; loose: Dec[]; extra?: ComponentChildren }) {
+export function Conversation({ s, items, decisions, loose, extra, detail = "expandable" }: { s: Sess; items: Item[]; decisions: Record<string, Dec>; loose: Dec[]; extra?: ComponentChildren; detail?: Detail }) {
   const box = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   useLayoutEffect(() => {
@@ -59,7 +69,7 @@ export function Conversation({ s, items, decisions, loose, extra }: { s: Sess; i
               <div class="body">
                 {k === first && who}
                 {it.parts.map((p) =>
-                  p.kind === "text" ? prose(p.text).trim() ? <Md text={prose(p.text).trim()} /> : null : p.kind === "tools" ? <Tools tools={p.tools} /> : decisions[p.id] ? <Decision d={decisions[p.id]} /> : null,
+                  p.kind === "text" ? prose(p.text).trim() ? <Md text={prose(p.text).trim()} /> : null : p.kind === "tools" ? <Tools tools={p.tools} detail={detail} /> : decisions[p.id] ? <Decision d={decisions[p.id]} /> : null,
                 )}
               </div>
             </div>

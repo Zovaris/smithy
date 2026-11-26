@@ -244,6 +244,7 @@ func foreground(o runOpts) int {
 	api.Version = Version
 	if o.demo {
 		api.Runners = DemoRunner
+		api.Ready = DemoReady
 	}
 	api.Pair = &Pairing{File: DevicesFile()}
 	api.ServersFile = remote.File()

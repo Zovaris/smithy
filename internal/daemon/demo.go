@@ -10,8 +10,17 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/usage"
 )
+
+// DemoReady is the demo's agent list: CLIs on its PATH only, so the host's own agents in
+// ~/.local/bin, /opt/homebrew/bin or /usr/local/bin never show.
+func DemoReady() []agents.Ready {
+	d := agents.DefaultReadyDeps()
+	d.PathOnly = true
+	return agents.DetectReady(d)
+}
 
 // DemoRunner is the scripted agent of `smithy daemon --demo`: every turn reads a file, runs the
 // tests, asks one decision and answers, with no CLI, key or network. The recorded demo uses it.

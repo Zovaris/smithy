@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Ev } from "./model";
-import { agentName, ago, argLine, blank, fold, initials, kindOf, open, primary, seed, sessionOf, sessions, type Store } from "./store";
+import { agentName, ago, argLine, blank, fold, initials, kindOf, open, primary, seed, sessionOf, sessions, setNames, type Store } from "./store";
 import { parse, totals, withComments } from "./diff";
 
 let seq = 0;
@@ -9,6 +9,12 @@ const run = (...es: Ev[]): Store => es.reduce(fold, blank());
 const started = (id = "s-1", title = "Add retry") => ev("session_started", { id, agent: "claude", model: "sonnet", dir: "/r", title, status: "done" }, id);
 
 describe("fold", () => {
+  it("keeps the daemon's log lines for /log, newest last and at most 200", () => {
+    const lines = Array.from({ length: 205 }, (_, i) => ev("log", { line: "daemon: " + i }, ""));
+    const s = run(...lines);
+    expect(s.log.length).toBe(200);
+    expect(s.log[199]).toBe("daemon: 204");
+  });
   it("keeps a session's model and effort when /model or /effort changes them", () => {
     const s = run(started(), ev("session_model", { model: "opus", effort: "low" }));
     expect([s.sessions["s-1"].model, s.sessions["s-1"].effort]).toEqual(["opus", "low"]);
@@ -77,7 +83,18 @@ describe("helpers", () => {
     expect(sessionOf("guard:ab")).toBe("");
     expect(sessionOf("guard:ab", "s-3")).toBe("s-3");
   });
+  it("names agents by what the daemon serves, else the raw name", () => {
+    setNames([]);
+    expect(agentName("pi")).toBe("pi");
+    expect(agentName("acp:dsh")).toBe("dsh");
+    setNames([{ name: "pi", display: "Pi" }, { name: "dsh", display: "dsh" }, { name: "api:anthropic", display: "Anthropic API" }, { name: "zed" }]);
+    expect(agentName("pi")).toBe("Pi");
+    expect(agentName("api:anthropic/claude-sonnet-5-5")).toBe("Anthropic API");
+    expect(agentName("zed")).toBe("zed");
+    expect(agentName("")).toBe("agent");
+  });
   it("names agents and decision kinds", () => {
+    setNames([{ name: "claude", display: "Claude Code" }, { name: "codex", display: "Codex" }, { name: "opencode", display: "OpenCode" }, { name: "api:anthropic", display: "Anthropic API" }]);
     expect(agentName("claude")).toBe("Claude Code");
     expect(agentName("acp:codex")).toBe("Codex");
     expect(agentName("api:anthropic/claude-sonnet-5-5")).toBe("Anthropic API");

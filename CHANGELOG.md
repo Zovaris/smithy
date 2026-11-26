@@ -29,6 +29,14 @@ part above `### Details`.
 
 - The web is flat: square corners everywhere, one control height for the stop button, chips and small buttons, a wider chat column, and no highlighted row behind "No results." in the command palette.
 - `scripts/eval.sh` scores are deterministic: trials share one smithy binary and a private Go cache, so a launcher rebuild or another process pruning the shared cache no longer grades as a task failure, and an agent that never starts stops the eval (exit 1) instead of counting as a fail.
+- Removing an API key or resetting a setting from the web works again (it failed with 415).
+- The web's `/` lists the TUI's chat commands (agent, sessions, mode, log, welcome, setup, help, key, tend, remote, bench), `/mode` sets the transcript detail as in the TUI, and light or dark moved to `/theme light|dark`.
+- `/tend` on the web shows the daemon's tend mode and each session's PRs in the agents panel.
+- The web names every agent the way the daemon's catalog does, Pi and dsh included.
+- `smithy daemon --demo` lists only the agents on its PATH, never the host's.
+- The command palette closes when you go to another page.
+- A web bench run with no passing task says why (exit status, or no task passed) over its last log lines, and "1 saved run" reads right.
+- `smithy tasks add "<title>" [dir]` takes the title first; the old `[dir] "<title>"` still works when the folder exists.
 
 ### Details
 

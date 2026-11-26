@@ -2,26 +2,40 @@
 // the agent as the start of the message, the way you would type them in the CLI).
 export type Cmd = { name: string; hint: string; kind: "action" | "skill" };
 
-export const ACTIONS: Cmd[] = [
-  { name: "new", hint: "new session", kind: "action" },
-  { name: "stop", hint: "stop the turn", kind: "action" },
-  { name: "model", hint: "session model", kind: "action" },
-  { name: "effort", hint: "session effort", kind: "action" },
-  { name: "skills", hint: "skills and MCP", kind: "action" },
-  { name: "theme", hint: "steel, frost or plum", kind: "action" },
-  { name: "connect", hint: "servers", kind: "action" },
-  { name: "agents", hint: "agents", kind: "action" },
-  { name: "board", hint: "board", kind: "action" },
-  { name: "decisions", hint: "decisions", kind: "action" },
-  { name: "ask", hint: "pin a sample question", kind: "action" },
-  { name: "answer", hint: "answer in your words", kind: "action" },
-  { name: "serve", hint: "serve on or off", kind: "action" },
-  { name: "set", hint: "<key> <value>", kind: "action" },
-  { name: "unset", hint: "<key> to default", kind: "action" },
-  { name: "keys", hint: "API keys", kind: "action" },
-  { name: "doctor", hint: "smithy doctor", kind: "action" },
-  { name: "settings", hint: "settings", kind: "action" },
-];
+// Each command and its hint, in the order the `/` menu lists them.
+const HINTS: Record<string, string> = {
+  new: "new session",
+  sessions: "agents and sessions",
+  agent: "default agent",
+  stop: "stop the turn",
+  model: "session model",
+  effort: "session effort",
+  skills: "skills and MCP",
+  theme: "steel, frost, plum, light or dark",
+  mode: "transcript detail",
+  connect: "servers",
+  remote: "from another machine",
+  agents: "agents",
+  board: "board",
+  decisions: "decisions",
+  bench: "bench",
+  log: "daemon log",
+  welcome: "first-run steps",
+  setup: "agents ready or missing",
+  ask: "pin a sample question",
+  answer: "answer in your words",
+  help: "keys and commands",
+  serve: "serve on or off",
+  set: "<key> <value>",
+  unset: "<key> to default",
+  keys: "API keys",
+  key: "rm <service>",
+  doctor: "smithy doctor",
+  tend: "PRs kept green",
+  settings: "settings",
+};
+
+export const ACTIONS: Cmd[] = Object.entries(HINTS).map(([name, hint]) => ({ name, hint, kind: "action" }));
 
 // suggest lists the commands matching a message that is only `/word` so far.
 export function suggest(input: string, skills: string[]): Cmd[] {

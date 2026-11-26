@@ -5,7 +5,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { api } from "./auth";
 import { apply, empty, parseSSE, type Ev, type Model } from "./model";
-import { blank, fold, seed, type Sess, type Store } from "./store";
+import { blank, fold, seed, setNames, type Sess, type Store } from "./store";
 import { setEffortRules } from "./parity";
 import type { Setup } from "./setup";
 
@@ -69,6 +69,7 @@ export async function loadSetup(): Promise<Setup | null> {
   const s = await api("/v1/setup").then((r) => (r.ok ? r.json() : null)).catch(() => null);
   if (s) {
     setEffortRules(s.effort);
+    setNames(s.agents ?? []);
     set({ ...cur, setup: s });
   }
   return s;
