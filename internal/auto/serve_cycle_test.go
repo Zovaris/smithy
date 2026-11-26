@@ -2,6 +2,8 @@ package auto
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -52,3 +54,39 @@ func TestRunWaitsForCycleOnCancel(t *testing.T) {
 		t.Fatal("Run returned while its cycle was still running")
 	}
 }
+
+func TestCycleSkipsGitHubOutsideRepo(t *testing.T) {
+	home(t)
+	fakeSmithy(t)
+	polled := false
+	Sources["github"] = func(Settings) (Source, error) {
+		return &brokenGitHub{poll: func() { polled = true }}, nil
+	}
+	t.Cleanup(func() { Sources["github"] = func(s Settings) (Source, error) { return GitHub{Settings: s}, nil } })
+	if err := config.Set(config.UserFile(), "auto.sources", "github"); err != nil {
+		t.Fatal(err)
+	}
+	var logs []string
+	sv, err := NewServer(ServeOptions{Agent: "claude", Cwd: t.TempDir()}, func(l string) { logs = append(logs, l) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	sv.Cycle()
+	if polled {
+		t.Error("github polled outside a git repository")
+	}
+	for _, l := range logs {
+		if strings.Contains(l, "poll") {
+			t.Errorf("logged %q; want a quiet skip", l)
+		}
+	}
+}
+
+type brokenGitHub struct{ poll func() }
+
+func (*brokenGitHub) Name() string { return "github" }
+func (f *brokenGitHub) Poll(time.Time) ([]Issue, error) {
+	f.poll()
+	return nil, errors.New("failed to run git: fatal: not a git repository")
+}
+func (*brokenGitHub) Report(string, string, string) error { return nil }
