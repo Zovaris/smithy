@@ -11,10 +11,12 @@ part above `### Details`.
 ### Fixed
 
 - The web is flat: square corners everywhere, one control height for the stop button, chips and small buttons, a wider chat column, and no highlighted row behind "No results." in the command palette.
+- The web does what the TUI does: every setting with a typed control, API keys, serve, doctor, a model and effort picker per session, `!cmd` and pasted or dropped images in the composer, /ask and /answer, the theme picker, a header like the TUI's, and adding or switching servers with a pairing code.
 
 ### Details
 
 - web: @zovaris/sephiro 1.2.0 → 1.4.0; Temper sets every `--sph-radius-*` token to 0; chat, composer and new-session width 720 → 960px; compact controls at 28px. Palette empty-state workaround until Zovaris/Sephiro#37 ships.
+- daemon: `POST /v1/servers` (pair and save), `DELETE /v1/servers/{name}`, `POST /v1/sessions/{id}/shell` and `POST /v1/images`, all for this machine's daemon token only. web: `/` lists every TUI command, Sephiro Dialog, SegmentedControl, Select and Toggle; first-load budget 30 → 31 KB gzip.
 ### New
 
 - The daemon keeps warden batch PRs green on its own: red CI, a conflict or open review threads
