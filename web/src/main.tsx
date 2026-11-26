@@ -26,6 +26,7 @@ const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
 };
 const Palette = lazy(() => import("./palette"));
 const AgentsPanel = lazy(() => import("./panel"));
+const Splash = lazy(() => import("./splash"));
 const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", setup: "gear" };
 
 type Auth = { state: "checking" } | { state: "ok" } | { state: "denied" } | { state: "down"; error: string };
@@ -44,7 +45,7 @@ function Gate({ auth }: { auth: Auth }) {
   if (auth.state === "checking") return null;
   return (
     <div class="gate" role="alert">
-      <Anvil />
+      <Suspense fallback={<Anvil />}><Splash /></Suspense>
       {auth.state === "denied" ? (
         <><h2>Not signed in</h2><p class="t2">Run <code>smithy web</code> and open the link it prints.</p></>
       ) : (

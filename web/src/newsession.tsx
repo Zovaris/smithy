@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "preact/compat";
 import { useEffect, useState } from "preact/hooks";
 import { Composer } from "./composer";
 import { I } from "./icons";
@@ -29,6 +30,8 @@ const modelOf = (r: Ready, s: Setup) => (!s.chosen || !isDefault(r, s.default) ?
 
 // NewSession is where a session starts: where it runs (server, folder), which agent and model,
 // and a few skill starters. The first message starts it.
+const Splash = lazy(() => import("./splash"));
+
 export function NewSession({ setup, recent, host, onAction }: { setup: Setup | null; recent: Sess[]; host: string; onAction: (a: string) => void }) {
   const [dir, setDir] = useState(() => remembered() || recent[0]?.dir || "");
   const [pick, setPick] = useState("");
@@ -78,6 +81,7 @@ export function NewSession({ setup, recent, host, onAction }: { setup: Setup | n
     <>
       <div class="scroll">
         <section class="hello" aria-label="New session">
+          {!recent.length && <Suspense fallback={null}><Splash /></Suspense>}
           <div>
             <h2>New session</h2>
             <div class="ctx">
