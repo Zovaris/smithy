@@ -10,8 +10,20 @@ Pick the flag for the harness you run in, then run:
 npx skills add Zovaris/smithy -g -y --skill '*' -a <harness>
 ```
 
-`<harness>` is the skills CLI name of your agent, for example `claude-code`, `codex`, `opencode`
-or `cursor`. Run `npx skills add --help` for the full list.
+`<harness>` is the skills CLI id of your agent:
+
+| Harness | `-a` id |
+|---|---|
+| Claude Code | `claude-code` |
+| Codex | `codex` |
+| OpenCode | `opencode` |
+| Cursor | `cursor` |
+| Antigravity CLI | `antigravity-cli` |
+| GitHub Copilot CLI | `github-copilot` |
+| Grok Build | `grok` |
+| Pi | `pi` |
+
+DeepSeek Harness has no id in the skills CLI: skip this step and let step 2 install the skills.
 
 Check: the `use-smithy` skill is in your skills folder (see [harnesses.md](harnesses.md) for the
 folder per harness).
