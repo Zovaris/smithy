@@ -231,8 +231,47 @@ button.row2 { width: 100%; text-align: left; }
 .tbl td { padding: 8px 12px; border-top: 1px solid var(--t-line); vertical-align: top; }
 .scrollx { overflow-x: auto; }
 .out { font: 12px/1.6 var(--sph-font-mono); background: var(--t-raised); border-radius: 0; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.page.wide { max-width: 1200px; }
+.card.pad { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.seg-row { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* board: task files by status */
+.board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.bcol { border: 1px solid var(--t-line); background: var(--t-side); display: flex; flex-direction: column; min-height: 160px; transition: border-color .15s; }
+.bcol.drop { border-style: dashed; border-color: var(--t-line-strong); }
+.bcol h3 { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; padding: 10px 12px; border-bottom: 1px solid var(--t-line); }
+.bcol .hint { font-size: 12px; color: var(--t-text-3); padding: 12px; }
+.tcard { margin: 8px 8px 0; padding: 8px 10px 10px; border: 1px solid var(--t-line); background: var(--t-card); display: flex; flex-direction: column; gap: 4px; cursor: grab; font-size: 13px; animation: fade .2s ease-out; }
+.tcard:last-child { margin-bottom: 8px; }
+.tcard.dragging { opacity: .4; }
+.tcard .top2 { display: flex; align-items: center; gap: 2px; }
+.tcard .icon.s { width: 24px; height: 24px; font-size: 16px; line-height: 1; }
+.tcard .icon:disabled { opacity: .25; cursor: default; }
+.tcard .tt { font-weight: 500; overflow-wrap: anywhere; }
+.tcard .tf { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.chip { font: 500 11px/18px var(--sph-font-mono); padding: 0 6px; border: 1px solid var(--t-line); color: var(--t-text-2); text-decoration: none; }
+.chip.warn { color: var(--t-wait); border-color: color-mix(in srgb, var(--t-wait) 40%, var(--t-line)); }
+
+/* text-glyph charts */
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.gc { margin: 0; border: 1px solid var(--t-line); background: var(--t-card); padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.gc figcaption { display: flex; gap: 8px; font-size: 12px; font-weight: 500; color: var(--t-text-3); margin-bottom: 4px; }
+.gc .t3 { font-size: 12px; }
+.gb { display: grid; grid-template-columns: minmax(0, 1fr) 16ch auto; gap: 10px; align-items: center; font-size: 12.5px; }
+.gl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--t-text-2); }
+.gg { font: 12px/1 var(--sph-font-mono); color: var(--t-ember); white-space: pre; }
+.gv { text-align: right; font-size: 12px; }
+.gs { font: 16px/1.2 var(--sph-font-mono); color: var(--t-ember); white-space: pre; overflow: hidden; }
+.card.pad .top2 { display: flex; gap: 8px; align-items: center; }
+.rail .sub { font-size: 11px; font-weight: 500; color: var(--t-text-3); padding: 8px 12px 0; }
+.rail .row2[aria-current="page"] { background: var(--t-raised); }
+.rail .tt1 { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.need-n { color: var(--t-wait); }
 .gate { max-width: 520px; margin: 20dvh auto 0; padding: 0 16px; display: flex; flex-direction: column; gap: 12px; }
 
+@media (max-width: 719px) { .board { grid-template-columns: minmax(0, 1fr); } }
+@media (min-width: 720px) and (max-width: 1279px) { .board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (min-width: 720px) {
   .pill .hide-s { display: inline; }
   .hints { display: flex; }

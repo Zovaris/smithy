@@ -11,6 +11,7 @@ part above `### Details`.
 ### Fixed
 
 - The web is flat: square corners everywhere, one control height for the stop button, chips and small buttons, a wider chat column, and no highlighted row behind "No results." in the command palette.
+- The web Board shows your local task files by status and moving a card updates its file; running agents, what waits on you and the cost sit in a side panel on every page; Bench can start a run; Agents shows cost, tokens, tok/s and runs per hour as text charts.
 
 ### Details
 
