@@ -71,6 +71,14 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   every detected one) change them. `GET /v1/agents/{id}/models[?refresh=1]` lists the models
   agent `id` (a CLI or `api:<provider>`) reports, default first, cached for a day. The TUI's first run, `ctrl+l`, `/agent`, `/model`, `/effort`, `/skills`
   and the web's Settings screen use these.
+- Settings (daemon token only): `GET /v1/settings` (every setting, API keys masked, serve on/off),
+  `PUT|DELETE /v1/settings/{key}` (user file; secret keys refused), `PUT|DELETE /v1/keys/{service}`,
+  `PUT /v1/serve` and `GET /v1/doctor`.
+- Projects: `GET|POST|DELETE /v1/projects` keep the daemon's projects and default in
+  `~/.smithy/projects.json`; a session started with no `dir` uses the default. `GET /v1/fs?dir=`
+  lists a folder's subfolders for the picker.
+- `POST /v1/asks` lets an agent ask the user (`ask:<key>` ids outside a warden card); the MCP
+  `ask` tool calls it.
 - It tails `~/.smithy/events.jsonl` and the proxy's log into its store (once per line, across
   rotation and restarts) and turns them into decisions: a proxy `secret_ask` is `secret:<id>`
   (approve/deny, handed back as `smithy proxy approve|deny` would), a ready item is
