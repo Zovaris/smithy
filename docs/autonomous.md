@@ -74,6 +74,12 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
 - Settings (daemon token only): `GET /v1/settings` (every setting, API keys masked, serve on/off),
   `PUT|DELETE /v1/settings/{key}` (user file; secret keys refused), `PUT|DELETE /v1/keys/{service}`,
   `PUT /v1/serve` and `GET /v1/doctor`.
+- Tend: `GET /v1/tend` lists the warden batch PRs the daemon tends (cards in `pr_open` or
+  `ready`) with tend's next action, the checks and a status (`green`, `waiting`, `fixing`,
+  `needs-fix`, `needs-you`, `closed`, `error`). With `tend.daemon fix` (the default; user
+  settings only, `auto.paused` holds it to `watch`) red CI, a conflict or open review threads
+  start one `smithy agent --profile auto` tend session in the item's worktree, two per action at
+  most; it never merges. The TUI shows it with `/tend`.
 - Projects: `GET|POST|DELETE /v1/projects` keep the daemon's projects and default in
   `~/.smithy/projects.json`; a session started with no `dir` uses the default. `GET /v1/fs?dir=`
   lists a folder's subfolders for the picker.

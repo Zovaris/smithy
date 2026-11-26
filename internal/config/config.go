@@ -45,6 +45,7 @@ var Known = []Setting{
 	{"watch.every", "30", "smithy wait", "seconds between GitHub polls"},
 	{"watch.max", "50", "smithy wait", "minutes before a heartbeat exit (4) when nothing happened"},
 	{"tend.watch", "prs", "tend", "what /tend watch follows: a comma list of prs, issues, actions, base, alerts, or all"},
+	{"tend.daemon", "fix", "smithy daemon", "how the daemon tends warden batch PRs: off, watch (show state only) or fix (start one tend session, auto profile, for red CI, a conflict or review threads; never merges); read from the user settings only; auto.paused holds fix to watch"},
 	{"tend.label", "agent", "tend", "label of issues tend may queue for warden"},
 	{"stack.test", "", "smelt warden", "this repo's test command when smithy stack can't detect it (also stack.single, stack.lint, stack.typecheck, stack.dev, …); set with --repo"},
 	{"guard.enabled", "true", "smithy agent", "the dangerous-command guard: a shell command matching guard.block (or the built-in list) asks the user; nothing else asks"},

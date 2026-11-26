@@ -67,6 +67,8 @@ type Server struct {
 	allow   []string
 	log     func(string)
 	started time.Time
+	// Tend, when set, is the PR tender GET /v1/tend reports.
+	Tend *Tender
 	// ServeState, when set, fills State.Serve (the auto loop's heartbeat).
 	ServeState func() any
 	// Route, when set, sends a won answer back to its asker (RouteBack); an error leaves it for Resume.
@@ -333,6 +335,7 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("DELETE /v1/keys/{service}", sv.deleteKey)
 	mux.HandleFunc("PUT /v1/serve", sv.putServe)
 	mux.HandleFunc("GET /v1/doctor", sv.doctor)
+	mux.HandleFunc("GET /v1/tend", sv.tendView)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
 	return mux
 }

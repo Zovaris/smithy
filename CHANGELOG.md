@@ -9,6 +9,18 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+
+- The daemon keeps warden batch PRs green on its own: red CI, a conflict or open review threads
+  start one tend session, and `/tend` in the TUI shows every watched PR. It never merges.
+
+### Details
+
+- `internal/daemon/tend.go`: a tender ticks every 2 minutes over the PRs of warden cards in
+  `pr_open` or `ready`, reads each with `smithy pr-state` in the item's worktree and, for
+  `fix-ci`, `sync-base` or `answer-review`, starts `smithy agent --bg --profile auto` (auto
+  mode's allow-list and `auto.sandbox`, fail closed) with the tend skill; two tries per action,
+  then `needs-you`. `GET /v1/tend` reports it; new setting `tend.daemon` (`off`, `watch`, `fix`;
+  default `fix`; user settings only; `auto.paused` holds it to `watch`).
 - The web has an anvil favicon and installs as an app (Chrome, and Add to Home Screen on iOS); its page shell opens offline.
 
 ### Details

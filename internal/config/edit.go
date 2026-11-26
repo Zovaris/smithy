@@ -18,6 +18,7 @@ var enums = map[string][]string{
 	"agent.effort":   {"low", "medium"},
 	"auto.mode":      {"labeled", "all"},
 	"auto.sandbox":   {"off", "native"},
+	"tend.daemon":    {"off", "watch", "fix"},
 	"ui.theme":       {"steel", "frost", "plum"},
 }
 
