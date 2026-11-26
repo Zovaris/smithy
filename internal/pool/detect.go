@@ -14,7 +14,6 @@ var (
 	codexLimit    = "hit your usage limit"
 	// The texts each CLI prints for an account limit; pool_test.go cites the source of each.
 	opencodeLimitRe = regexp.MustCompile(`(?i)^error: .*(usage limit reached|reached the usage limit|subscription limit reached)`)
-	geminiLimitRe   = regexp.MustCompile(`(?i)^an unexpected critical error occurred: .*(exhausted your capacity|quota will reset after)`)
 	piLimitRe       = regexp.MustCompile(`(?i)usage limit|GoUsageLimitError|FreeUsageLimitError|insufficient_quota|quota exceeded|subscription_sharing_[a-z_]*usage_limit_exceeded`)
 	ansiRe          = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 	isoResetRe      = regexp.MustCompile(`(?i)resets at (\d{4}-\d\d-\d\dT[0-9:.]+Z)`)
@@ -29,7 +28,7 @@ var (
 var Warn = func(s string) { fmt.Fprintln(os.Stderr, "smithy pool:", s) }
 
 // Detect reads a finished run's log for a usage-limit result of kind's CLI. claude: only a
-// result JSON object with is_error and limit text; codex, opencode, gemini and pi: only that
+// result JSON object with is_error and limit text; codex, opencode and pi: only that
 // CLI's own limit error in the last lines of a failed run (rc != 0). Any other CLI or text never
 // counts, so a test log that mentions rate_limit does not mark an account. until is the reset
 // the CLI gave, else now + DefaultLimit.
@@ -55,11 +54,11 @@ func Detect(log, kind string, rc int, now time.Time) (until time.Time, ok bool) 
 				return Reset(lines[i], now), true
 			}
 		}
-	case "opencode", "gemini", "pi":
+	case "opencode", "pi":
 		if rc == 0 {
 			return
 		}
-		re := map[string]*regexp.Regexp{"opencode": opencodeLimitRe, "gemini": geminiLimitRe, "pi": piLimitRe}[kind]
+		re := map[string]*regexp.Regexp{"opencode": opencodeLimitRe, "pi": piLimitRe}[kind]
 		for i := len(lines) - 1; i >= 0 && i >= len(lines)-5; i-- {
 			l := strings.TrimSpace(ansiRe.ReplaceAllString(lines[i], ""))
 			if !re.MatchString(l) {
