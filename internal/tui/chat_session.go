@@ -203,11 +203,36 @@ func (m *chatView) meta(id string, s daemon.Session) {
 	for i := range m.sessions {
 		if m.sessions[i].id == id {
 			m.sessions[i].title, m.sessions[i].agent, m.sessions[i].model = s.Title, s.Agent, s.Model
+			if s.Dir != "" {
+				m.sessions[i].dir = s.Dir
+			}
 			if !s.Created.IsZero() {
 				m.sessions[i].since = s.Created
 			}
 		}
 	}
+}
+
+// here reports whether s belongs to the folder the chat runs in.
+func (m chatView) here(s chatSession) bool {
+	return s.dir == "" || daemon.InProject(s.dir, m.dir) || daemon.InProject(s.dir, m.root)
+}
+
+// listed is the agents panel's rows: this folder's sessions, then the other projects' when
+// allProj is on.
+func (m chatView) listed() []chatSession {
+	var in, out []chatSession
+	for _, s := range m.sessions {
+		if m.here(s) {
+			in = append(in, s)
+		} else {
+			out = append(out, s)
+		}
+	}
+	if m.allProj {
+		return append(in, out...)
+	}
+	return in
 }
 
 func (m *chatView) now(id, what string) {

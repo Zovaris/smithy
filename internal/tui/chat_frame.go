@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -424,8 +425,14 @@ func (m chatView) agentsRows(pw, h int) []string {
 	if c := m.totalCost(); c > 0 {
 		sum += fmt.Sprintf(" %s $%.2f", t.g.dot, c)
 	}
+	list := m.listed()
 	rows := []string{line(bg, ""), line(bg, spread(strong.Bold(true).Render("Agents")+"  "+dim.Render(sum), t.fg(t.text).Render("tab")+dim.Render(" close"), in)), line(bg, "")}
-	for i, s := range m.sessions {
+	shownOther := false
+	for i, s := range list {
+		if !m.here(s) && !shownOther {
+			shownOther = true
+			rows = append(rows, line(bg, strong.Bold(true).Render("Other projects")), line(bg, ""))
+		}
 		st := bg
 		if i == m.agentSel {
 			st = sel
@@ -443,7 +450,11 @@ func (m chatView) agentsRows(pw, h int) []string {
 			}
 		}
 		var whoParts []string
-		for _, x := range []string{s.agent, s.model, s.id} {
+		where := ""
+		if !m.here(s) {
+			where = filepath.Base(s.dir)
+		}
+		for _, x := range []string{where, s.agent, s.model, s.id} {
 			if x != "" {
 				whoParts = append(whoParts, x)
 			}
@@ -464,7 +475,7 @@ func (m chatView) agentsRows(pw, h int) []string {
 		if now == "" {
 			now = s.kind
 		}
-		if i == m.current2() {
+		if s.id == m.current && m.current != "" {
 			now = t.fg(t.accent).Render(t.g.prompt) + " " + now
 		}
 		rows = append(rows,
@@ -473,8 +484,11 @@ func (m chatView) agentsRows(pw, h int) []string {
 			line(st, "   "+t.fg(t.text).Render(now)),
 			line(bg, ""))
 	}
-	if len(m.sessions) == 0 {
-		rows = append(rows, line(bg, dim.Render("no sessions yet: type a message to start one")), line(bg, ""))
+	if len(list) == 0 {
+		rows = append(rows, line(bg, dim.Render("no sessions in this folder yet: type a message to start one")), line(bg, ""))
+	}
+	if other := len(m.sessions) - len(m.listed()); other > 0 && !m.allProj {
+		rows = append(rows, line(bg, dim.Render(fmt.Sprintf("%d in other projects", other))), line(bg, ""))
 	}
 	if len(m.pending) > 0 {
 		rows = append(rows, line(bg, strong.Bold(true).Render("Waiting on you")+"  "+dim.Render(fmt.Sprintf("%d", len(m.pending)))), line(bg, ""))
@@ -482,7 +496,7 @@ func (m chatView) agentsRows(pw, h int) []string {
 			rows = append(rows, line(bg, t.fg(t.warn).Render(t.g.wait)+"  "+t.fg(t.text).Render(d.Question)+"  "+dim.Render(strings.Join(d.Options, " "+t.g.dot+" "))))
 		}
 	}
-	foot := line(bg, keyHints(t, "enter", "open", "s", "stop", "n", "new session", "↑↓", "move"))
+	foot := line(bg, keyHints(t, "enter", "open", "s", "stop", "n", "new session", "a", projHint(m.allProj), "↑↓", "move"))
 	if len(rows) > h-1 {
 		rows = rows[:h-1]
 	}
@@ -490,6 +504,23 @@ func (m chatView) agentsRows(pw, h int) []string {
 		rows = append(rows, line(bg, ""))
 	}
 	return append(rows, foot)
+}
+
+func projHint(all bool) string {
+	if all {
+		return "here"
+	}
+	return "all"
+}
+
+// listedAt is the index of session id in the agents panel's rows, -1 when not listed.
+func (m chatView) listedAt(id string) int {
+	for i, s := range m.listed() {
+		if s.id == id && id != "" {
+			return i
+		}
+	}
+	return -1
 }
 
 // current2 is the index of the open session in m.sessions, -1 when none.
