@@ -35,6 +35,15 @@ var slashCommands = []slashCommand{
 	{"quit", "", "leave; a background daemon keeps running"},
 }
 
+func isCommand(name string) bool {
+	for _, c := range slashCommands {
+		if c.name == name {
+			return true
+		}
+	}
+	return false
+}
+
 // popupItem is one row of the / or @ popup: what tab puts in the input, and its description.
 type popupItem struct{ fill, label, desc string }
 
@@ -52,6 +61,13 @@ func (m chatView) popup() []popupItem {
 		for _, c := range slashCommands {
 			if strings.HasPrefix(c.name, q) {
 				out = append(out, popupItem{fill: "/" + c.name + " ", label: "/" + c.name, desc: c.desc})
+			}
+		}
+		if m.setupSt != nil {
+			for _, s := range m.setupSt.Skills {
+				if p := m.setupSt.Paths[s]; p != "" && strings.HasPrefix(s, q) && !isCommand(s) {
+					out = append(out, popupItem{fill: "/" + s + " ", label: "/" + s, desc: "skill · " + skillDir(p)})
+				}
 			}
 		}
 		if len(out) == 1 && out[0].label == v {
