@@ -24,7 +24,7 @@ func TestEveryPickerIsTheCenteredModal(t *testing.T) {
 	f.s.Chosen = true
 	m := setupScene(f)
 	bw, _ := m.boxSize(m.width, m.height)
-	want := (m.width-bw)/2 + 2
+	want := (m.width-bw)/2 + 3 // frame edge, then the padding
 	palette := sendKey(m, ckey("ctrl+k"))
 	if got := footCol(palette); got != want {
 		t.Fatalf("palette key row at %d, want %d", got, want)
