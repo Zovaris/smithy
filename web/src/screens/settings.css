@@ -1,18 +1,11 @@
 .pick { display: flex; flex-direction: column; gap: 8px; min-width: min(420px, 80vw); }
 .pick .lbl { margin-top: 8px; }
-.setrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--t-line); }
-.setrow:first-child { border-top: 0; }
-.setrow .k { font-weight: 500; }
-.setrow .m { grid-column: 1; font-size: 12px; color: var(--t-text-3); }
-.setrow .c { grid-row: 1 / span 2; grid-column: 2; display: flex; gap: 6px; align-items: center; }
-.setrow input[type="text"], .setrow input[type="number"], .setrow input[type="password"], .inline input { height: 28px; border: 1px solid var(--t-line-strong); background: var(--t-bg); padding: 0 8px; font-size: 13px; border-radius: 0; min-width: 0; width: 220px; }
-.setrow input[type="number"] { width: 90px; }
+.sph-settings .c { display: flex; gap: 6px; align-items: center; }
+.sph-settings input[type="text"], .sph-settings input[type="number"], .inline input { height: 28px; border: 1px solid var(--t-line-strong); background: var(--t-bg); padding: 0 8px; font-size: 13px; border-radius: 0; min-width: 0; width: 220px; }
+.sph-settings input[type="number"] { width: 90px; }
 .inline { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--t-line); }
 .tabs-set { display: flex; gap: 4px; flex-wrap: wrap; }
 @media (max-width: 640px) {
-  .setrow { grid-template-columns: 1fr; }
-  .setrow .c { grid-row: auto; grid-column: 1; }
-  .setrow input[type="text"], .setrow input[type="password"], .inline input { width: 100%; }
+  .sph-settings__row { flex-wrap: wrap; }
+  .sph-settings input[type="text"], .inline input { width: 100%; }
 }
-
-#set-settings { display: flex; flex-direction: column; gap: 24px; }

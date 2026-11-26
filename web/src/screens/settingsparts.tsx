@@ -3,9 +3,11 @@
 // saved servers this daemon reaches.
 import { SegmentedControl } from "@zovaris/sephiro/segmented-control";
 import { Select } from "@zovaris/sephiro/select";
+import { SettingsList } from "@zovaris/sephiro/settings-list";
 import { Toggle } from "@zovaris/sephiro/toggle";
 import "@zovaris/sephiro/css/segmented-control.css";
 import "@zovaris/sephiro/css/select.css";
+import "@zovaris/sephiro/css/settings-list.css";
 import "@zovaris/sephiro/css/toggle.css";
 import "./settings.css";
 import { useEffect, useState } from "preact/hooks";
@@ -19,32 +21,31 @@ import { St } from "../ui";
 const err = (e: unknown) => String((e as Error).message ?? e);
 const GROUP: Record<string, string> = { notify: "Notifications", linear: "Linear" };
 
-function Row({ r, onSaved }: { r: SettingRow; onSaved: (msg: string) => void }) {
+const rowId = (r: SettingRow) => "s-" + r.key.replace(/\W/g, "-");
+
+// Control is the typed editor of one config key, with Reset once the user has set it.
+function Control({ r, onSaved }: { r: SettingRow; onSaved: (msg: string) => void }) {
   const [v, setV] = useState(r.value);
   useEffect(() => setV(r.value), [r.value]);
   const c = controlOf(r);
   const save = (x: string) => setSetting(r.key, x).then(() => onSaved("saved " + r.key), (e) => onSaved("error: " + err(e)));
   const reset = () => unsetSetting(r.key).then(() => onSaved(r.key + " is back to its default"), (e) => onSaved("error: " + err(e)));
-  const id = "s-" + r.key.replace(/\W/g, "-");
+  const id = rowId(r);
   return (
-    <div class="setrow">
-      <label class="k mono" for={id}>{r.key}{r.src !== "default" && r.src !== "unset" && <span class="t3"> · {r.src}</span>}</label>
-      <span class="m">{r.meaning}{r.default ? ` (default ${r.default})` : ""}</span>
-      <div class="c">
-        {c === "toggle" ? (
-          <Toggle id={id} label={r.key} checked={(v || r.default) === "true"} onCheckedChange={(on) => (setV(String(on)), save(String(on)))} />
-        ) : c === "select" ? (
-          <Select id={id} ariaLabel={r.key} value={v || r.default} options={(r.options ?? []).map((o) => ({ value: o, label: o }))} onValueChange={(x) => (setV(x), save(x))} size="sm" />
-        ) : c === "secret" ? (
-          <span class="mono t3">{r.value || "unset"} · set it under API keys</span>
-        ) : (
-          <form onSubmit={(e) => (e.preventDefault(), save(v))} style="display:flex;gap:6px">
-            <input id={id} type={c === "number" ? "number" : "text"} value={v} placeholder={r.default} onInput={(e) => setV(e.currentTarget.value)} spellcheck={false} />
-            {v !== r.value && <button class="btn sm" type="submit">Save</button>}
-          </form>
-        )}
-        {r.src === "user" && <button class="btn sm" title="Back to the default (/unset)" onClick={reset}>Reset</button>}
-      </div>
+    <div class="c">
+      {c === "toggle" ? (
+        <Toggle id={id} label={r.key} checked={(v || r.default) === "true"} onCheckedChange={(on) => (setV(String(on)), save(String(on)))} />
+      ) : c === "select" ? (
+        <Select id={id} ariaLabel={r.key} value={v || r.default} options={(r.options ?? []).map((o) => ({ value: o, label: o }))} onValueChange={(x) => (setV(x), save(x))} size="sm" />
+      ) : c === "secret" ? (
+        <span class="mono t3">{r.value || "unset"} · set it under API keys</span>
+      ) : (
+        <form onSubmit={(e) => (e.preventDefault(), save(v))} style="display:flex;gap:6px">
+          <input id={id} type={c === "number" ? "number" : "text"} value={v} placeholder={r.default} onInput={(e) => setV(e.currentTarget.value)} spellcheck={false} />
+          {v !== r.value && <button class="btn sm" type="submit">Save</button>}
+        </form>
+      )}
+      {r.src === "user" && <button class="btn sm" title="Back to the default (/unset)" onClick={reset}>Reset</button>}
     </div>
   );
 }
@@ -175,14 +176,19 @@ export function More() {
             </div></div>
           </div>
           <div id="set-keys"><div class="lbl">API keys</div><Keys st={st} onSaved={saved} /></div>
-          <div id="set-settings">
-            {groups.map((g) => (
-              <div>
-                <div class="lbl">{GROUP[g.group] ?? g.group}</div>
-                <div class="card">{g.rows.map((r) => <Row key={r.key} r={r} onSaved={saved} />)}</div>
-              </div>
-            ))}
-          </div>
+          <SettingsList
+            id="set-settings"
+            groups={groups.map((g) => ({
+              id: g.group,
+              title: GROUP[g.group] ?? g.group,
+              items: g.rows.map((r) => ({
+                id: r.key,
+                label: <label class="mono" for={rowId(r)}>{r.key}{r.src !== "default" && r.src !== "unset" && <span class="t3"> · {r.src}</span>}</label>,
+                description: r.meaning + (r.default ? ` (default ${r.default})` : ""),
+                control: <Control key={r.key} r={r} onSaved={saved} />,
+              })),
+            }))}
+          />
           <div id="set-doctor">
             <div class="lbl">Doctor</div>
             <div class="card">
