@@ -6,7 +6,8 @@
 - Branches come from `smithy names branch`; `main` is protected (PRs with green CI only).
 - Large or exploratory work merges into a `release/*` branch the maintainer reviews, never straight
   to `main`.
-- After a big feature lands, run a cheap-model audit before releasing: coherence between skills,
-  contradictions, duplicated rules, and skill size in lines and tokens. Fix what it finds first.
+- Warden offers its milestone review (`skills/warden/references/milestone.md`) when a milestone
+  batch merges. In this repo the maintainer's standing answer is 1 round before a release; merge
+  its fixes first.
 - Skill text and outputs are in English. Never add a feature for its own sake: it must fit the
   few-concepts, evidence-over-claims, user-decides standard.

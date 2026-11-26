@@ -18,7 +18,9 @@ Unattended runs also differ in their guard, sandbox support and limit detection;
 | OpenCode | `~/.config/opencode/skills`, `~/.agents/skills` | `@smelt` | `smithy agent` → `opencode run --standalone --auto` | yes |
 | Pi | `~/.pi/agent/skills`, `~/.agents/skills` | `/skill:smelt` | `smithy agent` → `pi -p` | no: foreground watcher |
 | DeepSeek Harness | `~/.dsh/skills`, `~/.agents/skills` | `/smelt` | `smithy agent` → `dsh headless` | yes |
-| Gemini CLI | `~/.gemini/skills`, `~/.agents/skills` | ask: "use smelt" | `smithy agent` → `gemini -p` | with `backgroundCompletionBehavior: inject` |
+| Antigravity CLI (`agy`) | `~/.gemini/skills`, `~/.agents/skills` | ask: "use smelt" | `smithy agent` → `agy -p` | no: foreground watcher |
+| GitHub Copilot CLI | `~/.copilot/skills`, `~/.agents/skills` | ask: "use smelt" | `smithy agent` → `copilot -p` | no: foreground watcher |
+| Grok Build | `~/.grok/skills`, `~/.agents/skills` | ask: "use smelt" | `smithy agent` → `grok -p` | no: foreground watcher |
 | Cursor CLI | `~/.cursor/skills`, `~/.agents/skills` | `/smelt` | `smithy agent` → `agent -p` | no: foreground watcher |
 
 ## Headless workers
@@ -31,7 +33,7 @@ and opening PRs without prompts.
 | `AGENT_CLI` | picks the CLI |
 | `AGENT_ARGS` | adds flags |
 | `AGENT_CMD` | plugs in any other command |
-| `AGENT_PROTOCOL=acp` | drives Gemini CLI, OpenCode or an ACP `AGENT_CMD` over the Agent Client Protocol: tool calls, permission answers and usage land in smithy's events; under `--profile auto` each permission request is checked against the auto allow-list and anything unclassified is rejected |
+| `AGENT_PROTOCOL=acp` | drives Antigravity (`agy acp`), Copilot (`copilot --acp`), Grok (`grok agent stdio`), OpenCode or an ACP `AGENT_CMD` over the Agent Client Protocol: tool calls, permission answers and usage land in smithy's events; under `--profile auto` each permission request is checked against the auto allow-list and anything unclassified is rejected |
 
 Every skill can be run by an agent. Only warden is kept out of implicit invocation: Codex reads
 `allow_implicit_invocation: false` from `skills/warden/agents/openai.yaml`. Warden still asks for
@@ -39,7 +41,7 @@ your yes before it starts sessions.
 
 ## Daemon
 
-The harness build of smithy (`smithy-harness-<os>-<arch>`) adds `smithy daemon`: the
+The release binary of smithy (`smithy-<os>-<arch>`, the harness build) adds `smithy daemon`: the
 autonomous loop plus a local API any client can follow (SSE events, first-answer-wins
 decisions). It is the same for every agent CLI; see [autonomous.md](autonomous.md#daemon-harness-build).
 

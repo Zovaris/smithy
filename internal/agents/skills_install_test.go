@@ -129,7 +129,7 @@ func TestSkillsInstallNamedHarnessOnly(t *testing.T) {
 	home := t.TempDir()
 	os.MkdirAll(filepath.Join(home, ".claude"), 0o755)
 	srv := release(t, goodArchive(t), "")
-	if err := InstallSkills(opts(t, srv, home, "gemini")); err != nil {
+	if err := InstallSkills(opts(t, srv, home, "agy")); err != nil {
 		t.Fatal(err)
 	}
 	if read(t, filepath.Join(home, ".gemini", "skills", "hush", "SKILL.md")) != "hush" {
@@ -180,6 +180,7 @@ func TestSkillsInstallLeavesSymlinkedSkill(t *testing.T) {
 	os.WriteFile(filepath.Join(src, "SKILL.md"), []byte("dev"), 0o644)
 	os.MkdirAll(filepath.Join(home, ".claude", "skills"), 0o755)
 	os.Symlink(src, filepath.Join(home, ".claude", "skills", "smelt"))
+	os.Symlink(src, filepath.Join(home, ".claude", "skills", "hush"))
 	srv := release(t, goodArchive(t), "")
 	o := opts(t, srv, home)
 	if err := InstallSkills(o); err != nil {
@@ -188,8 +189,9 @@ func TestSkillsInstallLeavesSymlinkedSkill(t *testing.T) {
 	if read(t, filepath.Join(src, "SKILL.md")) != "dev" {
 		t.Fatal("a symlinked skill (a dev checkout) must not be overwritten")
 	}
-	if !strings.Contains(o.Out.(*bytes.Buffer).String(), "symlink") {
-		t.Fatal("skipping a symlinked skill is reported")
+	out := o.Out.(*bytes.Buffer).String()
+	if strings.Count(out, "symlink") != 1 || !strings.Contains(out, "smelt") || !strings.Contains(out, "hush") {
+		t.Fatalf("skipped symlinked skills are reported in one line naming each: %q", out)
 	}
 }
 
@@ -205,8 +207,8 @@ func TestSkillsInstallErrors(t *testing.T) {
 }
 
 func TestSkillsInstallArgs(t *testing.T) {
-	hs, err := parseInstallArgs([]string{"--harness", "codex", "--harness=gemini", "claude"})
-	if err != nil || strings.Join(hs, ",") != "codex,gemini,claude" {
+	hs, err := parseInstallArgs([]string{"--harness", "codex", "--harness=agy", "claude"})
+	if err != nil || strings.Join(hs, ",") != "codex,agy,claude" {
 		t.Fatalf("%v %v", hs, err)
 	}
 	if _, err := parseInstallArgs([]string{"--bogus"}); err == nil {

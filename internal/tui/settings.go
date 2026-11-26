@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/harness"
 )
@@ -18,9 +20,40 @@ import (
 type Setting struct {
 	Key, Value, Src, Meaning, Default string
 	Secret                            bool
+	APIKey                            bool // a key.<service> row: an API key in ~/.smithy/auth.json
 }
 
-var groupOrder = []string{"auto", "linear", "warden", "notify", "decide", "agent", "ask", "tasks", "git", "watch", "tend", "route", "stack", "tui", "models"}
+// keyServices are the API keys smithy's own features read; stored keys of other services show too.
+var keyServices = []string{"github", "linear", "telegram", "slack", "slack_app", "discord"}
+
+// keyRows is one key.<service> row per known or stored service, from auth.List lines ("svc ****abcd …").
+func keyRows(stored []string) []Setting {
+	have := map[string]string{}
+	for _, l := range stored {
+		f := strings.Fields(l)
+		if len(f) >= 2 {
+			have[f[0]] = f[1]
+		}
+	}
+	svcs := append([]string{}, keyServices...)
+	for s := range have {
+		if !slices.Contains(svcs, s) {
+			svcs = append(svcs, s)
+		}
+	}
+	sort.Strings(svcs[len(keyServices):])
+	var out []Setting
+	for _, s := range svcs {
+		r := Setting{Key: "key." + s, Src: "unset", APIKey: true, Meaning: s + " API key in ~/.smithy/auth.json (smithy auth set " + s + "); an env var wins"}
+		if v, ok := have[s]; ok {
+			r.Value, r.Src = v, "auth"
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+var groupOrder = []string{"auto", "linear", "warden", "notify", "key", "decide", "agent", "ask", "tasks", "git", "watch", "tend", "route", "stack", "tui", "models"}
 
 // settingRows lists every known key plus the current harness's models, grouped, with value and source from eff.
 func settingRows(h string, eff func(string) (string, string, error)) []Setting {
@@ -42,6 +75,11 @@ func settingRows(h string, eff func(string) (string, string, error)) []Setting {
 	for _, t := range []string{"cheap", "mid", "strong", "judge"} {
 		add("models."+h+"."+t, "", t+" model in "+h+" (smithy config set-model)")
 	}
+	return grouped(out)
+}
+
+// grouped sorts rows by groupOrder, keeping the order within a group.
+func grouped(out []Setting) []Setting {
 	rank := map[string]int{}
 	for i, g := range groupOrder {
 		rank[g] = i + 1
@@ -87,6 +125,19 @@ type savedMsg struct {
 type setterFunc func(repo, unset bool, key, val string) (string, error)
 
 func writeSetting(repo, unset bool, key, val string) (string, error) {
+	if svc, ok := strings.CutPrefix(key, "key."); ok {
+		if unset {
+			found, err := auth.Remove(svc)
+			if err == nil && !found {
+				return "no " + svc + " key was stored", nil
+			}
+			return "removed the " + svc + " key", err
+		}
+		if err := auth.Set(svc, val); err != nil {
+			return "", err
+		}
+		return "saved the " + svc + " key " + auth.Mask(strings.TrimSpace(val)), nil
+	}
 	scope := scopeName(repo)
 	if unset {
 		_, found, err := config.Remove(repo, key)
@@ -111,6 +162,12 @@ func scopeName(repo bool) string {
 }
 
 func shellCmd(e *edit) string {
+	if svc, ok := strings.CutPrefix(e.set.Key, "key."); ok {
+		if e.unset {
+			return "smithy auth remove " + svc
+		}
+		return "smithy auth set " + svc + "  (key on stdin)"
+	}
 	scope := ""
 	if e.repo {
 		scope = "--repo "
@@ -141,6 +198,15 @@ func (m Model) openEdit(unset bool) (tea.Model, tea.Cmd) {
 	}
 	e := &edit{set: s, repo: s.Src == "repo"}
 	if unset {
+		if s.APIKey && s.Src != "auth" {
+			m.status = "no " + strings.TrimPrefix(s.Key, "key.") + " key is stored"
+			return m, nil
+		}
+		if s.APIKey {
+			e.unset, e.confirm = true, true
+			m.edit = e
+			return m, nil
+		}
 		if s.Src != "user" && s.Src != "repo" {
 			m.status = s.Key + " is already at its default"
 			return m, nil
@@ -148,6 +214,15 @@ func (m Model) openEdit(unset bool) (tea.Model, tea.Cmd) {
 		e.unset, e.confirm, e.val = true, true, s.Default
 		m.edit = e
 		return m, nil
+	}
+	if s.APIKey {
+		e.kind = "api key"
+		e.in = textinput.New()
+		e.in.Prompt = "> "
+		e.in.Placeholder = "paste the key"
+		e.in.EchoMode = textinput.EchoPassword
+		m.edit = e
+		return m, e.in.Focus()
 	}
 	e.kind, e.opts = config.KindOf(s.Key)
 	if e.opts != nil {
@@ -193,7 +268,7 @@ func (m Model) editKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if e.confirm {
 		switch msg.String() {
 		case "tab", "shift+tab":
-			e.repo = !e.repo
+			e.repo = !e.repo && !e.set.APIKey
 		case "enter":
 			return m.save()
 		}
@@ -204,7 +279,14 @@ func (m Model) editKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if e.opts != nil {
 			raw = e.opts[e.opt]
 		}
-		v, _, err := config.Normalize(e.set.Key, raw)
+		v, err := strings.TrimSpace(raw), error(nil)
+		if e.set.APIKey {
+			if v == "" {
+				err = fmt.Errorf("paste the key, or esc")
+			}
+		} else {
+			v, _, err = config.Normalize(e.set.Key, raw)
+		}
 		if err != nil {
 			e.err = err.Error()
 			return m, nil
@@ -281,7 +363,7 @@ func (m Model) settingLines(w, h int) []string {
 		}
 		lines = append(lines, row)
 	}
-	foot := []string{"", mut.Italic(true).Render("enter edits " + t.g.dot + " u unsets " + t.g.dot + " auth stays in smithy auth")}
+	foot := []string{"", mut.Italic(true).Render("enter edits " + t.g.dot + " u unsets " + t.g.dot + " key.* rows are API keys, typed masked")}
 	h -= len(foot)
 	if len(lines) > h && h > 0 {
 		top := min(max(at-h/2, 0), len(lines)-h)
@@ -314,7 +396,13 @@ func (m Model) editBox(w int) string {
 		if nv == "" {
 			nv = "(empty)"
 		}
+		if e.set.APIKey && !e.unset {
+			nv = auth.Mask(e.val)
+		}
 		file := "~/.smithy/config.json"
+		if e.set.APIKey {
+			file = "~/.smithy/auth.json"
+		}
 		if e.repo {
 			file = ".smithy/config.json in this repo"
 		}
@@ -334,6 +422,9 @@ func (m Model) editBox(w int) string {
 		hint := acc.Render("enter") + " " + mut.Render("save") + "   " + acc.Render("tab") + " " + mut.Render("user/repo") + "   " + acc.Render("esc") + " " + mut.Render("back")
 		if e.unset {
 			hint = acc.Render("enter") + " " + mut.Render("unset") + "   " + acc.Render("tab") + " " + mut.Render("user/repo") + "   " + acc.Render("esc") + " " + mut.Render("cancel")
+		}
+		if e.set.APIKey {
+			hint = strings.Replace(hint, "   "+acc.Render("tab")+" "+mut.Render("user/repo"), "", 1)
 		}
 		lines = append(lines, hint)
 	} else {

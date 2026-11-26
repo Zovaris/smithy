@@ -10,6 +10,7 @@ import (
 	neturl "net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/remote"
@@ -29,9 +31,10 @@ const ChatUsage = `usage: smithy chat [url | --server <name|url> | --standalone]
 A fullscreen chat over a smithy daemon: its events stream into the transcript and the input stays
 pinned at the bottom. A lost connection retries and resumes after the last event seen.
 Keys: enter send; pgup/pgdn, wheel or ctrl+u/ctrl+d scroll; home/end top/bottom; click a tool block
-to open it; v (empty input) cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
-option's first letter (empty input) or a click on it answers the decision pinned at the top;
-/ opens every command, @ a file, ? help; esc clears the input; ctrl+c quits.
+to open it; ctrl+o cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
+option's first letter alone then enter, or a click on it, answers the decision pinned at the top;
+/ opens every command, /name or $name runs an installed skill, @ a file, ? then enter help; !cmd runs a shell
+command in the session folder; ctrl+v attaches a clipboard image; esc clears the input; ctrl+c quits.
   url           default: the local daemon (token from ~/.smithy/daemon.token), started in the
                 background when none runs; it outlives the chat and exits after daemon.idle_exit
                 (default 30m) with no clients and no running work, or on smithy stop. A
@@ -39,6 +42,12 @@ option's first letter (empty input) or a click on it answers the decision pinned
   --server      a saved server (smithy servers), local or a URL; default: SMITHY_SERVER, then the
                 default /connect or smithy servers use saved, then this machine
   --standalone  run a private daemon inside this process instead; it stops when the chat quits`
+
+// WelcomeUsage is `smithy welcome`: the chat opened on its first-run walk.
+const WelcomeUsage = `usage: smithy welcome [url | --server <name|url>]
+Opens the chat on the first-run walk: a short animated welcome, then the agents found on this
+machine, the model new sessions start with, the stored API keys and the Telegram notifications.
+esc leaves it at any step; /welcome in the chat walks it again.`
 
 // chatWhere is where the daemon the chat talks to runs.
 type chatWhere int
@@ -87,8 +96,11 @@ type chatView struct {
 	sessions []chatSession
 	// decide posts an answer to /v1/decisions and returns a chatDecidedMsg.
 	decide func(id, answer string) tea.Cmd
+	// ask posts a question to /v1/asks (the /ask demo); nil without a daemon.
+	ask func(id, question string, options []string) tea.Cmd
 
 	setup     setupAPI      // the daemon's setup endpoints; nil: none
+	cfg       settingsAPI   // the daemon's settings endpoints; nil: none
 	setupSt   *daemon.Setup // last GET /v1/setup
 	setupSel  int
 	setupStep setupStep
@@ -97,13 +109,31 @@ type chatView struct {
 	modelIn   string       // the filter typed over the model list
 	modelSel  int          // the selected row of modelRows
 	modelList *models.List // what the agent reported; nil while it loads
+	modelSess string
+	effortSel int
+	themeSel  int
+
+	welcome      welcomeStep
+	welcomeAgent string
+	welcomeNote  string // the walk's last saved pick, printed once when it ends
+	welcomeSet   *daemon.Settings
 
 	sess     sessionAPI            // the daemon's sessions endpoints; nil: offline
 	current  string                // the open session, "" before the first message
 	convs    map[string][]*chatMsg // the other sessions' conversations
 	cost     map[string]float64    // spend per session
+	toks     map[string]int64      // input and output tokens per session
+	streamed map[string]int        // characters of agent text since the turn began, for tok/s
+	effort   string                // agent.effort
+	clock    func() time.Time      // the header clock; nil: time.Now
+	splashOn bool                  // play the entry animation at the first window size
+	still    bool                  // reduced motion: the welcome field and anvil hold still
+	splash   []string              // the entry animation's frames left; nil once it ends
 	noise    []noise               // daemon events kept out of the transcript
 	dir      string                // the folder sessions start in and @ lists
+	root     string                // dir with symlinks resolved, as the daemon records it
+	allProj  bool                  // the agents panel lists every project, not only dir
+	proj     projectPick           // the project modal a new session opens with
 	branch   string                // its git branch, for the footer
 	webURL   string                // the web UI with its token; "" when unknown
 	files    *fileCache            // the @ popup's file list
@@ -119,6 +149,11 @@ type chatView struct {
 	connectUse  func(string) error        // saves the default server
 	connectAdd  func(remote.Server) error // saves a discovered server
 	switchTo    *chatSwitch               // set when /connect picked another server
+
+	shell    func(ctx context.Context, dir, line string) (string, error) // runs !cmd; nil: runShell
+	clip     func() ([]byte, error)                                      // reads a clipboard image; nil: readClipImage
+	pasteDir string                                                      // where pasted images are saved; "": temp dir
+	images   []string                                                    // pasted images waiting for the next message
 }
 
 // infoPanel is what a read-only box shows: /connect, /remote, /web, /log.
@@ -135,13 +170,9 @@ func newChatView(stream <-chan daemon.ClientMsg, url string, th theme) chatView 
 // newComposer is the input pinned at the bottom: a textarea on the raised tier behind the
 // ember ›, three rows tall, growing to ten then scrolling; enter sends, shift+enter, alt+enter
 // or ctrl+j breaks the line.
-func newComposer(th theme) textarea.Model {
-	in := textarea.New()
-	in.ShowLineNumbers = false
-	in.Placeholder = "Ask, or / for commands"
-	in.DynamicHeight, in.MinHeight, in.MaxHeight, in.MaxContentHeight = true, 3, 10, 1<<20
-	in.KeyMap.InsertNewline.SetKeys("shift+enter", "alt+enter", "ctrl+j")
-	in.SetPromptFunc(2, func(i textarea.PromptInfo) string {
+// composerPrompt draws the accent › on the first row; a theme change sets it again.
+func composerPrompt(th theme) func(textarea.PromptInfo) string {
+	return func(i textarea.PromptInfo) string {
 		st := lipgloss.NewStyle()
 		if th.raised != nil {
 			st = st.Background(th.raised)
@@ -150,7 +181,16 @@ func newComposer(th theme) textarea.Model {
 			return th.fg(th.accent).Inherit(st).Render(th.g.prompt) + st.Render(" ")
 		}
 		return st.Render("  ")
-	})
+	}
+}
+
+func newComposer(th theme) textarea.Model {
+	in := textarea.New()
+	in.ShowLineNumbers = false
+	in.Placeholder = "Ask, or / for commands"
+	in.DynamicHeight, in.MinHeight, in.MaxHeight, in.MaxContentHeight = true, 3, 10, 1<<20
+	in.KeyMap.InsertNewline.SetKeys("shift+enter", "alt+enter", "ctrl+j")
+	in.SetPromptFunc(2, composerPrompt(th))
 	st := textarea.DefaultStyles(true)
 	for _, s := range []*textarea.StyleState{&st.Focused, &st.Blurred} {
 		base := lipgloss.NewStyle()
@@ -175,6 +215,7 @@ type chatArgs struct {
 	url        string
 	server     string
 	standalone bool
+	welcome    bool
 	open       string // a session to open once connected (after /connect)
 }
 
@@ -183,6 +224,8 @@ func parseChatArgs(args []string) (chatArgs, error) {
 	for i := 0; i < len(args); i++ {
 		x := args[i]
 		switch {
+		case x == "--welcome":
+			a.welcome = true
 		case x == "--standalone":
 			a.standalone = true
 		case x == "--server":
@@ -360,6 +403,8 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 		p = colorprofile.Ascii
 	}
 	m := newChatView(ch, url, newTheme(true, p, utf8Locale()))
+	m.splashOn = splashWanted(isTTY(os.Stdout), os.Getenv("NO_COLOR"), os.Getenv("SMITHY_REDUCE_MOTION"), config.Get("ui.splash", "true"), config.Get("tui.reduce_motion", "false"))
+	m.still = os.Getenv("SMITHY_REDUCE_MOTION") != "" || config.Get("tui.reduce_motion", "false") == "true"
 	m.where = where
 	m.server = serverName
 	m.connectLoad = defaultConnectLoad(func() (string, string) {
@@ -378,11 +423,16 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	if a.open != "" {
 		m.open(a.open)
 	}
+	if a.welcome {
+		m.welcome = welcomeSplash
+	}
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
-	m.setup, m.sess = c, c
+	m.setup, m.sess, m.cfg = c, c, c
 	m.dir, _ = os.Getwd()
+	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
+	m.effort = config.Get("agent.effort", "medium")
 	if tok != "" {
 		m.webURL = url + "/#token=" + neturl.QueryEscape(tok)
 	} else {
@@ -395,6 +445,14 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 		return func() tea.Msg {
 			_, err := c.Decide(ctx, id, answer)
 			return chatDecidedMsg{id: id, err: err}
+		}
+	}
+	m.ask = func(id, question string, options []string) tea.Cmd {
+		return func() tea.Msg {
+			if err := c.Ask(ctx, id, question, options); err != nil {
+				return chatDecidedMsg{id: id, err: err}
+			}
+			return nil
 		}
 	}
 	fm, err := tea.NewProgram(m).Run()
@@ -426,7 +484,9 @@ func (m *chatView) release() {
 	m.held = nil
 }
 
-func (m chatView) Init() tea.Cmd { return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true)) }
+func (m chatView) Init() tea.Cmd {
+	return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true), m.loadTheme(), clockTick())
+}
 
 func (m chatView) wait() tea.Cmd {
 	if m.stream == nil {
@@ -466,6 +526,8 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, cmd
 	}
 	switch msg := msg.(type) {
+	case clockMsg:
+		return m, clockTick()
 	case chatFrameMsg:
 		m.frame++
 		for i := max(len(m.msgs)-8, 0); i < len(m.msgs); i++ {
@@ -487,6 +549,19 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.open(msg.s.ID)
 		m.status("session " + msg.s.ID + " started with " + msg.s.Agent)
 		return m, nil
+	case projectsMsg:
+		return m.projectsLoaded(msg)
+	case dirsMsg:
+		return m.dirsLoaded(msg)
+	case settingsDoneMsg:
+		if msg.panel != nil {
+			m.info, m.overlay, m.pal = *msg.panel, overlayInfo, palette{}
+			return m, nil
+		}
+		for _, l := range msg.lines {
+			m.system(l)
+		}
+		return m, nil
 	case sessionErrMsg:
 		m.system(m.th.g.fail + " " + msg.what + " failed: " + msg.err.Error())
 		return m, nil
@@ -498,7 +573,7 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.conn, m.connErr = "reconnecting", msg.Err.Error()
 		case msg.Event != nil && msg.Event.Seq > m.last:
 			m.last = msg.Event.Seq
-			m.event(msg.Event.Kind, msg.Event.Session, msg.Event.Time.Local().Format("15:04"), msg.Event.Data)
+			m.event(msg.Event.Kind, msg.Event.Session, msg.Event.Time, msg.Event.Data)
 			if m.last >= m.heldTo {
 				m.release()
 			}
@@ -510,11 +585,24 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case chatDecidedMsg:
 		m.decided(msg)
 		return m, nil
+	case shellDoneMsg:
+		m.shellDone(msg)
+		return m, nil
+	case clipMsg:
+		m.clipped(msg)
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.input.SetWidth(max(m.width-2*m.pad()-4, 1))
 		m.scroll(0)
-		return m, nil
+		return m, m.startSplash()
+	case splashMsg:
+		if len(m.splash) <= 1 {
+			m.splash = nil
+			return m, nil
+		}
+		m.splash = m.splash[1:]
+		return m, splashTick()
 	case tea.MouseClickMsg:
 		return m.click(msg)
 	case tea.MouseWheelMsg:
@@ -526,6 +614,10 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyPressMsg:
+		if m.splash != nil {
+			m.splash = nil
+			return m, nil
+		}
 		if m.overlay != overlayNone {
 			return m.overlayKey(msg)
 		}
@@ -541,7 +633,13 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
+		case "ctrl+v":
+			return m, m.pasteImage()
 		case "esc":
+			if len(m.images) > 0 && m.input.Value() == "" {
+				m.images = nil
+				return m, nil
+			}
 			if m.input.Value() != "" {
 				m.input.SetValue("")
 				return m, nil
@@ -570,10 +668,26 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.input.SetValue("")
 			m.popSel = 0
+			if o, ok := m.optionFor(t); ok && len(m.images) == 0 {
+				return m, m.answer(o)
+			}
+			if t == "?" && len(m.images) == 0 {
+				m.overlay, m.pal = overlayHelp, palette{}
+				return m, nil
+			}
 			if strings.HasPrefix(t, "/") {
 				return m.command(t)
 			}
-			if t != "" {
+			if strings.HasPrefix(t, "!") {
+				return m.bang(strings.TrimSpace(t[1:]))
+			}
+			if name, arg, _ := strings.Cut(t, " "); strings.HasPrefix(name, "$") {
+				if p := m.skillPrompt(name[1:], strings.TrimSpace(arg)); p != "" {
+					return m.send(p)
+				}
+			}
+			if t != "" || len(m.images) > 0 {
+				t, m.images = withImages(t, m.images), nil
 				return m.send(t)
 			}
 			return m, nil
@@ -602,6 +716,8 @@ func eventText(kind, session string, data json.RawMessage) string {
 			return ""
 		}
 		return "answered: " + o.Answer + by(o.By)
+	case daemon.KindRouted:
+		return "" // bookkeeping: the answered line already said it
 	case "log":
 		var d struct {
 			Line string `json:"line"`
@@ -617,9 +733,10 @@ func eventText(kind, session string, data json.RawMessage) string {
 }
 
 // rows is the transcript height: the screen less the header, the decision strip, the status
-// line, the composer, the footer and the spinner row while the open session works.
+// line and the gap under it, the composer, the footer and the spinner row while the open
+// session works.
 func (m chatView) rows() int {
-	n := m.height - headRows - m.stripRows() - 1 - m.input.Height() - 1
+	n := m.height - headRows - m.stripRows() - 2 - m.input.Height() - 1
 	if m.working() {
 		n -= 2
 	}
@@ -771,6 +888,11 @@ func (m chatView) visible() (out []string, idx []int) {
 
 func (m chatView) View() tea.View {
 	t := m.th
+	if m.splash != nil && m.overlay != overlaySetup && m.welcome == welcomeOff {
+		v := tea.NewView(m.splash[0])
+		v.AltScreen = true
+		return v
+	}
 	w := max(m.width, 20)
 	out := make([]string, 0, m.height)
 	out = append(out, m.header(w)...)
@@ -778,15 +900,7 @@ func (m chatView) View() tea.View {
 		s, _ := m.strip(w)
 		out = append(out, s, "")
 	}
-	var vis []string
-	switch m.overlay {
-	case overlaySetup, overlayPicker:
-		vis = m.setupPanel(w)
-	case overlaySkills:
-		vis = m.skillsPanel(w)
-	default:
-		vis, _ = m.visible()
-	}
+	vis, _ := m.visible()
 	body := make([]string, 0, m.rows()+2)
 	for range m.rows() - len(vis) {
 		body = append(body, "")
@@ -805,12 +919,21 @@ func (m chatView) View() tea.View {
 		}
 	}
 	out = append(out, body...)
-	out = append(out, m.statusLine(w))
+	out = append(out, m.statusLine(w), "")
 	out = append(out, m.composer(w)...)
 	out = append(out, m.footer(w))
+	if m.welcome != welcomeOff {
+		out = m.welcomeView(w, m.height)
+	}
 	switch m.overlay {
 	case overlayAgents:
-		out = append(out[:headRows:headRows], m.sidePanel(out[headRows:], w)...)
+		out = m.agentsBox(out, w, m.height)
+	case overlaySetup, overlayPicker:
+		out = m.pickerBox(out, w, m.height)
+	case overlaySkills:
+		out = m.skillsBox(out, w, m.height)
+	case overlayProject:
+		out = m.projectBox(out, w, m.height)
 	case overlayPalette:
 		out = m.paletteBox(out, w, m.height)
 	case overlayHelp:
@@ -840,6 +963,9 @@ func (m chatView) composer(w int) []string {
 	p := strings.Repeat(" ", m.pad())
 	bw := w - 2*m.pad()
 	var out []string
+	if c := m.chips(); c != "" {
+		out = append(out, p+fill(raised, bw, "  "+c+"  esc drops")+p)
+	}
 	for _, l := range strings.Split(m.input.View(), "\n") {
 		out = append(out, p+fill(raised, bw, "  "+l)+p)
 	}

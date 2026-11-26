@@ -14,13 +14,14 @@ Show
 Type "smithy" Sleep 300ms Enter
 Sleep 3s
 Screenshot "@OUT@/tui-firstrun.png"
-Enter
+Escape
 Sleep 2s
 Type "add a health endpoint with a test" Sleep 300ms Enter
 Sleep 4s
 Screenshot "@OUT@/tui-tools.png"
 Sleep 1s
 Type "c"
+Enter
 Sleep 3s
 Screenshot "@OUT@/tui-answered.png"
 Sleep 1s

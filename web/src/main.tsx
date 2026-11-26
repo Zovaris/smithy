@@ -14,7 +14,7 @@ import { Agents, Changes, Decisions } from "./rail";
 import { Servers, useServers } from "./servers";
 import { go, href, PAGES, type Page, useView } from "./router";
 import { agentName, ago, open, sessions as list, type Sess } from "./store";
-import { initTheme, toggleTheme, current } from "./theme";
+import { initTheme, toggleTheme, current, loadAccent, saveAccent, type ThemeName } from "./theme";
 import { St } from "./ui";
 
 const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
@@ -105,6 +105,7 @@ function App() {
   const auth = useAuth();
   const l = useLive();
   const [pal, setPal] = useState(false);
+  const [accent, setAccent] = useState<ThemeName>("steel");
   const [palUsed, setPalUsed] = useState(false);
   const [sheet, setSheet] = useState<"" | "side" | "rail">("");
   const [collapsed, setCollapsed] = useState(false);
@@ -122,6 +123,7 @@ function App() {
   useEffect(() => {
     if (auth.state !== "ok") return;
     start();
+    loadAccent(api).then(setAccent).catch(() => {});
     if (!location.hash.replace(/^#\/?/, ""))
       api("/v1/setup").then((r) => (r.ok ? r.json() : null)).then((x) => x && !x.chosen && (location.hash = "#/setup")).catch(() => {});
   }, [auth.state]);
@@ -131,6 +133,11 @@ function App() {
     if (a === "new") go({ name: "new" });
     else if (a === "stop" && s) stopSession(s.id).catch(() => {});
     else if (a === "theme") toggleTheme();
+    else if (a.startsWith("theme:")) {
+      const n = a.slice(6) as ThemeName;
+      setAccent(n);
+      saveAccent(api, n).catch(() => {});
+    }
     else if (a === "settings") go({ name: "setup" });
     else if (a === "agents" || a === "board" || a === "decisions") go({ name: a });
   };
@@ -246,7 +253,7 @@ function App() {
       )}
       {palUsed && (
         <Suspense fallback={null}>
-          <Palette open={pal} onOpenChange={setPal} onAction={onAction} />
+          <Palette open={pal} onOpenChange={setPal} onAction={onAction} theme={accent} />
         </Suspense>
       )}
     </div>

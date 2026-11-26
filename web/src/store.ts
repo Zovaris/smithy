@@ -185,7 +185,7 @@ export const primary = (d: Dec) => (d.options.includes("deny") ? "deny" : d.opti
 // agentName is how a session's agent reads in the UI.
 export function agentName(agent: string): string {
   const a = agent.replace(/^acp:/, "");
-  const NAMES: Record<string, string> = { claude: "Claude Code", codex: "Codex", opencode: "OpenCode", gemini: "Gemini", cursor: "Cursor", amp: "Amp", goose: "Goose", copilot: "Copilot", qwen: "Qwen" };
+  const NAMES: Record<string, string> = { claude: "Claude Code", codex: "Codex", opencode: "OpenCode", agy: "Antigravity", grok: "Grok", cursor: "Cursor", amp: "Amp", goose: "Goose", copilot: "Copilot", qwen: "Qwen" };
   if (a.startsWith("api:")) return a.slice(4).split("/")[0].replace(/^\w/, (c) => c.toUpperCase()) + " API";
   return NAMES[a] ?? (a || "agent");
 }

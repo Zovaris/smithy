@@ -37,7 +37,7 @@ func (m Model) frame() (head []string, tabY int, body rect, footY int) {
 	head = m.header(w)
 	tabY = len(head)
 	footY = h - 1
-	body = rect{0, tabY + 1, w, max(footY-tabY-1, 3)}
+	body = rect{0, tabY + 2, w, max(footY-tabY-2, 3)}
 	return
 }
 
@@ -64,7 +64,7 @@ func (m Model) panes() map[string]rect {
 		out["main"] = rect{b.x, b.y, mw, b.h}
 		out["side"] = rect{b.x + mw, b.y, b.w - mw, b.h}
 	case vIncoming:
-		th := min(len(m.snap.Watcher.Sources), 4) + 3
+		th := min(len(m.snap.Watcher.Sources), 4) + 4
 		rest := rect{b.x, b.y + th, b.w, b.h - th}
 		out["top"] = rect{b.x, b.y, b.w, th}
 		if wide {
@@ -151,9 +151,9 @@ func (m Model) render() string {
 
 func (m Model) panelStyle(border color.Color) lipgloss.Style {
 	t := m.th
-	st := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
+	st := lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Padding(0, 1)
 	if !t.g.unicode {
-		st = st.Border(lipgloss.NormalBorder())
+		st = st.Border(lipgloss.ASCIIBorder())
 	}
 	if !t.plain && border != nil {
 		st = st.BorderForeground(border)
@@ -167,8 +167,8 @@ func pad(s string, w int) string {
 	return s + strings.Repeat(" ", max(w-lipgloss.Width(s), 0))
 }
 
-// box draws a rounded panel with its title and a badge in the top border, one blank column
-// inside each side, and the given lines.
+// box draws a square panel with its title and a badge in the top border, a blank row under the
+// title, one blank column inside each side, and the given lines.
 func (m Model) box(title, badge string, focused bool, border color.Color, r rect, lines []string) string {
 	t := m.th
 	bc := t.border
@@ -179,7 +179,7 @@ func (m Model) box(title, badge string, focused bool, border color.Color, r rect
 		bc = t.accent
 	}
 	bs := t.fg(bc)
-	tl, tr, bl, br, hz, vt := "╭", "╮", "╰", "╯", "─", "│"
+	tl, tr, bl, br, hz, vt := "┌", "┐", "└", "┘", "─", "│"
 	if !t.g.unicode {
 		tl, tr, bl, br, hz, vt = "+", "+", "+", "+", "-", "|"
 	}
@@ -197,6 +197,7 @@ func (m Model) box(title, badge string, focused bool, border color.Color, r rect
 	head = ansi.Truncate(head+" ", r.w-1, "")
 	head += bs.Render(strings.Repeat(hz, max(r.w-1-lipgloss.Width(head), 0)) + tr)
 	inner := r.w - 4
+	lines = append([]string{""}, lines...)
 	out := []string{head}
 	for i := 0; i < r.h-2; i++ {
 		l := ""
@@ -222,7 +223,7 @@ func (m Model) body() []*lipgloss.Layer {
 		_, _, b, _ := m.frame()
 		lw := b.w / 2
 		lr, rr := rect{b.x, b.y, lw, b.h}, rect{b.x + lw, b.y, b.w - lw, b.h}
-		l, r := m.systemLines(lw-4, rr.w-4, rr.h-2)
+		l, r := m.systemLines(lw-4, rr.w-4, rr.h-3)
 		badge := "enter edits"
 		if m.sys != nil {
 			badge = fmt.Sprint(len(m.sys.Settings)) + " " + t.g.dot + " enter edits"
@@ -236,7 +237,7 @@ func (m Model) body() []*lipgloss.Layer {
 	}
 	if r, ok := ps["main"]; ok {
 		rs := m.rows(v)
-		lines, _ := m.table(m.cols(v), rs, m.sel[v], m.pane[v] == 0, r.w-4, r.h-2, m.empty(v))
+		lines, _ := m.table(m.cols(v), rs, m.sel[v], m.pane[v] == 0, r.w-4, r.h-3, m.empty(v))
 		title := viewNames[v]
 		badge := fmt.Sprint(len(rs))
 		switch v {
@@ -258,7 +259,7 @@ func (m Model) body() []*lipgloss.Layer {
 		switch v {
 		case vAgents:
 			title = "Preview"
-			lines = m.preview(r.w-4, r.h-2)
+			lines = m.preview(r.w-4, r.h-3)
 		case vIncoming:
 			rs := m.rows2(v)
 			title, badge = "Ignored", fmt.Sprint(len(rs))
@@ -272,7 +273,7 @@ func (m Model) body() []*lipgloss.Layer {
 				title = "Tasks " + t.g.dot + " " + ps[m.sel[vPlans]].cells[0].s
 			}
 			badge = fmt.Sprint(len(rs))
-			lines, _ = m.table([]col{{"#", 3, false, 0}, {"status", 10, false, 0}, {"task", 0, true, 0}}, rs, m.sel2[v], m.pane[v] == 1, r.w-4, r.h-2,
+			lines, _ = m.table([]col{{"#", 3, false, 0}, {"status", 10, false, 0}, {"task", 0, true, 0}}, rs, m.sel2[v], m.pane[v] == 1, r.w-4, r.h-3,
 				[]string{"", t.fg(t.muted).Italic(true).Render("Pick a plan on the left.")})
 		}
 		out = append(out, layer(m.box(title, badge, m.pane[v] == 1, nil, r, lines), r))
@@ -556,8 +557,8 @@ func (m Model) rowAt(x, y int) (int, bool) {
 	if !ok || !r.has(x, y) || m.view == vOverview {
 		return 0, false
 	}
-	_, start := m.table(m.cols(m.view), m.rows(m.view), m.sel[m.view], true, r.w-4, r.h-2, nil)
-	i := start + y - r.y - 2
+	_, start := m.table(m.cols(m.view), m.rows(m.view), m.sel[m.view], true, r.w-4, r.h-3, nil)
+	i := start + y - r.y - 3
 	if i < start || i >= len(m.rows(m.view)) {
 		return 0, false
 	}
@@ -669,7 +670,7 @@ func (m Model) textBox() string {
 func (m Model) helpBox(w, h int) string {
 	t := m.th
 	k, l := t.fg(t.accent), t.fg(t.muted)
-	lines := []string{t.fg(t.accent).Bold(true).Render("smithy tui " + t.g.dot + " help"), ""}
+	lines := []string{t.fg(t.accent).Bold(true).Render("smithy stats " + t.g.dot + " help"), ""}
 	for _, b := range []key.Binding{keys.Next, keys.Prev, keys.Jump, keys.Up, keys.Left, keys.Enter, keys.Close, keys.Open,
 		keys.Log, keys.Copy, keys.Cmd, keys.Accept, keys.Reject, keys.Unset, keys.Sort, keys.Type, keys.Pause, keys.Filter, keys.Refresh, keys.Help, keys.Quit} {
 		lines = append(lines, k.Render(fmt.Sprintf("%-9s", b.Help().Key))+l.Render(b.Help().Desc))

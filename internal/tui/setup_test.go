@@ -92,12 +92,12 @@ func setupScene(f *fakeSetup) chatView {
 
 func TestFirstRunShowsEveryAgentReadyOrMissingWithItsFix(t *testing.T) {
 	f := firstRunSetup()
-	m := setupScene(f)
+	m := sendKey(setupScene(f), ckey("enter"))
 	if m.overlay != overlaySetup {
-		t.Fatalf("first run opens the setup overlay, got %v", m.overlay)
+		t.Fatalf("the welcome's first step is the agents, got %v", m.overlay)
 	}
 	out := screen(m)
-	for _, want := range []string{"Welcome to smithy", "claude", "/opt/homebrew/bin/claude", "codex", "npm install -g @openai/codex", "smithy auth set openai"} {
+	for _, want := range []string{"1/4  agents", "claude", "/opt/homebrew/bin/claude", "codex", "npm install -g @openai/codex", "smithy auth set openai"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("first run screen lacks %q:\n%s", want, out)
 		}
@@ -106,8 +106,8 @@ func TestFirstRunShowsEveryAgentReadyOrMissingWithItsFix(t *testing.T) {
 	if len(f.set) != 1 || f.set[0] != "claude|" {
 		t.Fatalf("enter on claude picks it: %v", f.set)
 	}
-	if m.overlay != overlayNone || !strings.Contains(screen(m), "new sessions start with claude") {
-		t.Fatalf("picking closes the overlay and says so: %v\n%s", m.overlay, screen(m))
+	if m = sendKey(m, ckey("esc")); !strings.Contains(screen(sendKey(m, ckey("esc"))), "new sessions start with claude") {
+		t.Fatalf("picking says so:\n%s", screen(m))
 	}
 }
 

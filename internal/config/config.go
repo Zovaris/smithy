@@ -71,7 +71,7 @@ var Known = []Setting{
 	{"daemon.idle_exit", "30m", "smithy daemon", "how long the background daemon bare smithy starts stays up with no clients (TUI, web, attach) and no running work before it exits on its own; a duration like 30m or 2h, 0 or off never"},
 	{"daemon.listen", "", "smithy daemon", "this machine's Tailscale ip:port (e.g. 100.x.y.z:7478; any other address is refused, the listener is plain HTTP) the background daemon also listens on for other machines; every request there needs a paired device's token (smithy pair), never the daemon token or the Tailscale login header; empty: loopback only"},
 	{"daemon.allow", "", "smithy daemon", "comma list of Tailscale logins (Tailscale-User-Login via tailscale serve) allowed to use the daemon's API; empty: only the local token. Set, it trusts any local user on this machine (the header is not authenticated past tailscale serve), so smithy doctor warns"},
-	{"auto.paused", "false", "smithy auto", "true holds smithy auto take: nothing launches until it is false again (p in smithy tui)"},
+	{"auto.paused", "false", "smithy auto", "true holds smithy auto take: nothing launches until it is false again (p in smithy stats)"},
 	{"auto.agent", "", "smithy auto serve", "agent CLI for serve's orchestrator (claude, codex, opencode…, pool: any smithy pool account, or api:<provider>/<model>: smithy's own loop on your key, harness build, read from the user settings only); empty = the one smithy agent detects"},
 	{"pool.order", "", "smithy agent", "comma list of harnesses a pool run (AGENT_CLI or auto.agent pool) tries in order, e.g. claude,codex: it stays on the first with a free account, falls back when all of that harness's accounts are limited (logged as pool_fallback) and goes back once a limit resets; empty = least recently used account of any harness"},
 	{"auto.session_hours", "3", "smithy auto serve", "hours one orchestrator session may run before smithy agent ends it (its workers keep going)"},
@@ -101,8 +101,10 @@ var Known = []Setting{
 	{"session.agent", "", "smithy daemon", "agent a new session starts with when none is named (a CLI name, acp:<cli> or api:<provider>/<model>); the agent picker (ctrl+l, /agent) sets it; empty = the last used, else the first installed CLI"},
 	{"session.model", "", "smithy daemon", "model a new CLI session passes to its agent (--model); the picker (/model) sets it; empty = the agent's own default"},
 	{"kit.mcp", "true", "smithy agent", "false: driven CLIs don't get smithy's own MCP server (smithy mcp); /skills in the TUI and the web Setup screen toggle it"},
-	{"kit.skills", "", "smithy agent", "comma list of installed skills linked into every driven CLI that takes skills (claude, codex, opencode, gemini, pi); /skills toggles them"},
-	{"tui.reduce_motion", "false", "smithy tui", "true draws every frame still: no sparks, shimmer or sliding bars (like --no-anim or SMITHY_REDUCE_MOTION)"},
+	{"kit.skills", "", "smithy agent", "comma list of installed skills linked into every driven CLI that takes skills (claude, codex, opencode, pi); /skills toggles them"},
+	{"ui.theme", "steel", "smithy, smithy stats, web", "color theme the TUI and web share: steel (ember accent), frost or plum; /theme and the web palette pick it"},
+	{"ui.splash", "true", "smithy", "false skips the short dither-and-anvil animation when smithy opens; it never plays without a terminal, color or motion, or under 80×24"},
+	{"tui.reduce_motion", "false", "smithy, smithy stats", "true draws every frame still: no sparks, shimmer or sliding bars (like --no-anim or SMITHY_REDUCE_MOTION)"},
 }
 
 // ErrUnset means the key has no value and no default: ask the user once, then save it.
@@ -341,20 +343,35 @@ func defaultOf(key string) string {
 
 // Effective returns a key's value and where it came from (repo, user or default); a settings
 // file that isn't a JSON object is an error, not ErrUnset.
-func Effective(key string) (string, string, error) {
+func Effective(key string) (string, string, error) { return Snapshot()(key) }
+
+// Snapshot finds and reads the repo and user settings files once and returns an Effective that
+// answers from them, for callers reading many keys at once.
+func Snapshot() func(key string) (string, string, error) {
+	type layer struct {
+		m   map[string]any
+		err error
+		src string
+	}
+	var ls []layer
 	for _, s := range [][2]string{{RepoFile(), "repo"}, {UserFile(), "user"}} {
-		v, ok, err := readKeyErr(s[0], key)
-		if err != nil {
-			return "", "", err
-		}
-		if ok {
-			return v, s[1], nil
-		}
+		m, err := loadFile(s[0])
+		ls = append(ls, layer{m, err, s[1]})
 	}
-	if d := defaultOf(key); d != "" && d != "ask" {
-		return d, "default", nil
+	return func(key string) (string, string, error) {
+		for _, l := range ls {
+			if l.err != nil {
+				return "", "", l.err
+			}
+			if v, ok := lookup(l.m, key); ok {
+				return str(v), l.src, nil
+			}
+		}
+		if d := defaultOf(key); d != "" && d != "ask" {
+			return d, "default", nil
+		}
+		return "", "", ErrUnset
 	}
-	return "", "", ErrUnset
 }
 
 // UserGet reads key from the user's settings file only, never the repo's (a cloned repo must not

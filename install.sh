@@ -4,13 +4,14 @@
 #   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.14.1   # pinned
 #   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # same, as an update
 #   ... | sh -s -- --no-skills   # binary only, skip `smithy skills install`
-# Installs the one shipped build (smithy-harness-*), then runs `smithy skills install`, which copies the
+# Installs the one shipped build (smithy-<os>-<arch>, the harness build), then runs `smithy skills install`, which copies the
 # skills into every agent it finds. --harness and --skills are accepted and ignored (older scripts).
-# Downloads smithy-harness-<os>-<arch> from the GitHub release, checks it against the release's
+# Downloads smithy-<os>-<arch> from the GitHub release, checks it against the release's
 # checksums.txt and its build attestation (gh), and puts it in ~/.local/share/smithy/versions/<version>/
 # ($XDG_DATA_HOME), with ~/.local/bin/smithy ($XDG_BIN_HOME) linking to it; on Windows
-# %LOCALAPPDATA%\smithy\versions and %LOCALAPPDATA%\Programs\smithy. An old ~/.smithy/bin install
-# moves there and keeps links for one release. ~/.smithy keeps data and config. Without gh (or a gh too old for `gh attestation`) nothing
+# %LOCALAPPDATA%\smithy\versions and %LOCALAPPDATA%\Programs\smithy. It keeps the new version and the
+# one it replaces, nothing older (folders not named like a version stay). An old ~/.smithy/bin
+# install moves there once and its links and ~/.smithy/kind go away; later runs say nothing about it. ~/.smithy keeps data and config. Without gh (or a gh too old for `gh attestation`) nothing
 # is installed unless SMITHY_ALLOW_UNATTESTED=1 (checksum only). The skills never download it.
 set -eu
 repo=Zovaris/smithy
@@ -40,7 +41,7 @@ esac
 case "$(uname -m)" in
   arm64|aarch64) arch=arm64 ;; x86_64|amd64) arch=amd64 ;; *) die "unsupported CPU $(uname -m)" ;;
 esac
-pre=smithy-harness
+pre=smithy
 if [ "$os" = windows ]; then
   lad=${LOCALAPPDATA:-$HOME/AppData/Local}; command -v cygpath >/dev/null 2>&1 && lad=$(cygpath -u "$lad")
   data="$lad/smithy"; bindir="$lad/Programs/smithy"
@@ -99,36 +100,48 @@ fi
 
 case $asset in *.gz) gunzip -f "$tmp/$asset"; src="$tmp/${asset%.gz}" ;; *) src="$tmp/$asset" ;; esac
 chmod +x "$src"
-# Migration: an old ~/.smithy/bin/<version> moves to $vdir and leaves a link behind, so the skills'
-# launchers and PATH entries that point there keep working for one release.
-legacy=
-if [ -d "$home/bin" ] && [ ! -L "$home/bin" ]; then
-  for d in "$home"/bin/*/; do
-    d=${d%/}; n=${d##*/}
-    case $n in dev|"*") continue ;; esac
-    [ -d "$d" ] && [ ! -L "$d" ] || continue
-    mkdir -p "$vdir"
-    # never delete: a version already at the target keeps both copies (the old one stays put)
-    if [ ! -e "$vdir/$n" ]; then mv "$d" "$vdir/$n" && ln -sfn "$vdir/$n" "$d"; fi
-    legacy=1
-  done
-  if [ -d "$home/bin/dev" ] && [ ! -L "$home/bin/dev" ]; then
-    mkdir -p "$data/dev"
-    for d in "$home"/bin/dev/*/; do
-      d=${d%/}; [ -d "$d" ] || continue
-      [ -e "$data/dev/${d##*/}" ] || mv "$d" "$data/dev/${d##*/}"
-    done
-    rmdir "$home/bin/dev" 2>/dev/null || true; legacy=1
-  fi
-  [ -e "$home/bin/$exe" ] || [ -L "$home/bin/$exe" ] && legacy=1
-fi
+prev=$(readlink "$bindir/$exe" 2>/dev/null || true); prev=${prev%/*}; prev=${prev##*/}
 mkdir -p "$vdir/$version" "$bindir"; mv "$src" "$vdir/$version/$exe"
 if [ "$os" = windows ]; then cp -f "$vdir/$version/$exe" "$bindir/$exe"; else ln -sfn "$vdir/$version/$exe" "$bindir/$exe"; fi
-if [ -n "$legacy" ]; then
-  { [ -L "$home/bin/$version" ] || [ ! -e "$home/bin/$version" ]; } && { rm -f "$home/bin/$version"; ln -sfn "$vdir/$version" "$home/bin/$version"; }
-  if [ "$os" = windows ]; then cp -f "$vdir/$version/$exe" "$home/bin/$exe"; else rm -f "$home/bin/$exe"; ln -s "$bindir/$exe" "$home/bin/$exe"; fi
-  say "moved the old install from $home/bin to $vdir; $home/bin keeps links to it for one release, so older skills and PATH entries keep working"
+# Migration, once and after the new binary is in place: an old ~/.smithy/bin/<version> moves to
+# $vdir (a version already there wins and the old copy goes), its dev builds move to $data/dev,
+# and the links and ~/.smithy/kind smithy wrote go away. Anything else in ~/.smithy/bin stays.
+moved=
+if [ -d "$home/bin" ] && [ ! -L "$home/bin" ]; then
+  for d in "$home"/bin/*; do
+    n=${d##*/}
+    case $n in
+      dev) continue ;;
+      smithy) [ -L "$d" ] && rm -f "$d" && moved=1; continue ;;
+      smithy.exe) rm -f "$d"; moved=1; continue ;;  # the old Windows copy
+      [0-9]*.[0-9]*) ;;
+      *) continue ;;
+    esac
+    if [ -L "$d" ]; then rm -f "$d"
+    elif [ -d "$d" ]; then mkdir -p "$vdir"; if [ -e "$vdir/$n" ]; then rm -rf "$d"; else mv "$d" "$vdir/$n"; fi
+    else continue; fi
+    moved=1
+  done
+  if [ -d "$home/bin/dev" ] && [ ! -L "$home/bin/dev" ]; then
+    for d in "$home"/bin/dev/*/; do
+      d=${d%/}; [ -d "$d" ] && [ ! -L "$d" ] || continue
+      mkdir -p "$data/dev"; if [ -e "$data/dev/${d##*/}" ]; then rm -rf "$d"; else mv "$d" "$data/dev/${d##*/}"; fi
+    done
+    rmdir "$home/bin/dev" 2>/dev/null && moved=1
+  fi
+  rmdir "$home/bin" 2>/dev/null || true
+elif [ -L "$home/bin" ]; then rm -f "$home/bin"; moved=1
 fi
+[ -e "$home/kind" ] && { rm -f "$home/kind"; moved=1; }
+[ -z "$moved" ] || say "moved the old install from $home/bin to $vdir and removed its links (once)"
+# Keep the current version and the one it replaces (else the newest other one); drop the rest.
+[ -n "$prev" ] && [ "$prev" != "$version" ] && [ -d "$vdir/$prev" ] ||
+  prev=$(ls "$vdir" | grep -vxF "$version" | grep -E '^[0-9]+\.[0-9]+' | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
+for d in "$vdir"/*/; do
+  d=${d%/}; n=${d##*/}
+  case $n in [0-9]*.[0-9]*) ;; *) continue ;; esac  # only release versions; a folder of yours stays
+  [ "$n" = "$version" ] || [ "$n" = "$prev" ] || rm -rf "$d"
+done
 rgx=; [ "$os" = windows ] && rgx=.exe
 rgasset="smithy-rg-$os-$arch${rgx:-.gz}"
 rgok=

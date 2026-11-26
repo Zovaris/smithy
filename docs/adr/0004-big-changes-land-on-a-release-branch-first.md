@@ -19,6 +19,9 @@ Chosen option: "a `release/*` branch": warden batches for large or exploratory w
 merge auto; the maintainer reviews the branch and merges it to `main` (production) themself. After
 each big feature a cheap-model audit checks coherence, contradictions and skill size (AGENTS.md).
 
+Note (v0.24): the cheap-model audit is now warden's milestone review
+(`skills/warden/references/milestone.md`).
+
 ## Consequences
 
 - Good: unattended work keeps moving; one review covers a coherent set of changes.

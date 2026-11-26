@@ -206,6 +206,9 @@ func (r *report) bad(msg, fix string) {
 // BinaryVersion is the running binary's version, set by main.
 var BinaryVersion = "dev"
 
+// UpdateCmd is the line that moves an installed smithy to version v.
+func UpdateCmd(v string) string { return "smithy update " + v }
+
 // InstallCmd is the line the user (or the agent, on the user's yes) runs to install a version.
 func InstallCmd(v string) string {
 	return "curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s " + v
@@ -230,7 +233,7 @@ func VersionHint() string {
 	if sv == "" || sv == "dev" || BinaryVersion == "dev" || sv == BinaryVersion {
 		return ""
 	}
-	return "smithy: binary v" + BinaryVersion + " but skills v" + sv + "; ask the user to install v" + sv + ": " + InstallCmd(sv)
+	return "smithy: binary v" + BinaryVersion + " but skills v" + sv + "; ask the user whether to run: " + UpdateCmd(sv)
 }
 
 func have(name string) bool { _, err := exec.LookPath(name); return err == nil }
@@ -303,7 +306,7 @@ func Doctor(args []string) int {
 		fmt.Println("warden doctor")
 	}
 	if sv := SkillsVersion(); VersionHint() != "" {
-		r.bad("binary v"+BinaryVersion+" does not match skills v"+sv, "ask the user, then: "+InstallCmd(sv))
+		r.bad("binary v"+BinaryVersion+" does not match skills v"+sv, "ask the user, then: "+UpdateCmd(sv))
 	} else if BinaryVersion != "dev" {
 		r.ok("binary v" + BinaryVersion)
 	}
@@ -327,7 +330,7 @@ func Doctor(args []string) int {
 	if os.Getenv("AGENT_CMD") != "" {
 		cli = "AGENT_CMD"
 	} else {
-		for _, c := range []string{"claude", "codex", "opencode", "gemini", "agent", "pi", "dsh"} {
+		for _, c := range []string{"claude", "codex", "opencode", "agy", "copilot", "grok", "agent", "pi", "dsh"} {
 			if have(c) {
 				cli = c
 				break
@@ -339,7 +342,7 @@ func Doctor(args []string) int {
 	case cli != "":
 		r.ok("agent CLI: " + cli)
 	case adapter == "any":
-		r.bad("no headless agent CLI on PATH (needed to spawn workers here)", "install one (claude, codex, opencode, gemini, cursor agent, pi, dsh) or set AGENT_CMD")
+		r.bad("no headless agent CLI on PATH (needed to spawn workers here)", "install one (claude, codex, opencode, agy, copilot, grok, cursor agent, pi, dsh) or set AGENT_CMD")
 	default:
 		r.warn("no headless agent CLI on PATH (only consult needs it here)", "optional: install one or set AGENT_CMD")
 	}
@@ -358,7 +361,7 @@ func Doctor(args []string) int {
 			r.ok("auto.agent: pool")
 		}
 	} else if a != "" {
-		bins := map[string]string{"claude": "claude", "codex": "codex", "opencode": "opencode", "gemini": "gemini", "cursor": "agent", "pi": "pi", "dsh": "dsh"}
+		bins := map[string]string{"claude": "claude", "codex": "codex", "opencode": "opencode", "agy": "agy", "copilot": "copilot", "grok": "grok", "cursor": "agent", "pi": "pi", "dsh": "dsh"}
 		kind := agents.Kind(a)
 		b, ok := bins[kind]
 		if strings.ContainsRune(a, '/') || strings.ContainsRune(a, os.PathSeparator) {
@@ -366,7 +369,7 @@ func Doctor(args []string) int {
 		}
 		switch {
 		case !ok:
-			r.warn("auto.agent "+a+" can't run headless (smithy auto serve)", "smithy config set auto.agent <claude|codex|opencode|gemini|cursor|pi|dsh or a path to one>")
+			r.warn("auto.agent "+a+" can't run headless (smithy auto serve)", "smithy config set auto.agent <claude|codex|opencode|agy|copilot|grok|cursor|pi|dsh or a path to one>")
 		case !have(b):
 			r.warn("auto.agent "+a+" not found (smithy auto serve can't start an orchestrator)", "install "+bins[kind]+", or smithy config set auto.agent <cli or absolute path>")
 		default:

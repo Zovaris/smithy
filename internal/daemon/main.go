@@ -50,7 +50,8 @@ serve a Tailscale-User-Login listed in daemon.allow; anything else gets 401):
   POST /v1/guard/suggested       add every suggested host to guard.fetch_allow
   POST /v1/sessions              {"agent","dir","message"}: start a session (agent: a CLI name,
                                  acp:<cli> or api:<provider>/<model>; "" the last used); 201
-  GET  /v1/sessions              every session with status working, needs_you, done or failed
+  GET  /v1/sessions              every session with status working, needs_you, done or failed;
+                                 ?dir= keeps the ones started in that folder or below
   POST /v1/sessions/{id}/messages  {"text"}: the next user message (queued behind a turn); 202
   POST /v1/sessions/{id}/stop    cancel the turn; a later message goes on with the history
 Session events (session_* kinds, decision_asked for a permission) carry the session id on

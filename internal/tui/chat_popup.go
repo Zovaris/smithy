@@ -21,18 +21,38 @@ var slashCommands = []slashCommand{
 	{"new", "", "start a new session; your next message opens it"},
 	{"sessions", "", "agents and sessions: open one, stop it, see what waits on you"},
 	{"agent", "[name]", "the agent new sessions start with"},
-	{"model", "[name]", "the model the agent runs"},
+	{"model", "[name]", "the model the open session runs, else new sessions; tab lists other agents"},
+	{"effort", "[low|medium]", "the open session's reasoning effort, for agents that take one"},
 	{"skills", "", "skills and MCP injected into every session"},
+	{"theme", "[steel|frost|plum]", "the color theme this TUI and the web share (ui.theme)"},
 	{"connect", "", "which daemon this chat talks to, and how to reach another"},
 	{"web", "", "open the web UI in your browser"},
 	{"remote", "", "reach this daemon from your phone or another machine"},
 	{"stop", "", "stop the open session's turn"},
 	{"mode", "[minimal|expandable|verbose]", "how much of each turn the transcript shows"},
 	{"log", "", "daemon events kept out of the transcript"},
+	{"welcome", "", "walk the first-run steps again: agents, model, API keys, notifications"},
 	{"setup", "", "first run: every agent ready or missing, with its fix"},
+	{"ask", "[question]", "pin a sample question on the strip, to see and try how decisions work"},
 	{"answer", "<text>", "answer the decision pinned at the top in your words"},
 	{"help", "", "keys and commands"},
+	{"serve", "[on|off]", "serve mode: off launches nothing new (auto.paused)"},
+	{"set", "<key> <value>", "save a setting in your user file (smithy config set)"},
+	{"unset", "<key>", "put a setting back to its default"},
+	{"keys", "", "stored API keys, masked, and how to add or remove one"},
+	{"key", "rm <service>", "remove a stored API key"},
+	{"doctor", "", "run smithy doctor on the daemon's machine"},
+	{"detach", "", "quit and leave the daemon running"},
 	{"quit", "", "leave; a background daemon keeps running"},
+}
+
+func isCommand(name string) bool {
+	for _, c := range slashCommands {
+		if c.name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // popupItem is one row of the / or @ popup: what tab puts in the input, and its description.
@@ -52,6 +72,13 @@ func (m chatView) popup() []popupItem {
 		for _, c := range slashCommands {
 			if strings.HasPrefix(c.name, q) {
 				out = append(out, popupItem{fill: "/" + c.name + " ", label: "/" + c.name, desc: c.desc})
+			}
+		}
+		if m.setupSt != nil {
+			for _, s := range m.setupSt.Skills {
+				if p := m.setupSt.Paths[s]; p != "" && strings.HasPrefix(s, q) && !isCommand(s) {
+					out = append(out, popupItem{fill: "/" + s + " ", label: "/" + s, desc: "skill · " + skillDir(p)})
+				}
 			}
 		}
 		if len(out) == 1 && out[0].label == v {
@@ -160,13 +187,15 @@ func (m chatView) popupKey(msg tea.KeyPressMsg, items []popupItem) (chatView, te
 	return m, nil, true
 }
 
-// popupRows draws the popup as a raised list w wide, the selected row on the border tier.
+// popupRows draws the popup as a raised list w wide, the selected row marked by the accent bar
+// floatBox uses.
 func (m chatView) popupRows(items []popupItem, w int) []string {
 	t := m.th
-	bg, sel := lipgloss.NewStyle(), lipgloss.NewStyle()
+	bg := lipgloss.NewStyle()
 	if t.overlay != nil {
-		bg, sel = bg.Background(t.overlay), sel.Background(t.border)
+		bg = bg.Background(t.overlay)
 	}
+	bar := frameGlyphs(t.uni).sel
 	lw := 0
 	for _, it := range items {
 		lw = max(lw, ansi.StringWidth(it.label))
@@ -176,15 +205,15 @@ func (m chatView) popupRows(items []popupItem, w int) []string {
 	var out []string
 	for i := start; i < len(items) && i < start+room; i++ {
 		it := items[i]
-		label, st := t.fg(t.text), bg
+		label, mark := t.fg(t.text), "  "
 		if i == m.popSel {
-			label, st = t.fg(t.strong).Bold(true), sel
+			label, mark = t.fg(t.strong).Bold(true), t.fg(t.accent).Render(bar)+" "
 		}
-		r := "  " + label.Render(it.label) + strings.Repeat(" ", lw-ansi.StringWidth(it.label))
+		r := mark + label.Render(it.label) + strings.Repeat(" ", lw-ansi.StringWidth(it.label))
 		if it.desc != "" {
 			r += "   " + t.fg(t.dim).Render(it.desc)
 		}
-		out = append(out, fill(st, w, ansi.Truncate(r, w-1, "…")))
+		out = append(out, fill(bg, w, ansi.Truncate(r, w-1, "…")))
 	}
 	return out
 }

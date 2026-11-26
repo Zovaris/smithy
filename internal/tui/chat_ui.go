@@ -4,10 +4,14 @@ package tui
 
 import (
 	"context"
+	"crypto/rand"
+	hexenc "encoding/hex"
 	"encoding/json"
 	"fmt"
 	"image/color"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -34,11 +38,13 @@ const (
 	overlayNone chatOverlay = iota
 	overlayAgents
 	overlayPalette
-	overlaySetup  // first run: every agent ready or missing
-	overlayPicker // ctrl+l, /agent, /model
-	overlaySkills // /skills
-	overlayHelp   // ? and /help
-	overlayInfo   // /connect, /remote, /web, /log
+	overlaySetup   // first run: every agent ready or missing
+	overlayPicker  // ctrl+l, /agent, /model
+	overlaySkills  // /skills
+	overlayHelp    // ? and /help
+	overlayInfo    // /connect, /remote, /web, /log
+	overlayProject // which project a new session starts in
+	overlayWelcome
 )
 
 // chatTool is the data of a "tool" event: one tool call of a session's turn.
@@ -55,6 +61,8 @@ type chatTool struct {
 type chatSession struct {
 	id, kind, state          string
 	title, agent, model, now string
+	effort                   string
+	dir                      string // the folder it started in; "" for batch events
 	since, turn              time.Time
 }
 
@@ -83,7 +91,7 @@ type stripHit struct {
 
 // event routes one daemon event: session events to their conversation, decisions to the
 // strip, a turn's tools and thinking to the transcript, everything else to the status line.
-func (m *chatView) event(kind, session, at string, data json.RawMessage) {
+func (m *chatView) event(kind, session string, at time.Time, data json.RawMessage) {
 	if strings.HasPrefix(kind, "session_") && session != "" {
 		if m.sessionEvent(kind, session, data) {
 			return
@@ -119,7 +127,7 @@ func (m *chatView) event(kind, session, at string, data json.RawMessage) {
 		}
 	}
 	if t := eventText(kind, session, data); t != "" {
-		m.status(t)
+		m.logNoise(noise{at: at, text: t, quiet: kind == daemon.KindAsked})
 	}
 }
 
@@ -137,6 +145,7 @@ func (m *chatView) track(id, kind string) {
 		if s := &m.sessions[i]; s.id == id {
 			if state == "running" && s.state != "running" {
 				s.turn = time.Now()
+				delete(m.streamed, id)
 			}
 			s.kind, s.state = kind, state
 			return
@@ -246,11 +255,15 @@ func (m chatView) toggle(i int) chatView {
 	return m
 }
 
-// shortcut handles the single keys that act only while the input is empty.
+// shortcut handles the chat's chord keys. A printable key always goes to the input, so typing
+// never loses a letter; a lone ? or option letter acts on enter instead.
 func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	switch msg.String() {
+	case "ctrl+o":
+		m.setMode((m.mode + 1) % 3)
+		return true, nil
 	case "tab":
-		m.overlay, m.agentSel = overlayAgents, max(m.current2(), 0)
+		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
 		return true, nil
 	case "ctrl+k":
 		m.overlay, m.pal = overlayPalette, palette{}
@@ -259,25 +272,21 @@ func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		m.openPicker(overlayPicker)
 		return true, m.loadSetup(false)
 	}
-	if m.input.Value() != "" || len([]rune(msg.Text)) != 1 {
-		return false, nil
+	return false, nil
+}
+
+// optionFor is the waiting decision's option whose first letter is t, when t is that letter
+// alone: the letter then enter answers, so a typed message never loses its first letter.
+func (m chatView) optionFor(t string) (string, bool) {
+	if len(m.pending) == 0 || len([]rune(t)) != 1 {
+		return "", false
 	}
-	if len(m.pending) > 0 {
-		for _, o := range m.pending[0].Options {
-			if strings.EqualFold(firstRune(o), msg.Text) {
-				return true, m.answer(o)
-			}
+	for _, o := range m.pending[0].Options {
+		if strings.EqualFold(firstRune(o), t) {
+			return o, true
 		}
 	}
-	switch msg.Text {
-	case "v":
-		m.setMode((m.mode + 1) % 3)
-		return true, nil
-	case "?":
-		m.overlay, m.pal = overlayHelp, palette{}
-		return true, nil
-	}
-	return false, nil
+	return "", false
 }
 
 func firstRune(s string) string {
@@ -301,7 +310,7 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		}
 		m.setMode(next)
 	case "agents", "sessions":
-		m.overlay, m.agentSel = overlayAgents, max(m.current2(), 0)
+		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
 	case "new":
 		m.newSession()
 		m.status("new session: your next message starts it with " + m.agentLabel())
@@ -321,26 +330,70 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.agentCommand(arg)
 	case "model":
 		return m.modelCommand(arg)
+	case "effort":
+		return m.effortCommand(arg)
+	case "theme":
+		return m.themeCommand(arg)
 	case "skills":
 		m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
 		return m, m.loadSetup(false)
+	case "welcome":
+		m.openWelcome()
+		return m, tea.Batch(m.loadSetup(false), m.loadWelcomeSettings())
 	case "setup":
 		m.openPicker(overlaySetup)
 		return m, m.loadSetup(false)
+	case "ask":
+		return m, m.askDemo(arg)
 	case "answer":
 		if arg == "" {
 			m.system("usage: /answer <text>")
 			return m, nil
 		}
 		return m, m.answer(arg)
+	case "detach":
+		return m.detach()
+	case "serve", "set", "unset", "key", "keys", "doctor":
+		return m.settingsCommand(name, arg)
 	case "quit":
 		return m, tea.Quit
 	case "help":
 		m.overlay, m.pal = overlayHelp, palette{}
 	default:
+		if p := m.skillPrompt(name, arg); p != "" {
+			return m.send(p)
+		}
 		m.system("unknown command /" + name)
 	}
 	return m, nil
+}
+
+// skillPrompt is what /name or $name sends for an installed skill: read its SKILL.md and follow it
+// on the rest of the line; "" when name is no installed skill.
+func (m chatView) skillPrompt(name, arg string) string {
+	if m.setupSt == nil {
+		return ""
+	}
+	p := m.setupSt.Paths[name]
+	if p == "" {
+		return ""
+	}
+	out := "Use the " + name + " skill: read " + p + " and follow it."
+	if arg != "" {
+		out += "\n\n" + arg
+	}
+	return out
+}
+
+// skillDir is where a skill lives, for its hint: the folder holding it, with ~ for home.
+func skillDir(path string) string {
+	d := filepath.Dir(filepath.Dir(path))
+	if h, err := os.UserHomeDir(); err == nil && h != "" {
+		if r, ok := strings.CutPrefix(d, h+string(filepath.Separator)); ok {
+			return "~/" + r
+		}
+	}
+	return d
 }
 
 // click focuses what is under the pointer: an option on the strip answers, a transcript row
@@ -383,10 +436,12 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	switch m.overlay {
-	case overlaySetup, overlayPicker, overlaySkills:
+	case overlaySetup, overlayPicker, overlaySkills, overlayWelcome:
 		return m.setupKey(msg)
 	case overlayAgents:
 		return m.agentsKey(k)
+	case overlayProject:
+		return m.projectKey(k)
 	case overlayHelp, overlayInfo:
 		switch k {
 		case "esc", "q", "?":
@@ -457,18 +512,21 @@ func (m chatView) agentsKey(k string) (tea.Model, tea.Cmd) {
 	case "up", "k":
 		m.agentSel = max(m.agentSel-1, 0)
 	case "down", "j":
-		m.agentSel = min(m.agentSel+1, max(len(m.sessions)-1, 0))
+		m.agentSel = min(m.agentSel+1, max(len(m.listed())-1, 0))
+	case "a":
+		m.allProj = !m.allProj
+		m.agentSel = min(m.agentSel, max(len(m.listed())-1, 0))
 	case "enter":
-		if m.agentSel < len(m.sessions) {
-			m.open(m.sessions[m.agentSel].id)
+		if l := m.listed(); m.agentSel < len(l) {
+			m.open(l[m.agentSel].id)
 		}
 		m.overlay = overlayNone
 	case "n":
 		m.newSession()
 		m.overlay = overlayNone
 	case "s":
-		if m.agentSel < len(m.sessions) && m.sess != nil {
-			api, id := m.sess, m.sessions[m.agentSel].id
+		if l := m.listed(); m.agentSel < len(l) && m.sess != nil {
+			api, id := m.sess, l[m.agentSel].id
 			return m, func() tea.Msg {
 				if err := api.StopSession(context.Background(), id); err != nil {
 					return sessionErrMsg{what: "stop", err: err}
@@ -503,7 +561,7 @@ func (m chatView) palItems() []palItem {
 			m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
 			return m.loadSetup(false)
 		}},
-		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Verbosity: " + m.mode.String(), hint: "minimal · expandable · verbose", key: "v", run: cycle},
+		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Verbosity: " + m.mode.String(), hint: "minimal · expandable · verbose", key: "ctrl+o", run: cycle},
 		palItem{group: "ACTIONS", glyph: t.g.on, color: t.muted, label: "Agents panel", hint: "sessions and waiting items", key: "tab", run: agents},
 		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Open the web UI", hint: "same sessions in the browser", key: "/web", run: func(m *chatView) tea.Cmd { _, c := m.openWeb(); return c }},
 		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Connect", hint: strings.TrimPrefix(m.server+" "+t.g.dot+" "+m.url, " "+t.g.dot+" "), key: "/connect", run: func(m *chatView) tea.Cmd { return m.showConnect() }},
@@ -793,44 +851,7 @@ func (m chatView) strip(w int) (string, []stripHit) {
 	if n := len(m.pending) - 1; n > 0 {
 		s += t.fg(t.dim).Render(fmt.Sprintf(" +%d more", n))
 	}
-	var run []string
-	for _, x := range m.sessions {
-		if x.state == "running" {
-			name := x.title
-			if name == "" {
-				name = x.id
-			}
-			run = append(run, name)
-		}
-	}
-	right := ""
-	if len(run) > 0 {
-		right = t.fg(t.accent).Render(t.g.on) + t.fg(t.dim).Render(fmt.Sprintf(" %d running %s %s", len(run), t.g.dot, strings.Join(run, " "+t.g.dot+" ")))
-	}
-	if room := w - ansi.StringWidth(s) - m.pad() - 2; room > 12 && right != "" {
-		s = spread(s, ansi.Truncate(right, room, "…")+p, w)
-	}
 	return fill(row, w, s), hits
-}
-
-func (m chatView) panel(w int, rows []string) []string {
-	t := m.th
-	bg := lipgloss.NewStyle()
-	if t.overlay != nil {
-		bg = bg.Background(t.overlay)
-	}
-	n := m.rows()
-	if len(rows) > n {
-		rows = rows[:n]
-	}
-	out := make([]string, 0, n)
-	for _, r := range rows {
-		out = append(out, bg.Width(w).MaxWidth(w).Render(ansi.Truncate(r, w, "")))
-	}
-	for len(out) < n {
-		out = append(out, bg.Width(w).Render(""))
-	}
-	return out
 }
 
 func spread(left, right string, w int) string {
@@ -842,4 +863,21 @@ func spread(left, right string, w int) string {
 		return left
 	}
 	return left + strings.Repeat(" ", gap) + right
+}
+
+// askDemo pins a sample question (or the one typed) on the decision strip through the daemon,
+// the same path an agent's ask tool takes outside warden, so it can be seen and answered.
+func (m *chatView) askDemo(q string) tea.Cmd {
+	if m.ask == nil {
+		m.system("/ask needs smithy daemon running: it carries the question and the answer")
+		return nil
+	}
+	opts := []string{"yes", "no", "later"}
+	if q == "" {
+		q, opts = "Demo: which answer should this sample question get?", []string{"approve", "reject", "later"}
+	}
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	m.status("asked: answer it on the strip at the top (click, its first letter then enter, or /answer)")
+	return m.ask("ask:demo"+hexenc.EncodeToString(b), q, opts)
 }

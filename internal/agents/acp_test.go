@@ -159,8 +159,9 @@ func TestBuildACP(t *testing.T) {
 		o    Options
 		want []string
 	}{
-		{"gemini", Options{Model: "m"}, []string{"gemini", "--experimental-acp", "-m", "m"}},
-		{"gemini", Options{ReadOnly: true}, []string{"gemini", "--experimental-acp", "--approval-mode", "plan"}},
+		{"agy", Options{Model: "m", ReadOnly: true}, []string{"agy", "acp"}},
+		{"copilot", Options{Model: "m"}, []string{"copilot", "--acp"}},
+		{"grok", Options{}, []string{"grok", "agent", "stdio"}},
 		{"opencode", Options{}, []string{"opencode", "acp"}},
 	}
 	for _, c := range cases {
@@ -176,7 +177,7 @@ func TestBuildACP(t *testing.T) {
 	if !s.ACP || s.PromptStdin {
 		t.Fatalf("custom over ACP = %+v", s)
 	}
-	if _, err := Build("gemini", Options{}, "P", nil, "", env(map[string]string{"AGENT_PROTOCOL": "grpc"})); err == nil {
+	if _, err := Build("agy", Options{}, "P", nil, "", env(map[string]string{"AGENT_PROTOCOL": "grpc"})); err == nil {
 		t.Fatal("unknown protocol accepted")
 	}
 }

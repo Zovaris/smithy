@@ -4,17 +4,13 @@ package tui
 
 import (
 	"context"
-	"fmt"
-	"image/color"
 	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/models"
-	"github.com/charmbracelet/x/ansi"
 )
 
 // setupAPI is the daemon's setup endpoints; *daemon.Client is one.
@@ -42,6 +38,8 @@ type setupStep int
 const (
 	stepAgent setupStep = iota
 	stepModel
+	stepEffort
+	stepTheme
 )
 
 type setupLoadedMsg struct {
@@ -117,8 +115,13 @@ func (m chatView) setupUpdate(msg tea.Msg) (chatView, tea.Cmd, bool) {
 			return m, nil, true
 		}
 		m.setupSt = &msg.s
-		if msg.first && !msg.s.Chosen && m.overlay == overlayNone {
-			m.openPicker(overlaySetup)
+		if msg.first && (!msg.s.Chosen || m.welcome == welcomeSplash) && m.overlay == overlayNone {
+			if m.input.Value() == "" {
+				m.openWelcome()
+				return m, m.loadWelcomeSettings(), true
+			}
+			m.welcome = welcomeOff
+			m.system("/welcome sets smithy up: agents, model, API keys, notifications")
 		}
 		return m, nil, true
 	case setupSavedMsg:
@@ -132,10 +135,28 @@ func (m chatView) setupUpdate(msg tea.Msg) (chatView, tea.Cmd, bool) {
 		if m.overlay == overlaySetup || m.overlay == overlayPicker {
 			m.overlay = overlayNone
 		}
-		if msg.note != "" {
+		if msg.note != "" && m.welcome != welcomeOff {
+			m.welcomeNote = msg.note
+		} else if msg.note != "" {
 			m.system(msg.note)
 		}
+		if m.welcome != welcomeOff {
+			n, cmd := m.welcomeSaved()
+			return n, tea.Batch(cmd, n.loadSetup(false)), true
+		}
 		return m, m.loadSetup(false), true
+	case sessionModelSetMsg:
+		m.sessionModelSet(msg)
+		return m, nil, true
+	case welcomeSettingsMsg:
+		if msg.err != nil {
+			m.setupNote = "could not read the settings: " + msg.err.Error()
+		} else {
+			m.welcomeSet = &msg.s
+		}
+		return m, nil, true
+	case themeMsg:
+		return m.themeLoaded(msg), nil, true
 	case modelsLoadedMsg:
 		if msg.agent != m.modelFor {
 			return m, nil, true
@@ -184,6 +205,7 @@ func (m *chatView) openPicker(o chatOverlay) {
 // and fetches what the agent reports.
 func (m *chatView) askModel(agent string) tea.Cmd {
 	m.overlay, m.setupStep, m.modelFor, m.modelIn, m.setupNote, m.modelSel, m.modelList = overlayPicker, stepModel, agent, "", "", 0, nil
+	m.modelSess = ""
 	return m.loadModels(false)
 }
 
@@ -306,8 +328,17 @@ func (m chatView) agentCommand(arg string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// modelCommand is /model [name] for the current agent: no name asks for it.
 func (m chatView) modelCommand(arg string) (tea.Model, tea.Cmd) {
+	if _, ok := m.sess.(sessionModelAPI); ok {
+		if s := m.openSession(); s != nil && !strings.HasPrefix(s.agent, "api:") {
+			if arg != "" {
+				return m, m.setSessionModel(s.id, arg, s.effort)
+			}
+			cmd := m.askModel(s.agent)
+			m.modelSess = s.id
+			return m, cmd
+		}
+	}
 	if m.setupSt == nil || m.setupSt.Default.Agent == "" {
 		m.system("pick an agent first: /agent")
 		return m, nil
@@ -332,11 +363,22 @@ func (m chatView) setupKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if k == "ctrl+c" {
 		return m, tea.Quit
 	}
+	if m.welcome != welcomeOff {
+		if n, cmd, ok := m.welcomeKey(msg); ok {
+			return n, cmd
+		}
+	}
 	if m.overlay == overlaySkills {
 		return m.skillsKey(msg)
 	}
 	if m.setupStep == stepModel {
 		return m.modelKey(msg)
+	}
+	if m.setupStep == stepEffort {
+		return m.effortKey(msg)
+	}
+	if m.setupStep == stepTheme {
+		return m.themeKey(msg)
 	}
 	var rows []agents.Ready
 	if m.setupSt != nil {
@@ -357,6 +399,7 @@ func (m chatView) setupKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	case "enter":
 		if m.setupSel < len(rows) {
+			m.welcomeAgent = rows[m.setupSel].Name
 			return m, m.pick(rows[m.setupSel])
 		}
 	}
@@ -377,6 +420,12 @@ func (m chatView) modelKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+r":
 		m.modelList = nil
 		return m, m.loadModels(true)
+	case "tab":
+		if m.modelSess == "" {
+			if next := m.nextReadyAgent(m.modelFor); next != "" {
+				return m, m.askModel(next)
+			}
+		}
 	case "backspace":
 		if r := []rune(m.modelIn); len(r) > 0 {
 			m.modelIn, m.modelSel = string(r[:len(r)-1]), 0
@@ -389,6 +438,14 @@ func (m chatView) modelKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		mod := rows[m.modelSel].m.ID
+		if m.modelSess != "" {
+			eff := ""
+			if s := m.sessionByID(m.modelSess); s != nil {
+				eff = s.effort
+			}
+			m.overlay = overlayNone
+			return m, m.setSessionModel(m.modelSess, mod, eff)
+		}
 		if strings.HasPrefix(m.modelFor, "api:") {
 			return m, m.saveDefault(m.modelFor+"/"+mod, "")
 		}
@@ -436,230 +493,4 @@ func (m chatView) skillsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, m.installSkills()
 	}
 	return m, nil
-}
-
-// selRow marks the selected row with the accent pointer; the rest keep the same indent.
-func (m chatView) selRow(sel bool, s string) string {
-	if !sel {
-		return "  " + s
-	}
-	return m.th.fg(m.th.accent).Render(m.th.g.sel) + " " + s
-}
-
-// setupPanel is the first-run screen and the ctrl+l / /agent / /model picker.
-func (m chatView) setupPanel(w int) []string {
-	t := m.th
-	dim, strong := t.fg(t.dim), t.fg(t.strong)
-	var rows []string
-	if m.overlay == overlaySetup {
-		rows = append(rows, "", "  "+strong.Render("Welcome to smithy"), "  "+dim.Render("These are the agents on this machine. Pick the one new sessions start with; ctrl+l changes it later."), "")
-	} else {
-		rows = append(rows, "", spread("  "+strong.Render("Pick an agent"), dim.Render("esc close  "), w), "")
-	}
-	if m.setupSt == nil {
-		rows = append(rows, "  "+dim.Render("reading the agents…"))
-		if m.setupNote != "" {
-			rows = append(rows, "  "+t.fg(t.err).Render(m.setupNote))
-		}
-		return m.panel(w, rows)
-	}
-	if m.setupStep == stepModel {
-		return m.modelPanel(w)
-	}
-	kind := ""
-	for i, a := range m.setupSt.Agents {
-		if a.Kind != kind {
-			kind = a.Kind
-			label := "AGENT CLIS"
-			if kind == "api" {
-				label = "API KEYS"
-			}
-			if i > 0 {
-				rows = append(rows, "")
-			}
-			rows = append(rows, "  "+t.fg(t.muted).Render(label))
-		}
-		g, c, state := t.g.pass, t.ok, "ready"
-		if !a.Ready {
-			g, c, state = t.g.fail, t.err, "missing"
-		}
-		name := fmt.Sprintf("%-16s", a.Name)
-		cur := ""
-		if d := m.setupSt.Default.Agent; m.setupSt.Chosen && (d == a.Name || strings.HasPrefix(d, a.Name+"/")) {
-			cur = t.fg(t.accent).Render("  " + t.g.on + " default")
-		}
-		info := dim.Render(fmt.Sprintf("%-8s", state)) + " " + dim.Render(short(a.Detail, max(w/3, 20)))
-		if !a.Ready && a.Fix != "" {
-			info = dim.Render(fmt.Sprintf("%-8s", state)) + " " + t.fg(t.text).Render(a.Fix)
-		}
-		rows = append(rows, m.selRow(i == m.setupSel, t.fg(c).Render(g)+" "+strong.Render(name)+" "+info+cur))
-	}
-	rows = append(rows, "")
-	if m.setupNote != "" {
-		rows = append(rows, "  "+t.fg(t.warn).Render(m.setupNote), "")
-	}
-	foot := dim.Render("  ↑↓ move   enter pick   m model   esc " + map[bool]string{true: "later", false: "close"}[m.overlay == overlaySetup])
-	n := m.rows()
-	if len(rows) >= n {
-		rows = rows[:n-1]
-	}
-	for len(rows) < n-1 {
-		rows = append(rows, "")
-	}
-	return m.panel(w, append(rows, foot))
-}
-
-// modelPanel is the model list for m.modelFor: the filter, the rows that match it in two
-// aligned columns and where the list came from. Every segment carries the panel's background so
-// no cell falls back to the terminal's.
-func (m chatView) modelPanel(w int) []string {
-	t := m.th
-	on := func(c color.Color) lipgloss.Style {
-		st := t.fg(c)
-		if t.overlay != nil {
-			st = st.Background(t.overlay)
-		}
-		return st
-	}
-	dim, strong, text := on(t.dim), on(t.strong), on(t.text)
-	sp := func(n int) string { return on(nil).Render(strings.Repeat(" ", max(n, 0))) }
-	row := func(sel bool, s string) string {
-		if sel {
-			return on(t.accent).Render(t.g.sel) + sp(1) + s
-		}
-		return sp(2) + s
-	}
-	hint := ""
-	if m.modelIn == "" {
-		hint = dim.Render("  type to filter")
-	}
-	title, closeHint := sp(2)+strong.Render("Model for "+m.modelFor), dim.Render("esc close")+sp(2)
-	rows := []string{"", title + sp(w-ansi.StringWidth(title)-ansi.StringWidth(closeHint)) + closeHint, "",
-		sp(2) + on(t.accent).Render(t.g.prompt) + sp(1) + text.Render(m.modelIn) + on(t.accent).Render("▏") + hint, ""}
-	list := m.modelRows()
-	idW := 0
-	for _, r := range list {
-		idW = max(idW, ansi.StringWidth(r.m.ID))
-	}
-	idW = min(max(idW, len("agent default")), max(w/2, 20))
-	n := m.rows()
-	room := max(n-len(rows)-4, 3)
-	from := 0
-	if m.modelSel >= room {
-		from = m.modelSel - room + 1
-	}
-	for i := from; i < len(list) && i < from+room; i++ {
-		r := list[i]
-		var left, right string
-		switch {
-		case r.other:
-			left, right = strong.Render("Other: ")+text.Render(r.m.ID), dim.Render("use this name as typed")
-		case r.m.ID == "":
-			left, right = strong.Render("agent default"), dim.Render("whatever "+m.modelFor+" starts with")
-		default:
-			left = text.Render(ansi.Truncate(r.m.ID, idW, "…"))
-			var parts []string
-			if r.m.Name != "" && r.m.Name != r.m.ID {
-				parts = append(parts, r.m.Name)
-			}
-			if r.m.InPerM != nil && r.m.OutPerM != nil {
-				parts = append(parts, fmt.Sprintf("$%.2f/$%.2f per M", *r.m.InPerM, *r.m.OutPerM))
-			}
-			tag := ""
-			if r.m.Default {
-				tag = sp(2) + on(t.accent).Render(t.g.on+" default")
-			}
-			rest := max(w-idW-8-ansi.StringWidth(tag), 8)
-			right = dim.Render(ansi.Truncate(strings.Join(parts, "  "), rest, "…")) + tag
-		}
-		line := left + sp(idW-ansi.StringWidth(left)+2) + right
-		rows = append(rows, row(i == m.modelSel, line))
-	}
-	if m.modelList == nil {
-		rows = append(rows, sp(2)+dim.Render("asking "+m.modelFor+" for its models…"))
-	}
-	rows = append(rows, "")
-	if l := m.modelList; l != nil {
-		if l.Error != "" {
-			rows = append(rows, sp(2)+on(t.warn).Render(ansi.Truncate(l.Error, w-4, "…")))
-		}
-		rows = append(rows, sp(2)+dim.Render(fmt.Sprintf("%d models from %s", len(l.Models), l.Source)))
-	}
-	if m.setupNote != "" {
-		rows = append(rows, sp(2)+on(t.warn).Render(m.setupNote))
-	}
-	foot := dim.Render("  type filter   ↑↓ move   enter save   ctrl+r ask again   esc cancel")
-	if len(rows) >= n {
-		rows = rows[:n-1]
-	}
-	for len(rows) < n-1 {
-		rows = append(rows, "")
-	}
-	return m.panel(w, append(rows, foot))
-}
-
-// skillsPanel is /skills: what goes into every session (smithy's MCP server, smithy skills) and
-// what each harness has installed.
-func (m chatView) skillsPanel(w int) []string {
-	t := m.th
-	dim, strong := t.fg(t.dim), t.fg(t.strong)
-	rows := []string{"", spread("  "+strong.Render("Skills and MCP"), dim.Render("esc close  "), w), ""}
-	if m.setupSt == nil {
-		return m.panel(w, append(rows, "  "+dim.Render("reading…")))
-	}
-	s := m.setupSt
-	box := func(on bool) string {
-		if on {
-			return t.fg(t.ok).Render("[x]")
-		}
-		return dim.Render("[ ]")
-	}
-	rows = append(rows, "  "+t.fg(t.muted).Render("INJECTED INTO EVERY SESSION"))
-	rows = append(rows, m.selRow(m.setupSel == 0, box(s.Kit.MCP)+" "+strong.Render(fmt.Sprintf("%-20s", "smithy MCP server"))+dim.Render("board, cards and decisions as tools")))
-	for i, sk := range s.Skills {
-		rows = append(rows, m.selRow(m.setupSel == i+1, box(slices.Contains(s.Kit.Skills, sk))+" "+strong.Render(fmt.Sprintf("%-20s", sk))+dim.Render("skill")))
-	}
-	if len(s.Skills) == 0 {
-		rows = append(rows, "  "+dim.Render("no smithy skills installed: press i"))
-	}
-	rows = append(rows, "", "  "+t.fg(t.muted).Render("INSTALLED PER HARNESS"))
-	for _, h := range s.Harnesses {
-		name := strong.Render(fmt.Sprintf("%-10s", h.Harness))
-		if !h.Present {
-			rows = append(rows, "  "+dim.Render(t.g.dot)+" "+name+" "+dim.Render("not installed"))
-			continue
-		}
-		g, c := t.g.pass, t.ok
-		if len(h.Missing) > 0 {
-			g, c = t.g.wait, t.warn
-		}
-		mcp := "no MCP servers"
-		if len(h.MCP) > 0 {
-			mcp = "MCP " + strings.Join(h.MCP, ", ")
-		}
-		if h.MCPError != "" {
-			mcp = h.MCPError
-		}
-		other := ""
-		if len(h.Other) > 0 {
-			other = fmt.Sprintf(" %s %d other skills", t.g.dot, len(h.Other))
-		}
-		line := t.fg(c).Render(g) + " " + name + " " + t.fg(t.text).Render(fmt.Sprintf("smithy %d/%d", len(h.Smithy), len(h.Smithy)+len(h.Missing))) + dim.Render(other+" "+t.g.dot+" "+mcp)
-		rows = append(rows, "  "+line)
-	}
-	rows = append(rows, "")
-	if m.setupNote != "" {
-		for _, l := range strings.Split(m.setupNote, "\n") {
-			rows = append(rows, "  "+t.fg(t.info).Render(l))
-		}
-	}
-	foot := dim.Render("  ↑↓ move   space toggle   i install/update smithy skills   esc close")
-	n := m.rows()
-	if len(rows) >= n {
-		rows = rows[:n-1]
-	}
-	for len(rows) < n-1 {
-		rows = append(rows, "")
-	}
-	return m.panel(w, append(rows, foot))
 }

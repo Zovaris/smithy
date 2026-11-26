@@ -564,3 +564,36 @@ func TestConnectorSettingsKnown(t *testing.T) {
 		t.Errorf("%s not a known setting", k)
 	}
 }
+
+func TestThemeIsAnEnumWithSteelDefault(t *testing.T) {
+	kind, opts := KindOf("ui.theme")
+	if kind != "enum" || len(opts) == 0 || opts[0] != "steel" || defaultOf("ui.theme") != "steel" {
+		t.Fatalf("ui.theme: %s %v default %q", kind, opts, defaultOf("ui.theme"))
+	}
+}
+
+func TestSnapshotMatchesEffective(t *testing.T) {
+	e := setup(t)
+	gitInit(t, e.repo)
+	write(t, filepath.Join(e.repo, ".smithy", "config.json"), `{"linear":{"team":"repo-team"}}`)
+	write(t, e.user, `{"linear":{"team":"user-team"},"auto":{"paused":true}}`)
+	eff := Snapshot()
+	keys := []string{"no.such.key"}
+	for _, k := range Known {
+		keys = append(keys, k.Key)
+	}
+	for _, k := range keys {
+		v1, s1, err1 := Effective(k)
+		v2, s2, err2 := eff(k)
+		if v1 != v2 || s1 != s2 || !errors.Is(err2, err1) {
+			t.Errorf("%s: Effective %q %q %v, Snapshot %q %q %v", k, v1, s1, err1, v2, s2, err2)
+		}
+	}
+	if v, src, _ := eff("linear.team"); v != "repo-team" || src != "repo" {
+		t.Errorf("linear.team = %q from %q", v, src)
+	}
+	write(t, e.user, `[]`)
+	if _, _, err := Snapshot()("auto.paused"); err == nil {
+		t.Error("a broken user file must be an error")
+	}
+}

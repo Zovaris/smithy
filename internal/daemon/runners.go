@@ -51,7 +51,7 @@ type apiRunner struct {
 func (r *apiRunner) Close() { r.chat.Close() }
 
 func (r *apiRunner) Turn(ctx context.Context, msg string, _ []Exchange, e Emit) (string, error) {
-	req := apiloop.Request{Model: r.chat.Model, Messages: append(r.msgs, apiloop.UserText(msg))}
+	req := apiloop.Request{Model: r.chat.Model, System: SystemPrompt("api:", hasRunCode(r.chat.Tools)), Messages: append(r.msgs, apiloop.UserText(msg))}
 	s := &apiSink{e: e}
 	t := &askTools{Tools: r.chat.Tools, hard: r.chat.Hard, ctx: ctx, e: e}
 	res, err := apiloop.Run(ctx, r.chat.Provider, req, t, s, apiloop.Options{Provider: r.chat.Name})
@@ -107,6 +107,7 @@ func (s *apiSink) Usage(u usage.Usage) { s.e.Usage(u) }
 
 type cliRunner struct {
 	exe, agent, model, dir, sdir string
+	effort                       string
 	n                            int
 }
 
@@ -141,15 +142,12 @@ func CLIPrompt(history []Exchange, msg string) string {
 		"---\nThe user's new message:\n\n" + msg
 }
 
-func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e Emit) (string, error) {
-	r.n++
-	base := filepath.Join(r.sdir, "turn-"+strconv.Itoa(r.n))
-	prompt, log := base+".prompt.md", base+".log"
-	if err := os.WriteFile(prompt, []byte(CLIPrompt(history, msg)), 0o600); err != nil {
-		return "", err
-	}
-	cmd := exec.Command(r.exe, "agent", "--cwd", r.dir, "--log", log, prompt)
-	cmd.Dir = r.dir
+type effortSetter interface{ SetEffort(string) }
+
+// SetEffort sets the effort the next turns pass as $AGENT_EFFORT ("": the agent.effort setting).
+func (r *cliRunner) SetEffort(e string) { r.effort = e }
+
+func (r *cliRunner) env() []string {
 	env := agents.Scrub(os.Environ())
 	env = append(env, "SMITHY_EVENTS=off")
 	if a := strings.TrimPrefix(r.agent, "acp:"); a != "" {
@@ -161,13 +159,29 @@ func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e 
 	if r.model != "" {
 		env = append(env, "AGENT_MODEL="+r.model)
 	}
+	if r.effort != "" {
+		env = append(env, "AGENT_EFFORT="+r.effort)
+	}
+	if r.agent == "claude" {
+		env = append(env, "AGENT_ARGS=--output-format stream-json --verbose --append-system-prompt "+quoteArg(SystemPrompt(r.agent, false)))
+	}
+	return append(env, "PATH="+agents.CLIPath(os.Getenv("PATH"), os.Getenv))
+}
+
+func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e Emit) (string, error) {
+	r.n++
+	base := filepath.Join(r.sdir, "turn-"+strconv.Itoa(r.n))
+	prompt, log := base+".prompt.md", base+".log"
+	if err := os.WriteFile(prompt, []byte(withSystem(r.agent, false, CLIPrompt(history, msg))), 0o600); err != nil {
+		return "", err
+	}
+	cmd := exec.Command(r.exe, "agent", "--cwd", r.dir, "--log", log, prompt)
+	cmd.Dir = r.dir
 	var cs *claudeStream
 	if r.agent == "claude" {
 		cs = newClaudeStream()
-		env = append(env, "AGENT_ARGS=--output-format stream-json --verbose")
 	}
-	env = append(env, "PATH="+agents.CLIPath(os.Getenv("PATH"), os.Getenv))
-	cmd.Env = env
+	cmd.Env = r.env()
 	var errOut capped
 	errOut.n = 4 << 10
 	cmd.Stdout, cmd.Stderr = io.Discard, &errOut

@@ -190,12 +190,12 @@ func TestSessionBadRequests(t *testing.T) {
 }
 
 func TestValidAgent(t *testing.T) {
-	for _, a := range []string{"", "claude", "codex", "acp:gemini", "api:anthropic/claude-sonnet-4-5", "api:openrouter/meta/llama-3:free", "api:ollama/qwen2.5-coder:7b"} {
+	for _, a := range []string{"", "claude", "codex", "acp:agy", "acp:copilot", "acp:grok", "api:anthropic/claude-sonnet-4-5", "api:openrouter/meta/llama-3:free", "api:ollama/qwen2.5-coder:7b"} {
 		if err := ValidAgent(a); err != nil {
 			t.Errorf("%q: %v", a, err)
 		}
 	}
-	for _, a := range []string{"custom", "acp:custom", "nope", "Claude", "-x", "a b", "acp:", "api:", "api:anthropic", "api:anthropic/a b", "claude\n", "../x", "acp:acp:x"} {
+	for _, a := range []string{"custom", "acp:custom", "nope", "Claude", "-x", "a b", "acp:", "api:", "api:anthropic", "api:anthropic/a b", "claude\n", "../x", "acp:acp:x", "acp:gemini"} {
 		if ValidAgent(a) == nil {
 			t.Errorf("%q passed", a)
 		}
@@ -506,13 +506,13 @@ func TestCLIRunnerTurn(t *testing.T) {
 	exe := filepath.Join(t.TempDir(), "smithy")
 	os.WriteFile(exe, []byte(fakeAgent), 0o755)
 	dir, sdir := t.TempDir(), t.TempDir()
-	r := &cliRunner{exe: exe, agent: "acp:gemini", dir: dir, sdir: sdir}
+	r := &cliRunner{exe: exe, agent: "acp:agy", dir: dir, sdir: sdir}
 	e := &recEmit{}
 	reply, err := r.Turn(context.Background(), "second", []Exchange{{"user", "first"}, {"agent", "ok"}}, e)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(reply, "cli=gemini proto=acp cwd="+dir) || !strings.Contains(reply, "User: first") || !strings.HasSuffix(reply, "second") {
+	if !strings.Contains(reply, "cli=agy proto=acp cwd="+dir) || !strings.Contains(reply, "User: first") || !strings.HasSuffix(reply, "second") {
 		t.Errorf("reply: %q", reply)
 	}
 	if strings.Join(e.text, "") != reply || e.usage.Input != 3 {

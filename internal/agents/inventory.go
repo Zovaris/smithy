@@ -80,8 +80,8 @@ func mcpFile(h, home string, getenv func(string) string) string {
 		return filepath.Join(envOr(getenv, "CODEX_HOME", filepath.Join(home, ".codex")), "config.toml")
 	case "opencode":
 		return filepath.Join(envOr(getenv, "XDG_CONFIG_HOME", filepath.Join(home, ".config")), "opencode", "opencode.json")
-	case "gemini":
-		return filepath.Join(home, ".gemini", "settings.json")
+	case "agy":
+		return filepath.Join(home, ".gemini", "config", "mcp_config.json")
 	case "cursor":
 		return filepath.Join(home, ".cursor", "mcp.json")
 	}

@@ -36,8 +36,9 @@ type sessionErrMsg struct {
 // noise is one daemon event kept out of the transcript: the status line shows the latest, /log
 // all of them.
 type noise struct {
-	at   time.Time
-	text string
+	at    time.Time
+	text  string
+	quiet bool // only in /log: what another part of the screen already shows
 }
 
 const maxNoise = 500
@@ -51,6 +52,14 @@ func (m chatView) send(text string) (chatView, tea.Cmd) {
 		return m, nil
 	}
 	api, dir, id := m.sess, m.dir, m.current
+	if id == "" && m.proj.dir == "" {
+		if pa, ok := api.(projectAPI); ok {
+			return m.askProject(pa, text)
+		}
+	}
+	if m.proj.dir != "" {
+		dir = m.proj.dir
+	}
 	if id == "" {
 		m.status("starting a session…")
 		return m, func() tea.Msg {
@@ -92,6 +101,7 @@ func (m *chatView) open(id string) {
 		m.convs[m.current] = m.msgs
 	}
 	m.current, m.msgs, m.offset, m.focus = id, m.convs[id], 0, -1
+	m.proj = projectPick{}
 	delete(m.convs, id)
 	for _, c := range m.msgs {
 		c.lines = nil
@@ -145,6 +155,7 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 		}
 		if m.lastText(id) != strings.TrimSpace(d.Text) {
 			m.into(id, chatMsg{who: "agent", text: strings.TrimSpace(d.Text)})
+			m.addStreamed(id, len(d.Text))
 		}
 	case daemon.KindSessionText:
 		var d struct{ Text string }
@@ -156,6 +167,7 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 			return true
 		}
 		m.into(id, chatMsg{who: "daemon", text: strings.TrimSpace(d.Text)})
+		m.addStreamed(id, len(d.Text))
 	case daemon.KindSessionTool:
 		var t daemon.ToolEvent
 		if json.Unmarshal(data, &t) == nil && t.Name != "" {
@@ -174,7 +186,13 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 		}
 	case daemon.KindSessionUsage:
 		var u usage.Usage
-		if json.Unmarshal(data, &u) == nil && u.CostUSD != nil {
+		if json.Unmarshal(data, &u) == nil {
+			if m.toks == nil {
+				m.toks = map[string]int64{}
+			}
+			m.toks[id] += u.Input + u.Output
+		}
+		if u.CostUSD != nil {
 			if m.cost == nil {
 				m.cost = map[string]float64{}
 			}
@@ -202,12 +220,54 @@ func (m *chatView) meta(id string, s daemon.Session) {
 	m.track(id, s.Status)
 	for i := range m.sessions {
 		if m.sessions[i].id == id {
-			m.sessions[i].title, m.sessions[i].agent, m.sessions[i].model = s.Title, s.Agent, s.Model
+			m.sessions[i].title, m.sessions[i].agent, m.sessions[i].model, m.sessions[i].effort = s.Title, s.Agent, s.Model, s.Effort
+			if s.Dir != "" {
+				m.sessions[i].dir = s.Dir
+			}
 			if !s.Created.IsZero() {
 				m.sessions[i].since = s.Created
 			}
 		}
 	}
+}
+
+// here reports whether s belongs to the folder the chat runs in.
+func (m chatView) here(s chatSession) bool {
+	return s.dir == "" || daemon.InProject(s.dir, m.dir) || daemon.InProject(s.dir, m.root)
+}
+
+// listed is the agents panel's rows: this folder's sessions, then the other projects' when
+// allProj is on.
+func (m chatView) listed() []chatSession {
+	var in, out []chatSession
+	for _, s := range m.sessions {
+		if m.here(s) {
+			in = append(in, s)
+		} else {
+			out = append(out, s)
+		}
+	}
+	if m.allProj {
+		return append(in, out...)
+	}
+	return in
+}
+
+func projHint(all bool) string {
+	if all {
+		return "here"
+	}
+	return "all"
+}
+
+// listedAt is the index of session id in the agents panel's rows, -1 when not listed.
+func (m chatView) listedAt(id string) int {
+	for i, s := range m.listed() {
+		if s.id == id && id != "" {
+			return i
+		}
+	}
+	return -1
 }
 
 func (m *chatView) now(id, what string) {
@@ -294,8 +354,16 @@ func diffStat(patch string) string {
 }
 
 // status puts text on the status line and in the log.
-func (m *chatView) status(text string) {
-	m.noise = append(m.noise, noise{at: time.Now(), text: text})
+func (m *chatView) status(text string) { m.logNoise(noise{at: time.Now(), text: text}) }
+
+// logNoise keeps n for /log, once per text; the status line shows it unless it is quiet.
+func (m *chatView) logNoise(n noise) {
+	for _, o := range m.noise {
+		if o.text == n.text {
+			return
+		}
+	}
+	m.noise = append(m.noise, n)
 	if len(m.noise) > maxNoise {
 		m.noise = m.noise[len(m.noise)-maxNoise:]
 	}

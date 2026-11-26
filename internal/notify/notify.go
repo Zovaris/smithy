@@ -310,7 +310,7 @@ func render(it item) (string, []button) {
 	}
 	if it.question != "" {
 		lines = append(lines, "<blockquote>"+clean(it.question, 300)+"</blockquote>",
-			"Answer in <code>smithy tui</code> › Needs you, or <code>smithy decisions pending</code>")
+			"Answer in <code>smithy stats</code> › Needs you, or <code>smithy decisions pending</code>")
 	}
 	if it.reason != "" {
 		lines = append(lines, "<blockquote>"+clean(it.reason, 200)+"</blockquote>")
@@ -592,7 +592,7 @@ func (n *Notifier) Flush(now time.Time) {
 		if len(parts) > 8 {
 			parts = parts[:8]
 		}
-		msg := fmt.Sprintf("📬 <b>%d more alerts</b> (rate limit)\n%s\n<i>smithy tui shows them</i>", len(rest), strings.Join(parts, "\n"))
+		msg := fmt.Sprintf("📬 <b>%d more alerts</b> (rate limit)\n%s\n<i>smithy stats shows them</i>", len(rest), strings.Join(parts, "\n"))
 		if !one(msg, nil) {
 			keep(rest)
 			todo = individual
@@ -731,7 +731,7 @@ func renderPlain(it item) (string, []button) {
 	}
 	if it.question != "" {
 		lines = append(lines, "<blockquote>"+clean(it.question, 300)+"</blockquote>",
-			"<i>Answer in</i> <code>smithy tui</code> <i>› Needs you, or</i> <code>smithy decisions pending</code>")
+			"<i>Answer in</i> <code>smithy stats</code> <i>› Needs you, or</i> <code>smithy decisions pending</code>")
 	}
 	if it.reason != "" {
 		lines = append(lines, "<blockquote>"+clean(it.reason, 200)+"</blockquote>")

@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="430" viewBox="0 0 960 430" role="img" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>How the smithy harness works</title>
+  <desc>One smithy daemon per machine runs every session; the TUI, the web and paired devices are views onto it; sessions run agent CLIs or API backends, each in one of the daemon projects.</desc>
+  <style>
+    .t { font-size: 15px; font-weight: 600; fill: #1f2328; }
+    .s { font-size: 12px; fill: #59636e; }
+    .c { font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #59636e; }
+    .k { font-size: 10.5px; font-weight: 700; letter-spacing: .09em; fill: #8c959f; }
+    .e { font-size: 11px; font-style: italic; fill: #8c959f; }
+    .n { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1.25; }
+    .r { fill: #ddf4ff; stroke: #54aeff; stroke-width: 1.25; }
+    .sm { fill: #f3f0ff; stroke: #8b7fe0; stroke-width: 1.25; }
+    .w { fill: #dafbe1; stroke: #4ac26b; stroke-width: 1.25; }
+    .wk { fill: #ffffff; stroke: #4ac26b; stroke-width: 1; }
+    .td { fill: #fff1e5; stroke: #fb8f44; stroke-width: 1.25; }
+    .m { fill: #fbefff; stroke: #a475f9; stroke-width: 1.25; }
+    .g { fill: none; stroke: #d0d7de; stroke-width: 1; stroke-dasharray: 3 4; }
+    .l { stroke: #8c959f; stroke-width: 1.5; fill: none; }
+    .lt { stroke: #fb8f44; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .h { fill: #8c959f; }
+    .ht { fill: #fb8f44; }
+    @media (prefers-color-scheme: dark) {
+      .t { fill: #f0f6fc; }
+      .s, .c { fill: #9198a1; }
+      .k, .e { fill: #6e7681; }
+      .n { fill: #151b23; stroke: #3d444d; }
+      .r { fill: #0c2d4f; stroke: #4493f8; }
+      .sm { fill: #231f3d; stroke: #8b7fe0; }
+      .w { fill: #0f2a19; stroke: #3fb950; }
+      .wk { fill: #0d1117; stroke: #3fb950; }
+      .td { fill: #3a2210; stroke: #db6d28; }
+      .m { fill: #2a1a40; stroke: #ab7df8; }
+      .g { stroke: #3d444d; }
+      .l { stroke: #6e7681; }
+      .h { fill: #6e7681; }
+      .lt { stroke: #db6d28; }
+      .ht { fill: #db6d28; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9z" class="h"/></marker>
+    <marker id="o" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9z" class="ht"/></marker>
+  </defs>
+  <rect class="n" x="20" y="40" width="280" height="70"/>
+  <text class="t" x="160.0" y="71.0" text-anchor="middle">TUI</text>
+  <text class="c" x="160.0" y="92.0" text-anchor="middle">smithy · smithy chat</text>
+  <text class="k" x="20" y="32" text-anchor="start">VIEWS</text>
+  <rect class="n" x="340" y="40" width="280" height="70"/>
+  <text class="t" x="480.0" y="71.0" text-anchor="middle">Web</text>
+  <text class="s" x="480.0" y="92.0" text-anchor="middle">smithy web · same sessions</text>
+  <rect class="n" x="660" y="40" width="280" height="70"/>
+  <text class="t" x="800.0" y="71.0" text-anchor="middle">Phone or other machine</text>
+  <text class="s" x="800.0" y="92.0" text-anchor="middle">paired device or tailscale serve</text>
+  <path class="l" d="M160 112V158" marker-start="url(#a)" marker-end="url(#a)"/>
+  <path class="l" d="M480 112V158" marker-start="url(#a)" marker-end="url(#a)"/>
+  <path class="l" d="M800 112V158" marker-start="url(#a)" marker-end="url(#a)"/>
+  <text class="e" x="488" y="140" text-anchor="start">events stream · resume after the last one seen</text>
+  <rect class="r" x="20" y="160" width="920" height="120"/>
+  <text class="k" x="36" y="180" text-anchor="start">DAEMON · ONE PER MACHINE</text>
+  <text class="t" x="170" y="212" text-anchor="middle">smithy daemon</text>
+  <text class="s" x="170" y="232" text-anchor="middle">127.0.0.1:7477 · token</text>
+  <text class="s" x="170" y="249" text-anchor="middle">outlives the chat</text>
+  <rect class="n" x="330" y="180" width="180" height="80"/>
+  <text class="t" x="420.0" y="207.0" text-anchor="middle">Sessions</text>
+  <text class="s" x="420.0" y="228.0" text-anchor="middle">one agent, one model</text>
+  <text class="s" x="420.0" y="245.0" text-anchor="middle">decisions, tool calls</text>
+  <rect class="n" x="540" y="180" width="180" height="80"/>
+  <text class="t" x="630.0" y="207.0" text-anchor="middle">Projects</text>
+  <text class="s" x="630.0" y="228.0" text-anchor="middle">folders sessions run in</text>
+  <text class="s" x="630.0" y="245.0" text-anchor="middle">per daemon</text>
+  <rect class="n" x="750" y="180" width="170" height="80"/>
+  <text class="t" x="835.0" y="207.0" text-anchor="middle">Skills · MCP</text>
+  <text class="s" x="835.0" y="228.0" text-anchor="middle">injected into</text>
+  <text class="s" x="835.0" y="245.0" text-anchor="middle">every session</text>
+  <path class="l" d="M420 282V318" marker-end="url(#a)"/>
+  <path class="l" d="M720 282V318" marker-end="url(#a)"/>
+  <rect class="sm" x="20" y="320" width="540" height="86"/>
+  <text class="t" x="290.0" y="350.0" text-anchor="middle">Agent CLIs</text>
+  <text class="s" x="290.0" y="371.0" text-anchor="middle">claude · codex · opencode · cursor · agy</text>
+  <text class="s" x="290.0" y="388.0" text-anchor="middle">copilot · grok · pi · dsh</text>
+  <text class="k" x="20" y="312" text-anchor="start">RUNS</text>
+  <rect class="w" x="600" y="320" width="340" height="86"/>
+  <text class="t" x="770.0" y="350.0" text-anchor="middle">API backends</text>
+  <text class="c" x="770.0" y="371.0" text-anchor="middle">api:&lt;provider&gt;/&lt;model&gt;</text>
+  <text class="s" x="770.0" y="388.0" text-anchor="middle">smithy's own tool loop</text>
+</svg>

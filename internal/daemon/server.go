@@ -81,6 +81,8 @@ type Server struct {
 	Version string
 	// Ready, when set, replaces agent detection (tests).
 	Ready func() []agents.Ready
+	// Doctor, when set, replaces running `smithy doctor` (tests).
+	Doctor func(context.Context) []string
 	// Models, when set, replaces model discovery (tests).
 	Models func(ctx context.Context, agent string, refresh bool) models.List
 	// SkillsInstall, when set, replaces running `smithy skills install` (tests).
@@ -150,7 +152,7 @@ func (sv *Server) apply(e store.Event) {
 		}
 	case KindIntake:
 		sv.applyIntake(e.Data)
-	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage:
+	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel:
 		sv.applySession(e)
 	case KindRouted:
 		var r struct{ ID string }
@@ -313,12 +315,24 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("GET /v1/sessions/{id}", sv.getSession)
 	mux.HandleFunc("POST /v1/sessions/{id}/messages", sv.sendSession)
 	mux.HandleFunc("POST /v1/sessions/{id}/stop", sv.stopSession)
+	mux.HandleFunc("PUT /v1/sessions/{id}/model", sv.setSessionModel)
+	mux.HandleFunc("GET /v1/projects", sv.listProjects)
+	mux.HandleFunc("POST /v1/projects", sv.addProject)
+	mux.HandleFunc("DELETE /v1/projects", sv.removeProject)
+	mux.HandleFunc("GET /v1/fs", sv.browse)
 	mux.HandleFunc("GET /v1/setup", sv.setup)
 	mux.HandleFunc("PUT /v1/setup/default", sv.setDefault)
 	mux.HandleFunc("PUT /v1/setup/kit", sv.setKit)
 	mux.HandleFunc("POST /v1/setup/skills/install", sv.installSkills)
 	mux.HandleFunc("GET /v1/agents/{id}/models", sv.agentModels)
 	mux.HandleFunc("GET /v1/bench", sv.benchRuns)
+	mux.HandleFunc("GET /v1/settings", sv.listSettings)
+	mux.HandleFunc("PUT /v1/settings/{key}", sv.putSetting)
+	mux.HandleFunc("DELETE /v1/settings/{key}", sv.deleteSetting)
+	mux.HandleFunc("PUT /v1/keys/{service}", sv.putKey)
+	mux.HandleFunc("DELETE /v1/keys/{service}", sv.deleteKey)
+	mux.HandleFunc("PUT /v1/serve", sv.putServe)
+	mux.HandleFunc("GET /v1/doctor", sv.doctor)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
 	return mux
 }
@@ -505,8 +519,8 @@ func (sv *Server) decision(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 
-// ask is POST /v1/asks: smithy mcp's ask tool records a warden decision (decide:<batch>/<item>/<key>)
-// here, so its answer comes only from the daemon's own record, never from a file the worker can write.
+// ask is POST /v1/asks: smithy mcp's ask tool records a warden decision (decide:<batch>/<item>/<key>),
+// or a plain chat question outside warden (ask:<key>), here, so its answer comes only from the daemon's own record, never from a file the worker can write.
 func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
 	if code, msg := sameOrigin(r); code != 0 {
 		writeJSON(w, code, map[string]string{"error": msg})
@@ -523,8 +537,9 @@ func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
 	}
 	parts := strings.Split(strings.TrimPrefix(req.ID, "decide:"), "/")
 	guardID := strings.HasPrefix(req.ID, "guard:") && cardID(strings.TrimPrefix(req.ID, "guard:"))
-	if !guardID && (!strings.HasPrefix(req.ID, "decide:") || len(parts) != 3 || !cardID(parts[0]) || !cardID(parts[1]) || !cardID(parts[2])) {
-		writeJSON(w, 400, map[string]string{"error": "id must be decide:<batch>/<item>/<key> or guard:<key>"})
+	chatID := strings.HasPrefix(req.ID, "ask:") && cardID(strings.TrimPrefix(req.ID, "ask:"))
+	if !guardID && !chatID && (!strings.HasPrefix(req.ID, "decide:") || len(parts) != 3 || !cardID(parts[0]) || !cardID(parts[1]) || !cardID(parts[2])) {
+		writeJSON(w, 400, map[string]string{"error": "id must be decide:<batch>/<item>/<key>, guard:<key> or ask:<key>"})
 		return
 	}
 	opts := make([]string, 0, len(req.Options))

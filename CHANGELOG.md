@@ -8,6 +8,80 @@ part above `### Details`.
 
 ## Unreleased
 
+### Highlights
+
+- A calmer TUI: one header bar, a short splash, framed pickers and color themes (`/theme`).
+- A guided first run (`smithy welcome`): agents, model, API keys and notifications.
+- Projects per server: each new session asks which project it works in.
+- Settings, keys, shell commands (`!cmd`), images (ctrl+v) and effort right from the chat.
+- New agents: Antigravity CLI, GitHub Copilot CLI and Grok Build.
+- **One binary per platform.** Each release ships one `smithy-<os>-<arch>`, the full build; `install.sh` and `smithy update` keep the current and the previous version only.
+
+### New
+
+- The README has a clear Usage section (install, update, uninstall) and a Harness section with screenshots; agents get their own install guide in docs/agents.md and every chat key and command is in docs/harness-guide.md.
+- The TUI header is one calm bar: smithy, its version and the project on the left, an idle or "N running" pill that breathes slowly and the clock on the right; model, branch, tokens and cost stay in the footer, so nothing shows twice.
+- `smithy tui` uses the same one-row header: smithy, its version and the repo on the left, the watcher state and the clock on the right. The big anvil plate is gone; the splash stays the only big anvil.
+- `smithy tui` is now `smithy stats`; `smithy tui` still works and says it was renamed. Its panels have square corners and a blank row under each title.
+- smithy opens with a short dither-and-anvil splash (under a second); any key skips it, and `ui.splash = false` turns it off.
+- First run opens a full-screen welcome, then four steps: the agents found on this machine, the model, your API keys and notifications. `smithy welcome` or `/welcome` walks them again.
+- The welcome shows the lit anvil over its dither field, the same one the splash draws, with sparks that hold still under reduced motion.
+- Pick a color theme (steel, frost or plum) with `/theme` in the TUI or from the web's command palette; both read the same `ui.theme` setting, and steel stays the default.
+- Antigravity CLI (`agy`) replaces Gemini CLI as an agent, and GitHub Copilot CLI and xAI's Grok Build are new agents.
+- The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
+- Each server keeps a list of projects. A new session asks which one it works in, and the
+  project stays fixed for that session. Add projects with a folder picker that browses the
+  server's machine.
+- Settings parity in the TUI: chat gets `/serve on|off`, `/set`, `/unset`, `/keys`, `/key rm`, `/doctor` and `/detach` (quit, the daemon keeps running); the Settings list edits API keys (`key.*` rows) in a masked field.
+- Your own skills in `~/.agents/skills` and `~/.smithy/skills` show in `/skills` next to smithy's, and any installed skill runs from the chat as `/name` or `$name`.
+- In the chat, `!ls` runs a shell command in the session folder and shows its output; ctrl+v attaches a clipboard image to your next message.
+- `/model` changes the open session's model; with no session open, `tab` in the list walks every ready agent, so OpenCode's models show up and can be picked.
+- `/effort` sets the open session's reasoning effort (low or medium) for claude and codex.
+- An agent can ask you a question in a normal chat, not only inside a warden run; `/ask` pins a
+  sample question so you can see and try how decisions look.
+- The chat header shows the folder, model, effort, tokens and cost; it no longer animates, and
+  the loader is a small four-cell pulse with the live tok/s of the running turn.
+- Every picker in the TUI (palette, agent, model, effort, theme, skills, projects) is one framed
+  panel: a rounded border, a title bar with `esc`, group headers, an accent bar on the selected
+  row and a key footer over the dimmed chat.
+- A repeated daemon line, such as serve's missing GitHub CLI note, shows once in the status area
+  and leaves it after 20 seconds; `/log` keeps every line.
+- **Milestone review in warden.** After a milestone batch merges, warden offers a cheap-model coherence review in rounds (contradictions, duplicated rules, size, docs vs code, TUI vs CLI gaps, or a topic you name); each round's findings go to one fix item.
+
+### Fixed
+
+- The settings page loads in well under a second again: `GET /v1/settings` finds the repo settings file once per request instead of running git for every setting.
+- Typing right after the chat opens no longer lands in the first-run picker: a `/` command goes to the chat (`/set linear.team ENG` used to save the model `ENG`).
+- Updating no longer repeats the old-install migration note: it runs once, then the old links in `~/.smithy/bin` and `~/.smithy/kind` are gone.
+- `smithy skills install` reports skipped symlinked skills (a checkout) in one line.
+- The chat's agent now knows it runs inside smithy: it is told about smithy's tools, its commands, code mode and that its tool calls show in the chat.
+- TUI fixes from a live check: typing a message while a decision waits keeps its first letter (an option's letter answers only alone, then enter); a message starting with "v" or "?" keeps it too: ctrl+o (or `/mode`) switches the view and `?` alone then enter opens help; modals fit short screens with their footer; a waiting decision shows once and the header says "waiting"; old daemon events and `decision_routed` stay off the status line; `/keys` opens a panel with the in-chat commands; long modal intros wrap.
+
+### Details
+
+- Chat tok/s is estimated from streamed agent text (about four characters per token) over the
+  turn's time; tokens and cost come from session usage events.
+- Daemon settings API, this machine's token only: `GET /v1/settings` (every setting, masked API
+  keys, serve on/off), `PUT|DELETE /v1/settings/{key}` (user file; secret keys refused),
+  `PUT|DELETE /v1/keys/{service}`, `PUT /v1/serve` (`auto.paused`), `GET /v1/doctor`.
+- `GET /v1/setup` lists the skills in `~/.agents/skills` and `~/.smithy/skills` (`$SMITHY_HOME/skills`) after the bundled ones, with `paths` (name to SKILL.md); `kit.skills` accepts them and `FindSkill` looks in `~/.smithy/skills`. In the TUI, `/name` or `$name` sends "read <SKILL.md> and follow it" plus the rest of the line; `/` and `/help` list the skills.
+- Chat `!cmd` runs with `$SHELL -c` in the session folder (2 min timeout, output capped at 256 KiB with escape sequences stripped, last 200 lines shown) and never reaches the agent. A ctrl+v image is saved as a PNG in a private per-chat temp dir and its path is appended to the next message; esc on an empty input drops it.
+- `PUT /v1/sessions/{id}/model` (`{"model","effort"}`) sets a session's model and effort; the next message starts a runner with them, and a `session_model` event keeps them across restarts.
+- `POST /v1/asks` accepts `ask:<key>` ids; the MCP `ask` tool uses one when no warden card is set
+  and writes no card.
+- `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),
+  for the web UI.
+- `GET/POST/DELETE /v1/projects` keeps the daemon's projects and default in
+  `~/.smithy/projects.json`; `GET /v1/fs?dir=` lists a folder's subfolders for the picker. A
+  session started with no `dir` uses the default project.
+- **One modal for every picker.** Agent and model (ctrl+l, `/agent`, `/model`, first run), `/skills` and the agents list (tab) open as the same centered box as the ctrl+k palette: filter or title on top, ↑↓ enter esc at the bottom, no per-cell background blocks.
+- release: build only the harness build, named `smithy-<os>-<arch>`; `smithy-harness-*` is no longer published (ADR 0015).
+- launcher: runs `~/.local/share/smithy/versions/<VERSION>`, else `~/.local/bin/smithy` or `smithy` on PATH with a `smithy update <VERSION>` notice, else prints the install line and exits 3; it no longer reads `~/.smithy/bin` and ignores relative PATH entries.
+- `warden doctor` and the version hint name `smithy update <version>` instead of the install line.
+- `internal/daemon/prompt.go`: `SystemPrompt` for every chat turn: `--append-system-prompt` for claude, the API loop's system field for `api:` agents (code mode on or off as configured), a marked preamble for other CLIs.
+- `smithy auto serve` no longer prints `poll: github: failed to run git` into the chat when it runs outside a git checkout: it skips the github source there quietly.
+- **Faster CI.** Go and bun caches; the harness tests split into two jobs (TUI and web, the rest); the demo, every cross-build target and the Windows launcher run only on `release/*` pull requests and on `main`; Blacksmith 4vcpu runners for test, build and demo, 2vcpu for lint, integration, web and the check gate.
+
 ## v0.23.1 — 2026-11-25
 
 ### Highlights

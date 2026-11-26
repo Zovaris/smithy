@@ -292,10 +292,10 @@ func TestDoctorFailures(t *testing.T) {
 		}
 	})
 	t.Run("agent CLI found on PATH", func(t *testing.T) {
-		newDoctor(t, "git", "gh", "gemini")
+		newDoctor(t, "git", "gh", "agy")
 		t.Setenv("AGENT_CMD", "")
 		o, c := doctor(t)
-		if c != 0 || !strings.Contains(o, "  ok    agent CLI: gemini") {
+		if c != 0 || !strings.Contains(o, "  ok    agent CLI: agy") {
 			t.Errorf("%d\n%s", c, o)
 		}
 	})
@@ -491,7 +491,7 @@ func TestVersionHint(t *testing.T) {
 	old := BinaryVersion
 	defer func() { BinaryVersion = old }()
 	BinaryVersion = "0.14.0"
-	if h := VersionHint(); !strings.Contains(h, "binary v0.14.0 but skills v0.14.1") || !strings.Contains(h, "sh -s 0.14.1") {
+	if h := VersionHint(); !strings.Contains(h, "binary v0.14.0 but skills v0.14.1") || !strings.Contains(h, "smithy update 0.14.1") {
 		t.Fatalf("hint: %q", h)
 	}
 	BinaryVersion = "0.14.1"

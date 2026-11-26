@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -23,6 +24,9 @@ func frameTick() tea.Cmd {
 
 // animating reports whether anything on screen moves: a session working or a tool running.
 func (m chatView) animating() bool {
+	if m.welcome != welcomeOff {
+		return true
+	}
 	for _, s := range m.sessions {
 		if s.state == "running" {
 			return true
@@ -59,65 +63,94 @@ func (m chatView) pad() int {
 	return 1
 }
 
-// headRows is the header's height: the 16×8-pixel anvil of the dashboard header, four text rows.
-const headRows = 4
+// headRows is the header's height: one bar and a spacer row.
+const headRows = 2
 
-// header is the anvil band: the dashboard's shaded anvil sprite on a steel dither band, with the
-// name beside it; the band's waves and the ember streak move only while something runs.
+// header is one bar on the raised surface: the name, version and project on the left, a state
+// pill and the clock in the corner. Model, branch, tokens and cost live in the footer and the
+// current tool in the transcript, so none of them repeat here. Only the pill's dot moves, a slow
+// breath while sessions run; the text never shifts.
 func (m chatView) header(w int) []string {
+	project := ""
+	if m.dir != "" {
+		project = filepath.Base(m.dir)
+	}
+	return []string{m.th.headBar(w, m.pad(), project, m.pill, m.clockNow().Format("15:04")), ""}
+}
+
+// clockMsg redraws the header clock; it fires on each minute, nothing else runs while idle.
+type clockMsg struct{}
+
+func untilMinute(t time.Time) time.Duration {
+	return t.Truncate(time.Minute).Add(time.Minute).Sub(t)
+}
+
+func clockTick() tea.Cmd {
+	return tea.Tick(untilMinute(time.Now()), func(time.Time) tea.Msg { return clockMsg{} })
+}
+
+// clockNow is the header clock's time.
+func (m chatView) clockNow() time.Time {
+	if m.clock != nil {
+		return m.clock()
+	}
+	return time.Now()
+}
+
+// pill is "idle", "● waiting" while a decision waits on you and nothing runs, or "● N running"
+// with the dot breathing between dim and the accent.
+func (m chatView) pill(bar lipgloss.Style) string {
 	t := m.th
-	name := "smithy"
-	if Version != "" {
-		name += " " + Version
-	}
-	if t.plain || t.ramp == nil || !t.g.unicode {
-		out := make([]string, headRows)
-		out[1] = ansi.Truncate("  "+name, w, "")
-		return out
-	}
-	f := 0.0
-	if m.animating() {
-		f = float64(m.frame)
-	}
-	s := smallPlate
-	ax := m.pad()
-	nx := ax + s.w() + 2
-	ph := headRows * 2
-	px := func(x, y int) color.Color {
-		if s.on(x-ax, y) {
-			return dpick([]color.Color{t.ramp[3], t.ramp[4], t.ramp[5], t.muted, t.text, t.strong}, s.shade(x-ax, y), x, y)
+	n := 0
+	for _, s := range m.sessions {
+		if s.state == "running" {
+			n++
 		}
-		v := 0.28 + 0.2*math.Sin(float64(x)*0.09+f*0.18+float64(y)*0.5) + 0.12*math.Sin(float64(x)*0.031-f*0.07)
-		if x < nx+len(name)+3 {
-			v *= 0.3
-		}
-		if f > 0 && y == ph-3 {
-			hx := math.Mod(f*1.3, float64(w+40)) - 20
-			if d := math.Abs(float64(x) - hx); d < 6 && d+(1-bayerAt(x, y))*4 < 5 {
-				return t.accent
+	}
+	if n == 0 && len(m.pending) > 0 {
+		return bar.Foreground(t.warn).Render(t.g.on) + bar.Foreground(t.text).Render(" waiting")
+	}
+	if n == 0 {
+		return bar.Foreground(t.dim).Render("idle")
+	}
+	dot := t.accent
+	if !t.plain && t.ramp != nil {
+		ph := float64(m.frame) / (breathSecs * fps) * 2 * math.Pi
+		dot = lipgloss.Blend1D(8, t.dim, t.accent)[int((1-math.Cos(ph))/2*7+0.5)]
+	}
+	return bar.Foreground(dot).Render(t.g.on) + bar.Foreground(t.text).Render(fmt.Sprintf(" %d running", n))
+}
+
+// kTok is a token count with a k or M suffix past a thousand.
+func kTok(n int64) string {
+	switch {
+	case n >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(n)/1e6)
+	case n >= 1000:
+		return fmt.Sprintf("%.1fk", float64(n)/1e3)
+	}
+	return fmt.Sprint(n)
+}
+
+// addStreamed counts n characters of agent text toward session id's live tok/s.
+func (m *chatView) addStreamed(id string, n int) {
+	if m.streamed == nil {
+		m.streamed = map[string]int{}
+	}
+	m.streamed[id] += n
+}
+
+// tokRate is session id's output rate this turn: streamed characters at about four per token
+// over the time since the turn began; 0 before the first text or second.
+func (m chatView) tokRate(id string) float64 {
+	for _, s := range m.sessions {
+		if s.id == id && !s.turn.IsZero() {
+			if el := time.Since(s.turn).Seconds(); el >= 1 {
+				return float64(m.streamed[id]) / 4 / el
 			}
 		}
-		return dpick(t.ramp, clamp01(v), x, y)
 	}
-	nameR := []rune(name)
-	out := make([]string, headRows)
-	for row := range out {
-		var b strings.Builder
-		for x := 0; x < w; x++ {
-			top, bot := px(x, row*2), px(x, row*2+1)
-			if row == 2 && x >= nx && x < nx+len(nameR) {
-				fg := t.strong
-				if x >= nx+len("smithy") {
-					fg = t.dim
-				}
-				b.WriteString(lipgloss.NewStyle().Foreground(fg).Background(bot).Bold(x < nx+len("smithy")).Render(string(nameR[x-nx])))
-				continue
-			}
-			b.WriteString(lipgloss.NewStyle().Foreground(top).Background(bot).Render("▀"))
-		}
-		out[row] = b.String()
-	}
-	return out
+	return 0
 }
 
 // statusLine is one dim row above the composer: the latest daemon note on the left, where the
@@ -147,8 +180,13 @@ func (m chatView) statusLine(w int) string {
 	}
 	right += where
 	left := ""
-	if n := len(m.noise); n > 0 {
-		left = dim.Render(m.noise[n-1].at.Format("15:04") + " " + m.noise[n-1].text)
+	for i := len(m.noise) - 1; i >= 0; i-- {
+		if n := m.noise[i]; !n.quiet {
+			if time.Since(n.at) < noiseShown {
+				left = dim.Render(n.text)
+			}
+			break
+		}
 	}
 	if m.offset > 0 {
 		left = t.fg(t.info).Render(fmt.Sprintf("→ %d rows up · end jumps back", m.offset))
@@ -161,19 +199,25 @@ func (m chatView) statusLine(w int) string {
 	return p + left + strings.Repeat(" ", max(w-2*m.pad()-ansi.StringWidth(left)-ansi.StringWidth(right), 1)) + right + p
 }
 
-// footer is the mockups' hint row: the keys on the left; agent, branch and cost on the right.
+// noiseShown is how long a daemon line stays in the status area; /log keeps them all.
+const noiseShown = 20 * time.Second
+
+// footer is the mockups' hint row: the keys on the left; agent, branch, tokens and cost on the right.
 func (m chatView) footer(w int) string {
 	t := m.th
 	dim, key := t.fg(t.dim), t.fg(t.text)
 	hint := func(k, what string) string { return key.Render(k) + dim.Render(" "+what) }
 	p := strings.Repeat(" ", m.pad())
-	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("v", "mode: "+m.mode.String()), hint("tab", "agents"), hint("ctrl+k", "palette"), hint("?", "help")}
+	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode: "+m.mode.String()), hint("tab", "agents"), hint("ctrl+k", "palette"), hint("?", "help")}
 	var info []string
 	if a := m.agentLabel(); a != "" {
 		info = append(info, a)
 	}
 	if m.branch != "" {
 		info = append(info, m.branch)
+	}
+	if n, ok := m.toks[m.current]; ok {
+		info = append(info, kTok(n)+" tok")
 	}
 	if c, ok := m.cost[m.current]; ok {
 		info = append(info, fmt.Sprintf("$%.2f", c))
@@ -224,72 +268,102 @@ type boxItem struct {
 	group, glyph     string
 	color            color.Color
 	label, hint, key string
+	static           bool // shown, never selected
 }
 
-// floatBox is the Palette mockup's panel: a query row and a key row on the focus tier around
-// grouped rows on the overlay tier, the selected row on the border tier.
+// floatBox is the one panel every picker uses: a rounded frame in the border color around a
+// title bar (prompt, query or title on the left, esc on the right), grouped rows with the
+// selected one marked by an accent bar, and a key footer.
 func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem, sel int, foot string) []string {
 	t := m.th
-	tier := func(c color.Color) lipgloss.Style {
-		if c == nil {
-			return lipgloss.NewStyle()
-		}
-		return lipgloss.NewStyle().Background(c)
+	bg := lipgloss.NewStyle()
+	if t.overlay != nil {
+		bg = bg.Background(t.overlay)
 	}
-	row := func(st lipgloss.Style, s string) string { return fill(st, w, s) }
+	edge := t.fg(t.dim)
+	if t.border != nil && t.ramp != nil {
+		edge = t.fg(t.ramp[len(t.ramp)-1])
+	}
+	if t.overlay != nil {
+		edge = edge.Background(t.overlay)
+	}
+	in := max(w-2, 1)
+	g := frameGlyphs(t.uni)
+	line := func(l, r string) string { return edge.Render(l + strings.Repeat(g.h, in) + r) }
+	row := func(s string) string { return edge.Render(g.v) + fill(bg, in, s) + edge.Render(g.v) }
 	dim := t.fg(t.dim)
 	q := t.fg(t.strong).Render(query)
 	if query == "" {
-		q = dim.Render(placeholder)
+		q = t.fg(t.text).Render(placeholder)
 	}
-	out := []string{row(tier(t.focus), spread("  "+t.fg(t.accent).Render(t.g.prompt)+"  "+q, dim.Render("esc")+"  ", w)), row(tier(t.overlay), "")}
-	body := h - 4
+	out := []string{line(g.tl, g.tr), row(spread(" "+t.fg(t.accent).Render(t.g.prompt)+" "+q, dim.Render("esc")+" ", in)), line(g.lt, g.rt)}
+	body := max(h-8, 1)
 	rows := make([]string, 0, len(items))
 	selRow := 0
 	n := 0
 	for _, it := range items {
 		if it.label == "" {
 			if len(rows) > 0 {
-				rows = append(rows, row(tier(t.overlay), ""))
+				rows = append(rows, row(""))
 			}
-			rows = append(rows, row(tier(t.overlay), "  "+dim.Render(it.group)))
+			for _, l := range strings.Split(ansi.Wordwrap(it.group, max(in-4, 1), ""), "\n") {
+				rows = append(rows, row("   "+t.fg(t.muted).Bold(true).Render(ansi.Truncate(l, max(in-4, 1), "…"))))
+			}
 			continue
 		}
-		st, label := tier(t.overlay), t.fg(t.text)
-		if n == sel {
-			st, label, selRow = tier(t.border), t.fg(t.strong), len(rows)
+		mark, label := "  ", t.fg(t.text)
+		if it.static {
+			label = t.fg(t.muted)
+		} else if n == sel {
+			mark, label, selRow = t.fg(t.accent).Render(g.sel)+" ", t.fg(t.strong).Bold(true), len(rows)
 		}
-		left := "  " + t.fg(it.color).Render(it.glyph) + "  " + label.Render(it.label)
+		left := " " + mark + t.fg(it.color).Render(it.glyph) + "  " + label.Render(it.label)
 		if it.hint != "" {
 			left += "  " + dim.Render(it.hint)
 		}
 		key := t.fg(t.muted).Render(it.key) + "  "
-		left = ansi.Truncate(left, w-ansi.StringWidth(key)-2, "…")
-		rows = append(rows, row(st, spread(left, key, w)))
-		n++
+		left = ansi.Truncate(left, max(in-ansi.StringWidth(key)-1, 1), "…")
+		rows = append(rows, row(spread(left, key, in)))
+		if !it.static {
+			n++
+		}
 	}
 	start := 0
 	if selRow >= body {
 		start = selRow - body + 1
 	}
+	out = append(out, row(""))
 	for i := start; i < len(rows) && i < start+body; i++ {
 		out = append(out, rows[i])
 	}
-	out = append(out, row(tier(t.overlay), ""))
-	return append(out, row(tier(t.focus), foot))
+	out = append(out, row(""), line(g.lt, g.rt), row(ansi.Truncate(foot, in, "…")), line(g.bl, g.br))
+	return out
 }
 
-// overBox centers box over the dimmed screen rows, 15% from the top as in the mockup.
+type boxFrame struct{ tl, tr, bl, br, lt, rt, h, v, sel string }
+
+func frameGlyphs(uni bool) boxFrame {
+	if uni {
+		return boxFrame{"┌", "┐", "└", "┘", "├", "┤", "─", "│", "▌"}
+	}
+	return boxFrame{"+", "+", "+", "+", "+", "+", "-", "|", ">"}
+}
+
+// overBox centers box over the dimmed screen rows, 15% from the top as in the mockup, or higher
+// when a tall box would otherwise run past the last row.
 func (m chatView) overBox(screen []string, box []string, w int) []string {
 	out := make([]string, len(screen))
 	for i, r := range screen {
-		out[i] = m.dimmed(r)
+		out[i] = r
+		if m.welcome == welcomeOff {
+			out[i] = m.dimmed(r)
+		}
 	}
 	bw := 0
 	if len(box) > 0 {
 		bw = ansi.StringWidth(box[0])
 	}
-	x, y := (w-bw)/2, max(len(screen)*120/800, 1)
+	x, y := (w-bw)/2, max(min(len(screen)*120/800, len(screen)-len(box)), 1)
 	for i, b := range box {
 		if y+i < len(out) {
 			out[y+i] = splice(out[y+i], b, x, w)
@@ -299,7 +373,7 @@ func (m chatView) overBox(screen []string, box []string, w int) []string {
 }
 
 func (m chatView) boxSize(w, h int) (int, int) {
-	return min(88, w-6), max(min(h-4, 30), 8)
+	return max(min(88, w-6, w*9/10), min(w, 20)), max(min(h-2, 32), 12)
 }
 
 func keyHints(t theme, pairs ...string) string {
@@ -324,11 +398,11 @@ func (m chatView) paletteBox(screen []string, w, h int) []string {
 		}
 		items = append(items, boxItem{glyph: it.glyph, color: it.color, label: it.label, hint: it.hint, key: it.key})
 	}
-	foot := spread("  "+keyHints(t, "↑↓", "move", "enter", "run", "tab", "next group"), t.fg(t.dim).Render(fmt.Sprintf("%d results", len(pal)))+"  ", bw)
+	foot := spread("  "+keyHints(t, "↑↓", "move", "enter", "run", "tab", "next group"), t.fg(t.dim).Render(fmt.Sprintf("%d results", len(pal)))+"  ", bw-2)
 	title := "Search actions, sessions, settings"
 	if m.picker != nil {
 		title = m.connectTitle()
-		foot = spread("  "+keyHints(t, "↑↓", "move", "enter", "connect", "esc", "close"), t.fg(t.dim).Render(fmt.Sprintf("%d rows", len(pal)))+"  ", bw)
+		foot = spread("  "+keyHints(t, "↑↓", "move", "enter", "connect", "esc", "close"), t.fg(t.dim).Render(fmt.Sprintf("%d rows", len(pal)))+"  ", bw-2)
 	}
 	return m.overBox(screen, m.floatBox(bw, bh, m.pal.query, title, items, m.pal.sel, foot), w)
 }
@@ -341,7 +415,9 @@ func (m chatView) helpBox(screen []string, w, h int) []string {
 	for _, k := range [][2]string{
 		{"enter", "send; shift+enter or alt+enter for a new line"}, {"/", "commands"}, {"@", "a file from this folder"},
 		{"tab", "agents and sessions"}, {"ctrl+k", "palette"}, {"ctrl+l", "agent and model"},
-		{"v", "minimal · expandable · verbose (empty input)"}, {"pgup pgdn", "scroll; wheel too, home and end"}, {"click", "open a tool block or answer a decision"}, {"ctrl+c", "quit"},
+		{"ctrl+o", "minimal · expandable · verbose"}, {"? enter", "this help (or /help)"}, {"pgup pgdn", "scroll; wheel too, home and end"}, {"click", "open a tool block or answer a decision"},
+		{"letter, enter", "an option's first letter alone answers the decision; typing is a message"},
+		{"/name or $name", "run an installed skill on the rest of the line"}, {"ctrl+c", "quit"},
 	} {
 		items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: k[0], hint: k[1]})
 	}
@@ -350,6 +426,14 @@ func (m chatView) helpBox(screen []string, w, h int) []string {
 	for _, c := range slashCommands {
 		if q == "" || strings.Contains(c.name+" "+c.desc, q) {
 			items = append(items, boxItem{glyph: "/", color: t.muted, label: "/" + c.name + " " + c.args, hint: c.desc})
+		}
+	}
+	if s := m.setupSt; s != nil && len(s.Skills) > 0 {
+		items = append(items, boxItem{group: "SKILLS · /skills turns them on for every session"})
+		for _, sk := range s.Skills {
+			if p := s.Paths[sk]; p != "" && (q == "" || strings.Contains(sk, q)) {
+				items = append(items, boxItem{glyph: "/", color: t.muted, label: "/" + sk + "  $" + sk, hint: skillDir(p)})
+			}
 		}
 	}
 	foot := "  " + keyHints(t, "↑↓", "scroll", "esc", "close")
@@ -387,121 +471,6 @@ func (m chatView) infoBox(screen []string, w, h int) []string {
 	return m.overBox(screen, m.floatBox(bw, bh, m.info.title, "", items, sel, foot), w)
 }
 
-// sidePanel is the Board mockup: the screen dimmed on the left, the agents panel on the right.
-func (m chatView) sidePanel(screen []string, w int) []string {
-	t := m.th
-	pw := max(min(w*560/1280, w-20), min(44, w))
-	x := w - pw
-	rows := m.agentsRows(pw, len(screen))
-	out := make([]string, len(screen))
-	for i, r := range screen {
-		out[i] = splice(m.dimmed(r), rows[i], x, w)
-	}
-	_ = t
-	return out
-}
-
-// agentsRows draws the panel pw wide and h tall: every session with what it does now, then
-// what waits on you.
-func (m chatView) agentsRows(pw, h int) []string {
-	t := m.th
-	bg, sel := lipgloss.NewStyle(), lipgloss.NewStyle()
-	if t.overlay != nil {
-		bg, sel = bg.Background(t.overlay), sel.Background(t.border)
-	}
-	dim, strong := t.fg(t.dim), t.fg(t.strong)
-	in := pw - 6
-	line := func(st lipgloss.Style, s string) string {
-		return fill(st, pw, "   "+ansi.Truncate(s, in, "…"))
-	}
-	running := 0
-	for _, s := range m.sessions {
-		if s.state == "running" {
-			running++
-		}
-	}
-	sum := fmt.Sprintf("%d running %s %d sessions", running, t.g.dot, len(m.sessions))
-	if c := m.totalCost(); c > 0 {
-		sum += fmt.Sprintf(" %s $%.2f", t.g.dot, c)
-	}
-	rows := []string{line(bg, ""), line(bg, spread(strong.Bold(true).Render("Agents")+"  "+dim.Render(sum), t.fg(t.text).Render("tab")+dim.Render(" close"), in)), line(bg, "")}
-	for i, s := range m.sessions {
-		st := bg
-		if i == m.agentSel {
-			st = sel
-		}
-		g, c := m.sessionGlyph(s.state)
-		title := s.title
-		if title == "" {
-			title = s.id
-		}
-		when := s.state
-		if !s.since.IsZero() && s.state == "running" {
-			when = shortDur(time.Since(s.since).Truncate(time.Minute))
-			if when == "0s" {
-				when = "now"
-			}
-		}
-		var whoParts []string
-		for _, x := range []string{s.agent, s.model, s.id} {
-			if x != "" {
-				whoParts = append(whoParts, x)
-			}
-		}
-		who := strings.Join(whoParts, " "+t.g.dot+" ")
-		var bar string
-		switch s.state {
-		case "running":
-			bar = t.loadingField(16, m.frame/2)
-		case "waiting":
-			bar = t.fg(t.warn).Render(strings.Repeat(t.g.shades[3], 16))
-		case "failed":
-			bar = t.fg(t.err).Render(strings.Repeat(t.g.shades[3], 16))
-		default:
-			bar = t.fg(t.muted).Render(strings.Repeat(t.g.shades[3], 16))
-		}
-		now := s.now
-		if now == "" {
-			now = s.kind
-		}
-		if i == m.current2() {
-			now = t.fg(t.accent).Render(t.g.prompt) + " " + now
-		}
-		rows = append(rows,
-			line(st, spread(t.fg(c).Render(g)+"  "+strong.Bold(true).Render(title), dim.Render(when), in)),
-			line(st, "   "+spread(t.fg(t.muted).Render(who), bar, in-3)),
-			line(st, "   "+t.fg(t.text).Render(now)),
-			line(bg, ""))
-	}
-	if len(m.sessions) == 0 {
-		rows = append(rows, line(bg, dim.Render("no sessions yet: type a message to start one")), line(bg, ""))
-	}
-	if len(m.pending) > 0 {
-		rows = append(rows, line(bg, strong.Bold(true).Render("Waiting on you")+"  "+dim.Render(fmt.Sprintf("%d", len(m.pending)))), line(bg, ""))
-		for _, d := range m.pending {
-			rows = append(rows, line(bg, t.fg(t.warn).Render(t.g.wait)+"  "+t.fg(t.text).Render(d.Question)+"  "+dim.Render(strings.Join(d.Options, " "+t.g.dot+" "))))
-		}
-	}
-	foot := line(bg, keyHints(t, "enter", "open", "s", "stop", "n", "new session", "↑↓", "move"))
-	if len(rows) > h-1 {
-		rows = rows[:h-1]
-	}
-	for len(rows) < h-1 {
-		rows = append(rows, line(bg, ""))
-	}
-	return append(rows, foot)
-}
-
-// current2 is the index of the open session in m.sessions, -1 when none.
-func (m chatView) current2() int {
-	for i, s := range m.sessions {
-		if s.id == m.current && m.current != "" {
-			return i
-		}
-	}
-	return -1
-}
-
 func (m chatView) totalCost() float64 {
 	c := 0.0
 	for _, v := range m.cost {
@@ -510,15 +479,11 @@ func (m chatView) totalCost() float64 {
 	return c
 }
 
-// spinRow is the transcript's last row while the open session works: the spinner and the
-// shimmer over what it does now, as in Chat-Expandable.
+// spinRow is the transcript's last row while the open session works: a small four-cell
+// pulse, what the session does now, and on the right the live tok/s and the turn's time.
 func (m chatView) spinRow(w int) string {
 	t := m.th
-	spin := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	g := spin[m.frame%len(spin)]
-	if !t.g.unicode {
-		g = []string{"|", "/", "-", "\\"}[m.frame%4]
-	}
+	g := m.pulse()
 	what, since := "working", time.Time{}
 	for _, s := range m.sessions {
 		if s.id == m.current {
@@ -528,14 +493,34 @@ func (m chatView) spinRow(w int) string {
 			since = s.turn
 		}
 	}
-	took := ""
-	if !since.IsZero() {
-		took = fmt.Sprintf("%.1fs", time.Since(since).Seconds())
+	var right []string
+	if r := m.tokRate(m.current); r > 0 {
+		right = append(right, fmt.Sprintf("%.0f tok/s", r))
 	}
-	n := ansi.StringWidth(what)
-	pos := math.Mod(float64(m.frame)*0.6, float64(n+12)) - 6
+	if !since.IsZero() {
+		right = append(right, fmt.Sprintf("%.1fs", time.Since(since).Seconds()))
+	}
 	p := strings.Repeat(" ", m.pad())
-	return spread(p+"  "+t.fg(t.accent).Render(g)+" "+t.shimmer(what, pos), t.fg(t.dim).Render(took)+p+"  ", w)
+	return spread(p+"  "+g+" "+t.fg(t.muted).Render(what), t.fg(t.dim).Render(strings.Join(right, "  "))+p+"  ", w)
+}
+
+// pulse is the loader: four small cells with one lit cell drifting across, dim elsewhere.
+func (m chatView) pulse() string {
+	t := m.th
+	on, off := "▪", "·"
+	if !t.g.unicode {
+		on, off = "*", "."
+	}
+	lit := (m.frame / 3) % 4
+	var b strings.Builder
+	for i := range 4 {
+		if i == lit {
+			b.WriteString(t.fg(t.accent).Render(on))
+		} else {
+			b.WriteString(t.fg(t.dim).Render(off))
+		}
+	}
+	return b.String()
 }
 
 // fill lays s on st's background w cells wide, cut to fit. Unlike Style.Width it keeps the

@@ -9,6 +9,8 @@ Start here
   setup         use-smithy setup: installed skills, settings, instructions block
   status        every task list and batch on this machine
   version       print the version
+  welcome       the first-run walk again: agents, model, API keys, notifications
+                (harness build)
 
 Daily
   attach        watch a daemon live: events, decisions, reconnect and resume
@@ -31,10 +33,10 @@ Daily
                 whole repo)
   servers       the daemons this machine talks to: list, add, use, discover
                 (harness build)
+  stats         live stats of the forge: agents, incoming issues, what needs
+                you, activity
   stop          stop the local background daemon (harness build)
   tasks         the shared task list (smithy tasks board --all)
-  tui           live dashboard of the forge: agents, incoming issues, what needs
-                you, activity
   wait          wait without tokens for PRs, runs, branches, issues or a batch
   web           print or open the daemon's web UI link (harness build)
 
@@ -87,9 +89,8 @@ Used by the skills
   wait-turn     a launched warden worker waits for its prereqs and a free slot
   worktree      create a task worktree at its standard path
 
-(harness build): get smithy-harness-<os>-<arch> from
-https://github.com/Zovaris/smithy/releases, or go build -tags harness
-./cmd/smithy.
+(harness build): the release binary; install it with smithy update, or go build
+-tags harness ./cmd/smithy.
 Run smithy help <command> for usage and examples. Not on PATH? smithy setup
 path.
 Exit codes: 0 success, 1 failure, 2 usage error (3 where a command's help says).

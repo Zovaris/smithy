@@ -21,7 +21,7 @@ smithy auto serve                              # Esc/q stops the loop; running a
 Issues opt in with the `auto` label. `model:` and `speed:` labels pick the tier and smelt speed.
 A daily issue cap (`auto.max_per_day`), an optional daily cost cap (`auto.max_cost_per_day`, USD
 of reported cost; running agents finish) and an optional hours window bound the spend; reaching
-either cap records a `cap_reached` event (and notification) once that day. `smithy tui` shows the queue, running
+either cap records a `cap_reached` event (and notification) once that day. `smithy stats` shows the queue, running
 agents and the cost of each issue, a History tab of past days' work with PR, cost and outcome, and
 edits settings in place. Every setting is listed in
 [settings.md](settings.md).
@@ -53,9 +53,11 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   or `api:<provider>/<model>`, `""` the last used, else `session.agent`; `model` goes to a CLI's
   `--model`; `dir` an absolute existing folder),
   `POST /v1/sessions/{id}/messages` (`{"text"}`, queued behind a running turn),
-  `POST /v1/sessions/{id}/stop` and `GET /v1/sessions` (status `working`, `needs_you`, `done`,
+  `POST /v1/sessions/{id}/stop`, `PUT /v1/sessions/{id}/model` (`{"model","effort"}`: the
+  model and effort the next turns run with; effort `low` or `medium`, only for claude and codex;
+  refused mid-turn and for `api:` sessions) and `GET /v1/sessions` (status `working`, `needs_you`, `done`,
   `failed`). Their events (`session_message`, `session_text`, `session_tool` with args and output,
-  `session_diff`, `session_usage`, `session_status`) stream on `/v1/events` with the session id.
+  `session_diff`, `session_usage`, `session_status`, `session_model`) stream on `/v1/events` with the session id.
   An `api:` session runs smithy's loop inside the daemon: a tool call the auto rules refuse becomes
   the decision `perm:<id>/<n>` (allow/deny) and the session shows `needs_you` until someone
   answers; the secret rules are never asked. Other agents run `smithy agent` once per turn with
@@ -67,8 +69,16 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   `PUT /v1/setup/default` (`{"agent","model"}`), `PUT /v1/setup/kit` (`{"mcp","skills"}`, skills
   must be installed smithy skills) and `POST /v1/setup/skills/install` (`{"harness"}`, empty for
   every detected one) change them. `GET /v1/agents/{id}/models[?refresh=1]` lists the models
-  agent `id` (a CLI or `api:<provider>`) reports, default first, cached for a day. The TUI's first run, `ctrl+l`, `/agent`, `/model`, `/skills`
+  agent `id` (a CLI or `api:<provider>`) reports, default first, cached for a day. The TUI's first run, `ctrl+l`, `/agent`, `/model`, `/effort`, `/skills`
   and the web's Settings screen use these.
+- Settings (daemon token only): `GET /v1/settings` (every setting, API keys masked, serve on/off),
+  `PUT|DELETE /v1/settings/{key}` (user file; secret keys refused), `PUT|DELETE /v1/keys/{service}`,
+  `PUT /v1/serve` and `GET /v1/doctor`.
+- Projects: `GET|POST|DELETE /v1/projects` keep the daemon's projects and default in
+  `~/.smithy/projects.json`; a session started with no `dir` uses the default. `GET /v1/fs?dir=`
+  lists a folder's subfolders for the picker.
+- `POST /v1/asks` lets an agent ask the user (`ask:<key>` ids outside a warden card); the MCP
+  `ask` tool calls it.
 - It tails `~/.smithy/events.jsonl` and the proxy's log into its store (once per line, across
   rotation and restarts) and turns them into decisions: a proxy `secret_ask` is `secret:<id>`
   (approve/deny, handed back as `smithy proxy approve|deny` would), a ready item is
@@ -98,6 +108,8 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   repeats nor drops events. Without a url it uses the local daemon and its token; a non-loopback
   url sends no token (`daemon.allow` decides).
 - `smithy doctor` reports whether it runs, a stale `daemon.json`, and a token readable by others.
+
+![How remote access works](remote.svg)
 
 ### Chat, intake, report and web UI
 
@@ -171,10 +183,10 @@ machine, with a fine-grained, repo-scoped GitHub token and a test or least-privi
   | Codex | its workspace-write sandbox, network on (push needs it), approvals off; `auto.sandbox native` turns its network off |
   | OpenCode | smithy's allow-list as `OPENCODE_PERMISSION` rules: bash allow-list, web fetch and outside directories denied, secret files denied for read and edit (also for `--readonly` runs such as the intake planner) |
   | Any CLI over ACP (`AGENT_PROTOCOL=acp`) | each permission request goes through the same allow-list: a command must match an allowed rule and no denied one (no `;`, `&&`, pipes, redirects or `$`), edits stay inside the worktree and off denied paths, reads off secret paths; fetch, delete, move and anything smithy can't classify are rejected |
-  | Others (gemini, pi, cursor, dsh) | their own headless mode, no smithy allow-list |
+  | Others (agy, copilot, grok, pi, cursor, dsh) | their own headless mode, no smithy allow-list |
 
   Only Claude Code and OpenCode can deny reads of `~/.smithy/auth.json` and the other secret
-  files. Codex, gemini, pi, cursor and dsh have no per-path read deny, so they can read
+  files. Codex, agy, copilot, grok, pi, cursor and dsh have no per-path read deny, so they can read
   them; `smithy doctor` says so for the configured CLI. Even for Claude Code and
   OpenCode the shell deny rules match command text (globs such as `~/.s*`, `$HOME` and key file
   names included), so a command that builds the path another way can slip past: only the `native`
@@ -205,7 +217,7 @@ it.
 | Mode | Isolation | Works with |
 |---|---|---|
 | `off` (default) | the allow-list above and the dangerous-command guard only, no OS sandbox | every harness |
-| `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off here (on under `off`), so push and `gh` fail; Gemini CLI is refused (its sandbox can't limit hosts) |
+| `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off here (on under `off`), so push and `gh` fail; other CLIs are refused |
 
 The API backend (`auto.agent api:<provider>/<model>`) runs its tools on the `--profile auto`
 rules only while `auto.sandbox` is `off` (the default); with `auto.sandbox native` its shell tool
@@ -235,10 +247,13 @@ signed in once in its own config dir.
 | Claude Code | `CLAUDE_CONFIG_DIR` | yes |
 | Codex | `CODEX_HOME` | yes |
 | OpenCode | `XDG_DATA_HOME` | yes |
-| Gemini CLI | `GEMINI_CLI_HOME` | yes |
+| Copilot CLI | `COPILOT_HOME` | no |
+| Grok Build | `GROK_HOME` | no |
 | Cursor CLI | `CURSOR_CONFIG_DIR` | no |
 | Pi | `PI_CODING_AGENT_DIR` | yes |
 | DeepSeek Harness | `DSH_HOME` | no |
+
+Antigravity (`agy`) has no config-dir variable, so it can't be pooled.
 
 Every harness rotates across its accounts. Where the limit is not detected yet, a limited run fails
 like any other error, and the next run picks the next account.

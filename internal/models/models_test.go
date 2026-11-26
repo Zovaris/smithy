@@ -50,12 +50,12 @@ func TestClaudeAddsConfiguredID(t *testing.T) {
 func TestACPAgentDefaultFirst(t *testing.T) {
 	d := deps(t)
 	d.ACP = func(_ context.Context, argv []string) (acp.ModelList, error) {
-		if argv[0] != "gemini" {
+		if argv[0] != "agy" {
 			t.Fatalf("argv %v", argv)
 		}
 		return acp.ModelList{Current: "g-pro", Models: []acp.Model{{ID: "g-flash", Name: "Flash"}, {ID: "g-pro", Name: "Pro"}}}, nil
 	}
-	l, err := Discover(context.Background(), d, "gemini")
+	l, err := Discover(context.Background(), d, "agy")
 	if err != nil || ids(l) != "g-pro,g-flash" || !l.Models[0].Default || l.Models[0].Name != "Pro" {
 		t.Fatalf("got %+v %v", l, err)
 	}

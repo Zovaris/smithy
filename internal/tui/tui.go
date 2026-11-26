@@ -24,9 +24,9 @@ import (
 	"github.com/charmbracelet/harmonica"
 )
 
-// Usage is the text for `smithy tui --help`.
-const Usage = `usage: smithy tui [--no-anim] [--demo]
-A live dashboard of the autonomous forge. Views: Overview, Agents, Incoming, Needs you,
+// Usage is the text for `smithy stats --help`.
+const Usage = `usage: smithy stats [--no-anim] [--demo]
+Live stats of the autonomous forge. Views: Overview, Agents, Incoming, Needs you,
 Done, Activity, Worktrees, Plans, System, History. It refreshes every 2 s from local files only (no network).
 Keys: tab/shift+tab or 1-9, 0 switch views; up/down (j/k) move inside a view; left/right switch
 panes or cards; enter details or read; esc close; o open; l log; c copy; y copy the action command;
@@ -155,7 +155,6 @@ var agentSorts = []string{"stage", "beat", "age", "issue"}
 
 type tickMsg time.Time
 type frameMsg struct{}
-type strikeMsg struct{}
 type snapMsg Snapshot
 type openedMsg struct{ err error }
 type pausedMsg struct {
@@ -211,7 +210,6 @@ type Model struct {
 	clickAt   time.Time
 	clickPos  [2]int
 	th        theme
-	fx        *fx
 	capPos    float64
 	capVel    float64
 	spring    harmonica.Spring
@@ -229,20 +227,21 @@ type options struct {
 	motion  bool
 	seed    uint64
 	toast   bool
+	theme   string // ui.theme
 	now     func() time.Time
 	load    func(time.Time) Snapshot
 }
 
 func newModel(o options) Model {
 	m := Model{width: 120, height: 40, dark: o.dark, profile: o.profile, unicode: o.unicode, motion: o.motion,
-		now: o.now, load: o.load, opener: openURL, pauser: setPaused, fx: newFX(o.seed),
+		now: o.now, load: o.load, opener: openURL, pauser: setPaused,
 		spring: harmonica.NewSpring(harmonica.FPS(fps), 4.0, 0.95), input: textinput.New(), reason: textinput.New(),
 		loadSys: loadSystem, setter: writeSetting, confirm: decisions.Confirm, reject: decisions.Reject}
 	m.reason.Prompt = "why reject? "
 	m.reason.Placeholder = "one line the agent will read"
 	m.input.Prompt = "/ "
 	m.input.Placeholder = "filter this view"
-	m.th = newTheme(m.dark, m.profile, m.unicode)
+	m.th = namedTheme(o.theme, m.dark, m.profile, m.unicode)
 	m.snap = m.load(m.now())
 	m.capPos = capPercent(m.snap.Watcher)
 	if o.toast {
@@ -274,7 +273,7 @@ func New(noAnim, demo bool) Model {
 		load = Demo
 	}
 	motion := motionOn(noAnim, os.Getenv("SMITHY_REDUCE_MOTION"), config.Get("tui.reduce_motion", "false"), p)
-	m := newModel(options{profile: p, dark: true, unicode: utf8Locale(), motion: motion, toast: first || demo,
+	m := newModel(options{profile: p, dark: true, unicode: utf8Locale(), motion: motion, toast: first || demo, theme: config.Get("ui.theme", "steel"),
 		seed: uint64(time.Now().UnixNano()), now: time.Now, load: load})
 	if demo {
 		m.pauser = func(bool) error { return fmt.Errorf("demo: intake is not real") }
@@ -320,12 +319,9 @@ func capPercent(w Watcher) float64 {
 	return min(float64(w.Today)/float64(w.Cap), 1)
 }
 
-// Init starts the refresh loop, asks for the background color and strikes the plate once.
+// Init starts the refresh loop and asks for the background color.
 func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{tick(), tea.RequestBackgroundColor}
-	if m.motion {
-		cmds = append(cmds, func() tea.Msg { return strikeMsg{} })
-	}
 	return tea.Batch(cmds...)
 }
 
@@ -342,21 +338,6 @@ func (m Model) reload() tea.Cmd {
 	return func() tea.Msg { return snapMsg(load(now())) }
 }
 
-func (m Model) sprite() sprite {
-	if m.width >= 110 {
-		return bigPlate
-	}
-	return smallPlate
-}
-
-func (m *Model) strike(n int) tea.Cmd {
-	if !m.motion {
-		return nil
-	}
-	m.fx.strike(m.sprite(), n, len([]rune(wordB[0])))
-	return m.animate()
-}
-
 // animate starts the frame loop if motion is on and none is running.
 func (m *Model) animate() tea.Cmd {
 	if !m.motion || m.framing {
@@ -367,7 +348,7 @@ func (m *Model) animate() tea.Cmd {
 }
 
 func (m Model) busy() bool {
-	return m.fx.busy() || (m.motion && m.running()) || abs(m.capPos-capPercent(m.snap.Watcher)) > 0.002 || abs(m.capVel) > 0.002
+	return (m.motion && m.running()) || abs(m.capPos-capPercent(m.snap.Watcher)) > 0.002 || abs(m.capVel) > 0.002
 }
 
 func abs(f float64) float64 {
@@ -385,11 +366,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.sizeText()
 	case tea.BackgroundColorMsg:
 		m.dark = msg.IsDark()
-		m.th = newTheme(m.dark, m.profile, m.unicode)
+		m.th = namedTheme(m.th.name, m.dark, m.profile, m.unicode)
 	case tea.ColorProfileMsg:
 		if os.Getenv("NO_COLOR") == "" {
 			m.profile = msg.Profile
-			m.th = newTheme(m.dark, m.profile, m.unicode)
+			m.th = namedTheme(m.th.name, m.dark, m.profile, m.unicode)
 		}
 	case tickMsg:
 		m.ticks++
@@ -401,16 +382,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.loading = true
 			cmds = append(cmds, m.reload())
 		}
-		if m.ticks%idleTicks == 0 {
-			cmds = append(cmds, m.strike(5))
-		}
 		return m, tea.Batch(cmds...)
-	case strikeMsg:
-		return m, m.strike(10)
 	case frameMsg:
 		m.framing = false
 		m.frames++
-		m.fx.step()
 		m.capPos, m.capVel = m.spring.Update(m.capPos, m.capVel, capPercent(m.snap.Watcher))
 		if m.busy() {
 			return m, m.animate()
@@ -421,15 +396,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.At.Before(m.snap.At) {
 			return m, nil
 		}
-		prev := m.snap
 		m.snap = Snapshot(msg)
 		m.clamp()
 		if !m.motion {
 			m.capPos = capPercent(m.snap.Watcher)
 			return m, nil
-		}
-		if happened(prev, m.snap) {
-			return m, m.strike(12)
 		}
 		return m, m.animate()
 	case openedMsg:
@@ -456,6 +427,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case systemMsg:
 		s := System(msg)
 		m.sys, m.sysBusy = &s, false
+		for _, r := range s.Settings {
+			if r.Key == "ui.theme" {
+				m.th = m.th.renamed(r.Value)
+			}
+		}
 	case pausedMsg:
 		if msg.err != nil {
 			m.status = "pause: " + msg.err.Error()
@@ -485,25 +461,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.key(msg)
 	}
 	return m, nil
-}
-
-// happened reports a real change worth a strike: something queued or launched, a PR ready, a merge.
-func happened(prev, cur Snapshot) bool {
-	count := func(s Snapshot, stages ...string) int {
-		n := 0
-		for _, b := range s.Batches {
-			for _, it := range b.Items {
-				for _, st := range stages {
-					if it.Stage == st {
-						n++
-					}
-				}
-			}
-		}
-		return n
-	}
-	return cur.Watcher.Today > prev.Watcher.Today || len(cur.Queue) > len(prev.Queue) ||
-		count(cur, "merged", "reported") > count(prev, "merged", "reported") || count(cur, "verify") > count(prev, "verify")
 }
 
 // move moves the selection of the focused pane of the current view.
@@ -947,7 +904,7 @@ func shortPR(pr string) string {
 	return pr
 }
 
-// Main runs `smithy tui`.
+// Main runs `smithy stats`.
 func Main(args []string) int {
 	noAnim, demo := false, false
 	for _, a := range args {
@@ -960,12 +917,12 @@ func Main(args []string) int {
 		case "--demo":
 			demo = true
 		default:
-			fmt.Fprintf(os.Stderr, "smithy tui: unexpected argument %s\n%s\n", a, Usage)
+			fmt.Fprintf(os.Stderr, "smithy stats: unexpected argument %s\n%s\n", a, Usage)
 			return 2
 		}
 	}
 	if _, err := tea.NewProgram(New(noAnim, demo)).Run(); err != nil {
-		fmt.Fprintln(os.Stderr, "smithy tui:", err)
+		fmt.Fprintln(os.Stderr, "smithy stats:", err)
 		return 1
 	}
 	return 0
