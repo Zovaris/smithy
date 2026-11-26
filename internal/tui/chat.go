@@ -708,6 +708,8 @@ func eventText(kind, session string, data json.RawMessage) string {
 			return ""
 		}
 		return "answered: " + o.Answer + by(o.By)
+	case daemon.KindRouted:
+		return "" // bookkeeping: the answered line already said it
 	case "log":
 		var d struct {
 			Line string `json:"line"`

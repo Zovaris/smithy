@@ -91,6 +91,14 @@ func TestHeaderSaysWaitingWhileADecisionWaits(t *testing.T) {
 	}
 }
 
+func TestRoutedEventStaysOffTheStatusLine(t *testing.T) {
+	m := newChatTest(0)
+	m = chatStep(m, evNow(1, daemon.KindRouted, map[string]string{"id": "d1"}))
+	if strings.Contains(screen(m), "decision_routed") {
+		t.Fatalf("raw event name leaks:\n%s", screen(m))
+	}
+}
+
 func TestWelcomeDefaultNotePrintedOnce(t *testing.T) {
 	m := newChatTest(0)
 	m.welcome = welcomeAgents
