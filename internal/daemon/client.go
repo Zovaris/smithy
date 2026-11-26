@@ -297,3 +297,31 @@ func (c *Client) InstallSkills(ctx context.Context, harness string) (string, err
 	err := c.call(ctx, "POST", "/v1/setup/skills/install", map[string]string{"harness": harness}, &out)
 	return out.Output, err
 }
+
+// Projects is GET /v1/projects: the folders new sessions can start in, and the default.
+func (c *Client) Projects(ctx context.Context) (ProjectList, error) {
+	var l ProjectList
+	err := c.call(ctx, "GET", "/v1/projects", nil, &l)
+	return l, err
+}
+
+// AddProject is POST /v1/projects; def also makes dir the default.
+func (c *Client) AddProject(ctx context.Context, dir string, def bool) (ProjectList, error) {
+	var l ProjectList
+	err := c.call(ctx, "POST", "/v1/projects", map[string]any{"dir": dir, "default": def}, &l)
+	return l, err
+}
+
+// RemoveProject is DELETE /v1/projects.
+func (c *Client) RemoveProject(ctx context.Context, dir string) (ProjectList, error) {
+	var l ProjectList
+	err := c.call(ctx, "DELETE", "/v1/projects", map[string]string{"dir": dir}, &l)
+	return l, err
+}
+
+// ListDirs is GET /v1/fs: the folders inside dir on the daemon's machine ("" is its home).
+func (c *Client) ListDirs(ctx context.Context, dir string) (DirList, error) {
+	var l DirList
+	err := c.call(ctx, "GET", "/v1/fs?dir="+url.QueryEscape(dir), nil, &l)
+	return l, err
+}

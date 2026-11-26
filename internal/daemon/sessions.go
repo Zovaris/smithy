@@ -255,6 +255,9 @@ func (sv *Server) StartSessionWith(agent, model, dir, msg, by string) (Session, 
 	if len(msg) > MaxMessage {
 		return Session{}, fmt.Errorf("%w: message over %d bytes", errBadRequest, MaxMessage)
 	}
+	if dir == "" {
+		dir = Projects().Default
+	}
 	d, err := cleanDir(dir)
 	if err != nil {
 		return Session{}, fmt.Errorf("%w: %v", errBadRequest, err)
