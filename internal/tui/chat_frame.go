@@ -88,7 +88,7 @@ func (m chatView) header(w int) []string {
 	nx := ax + s.w() + 2
 	ix := w - p - infoW
 	if ix < nx+len(name)+3 {
-		info, infoW, ix = "", 0, w
+		info, ix = "", w
 	}
 	px := func(x, y int) color.Color {
 		if s.on(x-ax, y) {
