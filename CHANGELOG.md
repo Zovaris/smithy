@@ -9,6 +9,32 @@ part above `### Details`.
 ## Unreleased
 
 - **One modal for every picker.** Agent and model (ctrl+l, `/agent`, `/model`, first run), `/skills` and the agents list (tab) open as the same centered box as the ctrl+k palette: filter or title on top, ↑↓ enter esc at the bottom, no per-cell background blocks.
+### Highlights
+
+- **One binary per platform.** Each release ships one `smithy-<os>-<arch>`, the full build; `install.sh` and `smithy update` keep the current and the previous version only.
+
+### Fixed
+
+- Updating no longer repeats the old-install migration note: it runs once, then the old links in `~/.smithy/bin` and `~/.smithy/kind` are gone.
+- `smithy skills install` reports skipped symlinked skills (a checkout) in one line.
+
+### Details
+
+- release: build only the harness build, named `smithy-<os>-<arch>`; `smithy-harness-*` is no longer published (ADR 0015).
+- launcher: runs `~/.local/share/smithy/versions/<VERSION>`, else `~/.local/bin/smithy` or `smithy` on PATH with a `smithy update <VERSION>` notice, else prints the install line and exits 3; it no longer reads `~/.smithy/bin` and ignores relative PATH entries.
+- `warden doctor` and the version hint name `smithy update <version>` instead of the install line.
+### New
+
+- **Milestone review in warden.** After a milestone batch merges, warden offers a cheap-model coherence review in rounds (contradictions, duplicated rules, size, docs vs code, TUI vs CLI gaps, or a topic you name); each round's findings go to one fix item.
+
+### Fixed
+
+- The chat's agent now knows it runs inside smithy: it is told about smithy's tools, its commands, code mode and that its tool calls show in the chat.
+
+### Details
+
+- `internal/daemon/prompt.go`: `SystemPrompt` for every chat turn: `--append-system-prompt` for claude, the API loop's system field for `api:` agents (code mode on or off as configured), a marked preamble for other CLIs.
+- `smithy auto serve` no longer prints `poll: github: failed to run git` into the chat when it runs outside a git checkout: it skips the github source there quietly.
 - **Faster CI.** Go and bun caches; the harness tests split into two jobs (TUI and web, the rest); the demo, every cross-build target and the Windows launcher run only on `release/*` pull requests and on `main`; Blacksmith 4vcpu runners for test, build and demo, 2vcpu for lint, integration, web and the check gate.
 
 ## v0.23.1 — 2026-11-25

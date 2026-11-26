@@ -119,6 +119,7 @@ func InstallSkills(o SkillsInstall) error {
 	if err := untar(tgz, stage); err != nil {
 		return fmt.Errorf("%s: %v, nothing installed", SkillsArchive, err)
 	}
+	var linked []string
 	for _, d := range dirs {
 		for _, s := range Known {
 			src := filepath.Join(stage, s)
@@ -127,7 +128,7 @@ func InstallSkills(o SkillsInstall) error {
 			}
 			dst := filepath.Join(d, s)
 			if fi, err := os.Lstat(dst); err == nil && fi.Mode()&os.ModeSymlink != 0 {
-				fmt.Fprintf(o.Out, "skip %s: a symlink (a checkout?), left as is\n", dst)
+				linked = append(linked, dst)
 				continue
 			}
 			if err := replaceDir(src, dst); err != nil {
@@ -138,6 +139,9 @@ func InstallSkills(o SkillsInstall) error {
 			}
 		}
 		fmt.Fprintf(o.Out, "installed skills into %s\n", d)
+	}
+	if len(linked) > 0 {
+		fmt.Fprintf(o.Out, "skipped %d symlinked skills (a checkout?), left as is: %s\n", len(linked), strings.Join(linked, ", "))
 	}
 	return nil
 }

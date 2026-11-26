@@ -180,6 +180,7 @@ func TestSkillsInstallLeavesSymlinkedSkill(t *testing.T) {
 	os.WriteFile(filepath.Join(src, "SKILL.md"), []byte("dev"), 0o644)
 	os.MkdirAll(filepath.Join(home, ".claude", "skills"), 0o755)
 	os.Symlink(src, filepath.Join(home, ".claude", "skills", "smelt"))
+	os.Symlink(src, filepath.Join(home, ".claude", "skills", "hush"))
 	srv := release(t, goodArchive(t), "")
 	o := opts(t, srv, home)
 	if err := InstallSkills(o); err != nil {
@@ -188,8 +189,9 @@ func TestSkillsInstallLeavesSymlinkedSkill(t *testing.T) {
 	if read(t, filepath.Join(src, "SKILL.md")) != "dev" {
 		t.Fatal("a symlinked skill (a dev checkout) must not be overwritten")
 	}
-	if !strings.Contains(o.Out.(*bytes.Buffer).String(), "symlink") {
-		t.Fatal("skipping a symlinked skill is reported")
+	out := o.Out.(*bytes.Buffer).String()
+	if strings.Count(out, "symlink") != 1 || !strings.Contains(out, "smelt") || !strings.Contains(out, "hush") {
+		t.Fatalf("skipped symlinked skills are reported in one line naming each: %q", out)
 	}
 }
 

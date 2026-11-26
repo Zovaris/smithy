@@ -51,7 +51,7 @@ type apiRunner struct {
 func (r *apiRunner) Close() { r.chat.Close() }
 
 func (r *apiRunner) Turn(ctx context.Context, msg string, _ []Exchange, e Emit) (string, error) {
-	req := apiloop.Request{Model: r.chat.Model, Messages: append(r.msgs, apiloop.UserText(msg))}
+	req := apiloop.Request{Model: r.chat.Model, System: SystemPrompt("api:", hasRunCode(r.chat.Tools)), Messages: append(r.msgs, apiloop.UserText(msg))}
 	s := &apiSink{e: e}
 	t := &askTools{Tools: r.chat.Tools, hard: r.chat.Hard, ctx: ctx, e: e}
 	res, err := apiloop.Run(ctx, r.chat.Provider, req, t, s, apiloop.Options{Provider: r.chat.Name})
@@ -145,7 +145,7 @@ func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e 
 	r.n++
 	base := filepath.Join(r.sdir, "turn-"+strconv.Itoa(r.n))
 	prompt, log := base+".prompt.md", base+".log"
-	if err := os.WriteFile(prompt, []byte(CLIPrompt(history, msg)), 0o600); err != nil {
+	if err := os.WriteFile(prompt, []byte(withSystem(r.agent, false, CLIPrompt(history, msg))), 0o600); err != nil {
 		return "", err
 	}
 	cmd := exec.Command(r.exe, "agent", "--cwd", r.dir, "--log", log, prompt)
@@ -164,7 +164,7 @@ func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e 
 	var cs *claudeStream
 	if r.agent == "claude" {
 		cs = newClaudeStream()
-		env = append(env, "AGENT_ARGS=--output-format stream-json --verbose")
+		env = append(env, "AGENT_ARGS=--output-format stream-json --verbose --append-system-prompt "+quoteArg(SystemPrompt(r.agent, false)))
 	}
 	env = append(env, "PATH="+agents.CLIPath(os.Getenv("PATH"), os.Getenv))
 	cmd.Env = env
