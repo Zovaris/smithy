@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/agents/catalog"
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
@@ -330,9 +331,9 @@ func Doctor(args []string) int {
 	if os.Getenv("AGENT_CMD") != "" {
 		cli = "AGENT_CMD"
 	} else {
-		for _, c := range []string{"claude", "codex", "opencode", "agy", "copilot", "grok", "agent", "pi", "dsh"} {
-			if have(c) {
-				cli = c
+		for _, a := range agents.KnownCLIs {
+			if have(a.Bin) {
+				cli = a.Bin
 				break
 			}
 		}
@@ -361,9 +362,9 @@ func Doctor(args []string) int {
 			r.ok("auto.agent: pool")
 		}
 	} else if a != "" {
-		bins := map[string]string{"claude": "claude", "codex": "codex", "opencode": "opencode", "agy": "agy", "copilot": "copilot", "grok": "grok", "cursor": "agent", "pi": "pi", "dsh": "dsh"}
 		kind := agents.Kind(a)
-		b, ok := bins[kind]
+		known, ok := catalog.Lookup(kind)
+		b := known.Bin
 		if strings.ContainsRune(a, '/') || strings.ContainsRune(a, os.PathSeparator) {
 			b = a
 		}
@@ -371,7 +372,7 @@ func Doctor(args []string) int {
 		case !ok:
 			r.warn("auto.agent "+a+" can't run headless (smithy auto serve)", "smithy config set auto.agent <claude|codex|opencode|agy|copilot|grok|cursor|pi|dsh or a path to one>")
 		case !have(b):
-			r.warn("auto.agent "+a+" not found (smithy auto serve can't start an orchestrator)", "install "+bins[kind]+", or smithy config set auto.agent <cli or absolute path>")
+			r.warn("auto.agent "+a+" not found (smithy auto serve can't start an orchestrator)", "install "+known.Bin+", or smithy config set auto.agent <cli or absolute path>")
 		default:
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			out, err := exec.CommandContext(ctx, b, "--version").CombinedOutput()

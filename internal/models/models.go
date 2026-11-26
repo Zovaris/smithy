@@ -62,7 +62,15 @@ type Deps struct {
 var ClaudeAliases = []string{"sonnet", "opus", "haiku"}
 
 // listCmd is the command a CLI lists its models with, for the ones that have one.
-var listCmd = map[string][]string{"opencode": {"opencode", "models"}}
+var listCmd = func() map[string][]string {
+	m := map[string][]string{}
+	for _, a := range agents.KnownCLIs {
+		if a.Models != nil {
+			m[a.Name] = a.Models
+		}
+	}
+	return m
+}()
 
 var validAgent = regexp.MustCompile(`^(api:)?[a-z][a-z0-9-]*$`)
 

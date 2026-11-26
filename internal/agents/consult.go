@@ -6,8 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
+	"github.com/Zovaris/smithy/internal/agents/catalog"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/harness"
 )
@@ -47,14 +49,14 @@ func ConsultCLI(h string, have func(string) bool) string {
 	switch {
 	case strings.HasPrefix(h, "claude-"):
 		cli = "claude"
-	case h == "codex", h == "opencode", h == "agy", h == "copilot", h == "grok", h == "pi", h == "dsh", h == "cursor":
+	case h != "claude" && slices.Contains(CLIs, h):
 		cli = h
 	}
 	if cli != "" && !have(Bin(cli)) {
 		cli = ""
 	}
 	if cli == "" {
-		for _, c := range []string{"claude", "codex", "opencode", "agy", "copilot", "grok", "pi", "dsh"} {
+		for _, c := range catalog.Names(func(a catalog.Agent) bool { return a.Consult }) {
 			if have(c) {
 				return c
 			}
