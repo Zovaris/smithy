@@ -98,6 +98,8 @@ type chatView struct {
 	modelIn   string       // the filter typed over the model list
 	modelSel  int          // the selected row of modelRows
 	modelList *models.List // what the agent reported; nil while it loads
+	modelSess string       // the session the model list sets; "": the default
+	effortSel int          // the selected row of the effort list
 
 	sess     sessionAPI            // the daemon's sessions endpoints; nil: offline
 	current  string                // the open session, "" before the first message
