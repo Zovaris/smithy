@@ -10,6 +10,7 @@ part above `### Details`.
 
 ### New
 
+- Pick a color theme (steel, frost or plum) with `/theme` in the TUI or from the web's command palette; both read the same `ui.theme` setting, and steel stays the default.
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
 - Settings parity in the TUI: chat gets `/serve on|off`, `/set`, `/unset`, `/keys`, `/key rm`, `/doctor` and `/detach` (quit, the daemon keeps running); the Settings list edits API keys (`key.*` rows) in a masked field.
 - Your own skills in `~/.agents/skills` and `~/.smithy/skills` show in `/skills` next to smithy's, and any installed skill runs from the chat as `/name` or `$name`.
