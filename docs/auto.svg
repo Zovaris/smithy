@@ -1,90 +1,86 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="430" viewBox="0 0 960 430" role="img" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="400" viewBox="0 0 960 400" role="img" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title>How autonomous mode works</title>
   <desc>Labeled GitHub or Linear issues are polled by smithy auto serve, which applies the team filter, daily cap and hours window; each batch gets a fresh orchestrator that follows warden and launches one worker per issue in its own worktree, optionally sandboxed and drawing on an opt-in account pool; tend keeps the pull request green and merges only with your yes; progress goes back to the issue, Telegram and smithy stats.</desc>
   <style>
-    .bg { fill: #ffffff; }
     .t { font-size: 15px; font-weight: 600; fill: #1f2328; }
     .s { font-size: 12px; fill: #59636e; }
-    .k { font-size: 11px; font-weight: 600; letter-spacing: .04em; fill: #59636e; }
-    .chip { font-size: 12px; font-weight: 600; fill: #1f2328; }
-    .neutral { fill: #f6f8fa; stroke: #d1d9e0; }
-    .router { fill: #ddf4ff; stroke: #54aeff; }
-    .smelt { fill: #f3f0ff; stroke: #8b7fe0; }
-    .warden { fill: #dafbe1; stroke: #4ac26b; }
-    .tend { fill: #fff1e5; stroke: #fb8f44; }
-    .done { fill: #f6f8fa; stroke: #8250df; }
-    .notify { fill: #fff8c5; stroke: #d4a72c; }
-    .worker { fill: #ffffff; stroke: #4ac26b; }
-    .lane { fill: none; stroke: #d1d9e0; stroke-dasharray: 4 4; }
-    .line { stroke: #8c959f; stroke-width: 1.5; fill: none; }
-    .head { fill: #8c959f; }
+    .c { font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #59636e; }
+    .k { font-size: 10.5px; font-weight: 700; letter-spacing: .09em; fill: #8c959f; }
+    .e { font-size: 11px; font-style: italic; fill: #8c959f; }
+    .n { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1.25; }
+    .r { fill: #ddf4ff; stroke: #54aeff; stroke-width: 1.25; }
+    .sm { fill: #f3f0ff; stroke: #8b7fe0; stroke-width: 1.25; }
+    .w { fill: #dafbe1; stroke: #4ac26b; stroke-width: 1.25; }
+    .wk { fill: #ffffff; stroke: #4ac26b; stroke-width: 1; }
+    .td { fill: #fff1e5; stroke: #fb8f44; stroke-width: 1.25; }
+    .m { fill: #fbefff; stroke: #a475f9; stroke-width: 1.25; }
+    .g { fill: none; stroke: #d0d7de; stroke-width: 1; stroke-dasharray: 3 4; }
+    .l { stroke: #8c959f; stroke-width: 1.5; fill: none; }
+    .lt { stroke: #fb8f44; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .h { fill: #8c959f; }
+    .ht { fill: #fb8f44; }
     @media (prefers-color-scheme: dark) {
-      .bg { fill: #0d1117; }
-      .t, .chip { fill: #f0f6fc; }
-      .s, .k { fill: #9198a1; }
-      .neutral { fill: #151b23; stroke: #3d444d; }
-      .router { fill: #0c2d4f; stroke: #4493f8; }
-      .smelt { fill: #231f3d; stroke: #8b7fe0; }
-      .warden { fill: #0f2a19; stroke: #3fb950; }
-      .tend { fill: #3a2210; stroke: #db6d28; }
-      .done { fill: #151b23; stroke: #ab7df8; }
-      .notify { fill: #2e2a10; stroke: #bb8009; }
-      .worker { fill: #0d1117; stroke: #3fb950; }
-      .lane { stroke: #3d444d; }
-      .line { stroke: #656c76; }
-      .head { fill: #656c76; }
+      .t { fill: #f0f6fc; }
+      .s, .c { fill: #9198a1; }
+      .k, .e { fill: #6e7681; }
+      .n { fill: #151b23; stroke: #3d444d; }
+      .r { fill: #0c2d4f; stroke: #4493f8; }
+      .sm { fill: #231f3d; stroke: #8b7fe0; }
+      .w { fill: #0f2a19; stroke: #3fb950; }
+      .wk { fill: #0d1117; stroke: #3fb950; }
+      .td { fill: #3a2210; stroke: #db6d28; }
+      .m { fill: #2a1a40; stroke: #ab7df8; }
+      .g { stroke: #3d444d; }
+      .l { stroke: #6e7681; }
+      .h { fill: #6e7681; }
+      .lt { stroke: #db6d28; }
+      .ht { fill: #db6d28; }
     }
   </style>
   <defs>
-    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0L10 5L0 10z" class="head"/>
-    </marker>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9z" class="h"/></marker>
+    <marker id="o" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9z" class="ht"/></marker>
   </defs>
-  <rect class="bg" x="0" y="0" width="960" height="430" rx="14"/>
-  <rect class="neutral" x="24" y="110" width="150" height="140" rx="12"/>
-  <text class="k" x="99" y="136" text-anchor="middle">SOURCES</text>
-  <text class="t" x="99" y="158" text-anchor="middle">Issues</text>
-  <text class="s" x="99" y="178" text-anchor="middle">GitHub · Linear</text>
-  <text class="s" x="99" y="195" text-anchor="middle">label auto</text>
-  <text class="s" x="99" y="212" text-anchor="middle">model: · speed:</text>
-  <rect class="router" x="206" y="90" width="170" height="180" rx="12"/>
-  <text class="k" x="291" y="116" text-anchor="middle">LOOP</text>
-  <text class="t" x="291" y="138" text-anchor="middle">smithy auto serve</text>
-  <text class="s" x="291" y="158" text-anchor="middle">polls the sources</text>
-  <text class="s" x="291" y="175" text-anchor="middle">team filter</text>
-  <text class="s" x="291" y="192" text-anchor="middle">daily cap (20)</text>
-  <text class="s" x="291" y="209" text-anchor="middle">hours window</text>
-  <text class="s" x="291" y="226" text-anchor="middle">Esc / q stops</text>
-  <rect class="warden" x="408" y="110" width="170" height="140" rx="12"/>
-  <text class="k" x="493" y="136" text-anchor="middle">PER BATCH</text>
-  <text class="t" x="493" y="158" text-anchor="middle">orchestrator</text>
-  <text class="s" x="493" y="178" text-anchor="middle">fresh agent session</text>
-  <text class="s" x="493" y="195" text-anchor="middle">any harness</text>
-  <text class="s" x="493" y="212" text-anchor="middle">auto allow-list</text>
-  <rect class="worker" x="610" y="40" width="150" height="122" rx="12"/>
-  <text class="k" x="685" y="66" text-anchor="middle">PER ISSUE</text>
-  <text class="t" x="685" y="88" text-anchor="middle">worker</text>
-  <text class="s" x="685" y="108" text-anchor="middle">own worktree</text>
-  <text class="s" x="685" y="125" text-anchor="middle">sandbox off</text>
-  <text class="s" x="685" y="142" text-anchor="middle">or native (OS)</text>
-  <rect class="smelt" x="610" y="196" width="150" height="98" rx="12"/>
-  <text class="t" x="685" y="222" text-anchor="middle">account pool</text>
-  <text class="s" x="685" y="242" text-anchor="middle">opt-in, your accounts</text>
-  <text class="s" x="685" y="259" text-anchor="middle">relaunch on limit</text>
-  <rect class="tend" x="792" y="100" width="144" height="160" rx="12"/>
-  <text class="k" x="864" y="126" text-anchor="middle">PR</text>
-  <text class="t" x="864" y="148" text-anchor="middle">tend</text>
-  <text class="s" x="864" y="168" text-anchor="middle">keeps it green</text>
-  <text class="s" x="864" y="185" text-anchor="middle">rebase · reviews</text>
-  <text class="s" x="864" y="202" text-anchor="middle">merge: your yes</text>
-  <rect class="notify" x="206" y="330" width="730" height="72" rx="12"/>
-  <text class="t" x="571" y="360" text-anchor="middle">Reports back</text>
-  <text class="s" x="571" y="382" text-anchor="middle">comment on the issue · Telegram · smithy stats (queue, running agents, cost per issue, settings)</text>
-  <path class="line" d="M174 180H202" marker-end="url(#a)"/>
-  <path class="line" d="M376 180H404" marker-end="url(#a)"/>
-  <path class="line" d="M578 160L606 120" marker-end="url(#a)"/>
-  <path class="line" d="M578 200L606 240" marker-end="url(#a)" stroke-dasharray="4 4"/>
-  <path class="line" d="M760 110L788 150" marker-end="url(#a)"/>
-  <path class="line" d="M864 260V326" marker-end="url(#a)"/>
-  <path class="line" d="M493 250V326" marker-end="url(#a)"/>
+  <rect class="n" x="20" y="60" width="168" height="200"/>
+  <text class="t" x="104.0" y="138.0" text-anchor="middle">Issues</text>
+  <text class="s" x="104.0" y="159.0" text-anchor="middle">GitHub · Linear</text>
+  <text class="c" x="104.0" y="176.0" text-anchor="middle">label auto</text>
+  <text class="c" x="104.0" y="193.0" text-anchor="middle">model: · speed:</text>
+  <text class="k" x="20" y="52" text-anchor="start">SOURCES</text>
+  <rect class="r" x="208" y="60" width="168" height="200"/>
+  <text class="t" x="292.0" y="120.0" text-anchor="middle">smithy auto serve</text>
+  <text class="s" x="292.0" y="141.0" text-anchor="middle">polls the sources</text>
+  <text class="s" x="292.0" y="158.0" text-anchor="middle">team filter</text>
+  <text class="s" x="292.0" y="175.0" text-anchor="middle">daily cap (20)</text>
+  <text class="s" x="292.0" y="192.0" text-anchor="middle">hours window</text>
+  <text class="s" x="292.0" y="209.0" text-anchor="middle">Esc / q stops</text>
+  <text class="k" x="208" y="52" text-anchor="start">LOOP</text>
+  <rect class="sm" x="396" y="60" width="168" height="200"/>
+  <text class="t" x="480.0" y="138.0" text-anchor="middle">orchestrator</text>
+  <text class="s" x="480.0" y="159.0" text-anchor="middle">fresh agent session</text>
+  <text class="s" x="480.0" y="176.0" text-anchor="middle">any harness</text>
+  <text class="s" x="480.0" y="193.0" text-anchor="middle">auto allow-list</text>
+  <text class="k" x="396" y="52" text-anchor="start">PER BATCH</text>
+  <rect class="w" x="584" y="60" width="168" height="200"/>
+  <text class="t" x="668.0" y="129.0" text-anchor="middle">worker</text>
+  <text class="s" x="668.0" y="150.0" text-anchor="middle">own worktree</text>
+  <text class="s" x="668.0" y="167.0" text-anchor="middle">sandbox off or native</text>
+  <text class="s" x="668.0" y="184.0" text-anchor="middle">account pool (opt-in)</text>
+  <text class="s" x="668.0" y="201.0" text-anchor="middle">relaunch on limit</text>
+  <text class="k" x="584" y="52" text-anchor="start">PER ISSUE</text>
+  <rect class="td" x="772" y="60" width="168" height="200"/>
+  <text class="t" x="856.0" y="138.0" text-anchor="middle">tend</text>
+  <text class="s" x="856.0" y="159.0" text-anchor="middle">keeps it green</text>
+  <text class="s" x="856.0" y="176.0" text-anchor="middle">rebase · reviews</text>
+  <text class="s" x="856.0" y="193.0" text-anchor="middle">merge: your yes</text>
+  <text class="k" x="772" y="52" text-anchor="start">PR</text>
+  <path class="l" d="M188 160H206" marker-end="url(#a)"/>
+  <path class="l" d="M376 160H394" marker-end="url(#a)"/>
+  <path class="l" d="M564 160H582" marker-end="url(#a)"/>
+  <path class="l" d="M752 160H770" marker-end="url(#a)"/>
+  <rect class="m" x="20" y="316" width="920" height="60"/>
+  <text class="t" x="480.0" y="342.0" text-anchor="middle">Reports back</text>
+  <text class="s" x="480.0" y="363.0" text-anchor="middle">comment on the issue · Telegram · smithy stats (queue, running agents, cost per issue, settings)</text>
+  <text class="k" x="20" y="308" text-anchor="start">PROGRESS</text>
+  <path class="l" d="M856 260V314" marker-end="url(#a)"/>
 </svg>

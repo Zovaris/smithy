@@ -1,114 +1,98 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="440" viewBox="0 0 960 440" role="img" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" role="img" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
   <title>How the smithy skills work together</title>
-  <desc>use-smithy routes work to smelt for one task or warden for many; both share one task list; warden runs workers in worktrees; tend keeps their pull requests green until they merge; scout, ledger, hush and simple help along the way.</desc>
+  <desc>use-smithy routes work to smelt for one task or warden for many; both share one task list; warden runs workers in worktrees; tend keeps their pull requests green until they merge.</desc>
   <style>
-    .bg { fill: #ffffff; }
     .t { font-size: 15px; font-weight: 600; fill: #1f2328; }
     .s { font-size: 12px; fill: #59636e; }
-    .k { font-size: 11px; font-weight: 600; letter-spacing: .04em; fill: #59636e; }
-    .chip { font-size: 12px; font-weight: 600; fill: #1f2328; }
-    .neutral { fill: #f6f8fa; stroke: #d1d9e0; }
-    .router { fill: #ddf4ff; stroke: #54aeff; }
-    .smelt { fill: #f3f0ff; stroke: #8b7fe0; }
-    .warden { fill: #dafbe1; stroke: #4ac26b; }
-    .tend { fill: #fff1e5; stroke: #fb8f44; }
-    .done { fill: #f6f8fa; stroke: #8250df; }
-    .worker { fill: #ffffff; stroke: #4ac26b; }
-    .lane { fill: none; stroke: #d1d9e0; stroke-dasharray: 4 4; }
-    .line { stroke: #8c959f; stroke-width: 1.5; fill: none; }
-    .head { fill: #8c959f; }
+    .c { font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #59636e; }
+    .k { font-size: 10.5px; font-weight: 700; letter-spacing: .09em; fill: #8c959f; }
+    .e { font-size: 11px; font-style: italic; fill: #8c959f; }
+    .n { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1.25; }
+    .r { fill: #ddf4ff; stroke: #54aeff; stroke-width: 1.25; }
+    .sm { fill: #f3f0ff; stroke: #8b7fe0; stroke-width: 1.25; }
+    .w { fill: #dafbe1; stroke: #4ac26b; stroke-width: 1.25; }
+    .wk { fill: #ffffff; stroke: #4ac26b; stroke-width: 1; }
+    .td { fill: #fff1e5; stroke: #fb8f44; stroke-width: 1.25; }
+    .m { fill: #fbefff; stroke: #a475f9; stroke-width: 1.25; }
+    .g { fill: none; stroke: #d0d7de; stroke-width: 1; stroke-dasharray: 3 4; }
+    .l { stroke: #8c959f; stroke-width: 1.5; fill: none; }
+    .lt { stroke: #fb8f44; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .h { fill: #8c959f; }
+    .ht { fill: #fb8f44; }
     @media (prefers-color-scheme: dark) {
-      .bg { fill: #0d1117; }
-      .t, .chip { fill: #f0f6fc; }
-      .s, .k { fill: #9198a1; }
-      .neutral { fill: #151b23; stroke: #3d444d; }
-      .router { fill: #0c2d4f; stroke: #4493f8; }
-      .smelt { fill: #231f3d; stroke: #8b7fe0; }
-      .warden { fill: #0f2a19; stroke: #3fb950; }
-      .tend { fill: #3a2210; stroke: #db6d28; }
-      .done { fill: #151b23; stroke: #ab7df8; }
-      .worker { fill: #0d1117; stroke: #3fb950; }
-      .lane { stroke: #3d444d; }
-      .line { stroke: #656c76; }
-      .head { fill: #656c76; }
+      .t { fill: #f0f6fc; }
+      .s, .c { fill: #9198a1; }
+      .k, .e { fill: #6e7681; }
+      .n { fill: #151b23; stroke: #3d444d; }
+      .r { fill: #0c2d4f; stroke: #4493f8; }
+      .sm { fill: #231f3d; stroke: #8b7fe0; }
+      .w { fill: #0f2a19; stroke: #3fb950; }
+      .wk { fill: #0d1117; stroke: #3fb950; }
+      .td { fill: #3a2210; stroke: #db6d28; }
+      .m { fill: #2a1a40; stroke: #ab7df8; }
+      .g { stroke: #3d444d; }
+      .l { stroke: #6e7681; }
+      .h { fill: #6e7681; }
+      .lt { stroke: #db6d28; }
+      .ht { fill: #db6d28; }
     }
   </style>
   <defs>
-    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0L10 5L0 10z" class="head"/>
-    </marker>
+    <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9z" class="h"/></marker>
+    <marker id="o" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 1L9 5L0 9z" class="ht"/></marker>
   </defs>
-  <rect class="bg" x="0" y="0" width="960" height="440" rx="14"/>
-
-  <!-- entry -->
-  <rect class="neutral" x="24" y="150" width="104" height="64" rx="12"/>
-  <text class="t" x="76" y="178" text-anchor="middle">You</text>
-  <text class="s" x="76" y="197" text-anchor="middle">an idea or tasks</text>
-
-  <rect class="router" x="160" y="122" width="128" height="120" rx="12"/>
-  <text class="k" x="224" y="150" text-anchor="middle">ROUTER</text>
-  <text class="t" x="224" y="174" text-anchor="middle">use-smithy</text>
-  <text class="s" x="224" y="194" text-anchor="middle">picks the skill</text>
-  <text class="s" x="224" y="210" text-anchor="middle">shared rules</text>
-
-  <!-- one task lane -->
-  <text class="k" x="328" y="34">ONE TASK</text>
-  <rect class="smelt" x="324" y="44" width="264" height="84" rx="12"/>
-  <text class="t" x="456" y="72" text-anchor="middle">smelt</text>
-  <text class="s" x="456" y="92" text-anchor="middle">brainstorm → spec → TDD</text>
-  <text class="s" x="456" y="110" text-anchor="middle">test agents → review → proof → PR</text>
-
-  <!-- task list -->
-  <rect class="neutral" x="324" y="168" width="264" height="64" rx="12"/>
-  <text class="t" x="456" y="194" text-anchor="middle">Task list</text>
-  <text class="s" x="456" y="213" text-anchor="middle">NN-slug.md · status · blocked by · PR</text>
-
-  <!-- many tasks lane -->
-  <text class="k" x="328" y="270">MANY TASKS</text>
-  <rect class="warden" x="324" y="280" width="264" height="104" rx="12"/>
-  <text class="t" x="456" y="306" text-anchor="middle">warden</text>
-  <text class="s" x="456" y="325" text-anchor="middle">one silent worker per task, own worktree</text>
-  <rect class="worker" x="346" y="340" width="66" height="28" rx="8"/>
-  <text class="s" x="379" y="359" text-anchor="middle">worker</text>
-  <rect class="worker" x="423" y="340" width="66" height="28" rx="8"/>
-  <text class="s" x="456" y="359" text-anchor="middle">worker</text>
-  <rect class="worker" x="500" y="340" width="66" height="28" rx="8"/>
-  <text class="s" x="533" y="359" text-anchor="middle">worker</text>
-
-  <!-- PRs, tend, merged -->
-  <rect class="neutral" x="628" y="150" width="108" height="64" rx="12"/>
-  <text class="t" x="682" y="178" text-anchor="middle">Pull</text>
-  <text class="t" x="682" y="197" text-anchor="middle">requests</text>
-
-  <rect class="tend" x="628" y="268" width="108" height="76" rx="12"/>
-  <text class="t" x="682" y="294" text-anchor="middle">tend</text>
-  <text class="s" x="682" y="313" text-anchor="middle">CI · rebases</text>
-  <text class="s" x="682" y="329" text-anchor="middle">review threads</text>
-
-  <rect class="done" x="776" y="150" width="160" height="64" rx="12"/>
-  <text class="t" x="856" y="178" text-anchor="middle">Merged</text>
-  <text class="s" x="856" y="197" text-anchor="middle">worktrees cleaned up</text>
-
-  <!-- arrows -->
-  <path class="line" d="M128 182H158" marker-end="url(#a)"/>
-  <path class="line" d="M288 160C306 160 306 86 322 86" marker-end="url(#a)"/>
-  <path class="line" d="M288 182H322" marker-end="url(#a)"/>
-  <path class="line" d="M288 204C306 204 306 332 322 332" marker-end="url(#a)"/>
-  <path class="line" d="M456 128V166" marker-end="url(#a)"/>
-  <text class="s" x="464" y="152">plan</text>
-  <path class="line" d="M456 232V278" marker-end="url(#a)"/>
-  <text class="s" x="464" y="260">ready tasks</text>
-  <path class="line" d="M588 86C610 86 610 170 626 170" marker-end="url(#a)"/>
-  <path class="line" d="M588 332C610 332 610 196 626 196" marker-end="url(#a)"/>
-  <path class="line" d="M682 214V266" marker-end="url(#a)"/>
-  <path class="line" d="M736 306C756 306 756 200 774 200" marker-end="url(#a)"/>
-  <path class="line" d="M736 182H774" marker-end="url(#a)"/>
-
-  <!-- helpers -->
-  <rect class="lane" x="24" y="398" width="912" height="30" rx="10"/>
-  <text class="k" x="40" y="417">ALONG THE WAY</text>
-  <text class="chip" x="160" y="418">scout</text><text class="s" x="200" y="418">facts with sources</text>
-  <text class="chip" x="340" y="418">ledger</text><text class="s" x="388" y="418">ADRs · docs · comments</text>
-  <text class="chip" x="560" y="418">hush</text><text class="s" x="598" y="418">no talk</text>
-  <text class="chip" x="676" y="418">simple</text><text class="s" x="726" y="418">plain replies</text>
+  <rect class="n" x="20" y="178" width="110" height="64"/>
+  <text class="t" x="75.0" y="206.0" text-anchor="middle">You</text>
+  <text class="s" x="75.0" y="227.0" text-anchor="middle">an idea or tasks</text>
+  <rect class="r" x="166" y="170" width="128" height="80"/>
+  <text class="t" x="230.0" y="197.0" text-anchor="middle">use-smithy</text>
+  <text class="s" x="230.0" y="218.0" text-anchor="middle">picks the skill</text>
+  <text class="s" x="230.0" y="235.0" text-anchor="middle">shared rules</text>
+  <text class="k" x="166" y="162" text-anchor="start">ROUTE</text>
+  <rect class="g" x="322" y="24" width="300" height="378"/>
+  <text class="k" x="472.0" y="46" text-anchor="middle">PLAN AND BUILD</text>
+  <rect class="sm" x="342" y="80" width="260" height="78"/>
+  <text class="t" x="472.0" y="106.0" text-anchor="middle">smelt</text>
+  <text class="s" x="472.0" y="127.0" text-anchor="middle">brainstorm → spec → TDD</text>
+  <text class="s" x="472.0" y="144.0" text-anchor="middle">test agents → review → proof → PR</text>
+  <text class="k" x="342" y="72" text-anchor="start">ONE TASK</text>
+  <rect class="n" x="342" y="188" width="260" height="56"/>
+  <text class="t" x="472.0" y="212.0" text-anchor="middle">Task list</text>
+  <text class="s" x="472.0" y="233.0" text-anchor="middle">NN-slug.md · status · blocked by · PR</text>
+  <rect class="w" x="342" y="284" width="260" height="104"/>
+  <text class="k" x="342" y="276" text-anchor="start">MANY TASKS</text>
+  <text class="t" x="472" y="309" text-anchor="middle">warden</text>
+  <text class="s" x="472" y="327" text-anchor="middle">one silent worker per task, own worktree</text>
+  <rect class="wk" x="360" y="341" width="70" height="30"/>
+  <text class="s" x="395.0" y="361.0" text-anchor="middle">worker</text>
+  <rect class="wk" x="437" y="341" width="70" height="30"/>
+  <text class="s" x="472.0" y="361.0" text-anchor="middle">worker</text>
+  <rect class="wk" x="514" y="341" width="70" height="30"/>
+  <text class="s" x="549.0" y="361.0" text-anchor="middle">worker</text>
+  <rect class="g" x="650" y="24" width="290" height="378"/>
+  <text class="k" x="795.0" y="46" text-anchor="middle">SHIP</text>
+  <rect class="n" x="670" y="178" width="120" height="64"/>
+  <text class="t" x="730.0" y="206.0" text-anchor="middle">Pull requests</text>
+  <text class="s" x="730.0" y="227.0" text-anchor="middle">one per task</text>
+  <rect class="td" x="670" y="296" width="120" height="76"/>
+  <text class="t" x="730.0" y="321.0" text-anchor="middle">tend</text>
+  <text class="s" x="730.0" y="342.0" text-anchor="middle">CI · rebases</text>
+  <text class="s" x="730.0" y="359.0" text-anchor="middle">review threads</text>
+  <rect class="m" x="818" y="178" width="106" height="64"/>
+  <text class="t" x="871.0" y="206.0" text-anchor="middle">Merged</text>
+  <text class="s" x="871.0" y="227.0" text-anchor="middle">worktrees gone</text>
+  <path class="l" d="M130 210H164" marker-end="url(#a)"/>
+  <path class="l" d="M294 192C318 192 318 119 340 119" marker-end="url(#a)"/>
+  <path class="l" d="M294 210H340" marker-end="url(#a)"/>
+  <path class="l" d="M294 228C318 228 318 336 340 336" marker-end="url(#a)"/>
+  <path class="l" d="M472 158V186" marker-end="url(#a)"/>
+  <path class="l" d="M472 244V282" marker-end="url(#a)"/>
+  <path class="l" d="M602 119C640 119 640 198 668 198" marker-end="url(#a)"/>
+  <path class="l" d="M602 336C640 336 640 222 668 222" marker-end="url(#a)"/>
+  <path class="l" d="M790 210H816" marker-end="url(#a)"/>
+  <text class="e" x="480" y="177" text-anchor="start">plan</text>
+  <text class="e" x="480" y="267" text-anchor="start">ready tasks</text>
+  <path class="lt" d="M712 244V294" marker-end="url(#o)"/>
+  <path class="lt" d="M748 294V244" marker-end="url(#o)"/>
+  <text class="e" x="756" y="274" text-anchor="start">until green</text>
 </svg>

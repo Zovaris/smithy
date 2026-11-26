@@ -109,6 +109,8 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   url sends no token (`daemon.allow` decides).
 - `smithy doctor` reports whether it runs, a stale `daemon.json`, and a token readable by others.
 
+![How remote access works](remote.svg)
+
 ### Chat, intake, report and web UI
 
 - Connectors: with Telegram (`notify.telegram.chat`), Slack (`connect.slack.channel`) or Discord
