@@ -11,9 +11,13 @@ part above `### Details`.
 ### New
 
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
+- Settings parity in the TUI: chat gets `/serve on|off`, `/set`, `/unset`, `/keys`, `/key rm`, `/doctor` and `/detach` (quit, the daemon keeps running); the Settings list edits API keys (`key.*` rows) in a masked field.
 
 ### Details
 
+- Daemon settings API, this machine's token only: `GET /v1/settings` (every setting, masked API
+  keys, serve on/off), `PUT|DELETE /v1/settings/{key}` (user file; secret keys refused),
+  `PUT|DELETE /v1/keys/{service}`, `PUT /v1/serve` (`auto.paused`), `GET /v1/doctor`.
 - `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),
   for the web UI.
 - **One modal for every picker.** Agent and model (ctrl+l, `/agent`, `/model`, first run), `/skills` and the agents list (tab) open as the same centered box as the ctrl+k palette: filter or title on top, ↑↓ enter esc at the bottom, no per-cell background blocks.
