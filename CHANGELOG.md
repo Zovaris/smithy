@@ -25,6 +25,11 @@ part above `### Details`.
   sample question so you can see and try how decisions look.
 - The chat header shows the folder, model, effort, tokens and cost; it no longer animates, and
   the loader is a small four-cell pulse with the live tok/s of the running turn.
+- Every picker in the TUI (palette, agent, model, effort, theme, skills, projects) is one framed
+  panel: a rounded border, a title bar with `esc`, group headers, an accent bar on the selected
+  row and a key footer over the dimmed chat.
+- A repeated daemon line, such as serve's missing GitHub CLI note, shows once in the status area
+  and leaves it after 20 seconds; `/log` keeps every line.
 
 ### Details
 

@@ -2,31 +2,31 @@
   smithy dev
 
 
-    ?   ›  Search actions, sessions, settings                                            esc  -29   
-                                                                                              
-        WAITING ON YOU                                                                        
-        ?  Merge #142 into release/v0.17?  merge · later                                      
-                                                                                              
-        ACTIONS                                                                               
-        +  New session  your next message starts it                                     /new  
-        ▸  Agent and model                                                            ctrl+l  
-        ≡  Skills and MCP  what goes into every session                              /skills  
-        ≡  Verbosity: minimal  minimal · expandable · verbose                              v  
-        ●  Agents panel  sessions and waiting items                                      tab  
-        →  Open the web UI  same sessions in the browser                                /web  
-        →  Connect  http://127.0.0.1:7477                                           /connect  
-        ·  Daemon log  0 events                                                         /log  
-     ›  ↓  Jump to latest                                                                end        
-        ✗  Quit                                                                       ctrl+c  
-     P                                                                                        
-     o  SESSIONS                                                                              
-        ✓  TK-6  done                                                                         
-     ✓  ●  TK-29  running                                                                     s     
-        ✗  TES-9  failed                                                                      
-     D                                                                                        
-        SETTINGS                                                                              
-        ·  chat.mode  minimal                                                                 477   
-     ›  ·  daemon  http://127.0.0.1:7477                                                            
-                                                                                                    
-        ↑↓ move   enter run   tab next group                                      16 results        
-   enter send  shift+enter newline  v mode: minimal  tab agents  ctrl+k palette  ? help             
+    ? ╭──────────────────────────────────────────────────────────────────────────────────────╮-29   
+      │ › Search actions, sessions, settings                                             esc │
+      ├──────────────────────────────────────────────────────────────────────────────────────┤
+      │                                                                                      │
+      │   WAITING ON YOU                                                                     │
+      │ ▌ ?  Merge #142 into release/v0.17?  merge · later                                   │
+      │                                                                                      │
+      │   ACTIONS                                                                            │
+      │   +  New session  your next message starts it                                  /new  │
+      │   ▸  Agent and model                                                         ctrl+l  │
+      │   ≡  Skills and MCP  what goes into every session                           /skills  │
+      │   ≡  Verbosity: minimal  minimal · expandable · verbose                           v  │
+      │   ●  Agents panel  sessions and waiting items                                   tab  │
+      │   →  Open the web UI  same sessions in the browser                             /web  │
+     ›│   →  Connect  http://127.0.0.1:7477                                        /connect  │      
+      │   ·  Daemon log  0 events                                                      /log  │
+     P│   ↓  Jump to latest                                                             end  │
+     o│   ✗  Quit                                                                    ctrl+c  │
+      │                                                                                      │
+     ✓│   SESSIONS                                                                           │s     
+      │   ✓  TK-6  done                                                                      │
+     D│   ●  TK-29  running                                                                  │
+      │   ✗  TES-9  failed                                                                   │
+      │                                                                                      │477   
+     ›│   SETTINGS                                                                           │      
+      │   ·  chat.mode  minimal                                                              │      
+      │                                                                                      │      
+   ent├──────────────────────────────────────────────────────────────────────────────────────┤      
