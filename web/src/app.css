@@ -253,6 +253,22 @@ a.row1:hover, button.row1:hover, .pick .row1:hover { background: var(--t-raised)
 .tbl td { padding: 8px 12px; border-top: 1px solid var(--t-line); vertical-align: top; }
 .scrollx { overflow-x: auto; }
 .out { font: 12px/1.6 var(--sph-font-mono); background: var(--t-raised); border-radius: 0; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.page.wide { max-width: 1200px; }
+.card.pad { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.seg-row { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* text-glyph charts (Sephiro GlyphChart) */
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.gc { margin: 0; border: 1px solid var(--t-line); background: var(--t-card); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.gc figcaption { font-size: 12px; font-weight: 500; color: var(--t-text-3); }
+.page .sph-task-board__column { min-width: 176px; }
+.card.pad .top2 { display: flex; gap: 8px; align-items: center; }
+.splash { width: 100%; height: 160px; color: var(--t-ember); }
+.splash-anvil .mark, .splash-anvil svg { width: 40px; height: 40px; color: var(--t-ember); }
+.rail .sub { font-size: 11px; font-weight: 500; color: var(--t-text-3); padding: 8px 12px 0; }
+.rail .row2[aria-current="page"] { background: var(--t-raised); }
+.rail .tt1 { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.need-n { color: var(--t-wait); }
 .gate { max-width: 520px; margin: 20dvh auto 0; padding: 0 16px; display: flex; flex-direction: column; gap: 12px; }
 
 @media (min-width: 720px) {
@@ -282,9 +298,6 @@ a.row1:hover, button.row1:hover, .pick .row1:hover { background: var(--t-raised)
 @media (prefers-reduced-motion: reduce) {
   *, *::before { animation: none !important; transition: none !important; }
 }
-
-/* TODO: remove after the Sephiro bump that ships Zovaris/Sephiro#37. Sephiro's palette keeps its highlight on the last option when the filter empties the list. */
-.sph-palette__track:has(.sph-palette__empty) .sph-palette__indicator { opacity: 0 !important; }
 
 /* TUI parity: header mark, clock, shell output, modal key hints, settings rows */
 .meta-bar .brandline { color: var(--t-text-2); font-size: 12px; white-space: nowrap; flex: none; }

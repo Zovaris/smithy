@@ -5,6 +5,7 @@ import { choice, installSkills, isDefault, loadSetup, type Ready, setDefault, se
 import { ModelSelect } from "../modelselect";
 import { agentName } from "../store";
 import { St } from "../ui";
+import Splash from "../splash";
 import { More } from "./settingsparts";
 
 type Guard = { enabled: boolean; block: string[]; allow: string[]; fetch_block: string[]; fetch_allow: string[]; suggested: { host: string; added: boolean }[] };
@@ -101,7 +102,7 @@ export default function Setup() {
         {s.chosen ? (
           <><h2>Settings</h2><p>{ready} of {s.agents.length} agents ready · new sessions start with {agentName(s.default.agent)}{s.default.model ? " · " + s.default.model : ""}</p></>
         ) : (
-          <><h2>Welcome to smithy</h2><p>These are the agents on this machine. Pick the one new sessions start with; you can change it here or with <kbd>ctrl+l</kbd> in the TUI.</p></>
+          <><Splash /><h2>Welcome to smithy</h2><p>These are the agents on this machine. Pick the one new sessions start with; you can change it here or with <kbd>ctrl+l</kbd> in the TUI.</p></>
         )}
       </header>
       {err && <p class="err" role="alert">{err}</p>}

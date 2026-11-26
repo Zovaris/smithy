@@ -43,7 +43,7 @@ export function run(a: string, arg: string, { s, pend, setPick, setNote, setAcce
   else if (a === "skills" || a === "keys" || a === "doctor" || a === "serve") toSettings(a);
   else if (a === "connect") toSettings("servers");
   else if (a === "settings") go({ name: "setup" });
-  else if (a === "agents" || a === "board" || a === "decisions") go({ name: a });
+  else if (a === "agents" || a === "board" || a === "decisions" || a === "bench") go({ name: a });
 }
 
 // shell is `!cmd`: the last 200 lines, like the TUI.

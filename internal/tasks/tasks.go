@@ -37,6 +37,9 @@ type Task struct {
 
 func isTask(name string) bool { return taskRe.MatchString(name) }
 
+// IsTaskFile reports whether name is a task file name (NN-<slug>.md).
+func IsTaskFile(name string) bool { return isTask(name) }
+
 func repoRoot() string {
 	cwd, _ := os.Getwd()
 	if r := ghx.RepoRoot(cwd); r != "" {
@@ -70,10 +73,14 @@ func mtime(p string) time.Time {
 // <plans>/<repo>/*, and any colon-separated $SMELT_TASKS_DIRS.
 func Dirs() []string { return scan(true) }
 
-// scan lists the subdirs of the task-dir bases, newest first; withTasks keeps only those
+// DirsIn lists the task dirs of the project at root, newest first, the way Dirs does for this repo.
+func DirsIn(root string) []string { return scanRoot(root, true) }
+
+func scan(withTasks bool) []string { return scanRoot(repoRoot(), withTasks) }
+
+// scanRoot lists the subdirs of root's task-dir bases, newest first; withTasks keeps only those
 // holding tasks.
-func scan(withTasks bool) []string {
-	root := repoRoot()
+func scanRoot(root string, withTasks bool) []string {
 	bases := []string{filepath.Join(root, "docs", "specs"), filepath.Join(root, ".docs", "specs"), filepath.Join(layout.PlansHome(), filepath.Base(root))}
 	for _, d := range strings.Split(os.Getenv("SMELT_TASKS_DIRS"), ":") {
 		if d != "" {

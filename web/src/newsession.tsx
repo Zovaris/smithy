@@ -32,7 +32,9 @@ const modelOf = (r: Ready, s: Setup) => (!s.chosen || !isDefault(r, s.default) ?
 
 // NewSession is where a session starts: the project it belongs to, the agent, its model and
 // effort, and the first message.
-export function NewSession({ setup, host, onAction }: { setup: Setup | null; recent: Sess[]; host: string; onAction: (a: string) => void }) {
+const Splash = lazy(() => import("./splash"));
+
+export function NewSession({ setup, recent, host, onAction }: { setup: Setup | null; recent: Sess[]; host: string; onAction: (a: string) => void }) {
   const [projects, setProjects] = useState<ProjectList | null>(null);
   const [perr, setPerr] = useState("");
   const [dir, setDir] = useState("");
@@ -99,6 +101,7 @@ export function NewSession({ setup, host, onAction }: { setup: Setup | null; rec
       <div class="scroll">
         <section class="hello ns" aria-label="New session">
           <header>
+          {!recent.length && <Suspense fallback={null}><Splash /></Suspense>}
             <h2>New session</h2>
             <span class="tag"><I n="server" /><span>{host}</span></span>
           </header>

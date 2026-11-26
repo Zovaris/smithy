@@ -4,6 +4,8 @@ import { groupAgents, projectOf } from "../projects";
 import { href } from "../router";
 import type { Ready } from "../setup";
 import { agentName, ago, sessions } from "../store";
+import { StatsCharts } from "../charts";
+import { stats } from "../stats";
 import { St } from "../ui";
 
 function Copy({ text }: { text: string }) {
@@ -34,6 +36,10 @@ export default function Agents() {
         <p>{working} working · {g.sessions.length} sessions · {g.clis.length + g.apis.length} set up · {g.missing.length} missing</p>
       </header>
 
+      <div>
+        <div class="lbl">Stats<span class="sp" /><span class="mono">smithy stats</span></div>
+        <StatsCharts s={stats(l.store)} />
+      </div>
       <div>
         <div class="lbl">Sessions<span class="sp" /><a class="t3" href="#/new">New session</a></div>
         <div class="card">
