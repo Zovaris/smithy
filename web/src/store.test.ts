@@ -9,6 +9,10 @@ const run = (...es: Ev[]): Store => es.reduce(fold, blank());
 const started = (id = "s-1", title = "Add retry") => ev("session_started", { id, agent: "claude", model: "sonnet", dir: "/r", title, status: "done" }, id);
 
 describe("fold", () => {
+  it("keeps a session's model and effort when /model or /effort changes them", () => {
+    const s = run(started(), ev("session_model", { model: "opus", effort: "low" }));
+    expect([s.sessions["s-1"].model, s.sessions["s-1"].effort]).toEqual(["opus", "low"]);
+  });
   it("starts a session and moves the latest updated to the top", () => {
     const s = run(started("s-1", "one"), started("s-2", "two"), ev("session_status", { status: "working" }, "s-1"));
     expect(sessions(s).map((x) => [x.id, x.status])).toEqual([["s-1", "working"], ["s-2", "done"]]);

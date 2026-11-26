@@ -23,7 +23,7 @@ export function statusLine(s: ServerRow): string {
   return `${s.version ?? ""} · ${agents}`;
 }
 
-export function useServers(): ServerRow[] {
+export function useServers(tick = 0): ServerRow[] {
   const [rows, set] = useState<ServerRow[]>([]);
   useEffect(() => {
     let on = true;
@@ -35,7 +35,7 @@ export function useServers(): ServerRow[] {
     load();
     const t = setInterval(load, 30000);
     return () => ((on = false), clearInterval(t));
-  }, []);
+  }, [tick]);
   return rows;
 }
 

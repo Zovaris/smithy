@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crumbs, efforts, groupAgents, projectOf, startDir } from "./projects";
+import { crumbs, groupAgents, projectOf, startDir } from "./projects";
 import type { Ready } from "./setup";
 import type { Sess } from "./store";
 
@@ -16,15 +16,6 @@ describe("groupAgents", () => {
   it("puts working sessions first, then the most recent", () => {
     const g = groupAgents([], [s("old", "done", "2026-01-01"), s("run", "working", "2025-01-01"), s("new", "done", "2026-02-01"), s("ask", "needs_you", "2024-01-01")]);
     expect(g.sessions.map((x) => x.id)).toEqual(["run", "ask", "new", "old"]);
-  });
-});
-
-describe("efforts", () => {
-  it("offers default, low and medium only to a CLI with an effort flag", () => {
-    expect(efforts("claude")).toEqual(["", "low", "medium"]);
-    expect(efforts("codex")).toEqual(["", "low", "medium"]);
-    expect(efforts("opencode")).toEqual([]);
-    expect(efforts("api:openai")).toEqual([]);
   });
 });
 

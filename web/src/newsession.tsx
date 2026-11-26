@@ -2,9 +2,9 @@ import { useEffect, useState } from "preact/hooks";
 import { Composer } from "./composer";
 import { lazy, Suspense } from "preact/compat";
 import { I } from "./icons";
-import { ModelSelect } from "./modelselect";
 import { startSession } from "./live";
-import { addProject, efforts, loadProjects, startDir, type ProjectList } from "./projects";
+import { effortOptions } from "./parity";
+import { addProject, loadProjects, startDir, type ProjectList } from "./projects";
 import { go } from "./router";
 import { choice, isDefault, type Ready, type Setup } from "./setup";
 import { agentName, type Sess } from "./store";
@@ -18,6 +18,7 @@ const STARTERS: Record<string, string> = {
 };
 const DIR = "smithy.dir";
 const FolderPicker = lazy(() => import("./folderpicker"));
+const ModelSelect = lazy(() => import("./modelselect").then((m) => ({ default: m.ModelSelect })));
 
 function remembered(): string {
   try {
@@ -43,7 +44,7 @@ export function NewSession({ setup, host, onAction }: { setup: Setup | null; rec
   const ready = setup?.agents.filter((a) => a.ready) ?? [];
   const missing = (setup?.agents.length ?? 0) - ready.length;
   const cur = setup?.agents.find((a) => a.name === pick);
-  const effs = cur ? efforts(cur.name) : [];
+  const effs = cur ? effortOptions(cur.name) : [];
 
   useEffect(() => {
     loadProjects()
@@ -147,7 +148,7 @@ export function NewSession({ setup, host, onAction }: { setup: Setup | null; rec
             <div class="opts">
               <div class="opt">
                 <label class="lbl" for="model">Model</label>
-                <ModelSelect agent={cur} value={model} onChange={setModel} />
+                <Suspense fallback={null}><ModelSelect agent={cur} value={model} onChange={setModel} /></Suspense>
               </div>
               <div class="opt eff">
                 <span class="lbl" id="effort-l">Effort</span>

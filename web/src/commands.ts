@@ -3,13 +3,24 @@
 export type Cmd = { name: string; hint: string; kind: "action" | "skill" };
 
 export const ACTIONS: Cmd[] = [
-  { name: "new", hint: "start a new session", kind: "action" },
-  { name: "stop", hint: "stop this session's turn", kind: "action" },
-  { name: "agents", hint: "every agent and session", kind: "action" },
-  { name: "board", hint: "sessions by state", kind: "action" },
-  { name: "decisions", hint: "what waits on you", kind: "action" },
-  { name: "settings", hint: "agents, model, skills, MCP", kind: "action" },
-  { name: "theme", hint: "light or dark", kind: "action" },
+  { name: "new", hint: "new session", kind: "action" },
+  { name: "stop", hint: "stop the turn", kind: "action" },
+  { name: "model", hint: "session model", kind: "action" },
+  { name: "effort", hint: "session effort", kind: "action" },
+  { name: "skills", hint: "skills and MCP", kind: "action" },
+  { name: "theme", hint: "steel, frost or plum", kind: "action" },
+  { name: "connect", hint: "servers", kind: "action" },
+  { name: "agents", hint: "agents", kind: "action" },
+  { name: "board", hint: "board", kind: "action" },
+  { name: "decisions", hint: "decisions", kind: "action" },
+  { name: "ask", hint: "pin a sample question", kind: "action" },
+  { name: "answer", hint: "answer in your words", kind: "action" },
+  { name: "serve", hint: "serve on or off", kind: "action" },
+  { name: "set", hint: "<key> <value>", kind: "action" },
+  { name: "unset", hint: "<key> to default", kind: "action" },
+  { name: "keys", hint: "API keys", kind: "action" },
+  { name: "doctor", hint: "smithy doctor", kind: "action" },
+  { name: "settings", hint: "settings", kind: "action" },
 ];
 
 // suggest lists the commands matching a message that is only `/word` so far.

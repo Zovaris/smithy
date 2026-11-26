@@ -6,7 +6,7 @@ import type { Ev } from "./model";
 export type Status = "working" | "needs_you" | "done" | "failed";
 export type Usage = { input_tokens?: number; output_tokens?: number; cost_usd?: number };
 export type Sess = {
-  id: string; agent: string; model?: string; dir: string; title: string;
+  id: string; agent: string; model?: string; effort?: string; dir: string; title: string;
   status: Status; detail?: string; created: string; updated: string; usage?: Usage;
 };
 export type Tool = { id?: string; name: string; args?: unknown; output?: string; is_error?: boolean };
@@ -86,6 +86,11 @@ export function fold(s: Store, e: Ev): Store {
       const st: Status = STATUSES.includes(d.status) ? d.status : sess.status;
       next.sessions = { ...s.sessions, [id]: { ...sess, status: st, detail: str(d.detail), updated: at } };
       next.order = touch(s, id);
+      return next;
+    }
+    case "session_model": {
+      if (!sess) return next;
+      next.sessions = { ...s.sessions, [id]: { ...sess, model: str(d.model), effort: str(d.effort) } };
       return next;
     }
     case "session_usage": {
