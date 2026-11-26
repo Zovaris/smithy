@@ -2,7 +2,7 @@ import { useMemo, useState } from "preact/hooks";
 import { parse, short, totals, type Comment, type File } from "./diff";
 import { I } from "./icons";
 import { href } from "./router";
-import { ago, agentName, type Dec, type Diff, type Sess } from "./store";
+import { ago, type Dec, type Diff, type Sess } from "./store";
 import { label, St, split } from "./ui";
 
 function Note({ c, onDrop }: { c: Comment; onDrop: () => void }) {
@@ -119,25 +119,3 @@ export function Decisions({ list, sessions }: { list: Dec[]; sessions: Record<st
   );
 }
 
-export function Agents({ sessions, host }: { sessions: Sess[]; host: string }) {
-  const live = sessions.filter((s) => s.status === "working" || s.status === "needs_you");
-  return (
-    <section aria-label="Agents">
-      <h2>Agents<span class="sp" /><span class="mono t3">{host}</span></h2>
-      <div class="card">
-        {!live.length && <p class="hint">No agent is working right now.</p>}
-        {live.map((s) => (
-          <a class="row2" href={href({ name: "session", id: s.id })}>
-            <div class="top2">
-              <span style="font-weight:500">{agentName(s.agent)}</span>
-              <span class="mono t3">{s.model}</span>
-              <span class="sp" />
-              <St s={s.status} />
-            </div>
-            <span class="t3" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{s.title}</span>
-          </a>
-        ))}
-      </div>
-    </section>
-  );
-}
