@@ -105,6 +105,7 @@ type live struct {
 	runner   Runner
 	inbox    chan string
 	cancel   context.CancelFunc
+	done     chan struct{}
 	history  []Exchange
 	asks     int
 	stopped  bool
@@ -302,7 +303,7 @@ func (sv *Server) StartSessionWith(agent, model, dir, msg, by string) (Session, 
 	now := time.Now().UTC()
 	s := Session{ID: id, Agent: agent, Model: model, Dir: d, Title: titleOf(msg), Status: StatusDone, Created: now, Updated: now}
 	ctx, cancel := context.WithCancel(sv.ctx())
-	l := &live{s: s, runner: r, inbox: make(chan string, MaxQueued), cancel: cancel}
+	l := &live{s: s, runner: r, inbox: make(chan string, MaxQueued), cancel: cancel, done: make(chan struct{})}
 	sv.mu.Lock()
 	sv.starting--
 	if _, err := sv.appendLocked(KindSessionStarted, id, s); err != nil {
@@ -319,7 +320,7 @@ func (sv *Server) StartSessionWith(agent, model, dir, msg, by string) (Session, 
 		s = l.s
 	}
 	sv.mu.Unlock()
-	go sv.loop(ctx, l, l.inbox, r)
+	go sv.loop(ctx, l, l.inbox, r, l.done)
 	if qerr != nil {
 		return s, qerr
 	}
@@ -368,8 +369,8 @@ func (sv *Server) SendSession(id, msg, by string) error {
 		sv.mu.Lock()
 		if l.runner == nil || l.stopped {
 			ctx, cancel := context.WithCancel(sv.ctx())
-			l.runner, l.inbox, l.cancel, l.stopped = r, make(chan string, MaxQueued), cancel, false
-			go sv.loop(ctx, l, l.inbox, r)
+			l.runner, l.inbox, l.cancel, l.stopped, l.done = r, make(chan string, MaxQueued), cancel, false, make(chan struct{})
+			go sv.loop(ctx, l, l.inbox, r, l.done)
 		} else {
 			r.Close()
 		}
@@ -403,14 +404,25 @@ func (sv *Server) StopSession(id string) error {
 		return errNoSession
 	}
 	running := l.runner != nil && !l.stopped
+	var done chan struct{}
 	if running {
 		l.stopped = true
 		l.cancel()
+		done = l.done
 	}
 	sv.setStatusLocked(id, StatusDone, "stopped")
 	sv.mu.Unlock()
+	if done != nil {
+		select {
+		case <-done:
+		case <-time.After(stopWait):
+		}
+	}
 	return nil
 }
+
+// stopWait bounds how long StopSession waits for the runner's last writes before it returns.
+const stopWait = 10 * time.Second
 
 // Sessions lists every session, the most recently updated first.
 func (sv *Server) Sessions() []Session {
@@ -431,7 +443,8 @@ func (sv *Server) ctx() context.Context {
 	return context.Background()
 }
 
-func (sv *Server) loop(ctx context.Context, l *live, inbox <-chan string, r Runner) {
+func (sv *Server) loop(ctx context.Context, l *live, inbox <-chan string, r Runner, done chan struct{}) {
+	defer close(done)
 	defer r.Close()
 	for {
 		select {
