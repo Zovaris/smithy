@@ -171,7 +171,7 @@ function App() {
     if (!location.hash.replace(/^#\/?/, ""))
       api("/v1/setup").then((r) => (r.ok ? r.json() : null)).then((x) => x && !x.chosen && (location.hash = "#/setup")).catch(() => {});
   }, [auth.state]);
-  useEffect(() => (setSheet(""), setNote("")), [v]);
+  useEffect(() => (setSheet(""), setNote(""), setPal(false)), [v]);
   const showTend = () => {
     setSheet("rail");
     setTimeout(() => document.querySelectorAll<HTMLElement>(".rail #tend").forEach((e) => e.scrollIntoView({ block: "start" })), 300);
