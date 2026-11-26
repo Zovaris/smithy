@@ -93,3 +93,24 @@ func TestReleaseEmbedsBuild(t *testing.T) {
 		t.Fatal("embedded web UI is the placeholder: run npm ci && npm run build in web/ first")
 	}
 }
+
+func TestHandlerServesPWAFiles(t *testing.T) {
+	fsys := fstest.MapFS{
+		"dist/app/index.html":           {Data: []byte(`<div id="app"></div>`)},
+		"dist/app/sw.js":                {Data: []byte("self")},
+		"dist/app/manifest.webmanifest": {Data: []byte("{}")},
+		"dist/app/favicon.svg":          {Data: []byte("<svg/>")},
+	}
+	cases := map[string]string{
+		"/sw.js":                "javascript",
+		"/manifest.webmanifest": "application/manifest+json",
+		"/favicon.svg":          "image/svg+xml",
+	}
+	for p, ct := range cases {
+		w := httptest.NewRecorder()
+		handler(fsys).ServeHTTP(w, httptest.NewRequest("GET", p, nil))
+		if w.Code != 200 || !strings.Contains(w.Header().Get("Content-Type"), ct) || w.Header().Get("Cache-Control") != "no-cache" || strings.Contains(w.Body.String(), `id="app"`) {
+			t.Errorf("%s: %d %q %q", p, w.Code, w.Header().Get("Content-Type"), w.Header().Get("Cache-Control"))
+		}
+	}
+}

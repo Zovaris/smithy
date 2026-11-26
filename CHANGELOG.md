@@ -8,6 +8,13 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+- The web has an anvil favicon and installs as an app (Chrome, and Add to Home Screen on iOS); its page shell opens offline.
+
+### Details
+- `web/public/`: `favicon.svg`, PNG icons (192, 512 maskable, 180 apple-touch), `manifest.webmanifest`, `sw.js` (caches only `/` and same-origin static files; never `/v1/`, query strings or non-GET). `index.html` gains description, Open Graph and iOS web-app meta tags.
+- `internal/web`: top-level build files (favicon, manifest, service worker) are served as themselves with `no-cache` instead of the SPA's `index.html`; `.webmanifest` gets `application/manifest+json`.
+
 ## v0.24.0 — 2026-11-26
 
 ### Highlights
