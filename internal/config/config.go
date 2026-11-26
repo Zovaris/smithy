@@ -342,20 +342,35 @@ func defaultOf(key string) string {
 
 // Effective returns a key's value and where it came from (repo, user or default); a settings
 // file that isn't a JSON object is an error, not ErrUnset.
-func Effective(key string) (string, string, error) {
+func Effective(key string) (string, string, error) { return Snapshot()(key) }
+
+// Snapshot finds and reads the repo and user settings files once and returns an Effective that
+// answers from them, for callers reading many keys at once.
+func Snapshot() func(key string) (string, string, error) {
+	type layer struct {
+		m   map[string]any
+		err error
+		src string
+	}
+	var ls []layer
 	for _, s := range [][2]string{{RepoFile(), "repo"}, {UserFile(), "user"}} {
-		v, ok, err := readKeyErr(s[0], key)
-		if err != nil {
-			return "", "", err
-		}
-		if ok {
-			return v, s[1], nil
-		}
+		m, err := loadFile(s[0])
+		ls = append(ls, layer{m, err, s[1]})
 	}
-	if d := defaultOf(key); d != "" && d != "ask" {
-		return d, "default", nil
+	return func(key string) (string, string, error) {
+		for _, l := range ls {
+			if l.err != nil {
+				return "", "", l.err
+			}
+			if v, ok := lookup(l.m, key); ok {
+				return str(v), l.src, nil
+			}
+		}
+		if d := defaultOf(key); d != "" && d != "ask" {
+			return d, "default", nil
+		}
+		return "", "", ErrUnset
 	}
-	return "", "", ErrUnset
 }
 
 // UserGet reads key from the user's settings file only, never the repo's (a cloned repo must not

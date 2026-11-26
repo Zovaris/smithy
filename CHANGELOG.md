@@ -31,6 +31,10 @@ part above `### Details`.
 - A repeated daemon line, such as serve's missing GitHub CLI note, shows once in the status area
   and leaves it after 20 seconds; `/log` keeps every line.
 
+### Fixed
+
+- The settings page loads in well under a second again: `GET /v1/settings` finds the repo settings file once per request instead of running git for every setting.
+
 ### Details
 
 - Chat tok/s is estimated from streamed agent text (about four characters per token) over the
