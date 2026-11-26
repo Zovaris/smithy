@@ -4,29 +4,20 @@ import { I, toolIcon } from "../../components/icons";
 import { prose, agentName, argLine, initials, type Dec, type Item, type Sess, type Tool } from "../../lib/store";
 import { Md } from "../../components/md";
 import { Decision, St } from "../../components/ui";
-import type { Detail } from "../../lib/commands";
+import type { Detail } from "../../lib/detail";
 
 const cost = (s: Sess) => (s.usage?.cost_usd != null ? " · $" + s.usage.cost_usd.toFixed(2) : "");
 
 // Tools is a run of tool calls in the /mode detail: minimal folds the run into one line, expandable
 // shows a header per tool, verbose opens every one.
 function Tools({ tools, detail }: { tools: Tool[]; detail: Detail }) {
-  if (detail === "minimal") {
-    const failed = tools.filter((t) => t.is_error).length;
+  if (detail === "minimal")
     return (
-      <div class="tools">
-        <details class={"tool" + (failed ? " err" : "")}>
-          <summary>
-            <I n="term" />
-            <span class="k">{tools.length} tool{tools.length === 1 ? "" : "s"}</span>
-            <span class="a">{[...new Set(tools.map((t) => t.name))].join(", ")}</span>
-            {failed > 0 && <span class="st fail">{failed} failed</span>}
-          </summary>
-          <Tools tools={tools} detail="expandable" />
-        </details>
-      </div>
+      <details class="tool">
+        <summary><I n="term" /><span class="k">{tools.length} tools</span><span class="a">{tools.map((t) => t.name).join(", ")}</span></summary>
+        <Tools tools={tools} detail="expandable" />
+      </details>
     );
-  }
   return (
     <div class="tools">
       {tools.map((t) => (

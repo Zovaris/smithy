@@ -1,5 +1,6 @@
 import { Dialog } from "@zovaris/sephiro/dialog";
 import "@zovaris/sephiro/css/dialog.css";
+import "./info.css";
 
 export type Info = { title: string; lines: string[] };
 

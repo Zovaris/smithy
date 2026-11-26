@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import popup from "../../../internal/tui/chat_popup.go?raw";
 import slash from "../features/chat/slash.ts?raw";
-import { ACTIONS, action, nextDetail, suggest, TUI_ONLY } from "./commands";
+import { ACTIONS, action, suggest } from "./commands";
+import { nextDetail } from "./detail";
+
+// The TUI commands the web leaves out on purpose: it has no terminal to detach from or quit, and
+// it already is the web UI.
+const TUI_ONLY = ["detach", "quit", "web"];
 
 const names = ACTIONS.map((a) => a.name);
 

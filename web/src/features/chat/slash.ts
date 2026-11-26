@@ -2,7 +2,8 @@
 // /model, /effort, /theme, /mode, /ask, /answer, /serve, /set, /unset, /key rm, the panels (/help,
 // /log, /remote, /tend) and the ones that open Settings.
 import { removeKey, runShell, sampleAsk, setServe, setSetting, unsetSetting } from "../../lib/actions";
-import { ACTIONS, nextDetail, type Detail } from "../../lib/commands";
+import { ACTIONS } from "../../lib/commands";
+import { nextDetail, type Detail } from "../../lib/detail";
 import type { Info } from "../../components/info";
 import { api } from "../../lib/auth";
 import { decide, stopSession } from "../../lib/live";
@@ -62,7 +63,10 @@ export function run(a: string, arg: string, { s, pend, log, detail, setPick, set
   } else if (a === "help") setInfo(help());
   else if (a === "remote") setInfo(remote());
   else if (a === "log") setInfo({ title: "Log", lines: ["#DAEMON LOG · " + log.length + " EVENTS", ...(log.length ? log : ["nothing yet"])] });
-  else if (a === "tend") showTend();
+  else if (a === "tend") {
+    showTend();
+    setTimeout(() => document.querySelector(".rail.sheet #tend")?.scrollIntoView({ block: "start" }), 300);
+  }
   else if (a === "key" && /^rm\s+\S+$/.test(arg)) {
     const svc = arg.split(/\s+/)[1];
     say(removeKey(svc), "removed the " + svc + " key");

@@ -10,23 +10,14 @@ import { parse, totals, withComments, type Comment } from "./lib/diff";
 import { Anvil, I } from "./components/icons";
 import { sendMessage, start, stopSession, useLive } from "./lib/live";
 import { clock, headerLine } from "./lib/parity";
-import { NewSession } from "./features/chat/newsession";
 import { Changes, Decisions } from "./components/rail";
 import { go, href, PAGES, type Page, useView } from "./lib/router";
 import { agentName, ago, open, sessions as list, type Sess } from "./lib/store";
 import { initTheme, toggleTheme, current, loadAccent, type ThemeName } from "./lib/theme";
 import { St } from "./components/ui";
 import type { Info } from "./components/info";
-import type { Detail } from "./lib/commands";
+import type { Detail } from "./lib/detail";
 
-// The transcript detail /mode picks, kept per browser like the TUI keeps it per run.
-function savedDetail(): Detail {
-  try {
-    const d = localStorage.getItem("smithy.detail");
-    if (d === "minimal" || d === "expandable" || d === "verbose") return d;
-  } catch {}
-  return "expandable";
-}
 
 const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
   decisions: lazy(() => import("./screens/decisions")),
@@ -41,6 +32,7 @@ const Splash = lazy(() => import("./components/splash"));
 const SideServers = lazy(() => import("./components/servers").then((m) => ({ default: () => <m.Servers rows={m.useServers()} /> })));
 const SessionPick = lazy(() => import("./features/chat/sessionpick"));
 const InfoPanel = lazy(() => import("./components/info"));
+const NewSession = lazy(() => import("./features/chat/newsession").then((m) => ({ default: m.NewSession })));
 type Shell = { cmd: string; output: string; code: number };
 
 const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", setup: "gear" };
@@ -142,13 +134,7 @@ function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [notes, setNotes] = useState<Record<string, Comment[]>>({});
   const [info, setInfo] = useState<Info | null>(null);
-  const [detail, setDetailState] = useState<Detail>(savedDetail);
-  const setDetail = (d: Detail) => {
-    setDetailState(d);
-    try {
-      localStorage.setItem("smithy.detail", d);
-    } catch {}
-  };
+  const [detail, setDetail] = useState<Detail>("expandable");
   const ss = list(l.store);
   const sid = v.name === "session" ? v.id : "";
   const s = sid ? l.store.sessions[sid] : undefined;
@@ -172,14 +158,10 @@ function App() {
       api("/v1/setup").then((r) => (r.ok ? r.json() : null)).then((x) => x && !x.chosen && (location.hash = "#/setup")).catch(() => {});
   }, [auth.state]);
   useEffect(() => (setSheet(""), setNote(""), setPal(false)), [v]);
-  const showTend = () => {
-    setSheet("rail");
-    setTimeout(() => document.querySelectorAll<HTMLElement>(".rail #tend").forEach((e) => e.scrollIntoView({ block: "start" })), 300);
-  };
 
   const onAction = (a: string, arg = "") => {
     if (a === "new") go({ name: "new" });
-    else import("./features/chat/slash").then((m) => m.run(a, arg, { s, pend, log: l.store.log, detail, setPick, setNote, setAccent, setDetail, setInfo, showTend }));
+    else import("./features/chat/slash").then((m) => m.run(a, arg, { s, pend, log: l.store.log, detail, setPick, setNote, setAccent, setDetail, setInfo, showTend: () => setSheet("rail") }));
   };
 
   useEffect(() => {
@@ -236,7 +218,7 @@ function App() {
     );
 
   let center;
-  if (v.name === "new") center = <NewSession setup={l.setup} recent={ss} host={host()} onAction={onAction} />;
+  if (v.name === "new") center = <Suspense fallback={null}><NewSession setup={l.setup} recent={ss} host={host()} onAction={onAction} /></Suspense>;
   else if (v.name === "session")
     center = s ? (
       <>
