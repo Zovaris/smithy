@@ -36,6 +36,7 @@ const (
 	KindSessionDiff    = "session_diff"
 	KindSessionUsage   = "session_usage"
 	KindSessionStatus  = "session_status"
+	KindSessionModel   = "session_model"
 )
 
 const (
@@ -61,6 +62,7 @@ type Session struct {
 	ID      string       `json:"id"`
 	Agent   string       `json:"agent"`
 	Model   string       `json:"model,omitempty"`
+	Effort  string       `json:"effort,omitempty"`
 	Dir     string       `json:"dir"`
 	Title   string       `json:"title"`
 	Status  string       `json:"status"`
@@ -171,6 +173,11 @@ func (sv *Server) applySession(e store.Event) {
 			s.Created, s.Updated = e.Time, e.Time
 			sv.sessions[s.ID] = &live{s: s}
 			sv.lastAgent, sv.lastModel = s.Agent, s.Model
+		}
+	case KindSessionModel:
+		var c struct{ Model, Effort string }
+		if l := sv.sessions[e.Session]; l != nil && json.Unmarshal(e.Data, &c) == nil {
+			l.s.Model, l.s.Effort, l.s.Updated = c.Model, c.Effort, e.Time
 		}
 	case KindSessionStatus:
 		var st struct{ Status, Detail string }
@@ -360,11 +367,14 @@ func (sv *Server) SendSession(id, msg, by string) error {
 		if rf == nil {
 			rf = DefaultRunner
 		}
-		agent, model, dir := l.s.Agent, l.s.Model, l.s.Dir
+		agent, model, effort, dir := l.s.Agent, l.s.Model, l.s.Effort, l.s.Dir
 		sv.mu.Unlock()
 		r, err := rf(agent, model, dir, filepath.Join(SessionsDir(), id))
 		if err != nil {
 			return fmt.Errorf("%w: %v", errBadRequest, text.Clean(err.Error()))
+		}
+		if es, ok := r.(effortSetter); ok && effort != "" {
+			es.SetEffort(effort)
 		}
 		sv.mu.Lock()
 		if l.runner == nil || l.stopped {
@@ -392,6 +402,74 @@ func (sv *Server) queueLocked(l *live, msg, by string) error {
 	}
 	sv.setStatusLocked(l.s.ID, StatusWorking, "")
 	return err
+}
+
+// ValidEffort reports whether effort may be set on a session of agent: "" (the agent.effort
+// setting) or one of agents.Efforts, and only for a CLI that takes an effort flag.
+func ValidEffort(agent, effort string) error {
+	if effort == "" {
+		return nil
+	}
+	if !slices.Contains(agents.Efforts, effort) {
+		return fmt.Errorf("effort must be one of %s (smithy caps effort at %s)", strings.Join(agents.Efforts, ", "), agents.MaxEffort)
+	}
+	if !agents.EffortFlags[agent] {
+		return fmt.Errorf("%s takes no effort setting; it keeps its own", agent)
+	}
+	return nil
+}
+
+// SetSessionModel sets the model and effort a session's next turns run with. A CLI agent's
+// runner is ended so the next message starts one with them; a session mid-turn is refused.
+func (sv *Server) SetSessionModel(id, model, effort string) (Session, error) {
+	if err := ValidModel(model); err != nil {
+		return Session{}, fmt.Errorf("%w: %v", errBadRequest, err)
+	}
+	sv.mu.Lock()
+	defer sv.mu.Unlock()
+	l := sv.sessions[id]
+	if l == nil {
+		return Session{}, errNoSession
+	}
+	if strings.HasPrefix(l.s.Agent, "api:") {
+		return Session{}, fmt.Errorf("%w: an API session's model is part of its agent; start a new session", errBadRequest)
+	}
+	if err := ValidEffort(l.s.Agent, effort); err != nil {
+		return Session{}, fmt.Errorf("%w: %v", errBadRequest, err)
+	}
+	if l.s.Status == StatusWorking || l.s.Status == StatusNeedsYou {
+		return Session{}, fmt.Errorf("%w: the session is mid-turn; wait for it or /stop it first", errBusy)
+	}
+	if _, err := sv.appendLocked(KindSessionModel, id, map[string]string{"model": model, "effort": effort}); err != nil {
+		return Session{}, err
+	}
+	l.s.Model, l.s.Effort = model, effort
+	if l.runner != nil && !l.stopped {
+		l.stopped = true
+		l.cancel()
+	}
+	return l.s, nil
+}
+
+func (sv *Server) setSessionModel(w http.ResponseWriter, r *http.Request) {
+	if code, msg := sameOrigin(r); code != 0 {
+		writeJSON(w, code, map[string]string{"error": msg})
+		return
+	}
+	var req struct {
+		Model  string `json:"model"`
+		Effort string `json:"effort"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&req); err != nil {
+		writeJSON(w, 400, map[string]string{"error": "body must be {\"model\":…,\"effort\":…}"})
+		return
+	}
+	s, err := sv.SetSessionModel(r.PathValue("id"), req.Model, req.Effort)
+	if err != nil {
+		sessionErr(w, err)
+		return
+	}
+	writeJSON(w, 200, s)
 }
 
 // StopSession cancels the running turn, drops queued messages and ends the runner. The session
