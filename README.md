@@ -150,6 +150,18 @@ smithy receipt run -- go test ./...  # record a test run for the PR
 smithy scan                          # secrets in what the change adds
 ```
 
+### The chat
+
+Run `smithy` to open a chat with any agent above, driven by a local daemon you can also reach
+from the web or another machine.
+
+- `tab` lists sessions of this folder (`a`: every project); a new session asks which project it works in.
+- `ctrl+l` or `/agent` and `/model` pick the agent and model (OpenCode's models too); `/effort` sets low or medium.
+- `/name` or `$name` runs any installed skill; `/skills` lists them.
+- `!cmd` runs a shell command in the session folder; `ctrl+v` attaches a clipboard image.
+- `/set`, `/keys`, `/serve`, `/doctor` change settings from the chat; `/detach` quits and leaves the daemon running.
+- `ctrl+k` opens the palette and `?` shows every key.
+
 `smithy help` lists the commands by task; `smithy help <command>` shows usage, flags and
 examples for one (`smithy help --all` adds the commands the skills call).
 
