@@ -103,6 +103,7 @@ var Known = []Setting{
 	{"kit.mcp", "true", "smithy agent", "false: driven CLIs don't get smithy's own MCP server (smithy mcp); /skills in the TUI and the web Setup screen toggle it"},
 	{"kit.skills", "", "smithy agent", "comma list of installed skills linked into every driven CLI that takes skills (claude, codex, opencode, pi); /skills toggles them"},
 	{"ui.theme", "steel", "smithy tui, web", "color theme the TUI and web share: steel (ember accent), frost or plum; /theme and the web palette pick it"},
+	{"ui.splash", "true", "smithy tui", "false skips the short dither-and-anvil animation when smithy opens; it never plays without a terminal, color or motion, or under 80×24"},
 	{"tui.reduce_motion", "false", "smithy tui", "true draws every frame still: no sparks, shimmer or sliding bars (like --no-anim or SMITHY_REDUCE_MOTION)"},
 }
 
