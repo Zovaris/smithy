@@ -11,9 +11,13 @@ part above `### Details`.
 ### New
 
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
+- An agent can ask you a question in a normal chat, not only inside a warden run; `/ask` pins a
+  sample question so you can see and try how decisions look.
 
 ### Details
 
+- `POST /v1/asks` accepts `ask:<key>` ids; the MCP `ask` tool uses one when no warden card is set
+  and writes no card.
 - `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),
   for the web UI.
 - **One modal for every picker.** Agent and model (ctrl+l, `/agent`, `/model`, first run), `/skills` and the agents list (tab) open as the same centered box as the ctrl+k palette: filter or title on top, ↑↓ enter esc at the bottom, no per-cell background blocks.
