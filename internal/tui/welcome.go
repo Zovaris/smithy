@@ -131,7 +131,6 @@ func (m chatView) welcomeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd, bool) {
 // welcomeView draws the walk full screen: the dither field, and the step's box over it.
 func (m chatView) welcomeView(w, h int) []string {
 	t := m.th
-	field := m.ditherField(w, h)
 	bw, bh := m.boxSize(w, h)
 	var items []boxItem
 	title, foot := "", ""
@@ -155,10 +154,11 @@ func (m chatView) welcomeView(w, h int) []string {
 		items = m.welcomeNotifyItems()
 		foot = "  " + keyHints(t, "enter", "finish", "←", "back", "/", "type a command", "esc", "done")
 	default:
-		return field
+		return m.welcomeField(w, h, 0)
 	}
 	items = append(items, m.noteItems()...)
-	return m.overBox(field, m.floatBox(bw, min(bh, len(items)+10), "", title, items, -1, foot), w)
+	box := m.floatBox(bw, min(bh, len(items)+10), "", title, items, -1, foot)
+	return m.overBox(m.welcomeField(w, h, len(box)), box, w)
 }
 
 func (m chatView) welcomeKeyItems() []boxItem {
@@ -212,6 +212,37 @@ func (m chatView) welcomeNotifyItems() []boxItem {
 // the entry splash both draw it.
 func fieldAt(x, y int, ph float64) float64 {
 	return 0.5 + 0.3*math.Sin(float64(x)/11+ph) + 0.2*math.Cos(float64(y)/4-ph*0.7)
+}
+
+// welcomeStrike is how often, in frames, the welcome's anvil throws sparks while motion is on.
+const welcomeStrike = 45
+
+// welcomeField is the dither field with the lit anvil centered in the room below a box of height
+// bh drawn by overBox; too short a screen gets the field alone. Reduced motion holds it still.
+func (m chatView) welcomeField(w, h, bh int) []string {
+	t := m.th
+	s := bigPlate
+	if t.plain || len(t.ramp) == 0 || !t.g.unicode {
+		return m.ditherField(w, h)
+	}
+	top := max(h*120/800, 1) + bh
+	room := h - top
+	sc := anvilScene{s: s, ax: (w - s.w()) / 2, fade: 1, rise: 1}
+	if room >= s.h()/2+1 && w >= s.w() {
+		sc.ay = (top + (room-s.h()/2)/2) * 2
+	} else {
+		sc.rise, sc.ay = 0, -s.h()
+	}
+	if !m.still {
+		sc.ph = float64(m.frame) / 12
+		f := newFX(7)
+		f.strike(s, 14, 0)
+		for range m.frame % welcomeStrike {
+			f.step()
+		}
+		sc.sparks = f.sparks
+	}
+	return t.anvilField(sc, w, h)
 }
 
 // ditherField fills w×h with the theme ramp drifting by frame, Bayer-dithered so the bands move
