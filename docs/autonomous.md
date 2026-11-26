@@ -72,7 +72,7 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
 - Setup: `GET /v1/setup` lists every agent CLI and API key as ready or missing with its fix, the
   default agent and model (`chosen` is false until one is picked or used: first run), the kit
   (`kit.mcp`, `kit.skills`), the skills and MCP servers each harness has installed, and the
-  effort rules (`effort.agents`: the CLIs that take effort, `effort.levels`, `effort.max`);
+  effort rules (`effort: {agents, levels, max}`: the CLIs that take effort, their levels and the highest);
   `PUT /v1/setup/default` (`{"agent","model"}`), `PUT /v1/setup/kit` (`{"mcp","skills"}`, skills
   must be installed smithy skills) and `POST /v1/setup/skills/install` (`{"harness"}`, empty for
   every detected one) change them. `GET /v1/agents/{id}/models[?refresh=1]` lists the models
@@ -96,7 +96,7 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   project's task dirs. The web's Board uses them.
 - Bench: `GET /v1/bench`, `GET /v1/bench/compare`, `POST /v1/bench/run` (`{"agent","model"}`) and
   `GET /v1/bench/status`.
-- This machine's daemon token only: `GET|POST /v1/servers` (list, pair and save a server),
+- This machine's daemon token only: `POST /v1/pair/code` (a one-time pairing code), `GET|POST /v1/servers` (list, pair and save a server),
   `DELETE /v1/servers/{name}`, `POST /v1/sessions/{id}/shell` (`{"cmd"}`, run in the session
   folder, 2 min timeout) and `POST /v1/images` (`{"data"}`, up to 32 MiB, saved for the next
   message).

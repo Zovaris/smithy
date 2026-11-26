@@ -60,6 +60,7 @@ stops with the chat.
 | `/set <key> <value>`, `/unset <key>` | change a setting (same as `smithy config set`) |
 | `/keys`, `/key rm <service>` | list or remove stored API keys |
 | `/serve [on\|off]` | serve mode; off launches nothing new |
+| `/tend` | the PRs the daemon tends and their state |
 | `/doctor` | run `smithy doctor` on the daemon's machine |
 | `/welcome` | walk the first-run steps again |
 | `/setup` | every agent, ready or missing, with its fix |
