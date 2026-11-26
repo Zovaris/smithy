@@ -14,6 +14,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
       - name: Go format and vet (both builds)
         run: |
           test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
@@ -30,20 +31,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build: [skills, harness]
+        build: [skills, harness-ui, harness-core]
     steps:
       - uses: useblacksmith/checkout@v1
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
       - uses: actions/setup-node@v4
-        if: matrix.build == 'harness'
+        if: matrix.build == 'harness-ui'
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
       - name: Build the web UI (embedded by the harness build)
-        if: matrix.build == 'harness'
+        if: matrix.build == 'harness-ui'
         working-directory: web
         run: npm ci && npm run build
       - name: Go tests, skills build (race detector, coverage)
@@ -61,11 +63,15 @@ jobs:
             go tool cover -func=cover.out | awk '$1 != "total:" {split($1,f,":"); pkg=f[1]; sub("/[^/]*$","",pkg); sub("github.com/Zovaris/smithy/","",pkg); n[pkg]++; s[pkg]+=$3} END {for (p in n) printf "| %s | %.1f%% |\n", p, s[p]/n[p]}' | sort
           } >> "$GITHUB_STEP_SUMMARY"
           awk -v t="${total%\%}" -v min="$COVERAGE_MIN" 'BEGIN { if (t+0 < min+0) { print "coverage " t "% is below " min "%"; exit 1 } }'
-      - name: Go tests, harness build (race detector)
-        if: matrix.build == 'harness'
+      # the harness build is split in two jobs: the TUI and web packages (slowest, need the web build) and the rest
+      - name: Go tests, harness build, TUI and web (race detector)
+        if: matrix.build == 'harness-ui'
         env:
           SMITHY_REQUIRE_WEB_BUILD: "1" # the web e2e test runs on the real build, never skips
-        run: go test -race -tags harness ./...
+        run: go test -race -tags harness ./internal/tui/... ./internal/web/...
+      - name: Go tests, harness build, every other package (race detector)
+        if: matrix.build == 'harness-core'
+        run: go test -race -tags harness $(go list -tags harness ./... | grep -v -e '/internal/tui' -e '/internal/web')
   integration:
     runs-on: blacksmith-2vcpu-ubuntu-2604
     steps:
@@ -73,6 +79,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
       - name: Integration tests (skill lint, CLI tests through the binary)
         env:
           SKIP_GO_TEST: "1"
@@ -82,13 +89,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # pull requests build one target per OS; main builds every release target
-        target: ${{ fromJSON(github.event_name == 'pull_request' && '["darwin/arm64","linux/amd64","windows/amd64"]' || '["darwin/arm64","darwin/amd64","linux/arm64","linux/amd64","windows/amd64"]') }}
+        # pull requests build the native target; release/* pull requests and main build every release target
+        target: ${{ fromJSON((github.event_name != 'pull_request' || startsWith(github.head_ref, 'release/')) && '["darwin/arm64","darwin/amd64","linux/arm64","linux/amd64","windows/amd64"]' || '["linux/amd64"]') }}
     steps:
       - uses: useblacksmith/checkout@v1
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -114,6 +122,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.5
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-1.4.5-${{ hashFiles('web/package-lock.json') }}
+          restore-keys: bun-${{ runner.os }}-1.4.5-
       - name: Web UI tests, typecheck, lint, build within budget (ADR 0010, 0011)
         working-directory: web
         run: |
@@ -125,12 +138,14 @@ jobs:
           npm run build
   demo:
     # Records the v0.23 demo (demo/run.sh): the TUI tape and the web screenshots, kept as an artifact.
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release/')
+    runs-on: blacksmith-4vcpu-ubuntu-2604
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -162,8 +177,9 @@ jobs:
         run: |
           r='${{ join(needs.*.result, ' ') }}'
           echo "results: $r"
-          for x in $r; do [ "$x" = success ] || exit 1; done
+          for x in $r; do case "$x" in success|skipped) ;; *) exit 1 ;; esac; done
   windows-launcher:
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release/')
     runs-on: blacksmith-2vcpu-windows-2025
     steps:
       - uses: actions/checkout@v4

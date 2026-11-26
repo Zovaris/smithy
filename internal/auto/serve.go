@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,7 +33,7 @@ Runs the auto loop in the foreground with no tokens (in the harness build it sta
 which runs this loop, or attaches to it): polls auto.sources every auto.every seconds and,
 when auto take yields a task dir, starts one headless orchestrator session (smithy agent --bg
 --profile auto) that runs tend auto once on it. At most one orchestrator at a time; new issues stay
-queued until it ends. Its output goes to ~/.smithy/auto/sessions/<time>.log.
+queued until it ends. Outside a git checkout the github source is skipped. Its output goes to ~/.smithy/auto/sessions/<time>.log.
   --agent      agent CLI for the orchestrator (default: auto.agent, else the detected one)
   --once       one cycle, then exit (a started orchestrator keeps running)
   --max-hours  exit after this many hours (default: no limit)
@@ -418,6 +419,9 @@ func (sv *Server) Cycle() time.Duration {
 	}
 	sv.hb.Every, sv.hb.State = s.Every, "polling"
 	_ = sv.beat()
+	if ghx.RepoRoot(sv.Opt.Cwd) == "" {
+		s.Sources = slices.DeleteFunc(slices.Clone(s.Sources), func(n string) bool { return n == "github" })
+	}
 	srcs, openErr := s.Open("")
 	if openErr != nil {
 		sv.logf("serve: %v", openErr)
