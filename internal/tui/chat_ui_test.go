@@ -205,7 +205,7 @@ func TestChatDecideErrorIsShown(t *testing.T) {
 func TestChatAgentsOverlay(t *testing.T) {
 	m := chatStep(newChatScene(), ckey("tab"))
 	out := screen(m)
-	for _, s := range []string{"Agents", "1 running", "●  TK-29", "✗  TES-9", "Waiting on you", "?  Merge #142"} {
+	for _, s := range []string{"Agents", "1 running", "●  TK-29", "✗  TES-9", "WAITING ON YOU", "?  Merge #142"} {
 		if !strings.Contains(out, s) {
 			t.Fatalf("agents overlay missing %q:\n%s", s, out)
 		}
