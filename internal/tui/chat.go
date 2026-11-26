@@ -105,6 +105,7 @@ type chatView struct {
 	modelList *models.List // what the agent reported; nil while it loads
 	modelSess string
 	effortSel int
+	themeSel  int
 
 	sess     sessionAPI            // the daemon's sessions endpoints; nil: offline
 	current  string                // the open session, "" before the first message
@@ -154,13 +155,9 @@ func newChatView(stream <-chan daemon.ClientMsg, url string, th theme) chatView 
 // newComposer is the input pinned at the bottom: a textarea on the raised tier behind the
 // ember ›, three rows tall, growing to ten then scrolling; enter sends, shift+enter, alt+enter
 // or ctrl+j breaks the line.
-func newComposer(th theme) textarea.Model {
-	in := textarea.New()
-	in.ShowLineNumbers = false
-	in.Placeholder = "Ask, or / for commands"
-	in.DynamicHeight, in.MinHeight, in.MaxHeight, in.MaxContentHeight = true, 3, 10, 1<<20
-	in.KeyMap.InsertNewline.SetKeys("shift+enter", "alt+enter", "ctrl+j")
-	in.SetPromptFunc(2, func(i textarea.PromptInfo) string {
+// composerPrompt draws the accent › on the first row; a theme change sets it again.
+func composerPrompt(th theme) func(textarea.PromptInfo) string {
+	return func(i textarea.PromptInfo) string {
 		st := lipgloss.NewStyle()
 		if th.raised != nil {
 			st = st.Background(th.raised)
@@ -169,7 +166,16 @@ func newComposer(th theme) textarea.Model {
 			return th.fg(th.accent).Inherit(st).Render(th.g.prompt) + st.Render(" ")
 		}
 		return st.Render("  ")
-	})
+	}
+}
+
+func newComposer(th theme) textarea.Model {
+	in := textarea.New()
+	in.ShowLineNumbers = false
+	in.Placeholder = "Ask, or / for commands"
+	in.DynamicHeight, in.MinHeight, in.MaxHeight, in.MaxContentHeight = true, 3, 10, 1<<20
+	in.KeyMap.InsertNewline.SetKeys("shift+enter", "alt+enter", "ctrl+j")
+	in.SetPromptFunc(2, composerPrompt(th))
 	st := textarea.DefaultStyles(true)
 	for _, s := range []*textarea.StyleState{&st.Focused, &st.Blurred} {
 		base := lipgloss.NewStyle()
@@ -455,7 +461,9 @@ func (m *chatView) release() {
 	m.held = nil
 }
 
-func (m chatView) Init() tea.Cmd { return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true)) }
+func (m chatView) Init() tea.Cmd {
+	return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true), m.loadTheme())
+}
 
 func (m chatView) wait() tea.Cmd {
 	if m.stream == nil {

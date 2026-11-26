@@ -331,6 +331,8 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.modelCommand(arg)
 	case "effort":
 		return m.effortCommand(arg)
+	case "theme":
+		return m.themeCommand(arg)
 	case "skills":
 		m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
 		return m, m.loadSetup(false)

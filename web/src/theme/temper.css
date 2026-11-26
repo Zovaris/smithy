@@ -78,3 +78,13 @@
   --sph-shadow-popover: 0 8px 24px rgb(0 0 0 / 0.4);
   color-scheme: dark;
 }
+
+/* ui.theme accents, shared with the TUI: data-accent swaps the ember; steel sets none. */
+[data-sephiro-theme="temper"][data-accent="frost"] { --t-ember: #0e7c86; --t-ember-ink: #0b646c; --sph-accent-pressed: #094f55; }
+[data-sephiro-theme="temper"][data-accent="plum"] { --t-ember: #9333ea; --t-ember-ink: #7e22ce; --sph-accent-pressed: #6b21a8; }
+@media (prefers-color-scheme: dark) {
+  [data-sephiro-theme="temper"][data-accent="frost"]:not([data-mode="light"]) { --t-ember: #3dd6d0; --t-ember-ink: #7ae6e2; }
+  [data-sephiro-theme="temper"][data-accent="plum"]:not([data-mode="light"]) { --t-ember: #c084fc; --t-ember-ink: #d8b4fe; }
+}
+[data-sephiro-theme="temper"][data-accent="frost"][data-mode="dark"] { --t-ember: #3dd6d0; --t-ember-ink: #7ae6e2; }
+[data-sephiro-theme="temper"][data-accent="plum"][data-mode="dark"] { --t-ember: #c084fc; --t-ember-ink: #d8b4fe; }

@@ -39,6 +39,7 @@ const (
 	stepAgent setupStep = iota
 	stepModel
 	stepEffort
+	stepTheme
 )
 
 type setupLoadedMsg struct {
@@ -136,6 +137,8 @@ func (m chatView) setupUpdate(msg tea.Msg) (chatView, tea.Cmd, bool) {
 	case sessionModelSetMsg:
 		m.sessionModelSet(msg)
 		return m, nil, true
+	case themeMsg:
+		return m.themeLoaded(msg), nil, true
 	case modelsLoadedMsg:
 		if msg.agent != m.modelFor {
 			return m, nil, true
@@ -350,6 +353,9 @@ func (m chatView) setupKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.setupStep == stepEffort {
 		return m.effortKey(msg)
+	}
+	if m.setupStep == stepTheme {
+		return m.themeKey(msg)
 	}
 	var rows []agents.Ready
 	if m.setupSt != nil {

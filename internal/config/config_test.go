@@ -564,3 +564,10 @@ func TestConnectorSettingsKnown(t *testing.T) {
 		t.Errorf("%s not a known setting", k)
 	}
 }
+
+func TestThemeIsAnEnumWithSteelDefault(t *testing.T) {
+	kind, opts := KindOf("ui.theme")
+	if kind != "enum" || len(opts) == 0 || opts[0] != "steel" || defaultOf("ui.theme") != "steel" {
+		t.Fatalf("ui.theme: %s %v default %q", kind, opts, defaultOf("ui.theme"))
+	}
+}
