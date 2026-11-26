@@ -8,6 +8,10 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- **Milestone review in warden.** After a milestone batch merges, warden offers a cheap-model coherence review in rounds (contradictions, duplicated rules, size, docs vs code, TUI vs CLI gaps, or a topic you name); each round's findings go to one fix item.
+
 ### Fixed
 
 - `smithy auto serve` no longer prints `poll: github: failed to run git` into the chat when it runs outside a git checkout: it skips the github source there quietly.
