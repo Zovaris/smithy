@@ -91,7 +91,7 @@ type stripHit struct {
 
 // event routes one daemon event: session events to their conversation, decisions to the
 // strip, a turn's tools and thinking to the transcript, everything else to the status line.
-func (m *chatView) event(kind, session, at string, data json.RawMessage) {
+func (m *chatView) event(kind, session string, at time.Time, data json.RawMessage) {
 	if strings.HasPrefix(kind, "session_") && session != "" {
 		if m.sessionEvent(kind, session, data) {
 			return
@@ -127,7 +127,7 @@ func (m *chatView) event(kind, session, at string, data json.RawMessage) {
 		}
 	}
 	if t := eventText(kind, session, data); t != "" {
-		m.logNoise(noise{at: time.Now(), text: t, quiet: kind == daemon.KindAsked})
+		m.logNoise(noise{at: at, text: t, quiet: kind == daemon.KindAsked})
 	}
 }
 

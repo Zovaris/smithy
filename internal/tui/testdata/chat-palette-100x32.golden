@@ -15,17 +15,17 @@
       │   ●  Agents panel  sessions and waiting items                                   tab  │
       │   →  Open the web UI  same sessions in the browser                             /web  │
       │   →  Connect  http://127.0.0.1:7477                                        /connect  │
-      │   ·  Daemon log  0 events                                                      /log  │
-     ›│   ↓  Jump to latest                                                             end  │      
-      │   ✗  Quit                                                                    ctrl+c  │
-     P│                                                                                      │
-     o│   SESSIONS                                                                           │
-      │   ✓  TK-6  done                                                                      │
-     ✓│   ●  TK-29  running                                                                  │s     
-      │   ✗  TES-9  failed                                                                   │
-     D│                                                                                      │
-      │   SETTINGS                                                                           │
-      │   ·  chat.mode  minimal                                                              │477   
+     ›│   ·  Daemon log  0 events                                                      /log  │      
+      │   ↓  Jump to latest                                                             end  │
+     P│   ✗  Quit                                                                    ctrl+c  │
+     o│                                                                                      │
+      │   SESSIONS                                                                           │
+     ✓│   ✓  TK-6  done                                                                      │s     
+      │   ●  TK-29  running                                                                  │
+     D│   ✗  TES-9  failed                                                                   │
+      │                                                                                      │
+      │   SETTINGS                                                                           │477   
+      │   ·  chat.mode  minimal                                                              │
      ›│                                                                                      │      
       ├──────────────────────────────────────────────────────────────────────────────────────┤      
       │  ↑↓ move   enter run   tab next group                                    16 results  │      

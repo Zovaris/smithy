@@ -102,7 +102,7 @@ func TestDaemonNoiseGoesToStatusLineNotTranscript(t *testing.T) {
 	m := newChatTest(0)
 	m.width = 120
 	m = chatStep(m, ev(1, "daemon_up", nil))
-	m = chatStep(m, ev(2, "log", map[string]string{"line": "serve: poll: github: To get started with GitHub CLI"}))
+	m = chatStep(m, evNow(2, "log", map[string]string{"line": "serve: poll: github: To get started with GitHub CLI"}))
 	if len(m.msgs) != 0 {
 		t.Fatalf("noise reached the transcript: %+v", m.msgs[0])
 	}

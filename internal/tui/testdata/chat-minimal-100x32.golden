@@ -15,7 +15,6 @@
 
 
 
-
      › Add usage-limit detection for Pi (TK-6).                                                     
 
      Pi prints its limit errors from packages/ai/src/errors.ts. I'll match those near the end
@@ -26,6 +25,7 @@
      Done: a Pi limit now marks the account limited until its reset.
 
                                                               ● connecting  http://127.0.0.1:7477   
+
      › Ask, or / for commands                                                                       
                                                                                                     
                                                                                                     

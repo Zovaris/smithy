@@ -569,7 +569,7 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.conn, m.connErr = "reconnecting", msg.Err.Error()
 		case msg.Event != nil && msg.Event.Seq > m.last:
 			m.last = msg.Event.Seq
-			m.event(msg.Event.Kind, msg.Event.Session, msg.Event.Time.Local().Format("15:04"), msg.Event.Data)
+			m.event(msg.Event.Kind, msg.Event.Session, msg.Event.Time, msg.Event.Data)
 			if m.last >= m.heldTo {
 				m.release()
 			}
@@ -725,9 +725,10 @@ func eventText(kind, session string, data json.RawMessage) string {
 }
 
 // rows is the transcript height: the screen less the header, the decision strip, the status
-// line, the composer, the footer and the spinner row while the open session works.
+// line and the gap under it, the composer, the footer and the spinner row while the open
+// session works.
 func (m chatView) rows() int {
-	n := m.height - headRows - m.stripRows() - 1 - m.input.Height() - 1
+	n := m.height - headRows - m.stripRows() - 2 - m.input.Height() - 1
 	if m.working() {
 		n -= 2
 	}
@@ -910,7 +911,7 @@ func (m chatView) View() tea.View {
 		}
 	}
 	out = append(out, body...)
-	out = append(out, m.statusLine(w))
+	out = append(out, m.statusLine(w), "")
 	out = append(out, m.composer(w)...)
 	out = append(out, m.footer(w))
 	if m.welcome != welcomeOff {

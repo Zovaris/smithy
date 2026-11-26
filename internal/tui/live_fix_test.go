@@ -99,6 +99,29 @@ func TestRoutedEventStaysOffTheStatusLine(t *testing.T) {
 	}
 }
 
+func TestReplayedServeStartStaysOffTheStatusLine(t *testing.T) {
+	m := newChatTest(0)
+	line := map[string]string{"line": "serve started: pid 42, agent claude"}
+	m = chatStep(m, ev(1, "log", line))
+	if strings.Contains(screen(m), "serve started") {
+		t.Fatalf("an old event from the replay shows as new:\n%s", screen(m))
+	}
+	m = chatStep(m, evNow(2, "log", map[string]string{"line": "serve started: pid 43, agent claude"}))
+	if !strings.Contains(screen(m), "pid 43") {
+		t.Fatalf("a fresh serve start shows:\n%s", screen(m))
+	}
+}
+
+func TestStatusLineHasAGapAboveTheComposer(t *testing.T) {
+	m := newChatTest(0)
+	m.status("hello status")
+	lines := strings.Split(screen(m), "\n")
+	y := rowOf(t, m, "hello status")
+	if strings.TrimSpace(lines[y+1]) != "" {
+		t.Fatalf("no gap between the status line and the input:\n%s", screen(m))
+	}
+}
+
 func TestWelcomeDefaultNotePrintedOnce(t *testing.T) {
 	m := newChatTest(0)
 	m.welcome = welcomeAgents
