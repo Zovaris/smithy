@@ -4,8 +4,8 @@ import { action, suggest } from "./commands";
 describe("commands", () => {
   it("suggests actions and skills for a bare /word, prefix matches first", () => {
     expect(suggest("/st", ["smelt", "tend"]).map((c) => c.name)).toEqual(["stop"]);
-    expect(suggest("/s", ["smelt", "scout"]).map((c) => c.name)).toEqual(["stop", "settings", "smelt", "scout", "agents", "decisions"]);
-    expect(suggest("/", []).length).toBe(7);
+    expect(suggest("/s", ["smelt", "scout"]).map((c) => c.name)).toEqual(["stop", "skills", "serve", "set", "settings", "smelt", "scout", "agents", "decisions", "ask", "answer", "unset", "keys"]);
+    expect(suggest("/", []).length).toBe(18);
   });
   it("stops suggesting once the message goes on", () => {
     expect(suggest("/smelt fix", ["smelt"])).toEqual([]);

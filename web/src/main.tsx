@@ -9,12 +9,12 @@ import { Conversation } from "./conversation";
 import { parse, totals, withComments, type Comment } from "./diff";
 import { Anvil, I } from "./icons";
 import { sendMessage, start, stopSession, useLive } from "./live";
+import { clock, headerLine } from "./parity";
 import { NewSession } from "./newsession";
 import { Changes, Decisions } from "./rail";
-import { Servers, useServers } from "./servers";
 import { go, href, PAGES, type Page, useView } from "./router";
 import { agentName, ago, open, sessions as list, type Sess } from "./store";
-import { initTheme, toggleTheme, current, loadAccent, saveAccent, type ThemeName } from "./theme";
+import { initTheme, toggleTheme, current, loadAccent, type ThemeName } from "./theme";
 import { St } from "./ui";
 
 const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
@@ -27,6 +27,10 @@ const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
 const Palette = lazy(() => import("./palette"));
 const AgentsPanel = lazy(() => import("./panel"));
 const Splash = lazy(() => import("./splash"));
+const SideServers = lazy(() => import("./servers").then((m) => ({ default: () => <m.Servers rows={m.useServers()} /> })));
+const SessionPick = lazy(() => import("./sessionpick"));
+type Shell = { cmd: string; output: string; code: number };
+
 const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", setup: "gear" };
 
 type Auth = { state: "checking" } | { state: "ok" } | { state: "denied" } | { state: "down"; error: string };
@@ -62,7 +66,6 @@ function Sidebar({ ss, cur, pending, conn, sheet, onClose, onPalette, onCollapse
   ss: Sess[]; cur: string; pending: number; conn: string; sheet: boolean; onClose: () => void; onPalette: () => void; onCollapse: () => void;
 }) {
   const [mode, setMode] = useState(current);
-  const servers = useServers();
   return (
     <aside class={"side" + (sheet ? " sheet" : "")} aria-label="Sessions" onClick={(e) => (e.target as HTMLElement).closest("a") && onClose()}>
       <div class="grab" />
@@ -81,7 +84,7 @@ function Sidebar({ ss, cur, pending, conn, sheet, onClose, onPalette, onCollapse
           </a>
         ))}
       </div>
-      <Servers rows={servers} />
+      <Suspense fallback={null}><SideServers /></Suspense>
       <nav class="nav" aria-label="Pages">
         {PAGES.map((p) => (
           <a href={"#/" + p.id} aria-current={cur === p.id ? "page" : undefined} aria-keyshortcuts={"Alt+" + p.key}>
@@ -102,7 +105,21 @@ function Sidebar({ ss, cur, pending, conn, sheet, onClose, onPalette, onCollapse
   );
 }
 
+function useClock(): string {
+  const [t, set] = useState(() => clock(new Date()));
+  useEffect(() => {
+    const i = setInterval(() => set(clock(new Date())), 10000);
+    return () => clearInterval(i);
+  }, []);
+  return t;
+}
+
 function App() {
+  const now = useClock();
+  const [version, setVersion] = useState("");
+  const [pick, setPick] = useState(false);
+  const [note, setNote] = useState("");
+  const [shells, setShells] = useState<Record<string, Shell[]>>({});
   const v = useView();
   const auth = useAuth();
   const l = useLive();
@@ -129,23 +146,16 @@ function App() {
   useEffect(() => {
     if (auth.state !== "ok") return;
     start();
+    api("/v1/state").then((r) => (r.ok ? r.json() : null)).then((x) => x?.version && setVersion(x.version)).catch(() => {});
     loadAccent(api).then(setAccent).catch(() => {});
     if (!location.hash.replace(/^#\/?/, ""))
       api("/v1/setup").then((r) => (r.ok ? r.json() : null)).then((x) => x && !x.chosen && (location.hash = "#/setup")).catch(() => {});
   }, [auth.state]);
-  useEffect(() => setSheet(""), [v]);
+  useEffect(() => (setSheet(""), setNote("")), [v]);
 
-  const onAction = (a: string) => {
+  const onAction = (a: string, arg = "") => {
     if (a === "new") go({ name: "new" });
-    else if (a === "stop" && s) stopSession(s.id).catch(() => {});
-    else if (a === "theme") toggleTheme();
-    else if (a.startsWith("theme:")) {
-      const n = a.slice(6) as ThemeName;
-      setAccent(n);
-      saveAccent(api, n).catch(() => {});
-    }
-    else if (a === "settings") go({ name: "setup" });
-    else if (a === "agents" || a === "board" || a === "decisions" || a === "bench") go({ name: a });
+    else import("./slash").then((m) => m.run(a, arg, { s, pend, setPick, setNote, setAccent }));
   };
 
   useEffect(() => {
@@ -206,20 +216,35 @@ function App() {
   else if (v.name === "session")
     center = s ? (
       <>
-        <Conversation s={s} items={l.store.convo[s.id] ?? []} decisions={decs} loose={s.status === "working" || s.status === "needs_you" ? pend.filter((d) => !d.session) : []} />
+        <Conversation s={s} items={l.store.convo[s.id] ?? []} decisions={decs} loose={s.status === "working" || s.status === "needs_you" ? pend.filter((d) => !d.session) : []}
+          extra={(shells[s.id] ?? []).map((x) => (
+            <div class="shell" role="group" aria-label={"Shell: " + x.cmd}>
+              <div class="mono"><span class="t3">$</span> {x.cmd}{x.code !== 0 && <span class="st fail">exit {x.code}</span>}</div>
+              <pre>{x.output.trimEnd() || "(no output)"}</pre>
+            </div>
+          ))} />
         <Composer
           placeholder={`Reply to ${agentName(s.agent)}`}
           skills={skills}
           working={s.status === "working" || s.status === "needs_you"}
           onStop={() => stopSession(s.id).catch(() => {})}
           onAction={onAction}
+          onShell={currentServer() ? undefined : async (cmd) => {
+            const x = await (await import("./slash")).shell(s.id, cmd);
+            setShells((m) => ({ ...m, [s.id]: [...(m[s.id] ?? []), x] }));
+          }}
+          onImage={currentServer() ? undefined : async (f) => (await import("./actions")).uploadImage(f)}
           above={!!mine.length && <div class="cmts"><span class="tag"><I n="pen" />{mine.length} diff comment{mine.length > 1 ? "s" : ""} go with this message</span></div>}
           onSend={async (text) => {
             await sendMessage(s.id, withComments(text, mine));
             setNotes({ ...notes, [sid]: [] });
             return "";
           }}
-          pills={<span class="pill"><I n="term" />{agentName(s.agent)}<span class="hide-s t3">{s.model || "default"}</span></span>}
+          pills={
+            <button class="pill" aria-haspopup="dialog" title="Model and effort (/model, /effort)" onClick={() => setPick(true)}>
+              <I n="term" />{agentName(s.agent)}<span class="hide-s t3">{(s.model || "default") + (s.effort ? " · " + s.effort : "")}</span>
+            </button>
+          }
         />
       </>
     ) : (
@@ -246,15 +271,18 @@ function App() {
       <main class="main" id="main" tabIndex={-1}>
         <div class="meta-bar">
           {collapsed && <button class="icon s" aria-label="Show sidebar" onClick={() => setCollapsed(false)}><I n="panel" /></button>}
+          <span class="brandline mono" title={s?.dir}>{headerLine(version, s?.dir ?? "")}</span>
           <h1>{title}</h1>
-          {s && <St s={s.status} />}
+          {s ? <St s={s.status} /> : <span class={"st " + (l.conn === "connected" ? "done" : "need")}>{l.conn === "connected" ? "live" : l.conn}</span>}
+          {note && <span class="t3 note" role="status" onClick={() => setNote("")}>{note}</span>}
           <span class="sp" />
-          {s && <span class="tag" title={s.dir}><I n="folder" /><span class="mono">{s.dir.split("/").slice(-2).join("/")}</span></span>}
+          {s && <span class="tag" title={"Runs on " + host()}><I n="server" sm /><span class="mono">{host()}</span></span>}
           {delta("rail-btn")}
           {panelBtn("rail-btn")}
           {s && (s.status === "working" || s.status === "needs_you") && (
-            <button class="btn" onClick={() => stopSession(s.id).catch(() => {})}>Stop<kbd>esc</kbd></button>
+            <button class="btn sm" onClick={() => stopSession(s.id).catch(() => {})}>Stop<kbd>esc</kbd></button>
           )}
+          <span class="mono t3 clock" aria-label="Time">{now}</span>
         </div>
         {center}
       </main>
@@ -264,6 +292,11 @@ function App() {
           <div class="scrim" onClick={() => setSheet("")} />
           <aside class="rail sheet" aria-label="Changes and decisions"><div class="grab" />{railBody}</aside>
         </>
+      )}
+      {pick && s && (
+        <Suspense fallback={null}>
+          <SessionPick s={s} open={pick} onClose={() => setPick(false)} />
+        </Suspense>
       )}
       {palUsed && (
         <Suspense fallback={null}>

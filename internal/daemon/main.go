@@ -246,14 +246,7 @@ func foreground(o runOpts) int {
 		api.Runners = DemoRunner
 	}
 	api.Pair = &Pairing{File: DevicesFile()}
-	api.Servers = func() ([]RemoteServer, error) {
-		l, err := remote.Load(remote.File())
-		var out []RemoteServer
-		for _, s := range l.Servers {
-			out = append(out, RemoteServer{Name: s.Name, URL: s.URL, Token: s.Token})
-		}
-		return out, err
-	}
+	api.ServersFile = remote.File()
 	api.Route = api.RouteIntake(RouteBack)
 	_ = api.Resume()
 	tctx, stopTails := context.WithCancel(context.Background())

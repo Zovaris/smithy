@@ -97,6 +97,8 @@ type Server struct {
 	Pair *Pairing
 	// Servers lists the saved servers the web switcher reaches through this daemon; nil: none.
 	Servers func() ([]RemoteServer, error)
+	// ServersFile is servers.json: the web adds and removes servers there, and lists it when Servers is nil.
+	ServersFile string
 
 	mu         sync.Mutex
 	decisions  map[string]*Decision
@@ -366,6 +368,10 @@ func (sv *Server) Handler() http.Handler {
 	mux := sv.apiMux()
 	mux.HandleFunc("POST /v1/pair/code", sv.pairCode)
 	mux.HandleFunc("GET /v1/servers", sv.listServers)
+	mux.HandleFunc("POST /v1/servers", sv.addServer)
+	mux.HandleFunc("DELETE /v1/servers/{name}", sv.removeServer)
+	mux.HandleFunc("POST /v1/sessions/{id}/shell", sv.sessionShell)
+	mux.HandleFunc("POST /v1/images", sv.saveImage)
 	mux.HandleFunc("/v1/servers/{name}/{rest...}", sv.proxyServer)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1" && !strings.HasPrefix(r.URL.Path, "/v1/") {

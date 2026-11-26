@@ -6,6 +6,7 @@ import { ModelSelect } from "../modelselect";
 import { agentName } from "../store";
 import { St } from "../ui";
 import Splash from "../splash";
+import { More } from "./settingsparts";
 
 type Guard = { enabled: boolean; block: string[]; allow: string[]; fetch_block: string[]; fetch_allow: string[]; suggested: { host: string; added: boolean }[] };
 
@@ -105,9 +106,9 @@ export default function Setup() {
         )}
       </header>
       {err && <p class="err" role="alert">{err}</p>}
-      <div><div class="lbl">Agent CLIs</div>{rows(s.agents.filter((a) => a.kind === "cli"))}</div>
+      <div id="set-agents"><div class="lbl">Agent CLIs</div>{rows(s.agents.filter((a) => a.kind === "cli"))}</div>
       <div><div class="lbl">API keys</div>{rows(s.agents.filter((a) => a.kind === "api"))}</div>
-      <div>
+      <div id="set-skills">
         <div class="lbl">Injected into every session</div>
         <div class="card">
           <label class="kv">
@@ -170,6 +171,7 @@ export default function Setup() {
           </div>
         </div>
       )}
+      <More />
     </section>
   );
 }
