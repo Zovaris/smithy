@@ -55,7 +55,7 @@ This downloads the `smithy` binary, checks its checksum and build attestation, a
 skills into every agent it finds. No Node needed.
 
 - Binary only: `curl ... | sh -s -- --no-skills` (add the skills later with `smithy skills install`).
-- Pin a version: `curl ... | sh -s 0.23.1`.
+- Pin a version: `curl ... | sh -s 0.24.0`.
 - The binary lands in `~/.local/bin/smithy`. If that folder is not on PATH, the script prints the line to add.
 - Requires git. The attestation check needs [`gh`](https://cli.github.com); without `gh`, PRs fall
   back to `GH_TOKEN` or a compare URL.
@@ -71,7 +71,7 @@ Then, in your agent:
 ```bash
 smithy update            # binary and skills to the latest release
 smithy update --check    # compare versions, change nothing
-smithy update 0.23.1     # a specific version
+smithy update 0.24.0     # a specific version
 ```
 
 Rerunning the installer with `sh -s -- --update` does the same.

@@ -8,6 +8,8 @@ part above `### Details`.
 
 ## Unreleased
 
+## v0.24.0 — 2026-11-26
+
 ### Highlights
 
 - A calmer TUI: one header bar, a short splash, framed pickers and color themes (`/theme`).
