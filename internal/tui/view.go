@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Zovaris/smithy/internal/cards"
+	"github.com/Zovaris/smithy/internal/text"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -465,7 +466,7 @@ func (m Model) sourceLines(w int) []string {
 			lp = wt.LastPoll
 		}
 		if !lp.IsZero() {
-			last = "polled " + ago(m.snap.At.Sub(lp))
+			last = "polled " + text.Ago(m.snap.At.Sub(lp))
 			next = fmt.Sprintf("next in %ds", max(int(lp.Add(time.Duration(wt.Every)*time.Second).Sub(m.snap.At).Seconds()), 0))
 		}
 		rate := "rate n/a"

@@ -15,6 +15,7 @@ import (
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/notify"
 	"github.com/Zovaris/smithy/internal/pool"
+	"github.com/Zovaris/smithy/internal/text"
 	"github.com/Zovaris/smithy/internal/usage"
 	"github.com/Zovaris/smithy/internal/warden"
 )
@@ -121,7 +122,7 @@ func (m Model) systemLines(w, rw, rh int) (left, right []string) {
 		}
 		cycle := "-"
 		if !sv.LastCycle.IsZero() {
-			cycle = ago(m.snap.At.Sub(sv.LastCycle))
+			cycle = text.Ago(m.snap.At.Sub(sv.LastCycle))
 		}
 		left = append(left, t.fg(c).Render(sv.State)+mut.Render(fmt.Sprintf("  pid %d %s agent ", sv.PID, t.g.dot))+val.Render(sv.Agent)+
 			mut.Render(" "+t.g.dot+" "+or(sv.Loop)+" "+t.g.dot+" last cycle ")+val.Render(cycle))

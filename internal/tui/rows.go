@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/text"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -123,7 +124,7 @@ func (m Model) rows2(v view) []row {
 				continue
 			}
 			reason, title, _ := strings.Cut(e.Detail, ": ")
-			out = append(out, row{cells: []cell{{s: e.ID, c: t.muted}, {s: title, c: t.text}, {s: reason, c: t.warn}, {s: ago(m.snap.At.Sub(e.T)), c: t.muted}},
+			out = append(out, row{cells: []cell{{s: e.ID, c: t.muted}, {s: title, c: t.text}, {s: reason, c: t.warn}, {s: text.Ago(m.snap.At.Sub(e.T)), c: t.muted}},
 				title: "Ignored " + e.ID, chip: "ignored", chipC: t.muted,
 				explain: []string{"Seen by smithy auto but not started: " + reason + ".", "Add the auto label (auto.label) or change the filters to start it."}, detail: [][2]string{{"issue", e.Source + " " + e.ID}, {"title", title}, {"why", reason}, {"seen", e.T.Local().Format("2006-01-02 15:04")}}})
 		}
@@ -190,7 +191,7 @@ func (m Model) beat(it Item) string {
 		b = *it.Updated
 	}
 	if tm, err := time.Parse(time.RFC3339, b); err == nil {
-		return ago(m.snap.At.Sub(tm))
+		return text.Ago(m.snap.At.Sub(tm))
 	}
 	return "-"
 }
@@ -439,7 +440,7 @@ func (m Model) incomingRows() []row {
 			d = append(d, [2]string{k, l})
 		}
 		out = append(out, row{cells: []cell{{s: q.ID, c: t.text, bold: true}, {s: q.Title, c: t.text}, {s: q.Source, c: t.muted},
-			{s: or(q.Model), c: t.muted}, {s: or(q.Speed), c: t.muted}, {s: ago(m.snap.At.Sub(q.QueuedAt)), c: t.muted}},
+			{s: or(q.Model), c: t.muted}, {s: or(q.Speed), c: t.muted}, {s: text.Ago(m.snap.At.Sub(q.QueuedAt)), c: t.muted}},
 			url: q.URL, copy: q.URL, title: q.ID + " · " + q.Title, detail: d, chip: "queued", chipC: t.accent,
 			explain: []string{"Waits for the daily cap and the hours window; smithy auto take starts it."}})
 	}
@@ -594,7 +595,7 @@ func (m Model) activityRows() []row {
 		if e.Batch != "" {
 			where = e.Batch
 		}
-		out = append(out, row{cells: []cell{{s: ago(m.snap.At.Sub(e.T)), c: t.muted}, {s: icon + " " + e.Kind, c: c}, {s: what, c: t.text}, {s: where, c: t.muted}},
+		out = append(out, row{cells: []cell{{s: text.Ago(m.snap.At.Sub(e.T)), c: t.muted}, {s: icon + " " + e.Kind, c: c}, {s: what, c: t.text}, {s: where, c: t.muted}},
 			url: e.PR, copy: e.PR, title: "Event", search: e.Kind,
 			detail: [][2]string{{"time", e.T.Local().Format("2006-01-02 15:04:05")}, {"kind", e.Kind}, {"what", what}, {"source", or(e.Source)},
 				{"issue", or(e.ID)}, {"batch", or(e.Batch)}, {"item", or(e.Item)}, {"pr", or(e.PR)}}})
@@ -624,7 +625,7 @@ func (m Model) worktreeRows() []row {
 		}
 		age := "-"
 		if w.Age > 0 {
-			age = ago(w.Age)
+			age = text.Ago(w.Age)
 		}
 		ab := fmt.Sprintf("%d↑ %d↓", w.Ahead, w.Behind)
 		d := [][2]string{{"path", w.Path}, {"branch", or(w.Branch)}, {"item", or(w.Item)}, {"age", age}, {"state", state.s + ", " + dirty.s},
@@ -772,7 +773,7 @@ func (m Model) doneRows() []row {
 	var out []row
 	for _, j := range m.doneJobs(m.snap.Events, true) {
 		r := m.jobRow(j)
-		r.cells = append(r.cells, cell{s: ago(m.snap.At.Sub(j.end)), c: m.th.muted})
+		r.cells = append(r.cells, cell{s: text.Ago(m.snap.At.Sub(j.end)), c: m.th.muted})
 		out = append(out, r)
 	}
 	return out
