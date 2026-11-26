@@ -117,7 +117,7 @@ func keysPanel(s daemon.Settings) *infoPanel {
 	return &infoPanel{title: "API keys", lines: lines}
 }
 
-// tendPanel is /tend: the warden batch PRs the daemon tends, each with its status, tend's next
+// tendPanel is /tend: the warden batch and chat session PRs the daemon tends, each with its status, tend's next
 // action and the CI state; a PR being fixed names its tend session.
 func tendPanel(l daemon.TendList) *infoPanel {
 	lines := []string{"#MODE", "tend.daemon " + l.Mode + "\t/set tend.daemon off|watch|fix"}
@@ -131,10 +131,14 @@ func tendPanel(l daemon.TendList) *infoPanel {
 		case p.PID != 0:
 			hint += " · tend session pid " + strconv.Itoa(p.PID)
 		}
-		lines = append(lines, mark+p.Batch+"/"+p.Item+" "+p.Status+" "+p.URL+"\t"+hint)
+		from := p.Batch + "/" + p.Item
+		if p.Batch == "" {
+			from = "session " + p.Session
+		}
+		lines = append(lines, mark+from+" "+p.Status+" "+p.URL+"\t"+hint)
 	}
 	if len(l.PRs) == 0 {
-		lines = append(lines, "none: no warden batch has an open PR whose worker ended")
+		lines = append(lines, "none: no warden batch or chat session has an open PR to tend")
 	}
 	return &infoPanel{title: "Tend", lines: lines, scroll: true}
 }

@@ -261,6 +261,7 @@ func foreground(o runOpts) int {
 	api.Ctx = tctx
 	go api.RunTails(tctx, time.Second, &Tail{Path: events.File(), Source: "tail:events"}, &Tail{Path: events.ProxyFile(), Source: ProxySource})
 	api.Tend = NewTender()
+	api.Tend.Sources = func() []TendRef { return mergeRefs(TendSources(), api.SessionTendRefs()) }
 	go api.Tend.Run(tctx, 2*time.Minute)
 	conns, cerr := connect.FromConfig()
 	if cerr != nil {

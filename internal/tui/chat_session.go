@@ -224,6 +224,7 @@ func (m *chatView) meta(id string, s daemon.Session) {
 			if s.Dir != "" {
 				m.sessions[i].dir = s.Dir
 			}
+			m.sessions[i].prs = s.PRs
 			if !s.Created.IsZero() {
 				m.sessions[i].since = s.Created
 			}

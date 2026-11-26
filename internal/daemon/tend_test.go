@@ -4,7 +4,9 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -165,6 +167,71 @@ func TestTendPRURLOnlyTakesGitHubPullURLs(t *testing.T) {
 	} {
 		if got := tendPRURL(u); got != want {
 			t.Errorf("tendPRURL(%q) = %v, want %v", u, got, want)
+		}
+	}
+}
+
+func gitRepo(t *testing.T, origin string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for _, args := range [][]string{{"init", "-q"}, {"remote", "add", "origin", origin}} {
+		if out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	return dir
+}
+
+func TestSessionRecordsPRsItOpensAndTheTenderSeesThem(t *testing.T) {
+	dir := gitRepo(t, "git@github.com:acme/app.git")
+	sv, url, _ := sessionTest(t, func(ctx context.Context, msg string, h []Exchange, e Emit) (string, error) {
+		e.Tool(ToolEvent{Name: "Bash", Args: json.RawMessage(`{"command":"gh pr view 3"}`), Output: "https://github.com/acme/app/pull/3"})
+		e.Tool(ToolEvent{Name: "Bash", Args: json.RawMessage(`{"command":"gh pr create --base main --title x"}`), Output: "Creating pull request\nhttps://github.com/acme/app/pull/7\n"})
+		e.Tool(ToolEvent{Name: "Bash", Args: json.RawMessage(`{"command":"smithy pr create --base main"}`), Output: "https://github.com/other/repo/pull/9"})
+		e.Tool(ToolEvent{Name: "Bash", Args: json.RawMessage(`{"command":"gh pr create"}`), Output: "https://github.com/acme/app/pull/7"})
+		return "ok", nil
+	})
+	code, m := post(t, url+"/v1/sessions", `{"agent":"claude","dir":"`+dir+`","message":"ship it"}`)
+	if code != 201 {
+		t.Fatalf("start: %d %v", code, m)
+	}
+	id := m["id"].(string)
+	s := waitStatus(t, sv, id, StatusDone)
+	want := []string{"https://github.com/acme/app/pull/7", "https://github.com/other/repo/pull/9"}
+	if strings.Join(s.PRs, " ") != strings.Join(want, " ") {
+		t.Fatalf("session PRs %v, want only the ones a pr create printed, once: %v", s.PRs, want)
+	}
+	refs := sv.SessionTendRefs()
+	if len(refs) != 1 || refs[0].URL != want[0] || refs[0].Session != id || refs[0].Dir != s.Dir {
+		t.Fatalf("tend refs %+v, want only the PR of the session's own repo", refs)
+	}
+	again, err := New(sv.st, testToken, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := again.SessionTendRefs(); len(r) != 1 || r[0].URL != want[0] {
+		t.Fatalf("after a restart the session's PRs are replayed: %+v", r)
+	}
+}
+
+func TestTendSourcesMergeBatchAndSessionPRsOnce(t *testing.T) {
+	got := mergeRefs([]TendRef{{URL: "u1", Batch: "b"}}, []TendRef{{URL: "u1", Session: "s-1"}, {URL: "u2", Session: "s-1"}})
+	if len(got) != 2 || got[0].Batch != "b" || got[1].URL != "u2" {
+		t.Fatalf("merged %+v, want the batch card to win and u2 added", got)
+	}
+}
+
+func TestRepoOfRemote(t *testing.T) {
+	for in, want := range map[string]string{
+		"git@github.com:acme/app.git":        "github.com/acme/app",
+		"https://github.com/acme/app":        "github.com/acme/app",
+		"https://github.com/acme/app.git":    "github.com/acme/app",
+		"ssh://git@github.com/acme/app.git":  "github.com/acme/app",
+		"https://github.com/acme/app/pull/7": "github.com/acme/app",
+		"/local/path":                        "",
+	} {
+		if got := repoOf(in); got != want {
+			t.Errorf("repoOf(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

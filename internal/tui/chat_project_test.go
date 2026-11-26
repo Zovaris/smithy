@@ -40,3 +40,14 @@ func TestAgentsListThisProjectFirst(t *testing.T) {
 		t.Errorf("enter opens the listed row, got %q", n.(chatView).current)
 	}
 }
+
+func TestAgentsPanelShowsTheSessionsPRs(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 120, 40
+	m.dir = "/w/alpha"
+	m.meta("a1", daemon.Session{ID: "a1", Title: "ship it", Dir: "/w/alpha", PRs: []string{"https://github.com/acme/app/pull/7", "https://github.com/acme/app/pull/12"}})
+	view := strings.Join(m.agentsBox(make([]string, 40), 120, 40), "\n")
+	if !strings.Contains(view, "PR #7 #12") {
+		t.Errorf("the row names the PRs the session opened:\n%s", view)
+	}
+}

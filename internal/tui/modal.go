@@ -238,6 +238,13 @@ func (m chatView) agentsBox(screen []string, w, h int) []string {
 				parts = append(parts, x)
 			}
 		}
+		if len(s.prs) > 0 {
+			nums := make([]string, len(s.prs))
+			for i, u := range s.prs {
+				nums[i] = "#" + u[strings.LastIndex(u, "/")+1:]
+			}
+			parts = append(parts, "PR "+strings.Join(nums, " "))
+		}
 		now := s.now
 		if now == "" {
 			now = s.kind

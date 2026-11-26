@@ -70,6 +70,7 @@ type Session struct {
 	Created time.Time    `json:"created"`
 	Updated time.Time    `json:"updated"`
 	Usage   *usage.Usage `json:"usage,omitempty"`
+	PRs     []string     `json:"prs,omitempty"`
 }
 
 // ToolEvent is one finished tool call of a session.
@@ -189,6 +190,11 @@ func (sv *Server) applySession(e store.Event) {
 		if l := sv.sessions[e.Session]; l != nil && json.Unmarshal(e.Data, &m) == nil {
 			l.history = append(l.history, Exchange{m.Role, m.Text})
 			l.s.Updated = e.Time
+		}
+	case KindSessionTool:
+		var t ToolEvent
+		if json.Unmarshal(e.Data, &t) == nil {
+			sv.notePRsLocked(e.Session, t)
 		}
 	case KindSessionUsage:
 		var u usage.Usage
@@ -588,7 +594,12 @@ func (e *emitter) Tool(t ToolEvent) {
 		t.Args, _ = json.Marshal(clipBytes(string(t.Args), MaxToolField))
 	}
 	t.Output = clipBytes(t.Output, MaxToolField)
-	_, _ = e.sv.Append(KindSessionTool, e.id, t)
+	sv := e.sv
+	sv.mu.Lock()
+	defer sv.mu.Unlock()
+	if _, err := sv.appendLocked(KindSessionTool, e.id, t); err == nil {
+		sv.notePRsLocked(e.id, t)
+	}
 }
 
 func (e *emitter) Usage(u usage.Usage) {
