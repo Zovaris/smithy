@@ -186,7 +186,7 @@ cat > "$L/fakegh" <<'EOF'
 #!/bin/sh
 if [ "$1" = release ]; then
   d=; a=; while [ $# -gt 0 ]; do case $1 in -D) d=$2; shift ;; -p) [ -z "$a" ] && a=$2; shift ;; esac; shift; done
-  printf '#!/bin/sh\n[ -d "$HOME" ] && echo "$*" >> "$HOME/calls" 2>/dev/null\necho fake-smithy\n' | gzip > "$d/$a"
+  printf '#!/bin/sh\n[ -d "$HOME" ] && echo "$*" >> "$HOME/calls" 2>/dev/null\n[ "$*" = "skills install" ] && [ -n "${FAKE_SKILLS_FAIL:-}" ] && { echo "no harness found" >&2; exit 1; }\necho fake-smithy\n' | gzip > "$d/$a"
   echo "$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$d/$a" || shasum -a 256 "$d/$a") | awk '{print $1}')  $a" > "$d/checksums.txt"
   exit 0
 fi
@@ -231,6 +231,7 @@ LK() { h=$1; shift; env -u SMITHY_BIN -u SMITHY_TTY -u XDG_DATA_HOME -u XDG_BIN_
 t "install.sh: default installs harness and runs skills install" 'LK a "$L/install.sh" 0.0.0 </dev/null && grep -q "(smithy-harness-.*\.gz)" "$L/err" && grep -qx "skills install" "$L/kha/calls" && [ ! -e "$L/ka/kind" ]'
 t "install.sh: --no-skills skips skills install" 'LK b "$L/install.sh" --no-skills 0.0.0 </dev/null && grep -q "(smithy-harness-.*\.gz)" "$L/err" && ! grep -q "skills install" "$L/khb/calls" 2>/dev/null && grep -q -- "--no-skills" "$L/err"'
 t "install.sh: --skills is an ignored old flag" 'LK c "$L/install.sh" --skills 0.0.0 </dev/null && grep -q -- "--skills is ignored" "$L/err" && grep -q "(smithy-harness-.*\.gz)" "$L/err"'
+t "install.sh: no agent found still installs the binary" 'FAKE_SKILLS_FAIL=1 LK e "$L/install.sh" 0.0.0 </dev/null && grep -q "no harness found" "$L/err" && grep -q "skills install" "$L/err"'
 t "install.sh: --update installs harness and the skills" 'LK d "$L/install.sh" --update 0.0.0 </dev/null && grep -q "(smithy-harness-.*\.gz)" "$L/err" && grep -qx "skills install" "$L/khd/calls"'
 t "install.sh: no build question on a tty" ': > "$L/ans"; LK e env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && ! grep -q "which build" "$L/err"'
 t "install.sh: rejects a bad version" 'env -u SMITHY_BIN HOME="$L/Hbad" SMITHY_HOME="$L/bad" PATH="$L/sys" "$L/install.sh" "../x" 2>"$L/err"; [ $? -eq 3 ] && grep -q "bad version" "$L/err"'

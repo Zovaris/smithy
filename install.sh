@@ -186,5 +186,6 @@ if [ -n "$noskills" ]; then
   say "skills not installed (--no-skills); install them with: $bindir/$exe skills install"
 else
   say "installing the skills into every agent found (smithy skills install)"
-  "$vdir/$version/$exe" skills install >&2 || die "smithy skills install failed"
+  "$vdir/$version/$exe" skills install >&2 ||
+    say "skills not installed yet (no agent found?); once an agent is installed run: $bindir/$exe skills install"
 fi
