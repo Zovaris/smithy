@@ -8,6 +8,8 @@ part above `### Details`.
 
 ## Unreleased
 
+- **Faster CI.** Go and bun caches; the harness tests split into two jobs (TUI and web, the rest); the demo, every cross-build target and the Windows launcher run only on `release/*` pull requests and on `main`; Blacksmith 4vcpu runners for test, build and demo, 2vcpu for lint, integration, web and the check gate.
+
 ## v0.23.1 — 2026-11-25
 
 ### Highlights
