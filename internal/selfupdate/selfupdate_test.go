@@ -63,14 +63,12 @@ func run(t *testing.T, o Options, args ...string) (string, string, int) {
 	return out.String(), errOut.String(), code
 }
 
-func TestKindPassthroughAndExitCode(t *testing.T) {
+func TestUpdatesBinaryAndSkills(t *testing.T) {
 	serve(t)
 	bin := installed(t)
-	for kind, harness := range map[string]bool{"harness": true, "skills": false} {
-		out, _, code := run(t, Options{Version: "1.0.0", Harness: harness, Exe: bin})
-		if code != 7 || !strings.Contains(out, "args: --update --"+kind) {
-			t.Errorf("%s: code %d out %q", kind, code, out)
-		}
+	out, _, code := run(t, Options{Version: "1.0.0", Exe: bin})
+	if code != 7 || !strings.Contains(out, "args: --update\n") {
+		t.Errorf("code %d out %q", code, out)
 	}
 }
 
@@ -78,7 +76,7 @@ func TestPinnedVersion(t *testing.T) {
 	serve(t)
 	bin := installed(t)
 	out, _, _ := run(t, Options{Version: "1.0.0", Exe: bin}, "v0.20.0")
-	if !strings.Contains(out, "args: --update --skills 0.20.0") {
+	if !strings.Contains(out, "args: --update 0.20.0\n") {
 		t.Errorf("out %q", out)
 	}
 }
@@ -101,7 +99,7 @@ func TestRefusesNonInstalledBinary(t *testing.T) {
 		t.Errorf("code %d err %q", code, errOut)
 	}
 	out, _, code := run(t, Options{Version: "dev", Exe: other}, "--force")
-	if code != 7 || !strings.Contains(out, "args: --update --skills") {
+	if code != 7 || !strings.Contains(out, "args: --update\n") {
 		t.Errorf("force: code %d out %q", code, out)
 	}
 }

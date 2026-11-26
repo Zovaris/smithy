@@ -1,4 +1,4 @@
-// Package selfupdate runs install.sh --update for the installed build kind.
+// Package selfupdate runs install.sh --update: the binary plus the skills.
 package selfupdate
 
 import (
@@ -17,9 +17,9 @@ import (
 
 // Usage is the help text of `smithy update`.
 const Usage = `usage: smithy update [<version>] [--check] [--force]
-Updates the smithy binary (and the skills, when installed) to the latest release, or to <version>,
-keeping the build kind that runs (harness or skills). It downloads install.sh from main and runs
-sh install.sh --update --<kind> [<version>], which verifies the checksum and build attestation.
+Updates the smithy binary and the skills to the latest release, or to <version>. It downloads
+install.sh from main and runs it as an update, which verifies the checksum and build attestation
+and then runs smithy skills install.
 --check prints the current version and the latest release tag and changes nothing (GH_TOKEN if set).
 --force updates even when this binary is not the installed one (~/.local/bin/smithy), e.g. a dev build.`
 
@@ -36,16 +36,15 @@ var client = &http.Client{Timeout: 30 * time.Second}
 // Options carry what the command needs from the running binary.
 type Options struct {
 	Version string
-	Harness bool
 	Exe     string
 	Stdout  io.Writer
 	Stderr  io.Writer
 }
 
 // Main runs `smithy update` for the running binary.
-func Main(args []string, version string, harness bool) int {
+func Main(args []string, version string) int {
 	exe, _ := os.Executable()
-	return Run(args, Options{Version: version, Harness: harness, Exe: exe, Stdout: os.Stdout, Stderr: os.Stderr})
+	return Run(args, Options{Version: version, Exe: exe, Stdout: os.Stdout, Stderr: os.Stderr})
 }
 
 // Run parses args and checks or updates; it returns install.sh's exit code.
@@ -78,17 +77,13 @@ func Run(args []string, o Options) int {
 		fmt.Fprintf(o.Stderr, "smithy update: this binary (%s) is not the installed one (%s); run that one, or pass --force\n", o.Exe, installedPath())
 		return 2
 	}
-	kind := "skills"
-	if o.Harness {
-		kind = "harness"
-	}
 	file, err := download()
 	if err != nil {
 		fmt.Fprintf(o.Stderr, "smithy update: %v\n", err)
 		return 1
 	}
 	defer func() { _ = os.Remove(file) }()
-	shArgs := []string{file, "--update", "--" + kind}
+	shArgs := []string{file, "--update"}
 	if pin != "" {
 		shArgs = append(shArgs, pin)
 	}

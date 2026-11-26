@@ -53,7 +53,7 @@ Maintenance
   skills        find installed skills (smithy skills --list)
   uninstall     remove smithy: binaries, the skills it installed, daemon,
                 images, PATH line (lists first)
-  update        update the binary and skills to the latest release (same build)
+  update        update the binary and the skills to the latest release
 
 (harness build): get smithy-harness-<os>-<arch> from
 https://github.com/Zovaris/smithy/releases, or go build -tags harness
