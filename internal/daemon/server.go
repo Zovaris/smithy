@@ -503,8 +503,11 @@ func (sv *Server) state(w http.ResponseWriter, r *http.Request) {
 
 // sameOrigin refuses a request a browser could forge from another site: the body must be JSON
 // (not a simple form or text post), the fetch not cross-site and any Origin the daemon's own host.
+// A body-less DELETE needs no Content-Type: DELETE is never a CORS simple request, so a browser
+// preflights it cross-site, and the Sec-Fetch-Site and Origin checks below still apply.
 func sameOrigin(r *http.Request) (int, string) {
-	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
+	bodyless := r.Method == http.MethodDelete && r.ContentLength == 0
+	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" && !bodyless {
 		return 415, "Content-Type must be application/json"
 	}
 	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
