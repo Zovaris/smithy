@@ -8,6 +8,7 @@ part above `### Details`.
 
 ## Unreleased
 
+- **One modal for every picker.** Agent and model (ctrl+l, `/agent`, `/model`, first run), `/skills` and the agents list (tab) open as the same centered box as the ctrl+k palette: filter or title on top, ↑↓ enter esc at the bottom, no per-cell background blocks.
 - **Faster CI.** Go and bun caches; the harness tests split into two jobs (TUI and web, the rest); the demo, every cross-build target and the Windows launcher run only on `release/*` pull requests and on `main`; Blacksmith 4vcpu runners for test, build and demo, 2vcpu for lint, integration, web and the check gate.
 
 ## v0.23.1 — 2026-11-25
