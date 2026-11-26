@@ -8,6 +8,21 @@ part above `### Details`.
 
 ## Unreleased
 
+### Highlights
+
+- **One binary per platform.** Each release ships one `smithy-<os>-<arch>`, the full build; `install.sh` and `smithy update` keep the current and the previous version only.
+
+### Fixed
+
+- Updating no longer repeats the old-install migration note: it runs once, then `~/.smithy/bin` and `~/.smithy/kind` are gone.
+- `smithy skills install` reports skipped symlinked skills (a checkout) in one line.
+
+### Details
+
+- release: build only the harness build, named `smithy-<os>-<arch>`; `smithy-harness-*` is no longer published (ADR 0015).
+- launcher: runs `~/.local/share/smithy/versions/<VERSION>`, else `~/.local/bin/smithy` or `smithy` on PATH with a `smithy update <VERSION>` notice, else prints the install line and exits 3; it no longer reads `~/.smithy/bin`.
+- `warden doctor` and the version hint name `smithy update <version>` instead of the install line.
+
 ## v0.23.1 — 2026-11-25
 
 ### Highlights
