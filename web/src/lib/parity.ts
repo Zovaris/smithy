@@ -3,13 +3,19 @@
 // header line.
 import { ACTIONS } from "./commands";
 
-// The one place the web keeps which agents take an effort and the levels (new session and
-// the session picker). EFFORT_AGENTS are the CLIs that take an effort flag (agents.EffortFlags); smithy caps at medium.
-const EFFORT_AGENTS = ["claude", "codex"];
-export const EFFORTS = ["low", "medium"];
+// Which agents take an effort and the levels (new session and the session picker) come from the
+// daemon's GET /v1/setup `effort`; an older daemon without it gets smithy's own rule: claude and
+// codex take one, capped at medium.
+export type EffortRules = { agents: string[]; levels: string[]; max?: string };
+const FALLBACK: EffortRules = { agents: ["claude", "codex"], levels: ["low", "medium"], max: "medium" };
+let rules = FALLBACK;
+
+export function setEffortRules(e?: Partial<EffortRules> | null) {
+  rules = e?.agents?.length && e.levels?.length ? { agents: e.agents, levels: e.levels, max: e.max } : FALLBACK;
+}
 
 export function effortOptions(agent: string): string[] {
-  return EFFORT_AGENTS.includes(agent.replace(/^acp:/, "")) ? ["", ...EFFORTS] : [];
+  return rules.agents.includes(agent.replace(/^acp:/, "")) ? ["", ...rules.levels] : [];
 }
 
 export const modelEditable = (agent: string) => !agent.startsWith("api:");

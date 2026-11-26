@@ -1,11 +1,11 @@
 import { useEffect, useState } from "preact/hooks";
-import { api } from "../auth";
-import { loadSetup as refresh } from "../live";
-import { choice, installSkills, isDefault, loadSetup, type Ready, setDefault, setKit, type Setup as S, toggleSkill } from "../setup";
-import { ModelSelect } from "../modelselect";
-import { agentName } from "../store";
-import { St } from "../ui";
-import Splash from "../splash";
+import { api } from "../lib/auth";
+import { loadSetup as refresh } from "../lib/live";
+import { choice, installSkills, isDefault, loadSetup, type Ready, setDefault, setKit, type Setup as S, toggleSkill } from "../lib/setup";
+import { ModelSelect } from "../features/chat/modelselect";
+import { agentName } from "../lib/store";
+import { St } from "../components/ui";
+import Splash from "../components/splash";
 import { More } from "./settingsparts";
 
 type Guard = { enabled: boolean; block: string[]; allow: string[]; fetch_block: string[]; fetch_allow: string[]; suggested: { host: string; added: boolean }[] };

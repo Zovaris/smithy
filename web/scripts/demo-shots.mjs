@@ -29,9 +29,9 @@ try {
   // The folder picker: from the root, open each folder of the repo's path, then add it.
   await page.getByRole("button", { name: "Add project" }).click();
   const picker = page.getByRole("dialog", { name: "Add a project" });
-  await picker.getByRole("navigation", { name: "Path" }).getByRole("button").first().click();
+  await picker.getByRole("navigation", { name: "Root" }).getByRole("button").first().click();
   for (const part of repo.split("/").filter(Boolean)) {
-    await picker.getByRole("listbox", { name: "Folders" }).getByRole("button", { name: part, exact: true }).click();
+    await picker.getByRole("listbox", { name: "Folders" }).getByRole("option", { name: part + "/", exact: true }).click();
   }
   await picker.getByRole("button", { name: /^Add / }).click();
   await picker.waitFor({ state: "hidden" });

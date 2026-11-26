@@ -1,9 +1,9 @@
 import type { ComponentChildren } from "preact";
 import { useLayoutEffect, useRef } from "preact/hooks";
-import { I, toolIcon } from "./icons";
-import { prose, agentName, argLine, initials, type Dec, type Item, type Sess, type Tool } from "./store";
-import { Md } from "./md";
-import { Decision, St } from "./ui";
+import { I, toolIcon } from "../../components/icons";
+import { prose, agentName, argLine, initials, type Dec, type Item, type Sess, type Tool } from "../../lib/store";
+import { Md } from "../../components/md";
+import { Decision, St } from "../../components/ui";
 
 const cost = (s: Sess) => (s.usage?.cost_usd != null ? " · $" + s.usage.cost_usd.toFixed(2) : "");
 

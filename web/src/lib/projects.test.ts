@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crumbs, groupAgents, projectOf, startDir } from "./projects";
+import { groupAgents, projectOf, startDir } from "./projects";
 import type { Ready } from "./setup";
 import type { Sess } from "./store";
 
@@ -16,23 +16,6 @@ describe("groupAgents", () => {
   it("puts working sessions first, then the most recent", () => {
     const g = groupAgents([], [s("old", "done", "2026-01-01"), s("run", "working", "2025-01-01"), s("new", "done", "2026-02-01"), s("ask", "needs_you", "2024-01-01")]);
     expect(g.sessions.map((x) => x.id)).toEqual(["run", "ask", "new", "old"]);
-  });
-});
-
-describe("crumbs", () => {
-  it("turns a path into clickable parts from the root", () => {
-    expect(crumbs("/Users/me/Codes")).toEqual([
-      { label: "/", path: "/" },
-      { label: "Users", path: "/Users" },
-      { label: "me", path: "/Users/me" },
-      { label: "Codes", path: "/Users/me/Codes" },
-    ]);
-    expect(crumbs("/")).toEqual([{ label: "/", path: "/" }]);
-    expect(crumbs("C:\\src\\api")).toEqual([
-      { label: "C:\\", path: "C:\\" },
-      { label: "src", path: "C:\\src" },
-      { label: "api", path: "C:\\src\\api" },
-    ]);
   });
 });
 

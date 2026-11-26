@@ -1,12 +1,12 @@
 import { useState } from "preact/hooks";
-import { useLive } from "../live";
-import { groupAgents, projectOf } from "../projects";
-import { href } from "../router";
-import type { Ready } from "../setup";
-import { agentName, ago, sessions } from "../store";
-import { StatsCharts } from "../charts";
-import { stats } from "../stats";
-import { St } from "../ui";
+import { useLive } from "../lib/live";
+import { groupAgents, projectOf } from "../lib/projects";
+import { href } from "../lib/router";
+import type { Ready } from "../lib/setup";
+import { agentName, ago, sessions } from "../lib/store";
+import { StatsCharts } from "../components/charts";
+import { stats } from "../lib/stats";
+import { St } from "../components/ui";
 
 function Copy({ text }: { text: string }) {
   const [ok, setOk] = useState(false);

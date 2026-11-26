@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { loadModels, modelRows, type ModelList, type Ready } from "./setup";
+import { loadModels, modelRows, type ModelList, type Ready } from "../../lib/setup";
 
 // ModelSelect is the Model field: a searchable list of what the agent reports, its default
 // first, and Other (the typed text) only when nothing matches.
