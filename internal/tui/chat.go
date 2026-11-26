@@ -88,6 +88,8 @@ type chatView struct {
 	sessions []chatSession
 	// decide posts an answer to /v1/decisions and returns a chatDecidedMsg.
 	decide func(id, answer string) tea.Cmd
+	// ask posts a question to /v1/asks (the /ask demo); nil without a daemon.
+	ask func(id, question string, options []string) tea.Cmd
 
 	setup     setupAPI      // the daemon's setup endpoints; nil: none
 	setupSt   *daemon.Setup // last GET /v1/setup
@@ -399,6 +401,14 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 		return func() tea.Msg {
 			_, err := c.Decide(ctx, id, answer)
 			return chatDecidedMsg{id: id, err: err}
+		}
+	}
+	m.ask = func(id, question string, options []string) tea.Cmd {
+		return func() tea.Msg {
+			if err := c.Ask(ctx, id, question, options); err != nil {
+				return chatDecidedMsg{id: id, err: err}
+			}
+			return nil
 		}
 	}
 	fm, err := tea.NewProgram(m).Run()

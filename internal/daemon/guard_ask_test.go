@@ -61,3 +61,24 @@ func TestGuardSettingsAPI(t *testing.T) {
 		t.Fatalf("allow %v", f.Allow)
 	}
 }
+
+func TestChatAskRoundTrip(t *testing.T) {
+	_, hs := newTest(t, filepath.Join(t.TempDir(), "s.db"))
+	c := &Client{Base: hs.URL, Token: testToken}
+	a := &Asker{C: c}
+	ctx := context.Background()
+	if err := a.Ask(ctx, "ask:ab12cd34", "Which db?", []string{"sqlite", "postgres"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{"ask:", "ask:a/b", "ask:../x"} {
+		if err := a.Ask(ctx, bad, "q", nil); err == nil {
+			t.Errorf("accepted %q", bad)
+		}
+	}
+	if _, err := c.Decide(ctx, "ask:ab12cd34", "sqlite"); err != nil {
+		t.Fatal(err)
+	}
+	if ans, ok, err := a.Outcome(ctx, "ask:ab12cd34"); !ok || ans != "sqlite" || err != nil {
+		t.Fatalf("%q %v %v", ans, ok, err)
+	}
+}
