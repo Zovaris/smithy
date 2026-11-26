@@ -51,6 +51,14 @@ func (m chatView) send(text string) (chatView, tea.Cmd) {
 		return m, nil
 	}
 	api, dir, id := m.sess, m.dir, m.current
+	if id == "" && m.proj.dir == "" {
+		if pa, ok := api.(projectAPI); ok {
+			return m.askProject(pa, text)
+		}
+	}
+	if m.proj.dir != "" {
+		dir = m.proj.dir
+	}
 	if id == "" {
 		m.status("starting a session…")
 		return m, func() tea.Msg {
@@ -92,6 +100,7 @@ func (m *chatView) open(id string) {
 		m.convs[m.current] = m.msgs
 	}
 	m.current, m.msgs, m.offset, m.focus = id, m.convs[id], 0, -1
+	m.proj = projectPick{}
 	delete(m.convs, id)
 	for _, c := range m.msgs {
 		c.lines = nil
