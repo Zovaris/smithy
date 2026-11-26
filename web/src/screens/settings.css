@@ -15,6 +15,4 @@
   .setrow input[type="text"], .setrow input[type="password"], .inline input { width: 100%; }
 }
 
-/* flat until Sephiro routes the toggle through its radius tokens (Zovaris/Sephiro#38) */
-.page .sph-toggle__track, .page .sph-toggle__thumb { border-radius: 0; }
 #set-settings { display: flex; flex-direction: column; gap: 24px; }
