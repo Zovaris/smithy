@@ -18,13 +18,18 @@
 [![Copilot CLI](https://img.shields.io/badge/Copilot_CLI-supported-24292f?logo=githubcopilot&logoColor=white)](#harnesses)
 [![Grok Build](https://img.shields.io/badge/Grok_Build-supported-000000)](#harnesses)
 
-[Install](#install) · [How it works](#how-it-works) · [Skills](#skills) ·
-[Autonomous mode](#autonomous-mode) · [Harnesses](#harnesses) · [Docs](#docs)
+[Usage](#usage) · [How it works](#how-it-works) · [Skills](#skills) ·
+[Autonomous mode](#autonomous-mode) · [Harness](#harness) · [Docs](#docs)
 
 </div>
 
 smithy turns your coding agent into a small engineering team: it plans before it builds, writes
 the failing test first, runs tasks in parallel and keeps every pull request green until it merges.
+
+> **If you are an AI agent:** read [docs/agents.md](docs/agents.md). In short:
+> 1. install the skills with `npx skills add Zovaris/smithy -g -y --skill '*' -a <harness>`;
+> 2. ask the user before running `install.sh`, and run it only on their yes;
+> 3. run use-smithy setup with the user.
 
 ## Highlights
 
@@ -38,15 +43,22 @@ the failing test first, runs tasks in parallel and keeps every pull request gree
 - **Runs unattended.** Label an issue `auto` and it gets built.
 - **Any harness.** Claude Code, Codex, OpenCode, Cursor, Antigravity CLI, Copilot CLI, Grok Build, Pi and DeepSeek Harness.
 
-## Install
+## Usage
+
+### Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh
 ```
 
-This installs the `smithy` binary (daemon, TUI and web: run `smithy`), after verifying its
-checksum and build attestation, then copies the skills into every agent it finds
-(`smithy skills install`; pass `sh -s -- --no-skills` to skip that step). No Node needed.
+This downloads the `smithy` binary, checks its checksum and build attestation, and copies the
+skills into every agent it finds. No Node needed.
+
+- Binary only: `curl ... | sh -s -- --no-skills` (add the skills later with `smithy skills install`).
+- Pin a version: `curl ... | sh -s 0.23.1`.
+- The binary lands in `~/.local/bin/smithy`. If that folder is not on PATH, the script prints the line to add.
+- Requires git. The attestation check needs [`gh`](https://cli.github.com); without `gh`, PRs fall
+  back to `GH_TOKEN` or a compare URL.
 
 Then, in your agent:
 
@@ -54,28 +66,26 @@ Then, in your agent:
 2. **Describe a task** (or `/smelt <task>`): it gets planned, built test-first and opened as a PR.
 3. **Hand over several tasks** (or `/warden <tasks>`): you get one worker and one PR for each.
 
-Requires git. [`gh`](https://cli.github.com) is recommended; without it, smithy falls back to
-`GH_TOKEN` or prints a compare URL. The binary lands in `~/.local/bin/smithy`. More options:
-[docs/install.md](docs/install.md).
-
-### Update and uninstall
+### Update
 
 ```bash
-smithy update      # binary + skills; --check only compares versions
-# or: curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update
-smithy uninstall   # lists what it removes, then asks
+smithy update            # binary and skills to the latest release
+smithy update --check    # compare versions, change nothing
+smithy update 0.23.1     # a specific version
 ```
 
-### For agents
+Rerunning the installer with `sh -s -- --update` does the same.
 
-If you are an AI agent asked to install smithy, follow these steps:
+### Uninstall
 
-1. **Install the skills:** run `npx skills add Zovaris/smithy -g -y --skill '*' -a <your-harness>`.
-2. **Ask about the binary:** ask the user before running `install.sh`, then run it only on their yes.
-3. **Run setup:** read the installed `use-smithy` skill and run its setup with the user.
+```bash
+smithy uninstall
+```
 
-Never store keys in config files: use `smithy auth set <name>`. Details are in
-[docs/install.md](docs/install.md).
+It lists what it removes, then asks: the binary, the skills it installed, a running daemon and the
+PATH line it added. Your keys and settings in `~/.smithy` stay unless you pass `--purge`.
+
+More options: [docs/install.md](docs/install.md).
 
 ## How it works
 
@@ -150,23 +160,28 @@ smithy receipt run -- go test ./...  # record a test run for the PR
 smithy scan                          # secrets in what the change adds
 ```
 
-### The chat
-
-Run `smithy` to open a chat with any agent above, driven by a local daemon you can also reach
-from the web or another machine.
-
-- `tab` lists sessions of this folder (`a`: every project); a new session asks which project it works in.
-- `ctrl+l` or `/agent` and `/model` pick the agent and model (OpenCode's models too); `/effort` sets low or medium.
-- `/name` or `$name` runs any installed skill; `/skills` lists them.
-- `!cmd` runs a shell command in the session folder; `ctrl+v` attaches a clipboard image.
-- `/set`, `/keys`, `/serve`, `/doctor` change settings from the chat; `/detach` quits and leaves the daemon running.
-- `/ask` pins a sample question so you can try how an agent's questions look.
-- `/theme` picks steel, frost or plum (`ui.theme`, shared with the web).
-- `/welcome` (or `smithy welcome`) walks the first-run setup again; `ui.splash = false` turns off the opening animation.
-- `ctrl+k` opens the palette and `?` shows every key.
-
 `smithy help` lists the commands by task; `smithy help <command>` shows usage, flags and
 examples for one (`smithy help --all` adds the commands the skills call).
+
+## Harness
+
+Run `smithy` to open a chat with any agent CLI above. A local daemon runs the sessions, and the
+TUI and the web are two views of it, so you can leave and come back, or open the same sessions
+from your phone.
+
+- Sessions per project; `tab` lists them.
+- Modals for agent, model, skills and settings; `ctrl+k` opens the palette.
+- `/name` runs any installed skill; `!cmd` runs a shell command.
+- Three themes (steel, frost, plum) and a first-run welcome.
+- `/detach` quits and keeps the daemon running.
+
+| First run | Working session |
+|---|---|
+| ![Welcome screen](demo/review/welcome-anvil-steel.png) | ![Chat with a pending decision](demo/review/header-steel-1280-running.png) |
+| **Palette (`ctrl+k`)** | **Same session on the web** |
+| ![Command palette](demo/review/modal-steel-palette.png) | ![Web view](docs/demo/web-session-1440.png) |
+
+Every key and command: [docs/harness-guide.md](docs/harness-guide.md).
 
 ## Docs
 
@@ -174,6 +189,8 @@ examples for one (`smithy help --all` adds the commands the skills call).
 - [Settings](docs/settings.md)
 - [Autonomous mode](docs/autonomous.md)
 - [Harnesses](docs/harnesses.md)
+- [Harness guide](docs/harness-guide.md)
+- [For AI agents](docs/agents.md)
 - [API backend and benchmark](docs/api-backend.md)
 - [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
 
