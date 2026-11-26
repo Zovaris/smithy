@@ -61,6 +61,23 @@ func handler(fsys fs.FS) http.Handler {
 			return
 		}
 		h.Set("Cache-Control", "no-cache")
+		if rootFile(sub, p, index) {
+			if strings.HasSuffix(p, ".webmanifest") {
+				h.Set("Content-Type", "application/manifest+json")
+			}
+			http.ServeFileFS(w, r, sub, p)
+			return
+		}
 		http.ServeFileFS(w, r, sub, index)
 	})
+}
+
+// rootFile reports whether p names a top-level file of the build other than index (favicon,
+// manifest, service worker); those are served as themselves, revalidated like index.html.
+func rootFile(fsys fs.FS, p, index string) bool {
+	if p == "" || p == index || strings.Contains(p, "/") {
+		return false
+	}
+	st, err := fs.Stat(fsys, p)
+	return err == nil && !st.IsDir()
 }
