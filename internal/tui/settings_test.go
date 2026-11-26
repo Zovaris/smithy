@@ -187,3 +187,50 @@ func TestSettingsFrames(t *testing.T) {
 	m, _ = press(m, "enter")
 	t.Log("\n" + ansi.Strip(m.render()))
 }
+
+func TestSettingsAPIKeysEditableMasked(t *testing.T) {
+	m := settingsAt(t, "key.linear")
+	if s := m.sys.Settings[m.sel[vSystem]]; s.Value != "****a41b" || s.Src != "auth" || !s.APIKey {
+		t.Fatalf("key row: %+v", s)
+	}
+	var got []string
+	m.setter = func(repo, unset bool, key, val string) (string, error) {
+		got = append(got, fmt.Sprintln(repo, unset, key, val)[:len(fmt.Sprintln(repo, unset, key, val))-1])
+		return "saved", nil
+	}
+	m, _ = press(m, "enter")
+	if m.edit == nil || m.edit.in.EchoMode == 0 {
+		t.Fatal("an API key edits in a masked field")
+	}
+	secret := strings.Repeat("s", 12) + "q9z1"
+	m.edit.in.SetValue(secret)
+	m, _ = press(m, "enter")
+	out := ansi.Strip(m.render())
+	if !m.edit.confirm || strings.Contains(out, secret) || !strings.Contains(out, "****q9z1") || !strings.Contains(out, "auth.json") {
+		t.Fatalf("confirm must mask the key:\n%s", out)
+	}
+	m, _ = press(m, "tab")
+	if m.edit.repo {
+		t.Fatal("keys have no repo scope")
+	}
+	m, cmd := press(m, "enter")
+	m.Update(cmd())
+	if len(got) != 1 || got[0] != "false false key.linear "+secret {
+		t.Fatalf("write = %v", got)
+	}
+	m = settingsAt(t, "key.slack")
+	if m, _ = press(m, "u"); m.edit != nil {
+		t.Fatal("an unstored key has nothing to unset")
+	}
+}
+
+func TestSettingsKeyWritePath(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	key := strings.Repeat("a", 12) + "b2c3"
+	if msg, err := writeSetting(false, false, "key.linear", key); err != nil || strings.Contains(msg, key) || !strings.Contains(msg, "****b2c3") {
+		t.Fatalf("set = %q %v", msg, err)
+	}
+	if msg, err := writeSetting(false, true, "key.linear", ""); err != nil || !strings.Contains(msg, "removed") {
+		t.Fatalf("remove = %q %v", msg, err)
+	}
+}

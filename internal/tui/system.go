@@ -48,6 +48,7 @@ func loadSystem() System {
 	s.Settings = settingRows(currentHarness(), config.Effective)
 	if l, err := auth.List(); err == nil {
 		s.Auth = cleanAll(l)
+		s.Settings = grouped(append(keyRows(s.Auth), s.Settings...))
 	} else {
 		s.Err = append(s.Err, "auth: "+clean(err.Error()))
 	}
@@ -68,7 +69,7 @@ func demoSystem() System {
 	return System{
 		Doctor: []string{"warden doctor", "ok   binary v0.15.0", "ok   git found", "ok   gh found and authenticated", "ok   claude found",
 			"ok   worktree root /home/dev/worktrees writable", "ok   sandbox: native (claude, hosts github.com,api.github.com,api.anthropic.com,api.linear.app)", "warn 2 orphaned worktrees (smithy warden cleanup)"},
-		Settings: settingRows("claude", demoEffective),
+		Settings: grouped(append(keyRows([]string{"github ****9f2c", "linear ****a41b"}), settingRows("claude", demoEffective)...)),
 		Auth:     []string{"github ****9f2c", "linear ****a41b"},
 		Notify: []string{"token  ****x7Qa (/home/dev/.smithy/auth.json)", "chat 123456789", "kinds  pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited",
 			"state  on (smithy auto serve sends)", "last sent 2026-11-23 09:12"},
