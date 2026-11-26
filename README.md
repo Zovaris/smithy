@@ -19,7 +19,7 @@
 [![Grok Build](https://img.shields.io/badge/Grok_Build-supported-000000)](#harnesses)
 
 [Usage](#usage) · [How it works](#how-it-works) · [Skills](#skills) ·
-[Autonomous mode](#autonomous-mode) · [Harness](#harness) · [Docs](#docs)
+[Autonomous mode](#autonomous-mode) · [Chat and TUI](#chat-and-tui) · [Docs](#docs)
 
 </div>
 
@@ -163,7 +163,7 @@ smithy scan                          # secrets in what the change adds
 `smithy help` lists the commands by task; `smithy help <command>` shows usage, flags and
 examples for one (`smithy help --all` adds the commands the skills call).
 
-## Harness
+## Chat and TUI
 
 Run `smithy` to open a chat with any agent CLI above. A local daemon runs the sessions, and the
 TUI and the web are two views of it, so you can leave and come back, or open the same sessions
@@ -189,7 +189,7 @@ Every key and command: [docs/harness-guide.md](docs/harness-guide.md).
 - [Settings](docs/settings.md)
 - [Autonomous mode](docs/autonomous.md)
 - [Harnesses](docs/harnesses.md)
-- [Harness guide](docs/harness-guide.md)
+- [Chat and TUI guide](docs/harness-guide.md)
 - [For AI agents](docs/agents.md)
 - [API backend and benchmark](docs/api-backend.md)
 - [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
