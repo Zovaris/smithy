@@ -150,7 +150,7 @@ func (sv *Server) apply(e store.Event) {
 		}
 	case KindIntake:
 		sv.applyIntake(e.Data)
-	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage:
+	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel:
 		sv.applySession(e)
 	case KindRouted:
 		var r struct{ ID string }
@@ -313,6 +313,7 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("GET /v1/sessions/{id}", sv.getSession)
 	mux.HandleFunc("POST /v1/sessions/{id}/messages", sv.sendSession)
 	mux.HandleFunc("POST /v1/sessions/{id}/stop", sv.stopSession)
+	mux.HandleFunc("PUT /v1/sessions/{id}/model", sv.setSessionModel)
 	mux.HandleFunc("GET /v1/setup", sv.setup)
 	mux.HandleFunc("PUT /v1/setup/default", sv.setDefault)
 	mux.HandleFunc("PUT /v1/setup/kit", sv.setKit)
