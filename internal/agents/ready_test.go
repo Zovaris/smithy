@@ -81,6 +81,28 @@ func TestDetectReadyAPIKeys(t *testing.T) {
 	}
 }
 
+// PathOnly (the demo) finds a CLI on PATH and nowhere else, so the host's agents never show.
+func TestDetectReadyPathOnlySkipsInstallFolders(t *testing.T) {
+	home := t.TempDir()
+	local := filepath.Join(home, ".claude", "local")
+	os.MkdirAll(local, 0o755)
+	os.WriteFile(filepath.Join(local, "claude"), []byte("#!/bin/sh\n"), 0o755)
+	look := func(bin string) (string, error) {
+		if bin == "codex" {
+			return "/demo/bin/codex", nil
+		}
+		return "", os.ErrNotExist
+	}
+	env := map[string]string{"HOME": home}
+	m := readyByName(DetectReady(ReadyDeps{LookPath: look, Getenv: func(k string) string { return env[k] }, Stored: func(string) string { return "" }, PathOnly: true}))
+	if c := m["claude"]; c.Ready {
+		t.Fatalf("claude off PATH must not be found in PathOnly: %+v", c)
+	}
+	if c := m["codex"]; !c.Ready || c.Detail != "/demo/bin/codex" {
+		t.Fatalf("codex on PATH: %+v", c)
+	}
+}
+
 // The web shows each agent by the name its catalog entry gives it, not a table of its own.
 func TestDetectReadyNamesEveryAgent(t *testing.T) {
 	rs := DetectReady(ReadyDeps{

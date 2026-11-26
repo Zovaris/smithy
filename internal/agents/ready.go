@@ -27,6 +27,7 @@ type ReadyDeps struct {
 	LookPath func(string) (string, error)
 	Getenv   func(string) string
 	Stored   func(string) string
+	PathOnly bool // look for CLIs on PATH only, not in the usual install folders (the demo)
 }
 
 // DefaultReadyDeps reads PATH, the environment and smithy auth.
@@ -112,7 +113,16 @@ func FindCLI(cli string, look func(string) (string, error), getenv func(string) 
 func DetectReady(d ReadyDeps) []Ready {
 	var out []Ready
 	for _, c := range CLIs {
-		if p, ok := FindCLI(c, d.LookPath, d.Getenv); ok {
+		var p string
+		var ok bool
+		if d.PathOnly {
+			var err error
+			p, err = d.LookPath(Bin(c))
+			ok = err == nil
+		} else {
+			p, ok = FindCLI(c, d.LookPath, d.Getenv)
+		}
+		if ok {
 			out = append(out, Ready{Name: c, Display: DisplayName(c), Kind: "cli", Ready: true, Detail: p})
 			continue
 		}
