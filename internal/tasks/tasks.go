@@ -15,6 +15,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/names"
 )
 
@@ -36,13 +37,8 @@ type Task struct {
 
 func isTask(name string) bool { return taskRe.MatchString(name) }
 
-// PlansHome is where local plans live: $SMELT_PLANS, else <smithy home>/plans.
-func PlansHome() string {
-	if p := os.Getenv("SMELT_PLANS"); p != "" {
-		return p
-	}
-	return filepath.Join(ghx.Home(), "plans")
-}
+// IsTaskFile reports whether name is a task file name (NN-<slug>.md).
+func IsTaskFile(name string) bool { return isTask(name) }
 
 func repoRoot() string {
 	cwd, _ := os.Getwd()
@@ -77,11 +73,15 @@ func mtime(p string) time.Time {
 // <plans>/<repo>/*, and any colon-separated $SMELT_TASKS_DIRS.
 func Dirs() []string { return scan(true) }
 
-// scan lists the subdirs of the task-dir bases, newest first; withTasks keeps only those
+// DirsIn lists the task dirs of the project at root, newest first, the way Dirs does for this repo.
+func DirsIn(root string) []string { return scanRoot(root, true) }
+
+func scan(withTasks bool) []string { return scanRoot(repoRoot(), withTasks) }
+
+// scanRoot lists the subdirs of root's task-dir bases, newest first; withTasks keeps only those
 // holding tasks.
-func scan(withTasks bool) []string {
-	root := repoRoot()
-	bases := []string{filepath.Join(root, "docs", "specs"), filepath.Join(root, ".docs", "specs"), filepath.Join(PlansHome(), filepath.Base(root))}
+func scanRoot(root string, withTasks bool) []string {
+	bases := []string{filepath.Join(root, "docs", "specs"), filepath.Join(root, ".docs", "specs"), filepath.Join(layout.PlansHome(), filepath.Base(root))}
 	for _, d := range strings.Split(os.Getenv("SMELT_TASKS_DIRS"), ":") {
 		if d != "" {
 			if !filepath.IsAbs(d) {
@@ -490,7 +490,7 @@ func Import(file, dir string) ([]string, error) {
 	return paths, nil
 }
 
-func indexFile() string { return filepath.Join(ghx.Home(), "tasks-index.json") }
+func indexFile() string { return filepath.Join(layout.Home(), "tasks-index.json") }
 
 func readIndex() map[string]map[string]string {
 	idx := map[string]map[string]string{}
@@ -501,7 +501,7 @@ func readIndex() map[string]map[string]string {
 }
 
 func writeIndex(idx map[string]map[string]string) {
-	if os.MkdirAll(ghx.Home(), 0o755) != nil {
+	if os.MkdirAll(layout.Home(), 0o755) != nil {
 		return
 	}
 	b, _ := json.MarshalIndent(idx, "", " ")
@@ -607,11 +607,23 @@ const usage = `usage: smithy tasks <command>
   next  [dir]                       first todo task whose blockers are done (exit 3 if none)
   ready [dir]                       every todo task whose blockers are done
   set   <file> key=value...         update header lines (Status, PR, Owner...)
-  add   [dir] "<title>" [--blocked-by 01,02] [--key PROJ-12] [--speed fast|normal|full]   next NN file from the full template
+  add   "<title>" [dir] [--blocked-by 01,02] [--key PROJ-12] [--speed fast|normal|full]   next NN file from the full template
   import <file> [dir]               split a list of "## NN · Title" sections into task files (default dir: the file's folder; never overwrites)
   board [--all]                     one line per task list and warden batch: this repo, or every repo
   where                             task dirs found for this repo
 Status: todo | doing | done | dropped. Blocked by: 01, 03 | none. PR: <url> | -`
+
+// addArgs is `tasks add`'s title and folder: "<title>" [dir], or the old [dir] "<title>" when the
+// first argument is a folder that exists.
+func addArgs(rest []string) (title, dir string) {
+	if len(rest) < 2 {
+		return rest[0], ""
+	}
+	if fi, err := os.Stat(rest[0]); err == nil && fi.IsDir() {
+		return rest[len(rest)-1], rest[0]
+	}
+	return rest[0], rest[1]
+}
 
 // Main runs `smithy tasks`.
 func Main(args []string) int {
@@ -713,14 +725,14 @@ func Main(args []string) int {
 			}
 		}
 		if len(rest) == 0 {
-			fmt.Fprintln(os.Stderr, `usage: smithy tasks add [dir] "<title>" [--blocked-by 01,02] [--key K] [--speed fast|normal|full]`)
+			fmt.Fprintln(os.Stderr, `usage: smithy tasks add "<title>" [dir] [--blocked-by 01,02] [--key K] [--speed fast|normal|full]`)
 			return 2
 		}
-		title := rest[len(rest)-1]
+		title, where := addArgs(rest)
 		var dir string
 		var err error
-		if len(rest) > 1 {
-			dir, err = filepath.Abs(rest[0])
+		if where != "" {
+			dir, err = filepath.Abs(where)
 		} else {
 			dir, err = resolve("")
 		}

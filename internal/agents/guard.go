@@ -2,8 +2,9 @@ package agents
 
 import (
 	"encoding/json"
-	"os"
 	"strings"
+
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // secretPaths are the files no driven CLI should read: smithy's auth.json and pool accounts,
@@ -106,7 +107,7 @@ func opencodeEnv(s Spec, o Options) []string {
 	if s.Harness != "opencode" {
 		return nil
 	}
-	home, _ := os.UserHomeDir()
+	home := layout.UserHome()
 	if p := OpenCodePermission(o, home); p != "" {
 		return []string{"OPENCODE_PERMISSION=" + p}
 	}

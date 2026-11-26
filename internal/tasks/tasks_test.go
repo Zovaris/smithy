@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 func sandbox(t *testing.T) string {
@@ -219,7 +221,7 @@ func TestDirs(t *testing.T) {
 	repo := sandbox(t)
 	a := filepath.Join(repo, "docs", "specs", "a")
 	b := filepath.Join(repo, ".docs", "specs", "b")
-	c := filepath.Join(PlansHome(), filepath.Base(repo), "c")
+	c := filepath.Join(layout.PlansHome(), filepath.Base(repo), "c")
 	d := filepath.Join(repo, "extra", "d")
 	empty := filepath.Join(repo, "docs", "specs", "empty")
 	for _, dir := range []string{a, b, c, d} {
@@ -290,11 +292,11 @@ func TestSummary(t *testing.T) {
 func TestPlansHome(t *testing.T) {
 	t.Setenv("SMELT_PLANS", "")
 	t.Setenv("SMITHY_HOME", "/h")
-	if got := PlansHome(); got != "/h/plans" {
+	if got := layout.PlansHome(); got != "/h/plans" {
 		t.Errorf("got %s", got)
 	}
 	t.Setenv("SMELT_PLANS", "/p")
-	if got := PlansHome(); got != "/p" {
+	if got := layout.PlansHome(); got != "/p" {
 		t.Errorf("got %s", got)
 	}
 }
@@ -403,7 +405,7 @@ func TestMainCommands(t *testing.T) {
 		t.Errorf("set short: %d", c)
 	}
 
-	o, _, c := run(t, "add", dir, "First", "--key", "K-1")
+	o, _, c := run(t, "add", "First", dir, "--key", "K-1")
 	if c != 0 || filepath.Base(strings.TrimSpace(o)) != "01-first.md" {
 		t.Fatalf("add: %d %q", c, o)
 	}

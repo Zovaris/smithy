@@ -12,9 +12,10 @@ import (
 	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/notify"
 	"github.com/Zovaris/smithy/internal/pool"
+	"github.com/Zovaris/smithy/internal/text"
 	"github.com/Zovaris/smithy/internal/usage"
 	"github.com/Zovaris/smithy/internal/warden"
 )
@@ -35,7 +36,7 @@ type System struct {
 
 // loadSystem runs `smithy doctor` (this binary, 20 s cap) and reads the settings, auth and paths.
 func loadSystem() System {
-	s := System{Binary: Version, Skills: or(warden.SkillsVersion()), Home: ghx.Home()}
+	s := System{Binary: Version, Skills: or(warden.SkillsVersion()), Home: layout.Home()}
 	if exe, err := os.Executable(); err == nil && strings.HasPrefix(strings.ToLower(filepath.Base(exe)), "smithy") {
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		out, err := exec.CommandContext(ctx, exe, "doctor").CombinedOutput()
@@ -121,7 +122,7 @@ func (m Model) systemLines(w, rw, rh int) (left, right []string) {
 		}
 		cycle := "-"
 		if !sv.LastCycle.IsZero() {
-			cycle = ago(m.snap.At.Sub(sv.LastCycle))
+			cycle = text.Ago(m.snap.At.Sub(sv.LastCycle))
 		}
 		left = append(left, t.fg(c).Render(sv.State)+mut.Render(fmt.Sprintf("  pid %d %s agent ", sv.PID, t.g.dot))+val.Render(sv.Agent)+
 			mut.Render(" "+t.g.dot+" "+or(sv.Loop)+" "+t.g.dot+" last cycle ")+val.Render(cycle))
@@ -129,10 +130,10 @@ func (m Model) systemLines(w, rw, rh int) (left, right []string) {
 		left = append(left, mut.Render("not running (start: smithy auto serve)"))
 	}
 	if sv.SessionLog != "" {
-		left = append(left, mut.Render("session ")+val.Render(short(home(sv.SessionLog), max(w-12, 20)))+mut.Render("  l opens it"))
+		left = append(left, mut.Render("session ")+val.Render(short(layout.Tilde(sv.SessionLog), max(w-12, 20)))+mut.Render("  l opens it"))
 	}
 	left = append(left, "",
-		head.Render("Paths"), mut.Render("home    ")+val.Render(home(s.Home)), mut.Render("events  ")+val.Render(home(s.Events)), "",
+		head.Render("Paths"), mut.Render("home    ")+val.Render(layout.Tilde(s.Home)), mut.Render("events  ")+val.Render(layout.Tilde(s.Events)), "",
 		head.Render("Auth")+mut.Render("  keys are masked"))
 	if len(s.Auth) == 0 {
 		left = append(left, mut.Render("no keys stored (smithy auth set <service>)"))

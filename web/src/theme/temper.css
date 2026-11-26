@@ -45,10 +45,11 @@
   --sph-focus-ring: color-mix(in srgb, var(--t-ember) 30%, transparent);
   --sph-font-sans: "Geist", ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
   --sph-font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  --sph-radius-xs: 4px;
-  --sph-radius-sm: 8px;
-  --sph-radius-md: 12px;
-  --sph-radius-lg: 14px;
+  --sph-radius-xs: 0;
+  --sph-radius-sm: 0;
+  --sph-radius-md: 0;
+  --sph-radius-lg: 0;
+  --sph-radius-full: 0;
   --sph-shadow-popover: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px rgb(0 0 0 / 0.06);
   color-scheme: light;
 }

@@ -1,0 +1,41 @@
+import { api } from "./auth";
+import type { Ready } from "./setup";
+import type { Sess } from "./store";
+
+export type Project = { dir: string; name: string };
+export type ProjectList = { projects: Project[]; default?: string };
+export type DirList = { dir: string; parent?: string; dirs: string[] };
+
+
+const RANK: Record<string, number> = { working: 0, needs_you: 1 };
+
+// groupAgents is the Agents page: sessions (working first, then newest), ready CLIs, ready API
+// agents, and the missing ones with the command that sets them up.
+export function groupAgents(agents: Ready[], sessions: Sess[]) {
+  const ss = [...sessions].sort((a, b) => (RANK[a.status] ?? 2) - (RANK[b.status] ?? 2) || b.updated.localeCompare(a.updated));
+  return {
+    sessions: ss,
+    clis: agents.filter((a) => a.ready && a.kind === "cli"),
+    apis: agents.filter((a) => a.ready && a.kind === "api"),
+    missing: agents.filter((a) => !a.ready),
+  };
+}
+
+export const projectOf = (l: ProjectList, dir: string) => l.projects.find((p) => p.dir === dir)?.name ?? dir.split(/[\\/]/).filter(Boolean).pop() ?? dir;
+
+export function startDir(l: ProjectList, remembered: string): string {
+  if (remembered && l.projects.some((p) => p.dir === remembered)) return remembered;
+  return l.default || l.projects[0]?.dir || "";
+}
+
+async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const r = await api(path, body === undefined ? { method } : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "HTTP " + r.status);
+  return j;
+}
+
+export const loadProjects = () => call<ProjectList>("GET", "/v1/projects");
+export const addProject = (dir: string, def = false) => call<ProjectList>("POST", "/v1/projects", { dir, default: def });
+export const removeProject = (dir: string) => call<ProjectList>("DELETE", "/v1/projects", { dir });
+export const listDirs = (dir = "") => call<DirList>("GET", "/v1/fs" + (dir ? "?dir=" + encodeURIComponent(dir) : ""));

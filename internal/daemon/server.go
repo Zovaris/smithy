@@ -67,6 +67,8 @@ type Server struct {
 	allow   []string
 	log     func(string)
 	started time.Time
+	// Tend, when set, is the PR tender GET /v1/tend reports.
+	Tend *Tender
 	// ServeState, when set, fills State.Serve (the auto loop's heartbeat).
 	ServeState func() any
 	// Route, when set, sends a won answer back to its asker (RouteBack); an error leaves it for Resume.
@@ -75,6 +77,8 @@ type Server struct {
 	Plan func(ctx context.Context, idea string) ([]PlanTask, error)
 	// BenchDir is where bench runs are read from; empty: bench.Dir().
 	BenchDir string
+	// BenchRun, when set, replaces running `smithy <args>` for a web-started bench run (tests).
+	BenchRun func(args []string) error
 	// Runners makes each session's runner; nil: DefaultRunner.
 	Runners RunnerFor
 	// Version is the daemon binary's version, reported in State so a client can warn on a mismatch.
@@ -93,6 +97,8 @@ type Server struct {
 	Pair *Pairing
 	// Servers lists the saved servers the web switcher reaches through this daemon; nil: none.
 	Servers func() ([]RemoteServer, error)
+	// ServersFile is servers.json: the web adds and removes servers there, and lists it when Servers is nil.
+	ServersFile string
 
 	mu         sync.Mutex
 	decisions  map[string]*Decision
@@ -100,6 +106,8 @@ type Server struct {
 	intakes    map[string]*intakePlan
 	planning   atomic.Bool
 	installing atomic.Bool
+	benchMu    sync.Mutex
+	benchNow   BenchStatus
 	lastSeq    int64
 	wake       chan struct{}
 	sessions   map[string]*live
@@ -152,7 +160,7 @@ func (sv *Server) apply(e store.Event) {
 		}
 	case KindIntake:
 		sv.applyIntake(e.Data)
-	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel:
+	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool:
 		sv.applySession(e)
 	case KindRouted:
 		var r struct{ ID string }
@@ -333,7 +341,12 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("DELETE /v1/keys/{service}", sv.deleteKey)
 	mux.HandleFunc("PUT /v1/serve", sv.putServe)
 	mux.HandleFunc("GET /v1/doctor", sv.doctor)
+	mux.HandleFunc("GET /v1/tend", sv.tendView)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
+	mux.HandleFunc("POST /v1/bench/run", sv.benchStart)
+	mux.HandleFunc("GET /v1/bench/status", sv.benchStatus)
+	mux.HandleFunc("GET /v1/tasks", sv.listTasks)
+	mux.HandleFunc("PUT /v1/tasks/status", sv.moveTask)
 	return mux
 }
 
@@ -355,6 +368,10 @@ func (sv *Server) Handler() http.Handler {
 	mux := sv.apiMux()
 	mux.HandleFunc("POST /v1/pair/code", sv.pairCode)
 	mux.HandleFunc("GET /v1/servers", sv.listServers)
+	mux.HandleFunc("POST /v1/servers", sv.addServer)
+	mux.HandleFunc("DELETE /v1/servers/{name}", sv.removeServer)
+	mux.HandleFunc("POST /v1/sessions/{id}/shell", sv.sessionShell)
+	mux.HandleFunc("POST /v1/images", sv.saveImage)
 	mux.HandleFunc("/v1/servers/{name}/{rest...}", sv.proxyServer)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1" && !strings.HasPrefix(r.URL.Path, "/v1/") {
@@ -486,8 +503,11 @@ func (sv *Server) state(w http.ResponseWriter, r *http.Request) {
 
 // sameOrigin refuses a request a browser could forge from another site: the body must be JSON
 // (not a simple form or text post), the fetch not cross-site and any Origin the daemon's own host.
+// A body-less DELETE needs no Content-Type: DELETE is never a CORS simple request, so a browser
+// preflights it cross-site, and the Sec-Fetch-Site and Origin checks below still apply.
 func sameOrigin(r *http.Request) (int, string) {
-	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
+	bodyless := r.Method == http.MethodDelete && r.ContentLength == 0
+	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" && !bodyless {
 		return 415, "Content-Type must be application/json"
 	}
 	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {

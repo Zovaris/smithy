@@ -183,6 +183,14 @@ from your phone.
 | **Palette (`ctrl+k`)** | **Same session on the web** |
 | ![Command palette](demo/review/modal-steel-palette.png) | ![Web view](docs/demo/web-session-1440.png) |
 
+The web does everything the TUI does: sessions, a board of your task files, agents with cost and
+speed charts, bench, decisions and every setting. `smithy web open` opens it; install it as an
+app from Chrome, or with Add to Home Screen on iOS.
+
+| Board | Agents | New session |
+|---|---|---|
+| ![Web board](demo/review/web-board-1440.png) | ![Web agents with charts](demo/review/web-agents-1440.png) | ![Web new session with folder picker](demo/review/web-picker-1440.png) |
+
 Every key and command: [docs/harness-guide.md](docs/harness-guide.md).
 
 ## Docs

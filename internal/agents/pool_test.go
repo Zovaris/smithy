@@ -2,7 +2,6 @@ package agents
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -11,6 +10,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/pool"
+	"github.com/Zovaris/smithy/internal/testkit"
 )
 
 // fakePoolClaude is a claude that hits its limit when CLAUDE_CONFIG_DIR ends in "-limited" and
@@ -113,11 +113,8 @@ func TestAgentPoolOffRunsAsBefore(t *testing.T) {
 func gitRepo(t *testing.T) string {
 	t.Helper()
 	d := t.TempDir()
-	for _, a := range [][]string{{"init", "-q", "-b", "feat/x"}, {"-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "init"}} {
-		if out, err := exec.Command("git", append([]string{"-C", d}, a...)...).CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v %s", a, err, out)
-		}
-	}
+	testkit.Git(t, d, "init", "-q", "-b", "feat/x")
+	testkit.Git(t, d, "commit", "-q", "--allow-empty", "-m", "init")
 	return d
 }
 

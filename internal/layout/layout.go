@@ -1,25 +1,15 @@
 // Package layout is where install.sh puts the smithy binary: the versions in
 // $XDG_DATA_HOME/smithy/versions/<version> (default ~/.local/share), the command as a link at
 // $XDG_BIN_HOME/smithy (default ~/.local/bin); on Windows %LOCALAPPDATA%\smithy\versions and
-// %LOCALAPPDATA%\Programs\smithy. Data and config stay in the smithy home (~/.smithy).
+// %LOCALAPPDATA%\Programs\smithy. It also owns every home lookup: the user home, the smithy home
+// ($SMITHY_HOME, else ~/.smithy) that holds data and config, and the warden and plans dirs.
 package layout
 
 import (
 	"os"
 	"path/filepath"
 	"runtime"
-
-	"github.com/Zovaris/smithy/internal/ghx"
 )
-
-// UserHome is $HOME, else the OS user home.
-func UserHome() string {
-	if h := os.Getenv("HOME"); h != "" {
-		return h
-	}
-	h, _ := os.UserHomeDir()
-	return h
-}
 
 func localAppData() string {
 	if d := os.Getenv("LOCALAPPDATA"); d != "" {
@@ -68,13 +58,13 @@ func Exe() string {
 func Link() string { return filepath.Join(BinDir(), Exe()) }
 
 // LegacyBin is the pre-0.21 install folder (~/.smithy/bin); install.sh and updates remove it (ADR 0015).
-func LegacyBin() string { return filepath.Join(ghx.Home(), "bin") }
+func LegacyBin() string { return filepath.Join(Home(), "bin") }
 
 // SkillsManifest lists, one per line, the skill folders `smithy skills install` wrote.
-func SkillsManifest() string { return filepath.Join(ghx.Home(), "installed-skills") }
+func SkillsManifest() string { return filepath.Join(Home(), "installed-skills") }
 
 // PathRecord lists, one per line, the shell startup files a PATH line was added to.
-func PathRecord() string { return filepath.Join(ghx.Home(), "path-added") }
+func PathRecord() string { return filepath.Join(Home(), "path-added") }
 
 // PathMarker precedes the PATH line install.sh and `smithy setup path add` write.
 const PathMarker = "# smithy: run `smithy` from any terminal"

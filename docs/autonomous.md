@@ -28,6 +28,12 @@ edits settings in place. Every setting is listed in
 
 ## Daemon (harness build)
 
+The daemon also tends PRs: it watches the warden batch PRs (cards in `pr_open` or `ready`) and the
+PRs chat sessions opened, every 2 minutes. Red CI, a conflict or open review threads start one tend
+session (two tries per action, then `needs-you`). It never merges; merging stays your call.
+`/tend` in the TUI and `GET /v1/tend` show every watched PR; `tend.daemon` (`off`, `watch`, `fix`)
+sets how far it goes.
+
 In the harness build, the serve loop runs inside `smithy daemon`, which also serves a local API
 and writes every event to `~/.smithy/smithy.db`. `smithy auto serve` starts it in the foreground
 (same flags, same view) or, when one already runs, attaches and prints its events.
@@ -65,7 +71,8 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   At most 16 sessions working at once and 8 queued messages each (429 past that); a permission question shows the whole call, and tool output and text are redacted before they are stored.
 - Setup: `GET /v1/setup` lists every agent CLI and API key as ready or missing with its fix, the
   default agent and model (`chosen` is false until one is picked or used: first run), the kit
-  (`kit.mcp`, `kit.skills`) and the skills and MCP servers each harness has installed;
+  (`kit.mcp`, `kit.skills`), the skills and MCP servers each harness has installed, and the
+  effort rules (`effort: {agents, levels, max}`: the CLIs that take effort, their levels and the highest);
   `PUT /v1/setup/default` (`{"agent","model"}`), `PUT /v1/setup/kit` (`{"mcp","skills"}`, skills
   must be installed smithy skills) and `POST /v1/setup/skills/install` (`{"harness"}`, empty for
   every detected one) change them. `GET /v1/agents/{id}/models[?refresh=1]` lists the models
@@ -74,6 +81,25 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
 - Settings (daemon token only): `GET /v1/settings` (every setting, API keys masked, serve on/off),
   `PUT|DELETE /v1/settings/{key}` (user file; secret keys refused), `PUT|DELETE /v1/keys/{service}`,
   `PUT /v1/serve` and `GET /v1/doctor`.
+- Tend: `GET /v1/tend` lists the warden batch PRs the daemon tends (cards in `pr_open` or
+  `ready`) and the PRs chat sessions opened (a `gh pr create` or `smithy pr create` the session
+  ran printed the PR, and it belongs to the session folder's `origin`; `session` names it) with
+  tend's next action, the checks and a status (`green`, `waiting`, `fixing`,
+  `needs-fix`, `needs-you`, `closed`, `error`). With `tend.daemon fix` (the default; user
+  settings only, `auto.paused` holds it to `watch`) red CI, a conflict or open review threads
+  start one `smithy agent --profile auto` tend session in the item's worktree (a chat PR's: the
+  session's folder, only while it is on the PR's head branch), two per action at
+  most; it never merges. The TUI shows it with `/tend`.
+- Tasks: `GET /v1/tasks[?project=<dir>]` lists the task dirs of a project (default project when
+  unset) and their `.md` tasks; `PUT /v1/tasks/status` (`{"file","status"}`, status `todo`,
+  `doing`, `done` or `dropped`) rewrites a task file's Status line, only for files in a
+  project's task dirs. The web's Board uses them.
+- Bench: `GET /v1/bench`, `GET /v1/bench/compare`, `POST /v1/bench/run` (`{"agent","model"}`) and
+  `GET /v1/bench/status`.
+- This machine's daemon token only: `POST /v1/pair/code` (a one-time pairing code), `GET|POST /v1/servers` (list, pair and save a server),
+  `DELETE /v1/servers/{name}`, `POST /v1/sessions/{id}/shell` (`{"cmd"}`, run in the session
+  folder, 2 min timeout) and `POST /v1/images` (`{"data"}`, up to 32 MiB, saved for the next
+  message).
 - Projects: `GET|POST|DELETE /v1/projects` keep the daemon's projects and default in
   `~/.smithy/projects.json`; a session started with no `dir` uses the default. `GET /v1/fs?dir=`
   lists a folder's subfolders for the picker.

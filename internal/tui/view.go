@@ -10,11 +10,12 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/Zovaris/smithy/internal/cards"
+	"github.com/Zovaris/smithy/internal/layout"
+	"github.com/Zovaris/smithy/internal/text"
 	"github.com/charmbracelet/x/ansi"
 )
 
-func cardPath(batch, id string) string { return filepath.Join(cards.Home(), batch, id+".json") }
+func cardPath(batch, id string) string { return filepath.Join(layout.WardenHome(), batch, id+".json") }
 
 type rect struct{ x, y, w, h int }
 
@@ -304,7 +305,7 @@ func (m Model) empty(v view) []string {
 	case vDone:
 		return []string{"", mut.Render("Nothing finished yet: merged, ready, closed and blocked work lands here."), mut.Render("It reads ~/.smithy/events.jsonl and the cards.")}
 	}
-	return []string{"", mut.Render(meaning[v]), cmd(`smithy tasks add <dir> "<title>"`)}
+	return []string{"", mut.Render(meaning[v]), cmd(`smithy tasks add "<title>" [dir]`)}
 }
 
 // fitCols keeps the columns that fit w, most important first, in their original order.
@@ -465,7 +466,7 @@ func (m Model) sourceLines(w int) []string {
 			lp = wt.LastPoll
 		}
 		if !lp.IsZero() {
-			last = "polled " + ago(m.snap.At.Sub(lp))
+			last = "polled " + text.Ago(m.snap.At.Sub(lp))
 			next = fmt.Sprintf("next in %ds", max(int(lp.Add(time.Duration(wt.Every)*time.Second).Sub(m.snap.At).Seconds()), 0))
 		}
 		rate := "rate n/a"

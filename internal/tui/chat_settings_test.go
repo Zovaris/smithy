@@ -89,3 +89,24 @@ func TestSettingsCommandsGoThroughTheDaemon(t *testing.T) {
 		t.Fatalf("keys/serve missing:\n%s", out)
 	}
 }
+
+func (f *fakeSettings) Tend(context.Context) (daemon.TendList, error) {
+	return daemon.TendList{Mode: "fix", PRs: []daemon.TendPR{
+		{TendRef: daemon.TendRef{URL: "https://github.com/o/r/pull/7", Batch: "b1", Item: "01"}, Action: "fix-ci", Checks: "red", Status: "fixing", PID: 42},
+		{TendRef: daemon.TendRef{URL: "https://github.com/o/r/pull/8", Batch: "b1", Item: "02"}, Action: "done", Checks: "green", Status: "green"},
+		{TendRef: daemon.TendRef{URL: "https://github.com/o/r/pull/9", Session: "s-abc"}, Action: "wait", Checks: "pending", Status: "waiting"},
+	}}, nil
+}
+
+func TestTendPanelShowsEveryWatchedPR(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 160, 48
+	m.cfg = &fakeSettings{}
+	m = cpress(typeIn(m, "/tend"), ckey("enter"))
+	out := screen(m)
+	for _, want := range []string{"tend.daemon fix", "pull/7", "fixing", "fix-ci", "pull/8", "green", "session s-abc", "pull/9"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("/tend lacks %q:\n%s", want, out)
+		}
+	}
+}

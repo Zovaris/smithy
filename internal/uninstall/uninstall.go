@@ -20,7 +20,6 @@ import (
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/auto"
 	"github.com/Zovaris/smithy/internal/daemon"
-	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/layout"
 )
 
@@ -193,10 +192,10 @@ func Gather(purge bool, engine string) Plan {
 			p.RCFiles = append(p.RCFiles, rc)
 		}
 	}
-	if h := filepath.Clean(ghx.Home()); purge && h != filepath.Clean(layout.UserHome()) && h != filepath.Dir(h) {
+	if h := filepath.Clean(layout.Home()); purge && h != filepath.Clean(layout.UserHome()) && h != filepath.Dir(h) {
 		if fi, err := os.Stat(h); err == nil && fi.IsDir() {
 			if ok, why := ownHome(h); ok {
-				p.Home = ghx.Home()
+				p.Home = layout.Home()
 			} else {
 				p.Refused = "smithy uninstall: refusing to purge " + h + ": not smithy's home (" + why + "); remove it yourself if you mean to"
 			}
@@ -340,7 +339,7 @@ func (p Plan) Apply(w io.Writer) int {
 			say("removed %s", p.Home)
 		}
 	} else {
-		say("kept %s (keys, db, plans); --purge removes it", ghx.Home())
+		say("kept %s (keys, db, plans); --purge removes it", layout.Home())
 	}
 	return failed
 }

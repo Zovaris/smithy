@@ -17,6 +17,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/harness"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // Setting is one known key: its default ("ask" means no default, ask the user once), who uses
@@ -45,6 +46,7 @@ var Known = []Setting{
 	{"watch.every", "30", "smithy wait", "seconds between GitHub polls"},
 	{"watch.max", "50", "smithy wait", "minutes before a heartbeat exit (4) when nothing happened"},
 	{"tend.watch", "prs", "tend", "what /tend watch follows: a comma list of prs, issues, actions, base, alerts, or all"},
+	{"tend.daemon", "fix", "smithy daemon", "how the daemon tends warden batch PRs: off, watch (show state only) or fix (start one tend session, auto profile, for red CI, a conflict or review threads; never merges); read from the user settings only; auto.paused holds fix to watch"},
 	{"tend.label", "agent", "tend", "label of issues tend may queue for warden"},
 	{"stack.test", "", "smelt warden", "this repo's test command when smithy stack can't detect it (also stack.single, stack.lint, stack.typecheck, stack.dev, …); set with --repo"},
 	{"guard.enabled", "true", "smithy agent", "the dangerous-command guard: a shell command matching guard.block (or the built-in list) asks the user; nothing else asks"},
@@ -115,7 +117,7 @@ func UserFile() string {
 	if f := os.Getenv("SMITHY_CONFIG"); f != "" {
 		return f
 	}
-	return filepath.Join(ghx.Home(), "config.json")
+	return filepath.Join(layout.Home(), "config.json")
 }
 
 // RepoFile is this repo's settings file ("" outside a repo). In a linked worktree it is the main
@@ -534,13 +536,13 @@ func ModelFor(h, t string) (string, error) {
 
 // Migrate moves pre-0.8 state (~/.agents/{config.json,plans,foreman,tend}) to ~/.smithy.
 func Migrate() []string {
-	home, _ := os.UserHomeDir()
+	home := layout.UserHome()
 	old := filepath.Join(home, ".agents")
 	var moved []string
 	for _, p := range [][2]string{{"config.json", "config.json"}, {"plans", "plans"}, {"foreman", "warden"}, {"tend", "tend"}} {
-		a, b := filepath.Join(old, p[0]), filepath.Join(ghx.Home(), p[1])
+		a, b := filepath.Join(old, p[0]), filepath.Join(layout.Home(), p[1])
 		if exists(a) && !exists(b) {
-			_ = os.MkdirAll(ghx.Home(), 0o755)
+			_ = os.MkdirAll(layout.Home(), 0o755)
 			if os.Rename(a, b) == nil {
 				moved = append(moved, a+" -> "+b)
 			}
@@ -551,8 +553,8 @@ func Migrate() []string {
 
 // AutoMigrate runs Migrate once, the first time smithy runs after an upgrade.
 func AutoMigrate() {
-	home, _ := os.UserHomeDir()
-	if os.Getenv("SMITHY_CONFIG") != "" || exists(ghx.Home()) || !exists(filepath.Join(home, ".agents", "config.json")) {
+	home := layout.UserHome()
+	if os.Getenv("SMITHY_CONFIG") != "" || exists(layout.Home()) || !exists(filepath.Join(home, ".agents", "config.json")) {
 		return
 	}
 	for _, m := range Migrate() {

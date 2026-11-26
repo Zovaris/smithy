@@ -10,7 +10,7 @@
     "lint": "oxlint --deny-warnings"
   },
   "dependencies": {
-    "@zovaris/sephiro": "1.2.0",
+    "@zovaris/sephiro": "1.5.0",
     "preact": "10.29.8"
   },
   "devDependencies": {

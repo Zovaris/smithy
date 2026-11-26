@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/Zovaris/smithy/internal/agents"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -34,7 +34,7 @@ its id, a unique id prefix, latest, latest~N or a saved .json path; the
 daemon serves the same runs to the web UI (Bench).`
 
 // Dir is where results go.
-func Dir() string { return filepath.Join(ghx.Home(), "bench") }
+func Dir() string { return filepath.Join(layout.Home(), "bench") }
 
 // Main is `smithy bench`.
 func Main(args []string) int { return mainIn(Dir(), args, os.Stdout, os.Stderr) }

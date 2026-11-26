@@ -8,6 +8,56 @@ part above `### Details`.
 
 ## Unreleased
 
+### Highlights
+
+- The web does everything the TUI does, with the same flat look and themes, and installs as an app.
+- A Board for your local task files, an Agents page with cost and speed charts, and Bench runs from the browser.
+- New sessions pick a project through a folder browser, plus the agent, model and effort.
+- The daemon keeps your PRs green on its own (warden batches and chat sessions) and never merges.
+
+### New
+
+- The daemon keeps warden batch PRs green on its own: red CI, a conflict or open review threads
+  start one tend session, and `/tend` in the TUI shows every watched PR. It never merges.
+- The daemon also tends the PRs a chat session opens, and the TUI's agents panel shows each session's PRs.
+- The web has an anvil favicon and installs as an app (Chrome, and Add to Home Screen on iOS); its page shell opens offline.
+- The web Board shows your local task files by status and moving a card updates its file; running agents, what waits on you and the cost sit in a side panel on every page; Bench can start a run; Agents shows cost, tokens, tok/s and runs per hour as text charts.
+- The web does what the TUI does: every setting with a typed control, API keys, serve, doctor, a model and effort picker per session, `!cmd` and pasted or dropped images in the composer, /ask and /answer, the theme picker, a header like the TUI's, and adding or switching servers with a pairing code.
+- The web's Agents page splits sessions, the CLIs and API agents that are set up, and the missing ones with their install command. New session picks a project (added through a folder browser on the daemon's machine, never a typed path), the agent, its model and effort.
+
+### Fixed
+
+- The web is flat: square corners everywhere, one control height for the stop button, chips and small buttons, a wider chat column, and no highlighted row behind "No results." in the command palette.
+- `scripts/eval.sh` scores are deterministic: trials share one smithy binary and a private Go cache, so a launcher rebuild or another process pruning the shared cache no longer grades as a task failure, and an agent that never starts stops the eval (exit 1) instead of counting as a fail.
+- Removing an API key or resetting a setting from the web works again (it failed with 415).
+- The web's `/` lists the TUI's chat commands (agent, sessions, mode, log, welcome, setup, help, key, tend, remote, bench), `/mode` sets the transcript detail as in the TUI, and light or dark moved to `/theme light|dark`.
+- `/tend` on the web shows the daemon's tend mode and each session's PRs in the agents panel.
+- The web names every agent the way the daemon's catalog does, Pi and dsh included.
+- `smithy daemon --demo` lists only the agents on its PATH, never the host's.
+- The command palette closes when you go to another page.
+- A web bench run with no passing task says why (exit status, or no task passed) over its last log lines, and "1 saved run" reads right.
+- `smithy tasks add "<title>" [dir]` takes the title first; the old `[dir] "<title>"` still works when the folder exists.
+
+### Details
+
+- web: the folder picker, Settings rows and the model dialog's key hints are Sephiro 1.5.0 FileBrowser, SettingsList and Dialog `keys`/`escHint`; the toggle is square through `--sph-radius-full`; `web/src` is split into `lib/`, `components/` and `features/chat/`.
+- web: @zovaris/sephiro 1.2.0 → 1.4.0; Temper sets every `--sph-radius-*` token to 0; chat, composer and new-session width 720 → 960px; compact controls at 28px. Palette empty-state workaround until Zovaris/Sephiro#37 ships.
+- daemon: `POST /v1/servers` (pair and save), `DELETE /v1/servers/{name}`, `POST /v1/sessions/{id}/shell` and `POST /v1/images`, all for this machine's daemon token only. web: the composer's `/` covers the TUI's chat commands (terminal-only ones: detach, quit, web, are left out); Sephiro Dialog, SegmentedControl, Select and Toggle; first-load budget 30 → 31 KB gzip.
+- daemon: `GET /v1/tasks` and `PUT /v1/tasks/status` (task files of the daemon's projects only); `POST /v1/bench/run` and `GET /v1/bench/status`.
+- Go: shared test git helpers in `internal/testkit`; `Plural`, `Ago`, `Bytes` in `internal/text`; every home lookup through `internal/layout`; one agent CLI table (`internal/agents/catalog`, `agents.KnownCLIs`); one effort rule, reported as `effort` (`agents`, `levels`, `max`) by `GET /v1/setup`. ADR 0016 records the deferred splits.
+- `internal/daemon/tend.go`: a tender ticks every 2 minutes over the PRs of warden cards in
+  `pr_open` or `ready`, reads each with `smithy pr-state` in the item's worktree and, for
+  `fix-ci`, `sync-base` or `answer-review`, starts `smithy agent --bg --profile auto` (auto
+  mode's allow-list and `auto.sandbox`, fail closed) with the tend skill; two tries per action,
+  then `needs-you`. `GET /v1/tend` reports it; new setting `tend.daemon` (`off`, `watch`, `fix`;
+  default `fix`; user settings only; `auto.paused` holds it to `watch`).
+- `internal/daemon`: a session records the PR URLs a `gh pr create` or `smithy pr create` tool call
+  printed (`Session.prs`, replayed from `session_tool` events, 20 at most); the tender adds those
+  of the session folder's `origin` repository as `TendRef`s with `session` set, after the batch
+  cards. `/tend` labels them `session <id>`; the TUI's agents panel shows `PR #n`.
+- `web/public/`: `favicon.svg`, PNG icons (192, 512 maskable, 180 apple-touch), `manifest.webmanifest`, `sw.js` (caches only `/` and same-origin static files; never `/v1/`, query strings or non-GET). `index.html` gains description, Open Graph and iOS web-app meta tags.
+- `internal/web`: top-level build files (favicon, manifest, service worker) are served as themselves with `no-cache` instead of the SPA's `index.html`; `.webmanifest` gets `application/manifest+json`.
+
 ## v0.24.0 — 2026-11-26
 
 ### Highlights

@@ -72,6 +72,29 @@ func TestSetupReportsAgentsSkillsAndKit(t *testing.T) {
 	}
 }
 
+func TestSetupReportsTheEffortRules(t *testing.T) {
+	_, url, _ := setupTest(t)
+	e := getSetup(t, url).Effort
+	if !slices.Equal(e.Agents, []string{"claude", "codex"}) || !slices.Equal(e.Levels, agents.Efforts) || e.Max != agents.MaxEffort {
+		t.Fatalf("effort rules: %+v", e)
+	}
+	for _, a := range e.Agents {
+		for _, l := range e.Levels {
+			if err := ValidEffort(a, l); err != nil {
+				t.Errorf("ValidEffort(%s, %s): %v", a, l, err)
+			}
+		}
+	}
+	for _, c := range [][2]string{{"claude", "high"}, {"claude", "minimal"}, {"claude", "Low"}, {"opencode", "low"}} {
+		if ValidEffort(c[0], c[1]) == nil {
+			t.Errorf("ValidEffort(%s, %s) accepted", c[0], c[1])
+		}
+	}
+	if ValidEffort("opencode", "") != nil {
+		t.Error("an empty effort is always fine")
+	}
+}
+
 func TestSetupDefaultIsSavedAndUsed(t *testing.T) {
 	sv, url, home := setupTest(t)
 	if code, m := put(t, url+"/v1/setup/default", `{"agent":"codex","model":"gpt-5"}`); code != 200 || m["agent"] != "codex" {

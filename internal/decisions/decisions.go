@@ -13,6 +13,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/text"
 )
 
@@ -59,7 +60,7 @@ func slug(url, dir string) string {
 }
 
 // File is the decisions log of the current repo.
-func File() string { return filepath.Join(ghx.Home(), "decisions", repoSlug()+".md") }
+func File() string { return filepath.Join(layout.Home(), "decisions", repoSlug()+".md") }
 
 func flat(s string) string { return text.Clean(s) }
 

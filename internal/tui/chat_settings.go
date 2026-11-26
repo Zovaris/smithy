@@ -4,6 +4,7 @@ package tui
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -18,6 +19,7 @@ type settingsAPI interface {
 	RemoveKey(ctx context.Context, service string) error
 	SetServe(ctx context.Context, on bool) error
 	Doctor(ctx context.Context) ([]string, error)
+	Tend(ctx context.Context) (daemon.TendList, error)
 }
 
 // settingsDoneMsg is a settings command's result: lines for the transcript, or a panel to open.
@@ -35,7 +37,7 @@ func (m chatView) detach() (tea.Model, tea.Cmd) {
 	return m, tea.Quit
 }
 
-// settingsCommand runs /serve, /set, /unset, /key, /keys and /doctor through the daemon.
+// settingsCommand runs /serve, /set, /unset, /key, /keys, /doctor and /tend through the daemon.
 func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 	if m.cfg == nil {
 		m.system("settings need a daemon this chat can reach")
@@ -76,11 +78,19 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 			s, err := api.Settings(ctx)
 			return []string{map[bool]string{true: "serve on", false: "serve off (auto.paused)"}[s.Serve]}, err
 		}
+	case name == "tend":
+		return m, func() tea.Msg {
+			l, err := api.Tend(context.Background())
+			if err != nil {
+				return sessionErrMsg{what: "/tend", err: err}
+			}
+			return settingsDoneMsg{panel: tendPanel(l)}
+		}
 	case name == "doctor":
 		m.system("running smithy doctor…")
 		run = api.Doctor
 	default:
-		m.system("usage: /serve on|off · /set <key> <value> · /unset <key> · /keys · /key rm <service> · /doctor")
+		m.system("usage: /serve on|off · /set <key> <value> · /unset <key> · /keys · /key rm <service> · /doctor · /tend")
 		return m, nil
 	}
 	return m, func() tea.Msg {
@@ -105,4 +115,30 @@ func keysPanel(s daemon.Settings) *infoPanel {
 	lines = append(lines, "#ADD OR REPLACE ONE", "-> smithy auth set <service>\tin a terminal; the key is read without echo",
 		"#SERVE", map[bool]string{true: "ok serve on\t/serve off pauses new work", false: "serve off (auto.paused)\t/serve on resumes it"}[s.Serve])
 	return &infoPanel{title: "API keys", lines: lines}
+}
+
+// tendPanel is /tend: the warden batch and chat session PRs the daemon tends, each with its status, tend's next
+// action and the CI state; a PR being fixed names its tend session.
+func tendPanel(l daemon.TendList) *infoPanel {
+	lines := []string{"#MODE", "tend.daemon " + l.Mode + "\t/set tend.daemon off|watch|fix"}
+	lines = append(lines, "#PULL REQUESTS")
+	for _, p := range l.PRs {
+		mark := map[string]string{"green": "ok ", "closed": "ok ", "error": "!! ", "needs-you": "!! "}[p.Status]
+		hint := p.Action + " · checks " + p.Checks
+		switch {
+		case p.Error != "":
+			hint = p.Error
+		case p.PID != 0:
+			hint += " · tend session pid " + strconv.Itoa(p.PID)
+		}
+		from := p.Batch + "/" + p.Item
+		if p.Batch == "" {
+			from = "session " + p.Session
+		}
+		lines = append(lines, mark+from+" "+p.Status+" "+p.URL+"\t"+hint)
+	}
+	if len(l.PRs) == 0 {
+		lines = append(lines, "none: no warden batch or chat session has an open PR to tend")
+	}
+	return &infoPanel{title: "Tend", lines: lines, scroll: true}
 }

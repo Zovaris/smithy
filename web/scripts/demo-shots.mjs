@@ -24,9 +24,17 @@ try {
   await settings.getByText("default").first().waitFor({ timeout: 20000 });
 
   await page.goto(url.replace(/#.*/, "#/"), { waitUntil: "domcontentloaded" });
-  await page.getByRole("radiogroup", { name: "Agent" }).locator(".row2").first().waitFor({ timeout: 20000 });
+  await page.getByRole("radiogroup", { name: "Agent" }).locator(".row1").first().waitFor({ timeout: 20000 });
   await shot("web-new-1440");
-  await page.getByLabel("Folder").fill(repo);
+  // The folder picker: from the root, open each folder of the repo's path, then add it.
+  await page.getByRole("button", { name: "Add project" }).click();
+  const picker = page.getByRole("dialog", { name: "Add a project" });
+  await picker.getByRole("navigation", { name: "Root" }).getByRole("button").first().click();
+  for (const part of repo.split("/").filter(Boolean)) {
+    await picker.getByRole("listbox", { name: "Folders" }).getByRole("option", { name: part + "/", exact: true }).click();
+  }
+  await picker.getByRole("button", { name: /^Add / }).click();
+  await picker.waitFor({ state: "hidden" });
   const box = page.locator("textarea");
   await box.fill("add a health endpoint with a test");
   await page.getByRole("button", { name: "Send" }).click();

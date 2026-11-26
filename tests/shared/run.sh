@@ -58,7 +58,7 @@ t "unknown target exits 2" 'W nope:1 --max 0; [ $? -eq 2 ]'
 
 # smithy tasks add / board
 export SMITHY_HOME="$T/home"
-t "add numbers the next task" '[ "$(basename "$("$S/smithy" tasks add docs/specs/b "Add login")")" = 01-add-login.md ] && [ "$(basename "$("$S/smithy" tasks add docs/specs/b "Rate limit" --blocked-by 01)")" = 02-rate-limit.md ]'
+t "add numbers the next task" '[ "$(basename "$("$S/smithy" tasks add "Add login" docs/specs/b)")" = 01-add-login.md ] && [ "$(basename "$("$S/smithy" tasks add "Rate limit" docs/specs/b --blocked-by 01)")" = 02-rate-limit.md ]'
 t "added task is todo and blocked" 'grep -q "^Blocked by: 01" docs/specs/b/02-rate-limit.md && [ "$(basename "$("$S/smithy" tasks next docs/specs/b)")" = 01-add-login.md ]'
 t "board shows the list" '"$S/smithy" tasks board | grep "0/2 done, 0 doing, 1 ready"'
 t "board --all finds it from elsewhere" '(cd / && "$S/smithy" tasks board --all) | grep "repo/b"'

@@ -1,12 +1,12 @@
 package agents
 
 import (
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
 	"github.com/Zovaris/smithy/internal/acp"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // autoPermit maps one ACP permission request through the --profile auto rules (AutoTools,
@@ -83,7 +83,7 @@ func matchAny(rules []string, tool, s string) bool {
 // pathRule turns a Read/Edit rule path (~/x, //abs, **/x, * and **) into an anchored regexp.
 func pathRule(pat string) string {
 	if strings.HasPrefix(pat, "~/") {
-		home, _ := os.UserHomeDir()
+		home := layout.UserHome()
 		pat = filepath.ToSlash(home) + pat[1:]
 	} else if strings.HasPrefix(pat, "//") {
 		pat = pat[1:]

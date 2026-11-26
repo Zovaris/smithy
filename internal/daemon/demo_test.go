@@ -72,3 +72,22 @@ func TestDemoRunnerLeavesOtherFilesAlone(t *testing.T) {
 		t.Errorf("demo overwrote a real %s: %q", demoFile, b)
 	}
 }
+
+// The demo lists only the agents on its PATH, never the host's from its usual install folders.
+func TestDemoReadyLooksOnlyOnPath(t *testing.T) {
+	home, bin := t.TempDir(), t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", bin)
+	os.MkdirAll(filepath.Join(home, ".local", "bin"), 0o755)
+	os.WriteFile(filepath.Join(home, ".local", "bin", "opencode"), []byte("#!/bin/sh\n"), 0o755)
+	os.WriteFile(filepath.Join(bin, "claude"), []byte("#!/bin/sh\n"), 0o755)
+	var ready []string
+	for _, r := range DemoReady() {
+		if r.Ready && r.Kind == "cli" {
+			ready = append(ready, r.Name)
+		}
+	}
+	if !slices.Equal(ready, []string{"claude"}) {
+		t.Fatalf("demo ready CLIs = %v, want only claude from PATH", ready)
+	}
+}

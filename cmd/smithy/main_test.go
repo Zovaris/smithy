@@ -194,6 +194,15 @@ func TestTasksAfterTaskDir(t *testing.T) {
 	if b, _ := os.ReadFile(strings.TrimSpace(out)); !strings.Contains(string(b), "Speed: full") {
 		t.Fatalf("tasks add --speed full wrote %q", b)
 	}
+	other := filepath.Join(repo, "docs", "specs", "other")
+	out, e, code = run(t, repo, env, "tasks", "add", "Third task", other)
+	if code != 0 || filepath.Base(strings.TrimSpace(out)) != "01-third-task.md" || !strings.HasPrefix(strings.TrimSpace(out), other) {
+		t.Fatalf("tasks add <title> <new dir>: exit %d, out %q, err %q", code, out, e)
+	}
+	out, e, code = run(t, repo, env, "tasks", "add", other, "Fourth task")
+	if code != 0 || filepath.Base(strings.TrimSpace(out)) != "02-fourth-task.md" {
+		t.Fatalf("tasks add <existing dir> <title> (old order): exit %d, out %q, err %q", code, out, e)
+	}
 }
 
 func TestDoubleDashReachesNoCommand(t *testing.T) {

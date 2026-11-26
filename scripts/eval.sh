@@ -10,14 +10,21 @@
 # The none arm is a plain instruction, not a skill-free HOME: an agent that auto-loads installed
 # skills may still do so, so run `none` on a machine or profile without them for a clean baseline.
 # Prints pass@1 (share of trials that passed) and pass^k (share of tasks passing all k trials).
+# One smithy binary ($SMITHY_BIN, else built once here) and one private Go cache ($EVAL_GOCACHE,
+# else a fresh one) serve every trial, so a launcher rebuild or another process pruning the shared
+# Go cache never grades as a task failure. An agent that never starts (no log) stops the eval with
+# exit 1 instead of counting as a fail.
 set -uo pipefail
 cd "$(dirname "$0")/.."
-AGENT="skills/smelt/scripts/smithy"; k=1; arms="none,fast,normal"
+k=1; arms="none,fast,normal"
 while getopts k:a: o; do case $o in k) k=$OPTARG;; a) arms=$OPTARG;; *) exit 2;; esac; done
 shift $((OPTIND-1))
 case $k in ''|*[!0-9]*|0) echo "eval: -k needs a positive number" >&2; exit 2;; esac
 tasks=("$@"); [ ${#tasks[@]} -gt 0 ] || for d in tests/eval/*/; do tasks+=("$(basename "$d")"); done
 logs="$(mktemp -d)"; echo "transcripts: $logs"
+own="$(mktemp -d)"; trap 'rm -rf "$own"' EXIT; AGENT="${SMITHY_BIN:-$own/smithy}"
+[ -n "${SMITHY_BIN:-}" ] || go build -trimpath -o "$AGENT" ./cmd/smithy || { echo "eval: cannot build smithy" >&2; exit 1; }
+export GOCACHE="${EVAL_GOCACHE:-$own/gocache}"
 intro() { case $1 in
   none) echo "Do not load or use any skills; solve this directly." ;;
   fast|normal) echo "Use the smelt skill at speed $1 for this task." ;;
@@ -31,7 +38,8 @@ for arm in ${arms//,/ }; do
     for i in $(seq "$k"); do
       w="$(mktemp -d)"; cp -R "$d/fixture/." "$w"
       p="$logs/$arm-$t-$i.prompt"; { intro "$arm"; echo; cat "$d/prompt.md"; } > "$p"
-      "$AGENT" agent --cwd "$w" --log "$logs/$arm-$t-$i.log" "$p" >/dev/null 2>&1
+      "$AGENT" agent --cwd "$w" --log "$logs/$arm-$t-$i.log" "$p" >/dev/null 2>"$logs/$arm-$t-$i.err"
+      [ -f "$logs/$arm-$t-$i.log" ] || { echo "eval: agent did not start ($arm $t #$i): $(tail -n 1 "$logs/$arm-$t-$i.err")" >&2; rm -rf "$w"; exit 1; }
       cp -R "$d/hidden/." "$w"
       if (cd "$w" && bash -c "$chk") >"$logs/$arm-$t-$i.check" 2>&1; then
         wins=$((wins+1)); r=pass; else r=fail; fi

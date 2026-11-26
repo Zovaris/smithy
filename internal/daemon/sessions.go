@@ -21,7 +21,7 @@ import (
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/Zovaris/smithy/internal/config"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/text"
@@ -70,6 +70,7 @@ type Session struct {
 	Created time.Time    `json:"created"`
 	Updated time.Time    `json:"updated"`
 	Usage   *usage.Usage `json:"usage,omitempty"`
+	PRs     []string     `json:"prs,omitempty"`
 }
 
 // ToolEvent is one finished tool call of a session.
@@ -190,6 +191,11 @@ func (sv *Server) applySession(e store.Event) {
 			l.history = append(l.history, Exchange{m.Role, m.Text})
 			l.s.Updated = e.Time
 		}
+	case KindSessionTool:
+		var t ToolEvent
+		if json.Unmarshal(e.Data, &t) == nil {
+			sv.notePRsLocked(e.Session, t)
+		}
 	case KindSessionUsage:
 		var u usage.Usage
 		if l := sv.sessions[e.Session]; l != nil && json.Unmarshal(e.Data, &u) == nil {
@@ -259,6 +265,11 @@ func (sv *Server) StartSession(agent, dir, msg, by string) (Session, error) {
 
 // StartSessionWith is StartSession with a model for a CLI agent ("" with agent "": the default's).
 func (sv *Server) StartSessionWith(agent, model, dir, msg, by string) (Session, error) {
+	return sv.StartSessionEffort(agent, model, "", dir, msg, by)
+}
+
+// StartSessionEffort is StartSessionWith with an effort for a CLI that takes one ("": agent.effort).
+func (sv *Server) StartSessionEffort(agent, model, effort, dir, msg, by string) (Session, error) {
 	if len(msg) > MaxMessage {
 		return Session{}, fmt.Errorf("%w: message over %d bytes", errBadRequest, MaxMessage)
 	}
@@ -283,6 +294,9 @@ func (sv *Server) StartSessionWith(agent, model, dir, msg, by string) (Session, 
 		model = ""
 	}
 	if err := ValidModel(model); err != nil {
+		return Session{}, fmt.Errorf("%w: %v", errBadRequest, err)
+	}
+	if err := ValidEffort(agent, effort); err != nil {
 		return Session{}, fmt.Errorf("%w: %v", errBadRequest, err)
 	}
 	id := newSessionID()
@@ -310,8 +324,11 @@ func (sv *Server) StartSessionWith(agent, model, dir, msg, by string) (Session, 
 		os.RemoveAll(sdir)
 		return Session{}, fmt.Errorf("%w: %v", errBadRequest, text.Clean(err.Error()))
 	}
+	if es, ok := r.(effortSetter); ok && effort != "" {
+		es.SetEffort(effort)
+	}
 	now := time.Now().UTC()
-	s := Session{ID: id, Agent: agent, Model: model, Dir: d, Title: titleOf(msg), Status: StatusDone, Created: now, Updated: now}
+	s := Session{ID: id, Agent: agent, Model: model, Effort: effort, Dir: d, Title: titleOf(msg), Status: StatusDone, Created: now, Updated: now}
 	ctx, cancel := context.WithCancel(sv.ctx())
 	l := &live{s: s, runner: r, inbox: make(chan string, MaxQueued), cancel: cancel, done: make(chan struct{})}
 	sv.mu.Lock()
@@ -408,12 +425,12 @@ func (sv *Server) queueLocked(l *live, msg, by string) error {
 }
 
 // ValidEffort reports whether effort may be set on a session of agent: "" (the agent.effort
-// setting) or one of agents.Efforts, and only for a CLI that takes an effort flag.
+// setting) or a level agents.ClampEffort keeps as it is, and only for a CLI that takes an effort flag.
 func ValidEffort(agent, effort string) error {
 	if effort == "" {
 		return nil
 	}
-	if !slices.Contains(agents.Efforts, effort) {
+	if e, capped := agents.ClampEffort(effort); capped || e != effort {
 		return fmt.Errorf("effort must be one of %s (smithy caps effort at %s)", strings.Join(agents.Efforts, ", "), agents.MaxEffort)
 	}
 	if !agents.EffortFlags[agent] {
@@ -588,7 +605,12 @@ func (e *emitter) Tool(t ToolEvent) {
 		t.Args, _ = json.Marshal(clipBytes(string(t.Args), MaxToolField))
 	}
 	t.Output = clipBytes(t.Output, MaxToolField)
-	_, _ = e.sv.Append(KindSessionTool, e.id, t)
+	sv := e.sv
+	sv.mu.Lock()
+	defer sv.mu.Unlock()
+	if _, err := sv.appendLocked(KindSessionTool, e.id, t); err == nil {
+		sv.notePRsLocked(e.id, t)
+	}
 }
 
 func (e *emitter) Usage(u usage.Usage) {
@@ -664,7 +686,7 @@ var (
 )
 
 // SessionsDir holds each session's folder (CLI turn logs).
-func SessionsDir() string { return filepath.Join(ghx.Home(), "sessions") }
+func SessionsDir() string { return filepath.Join(layout.Home(), "sessions") }
 
 func sessionErr(w http.ResponseWriter, err error) {
 	switch {
@@ -687,6 +709,7 @@ func (sv *Server) startSession(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Agent   string `json:"agent"`
 		Model   string `json:"model"`
+		Effort  string `json:"effort"`
 		Dir     string `json:"dir"`
 		Message string `json:"message"`
 	}
@@ -694,7 +717,7 @@ func (sv *Server) startSession(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "body must be {\"agent\":…,\"dir\":…,\"message\":…}"})
 		return
 	}
-	s, err := sv.StartSessionWith(req.Agent, req.Model, req.Dir, req.Message, r.Header.Get("X-Smithy-Who"))
+	s, err := sv.StartSessionEffort(req.Agent, req.Model, req.Effort, req.Dir, req.Message, r.Header.Get("X-Smithy-Who"))
 	if err != nil && s.ID == "" {
 		sessionErr(w, err)
 		return

@@ -11,6 +11,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/proof"
+	"github.com/Zovaris/smithy/internal/text"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -137,13 +138,6 @@ func hm(d time.Duration) string {
 	return fmt.Sprintf("%dh%dm", m/60, m%60)
 }
 
-func plural(n int, one string) string {
-	if n == 1 {
-		return fmt.Sprintf("%d %s", n, one)
-	}
-	return fmt.Sprintf("%d %ss", n, one)
-}
-
 func (l Line) name() string {
 	if l.Item == "" {
 		return l.Detail
@@ -162,7 +156,7 @@ func (r Report) Text() string {
 	if len(r.Shipped) == 0 {
 		b.WriteString("Nothing shipped this week.\n")
 	} else {
-		fmt.Fprintf(&b, "Shipped: %s merged\n", plural(len(r.Shipped), "PR"))
+		fmt.Fprintf(&b, "Shipped: %s merged\n", text.Plural(len(r.Shipped), "PR", "PRs"))
 		for _, l := range r.Shipped {
 			b.WriteString("  ✓ " + l.name() + "\n")
 		}
@@ -191,7 +185,7 @@ func (r Report) Text() string {
 		b.WriteString("Time and known cost per harness:\n")
 		total := usage.Usage{}
 		for _, h := range r.Harness {
-			fmt.Fprintf(&b, "  %s: %s, %s, %s\n", h.Name, plural(h.Runs, "run"), hm(h.Time), usage.Cost(h.Cost))
+			fmt.Fprintf(&b, "  %s: %s, %s, %s\n", h.Name, text.Plural(h.Runs, "run", "runs"), hm(h.Time), usage.Cost(h.Cost))
 			total = total.Add(usage.Usage{CostUSD: h.Cost})
 		}
 		b.WriteString("Total known cost: " + usage.Cost(total.CostUSD) + "\n")

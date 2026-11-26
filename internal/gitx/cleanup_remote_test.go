@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/testkit"
 )
 
 // A merged branch's remote copy is deleted; an unmerged one is kept.
@@ -15,23 +17,23 @@ func TestDropRemoteDeletesOnlyMergedBranches(t *testing.T) {
 		t.Fatalf("init bare: %v\n%s", err, out)
 	}
 	repo := t.TempDir()
-	gitIn(t, repo, "init", "-q", "-b", "main")
-	gitIn(t, repo, "remote", "add", "origin", bare)
-	commitFile(t, repo, "a.txt")
-	gitIn(t, repo, "push", "-q", "origin", "main")
+	testkit.Git(t, repo, "init", "-q", "-b", "main")
+	testkit.Git(t, repo, "remote", "add", "origin", bare)
+	testkit.CommitFile(t, repo, "a.txt", "a.txt\n")
+	testkit.Git(t, repo, "push", "-q", "origin", "main")
 
-	gitIn(t, repo, "checkout", "-q", "-b", "feat/done")
-	commitFile(t, repo, "b.txt")
-	gitIn(t, repo, "push", "-q", "origin", "feat/done")
-	gitIn(t, repo, "checkout", "-q", "main")
-	gitIn(t, repo, "merge", "-q", "--ff-only", "feat/done")
-	gitIn(t, repo, "push", "-q", "origin", "main")
+	testkit.Git(t, repo, "checkout", "-q", "-b", "feat/done")
+	testkit.CommitFile(t, repo, "b.txt", "b.txt\n")
+	testkit.Git(t, repo, "push", "-q", "origin", "feat/done")
+	testkit.Git(t, repo, "checkout", "-q", "main")
+	testkit.Git(t, repo, "merge", "-q", "--ff-only", "feat/done")
+	testkit.Git(t, repo, "push", "-q", "origin", "main")
 
-	gitIn(t, repo, "checkout", "-q", "-b", "feat/open")
-	commitFile(t, repo, "c.txt")
-	gitIn(t, repo, "push", "-q", "origin", "feat/open")
-	gitIn(t, repo, "checkout", "-q", "main")
-	gitIn(t, repo, "fetch", "-q", "origin")
+	testkit.Git(t, repo, "checkout", "-q", "-b", "feat/open")
+	testkit.CommitFile(t, repo, "c.txt", "c.txt\n")
+	testkit.Git(t, repo, "push", "-q", "origin", "feat/open")
+	testkit.Git(t, repo, "checkout", "-q", "main")
+	testkit.Git(t, repo, "fetch", "-q", "origin")
 	wd, _ := os.Getwd()
 	if err := os.Chdir(repo); err != nil {
 		t.Fatal(err)
@@ -58,15 +60,15 @@ func TestFastForwardCleanBase(t *testing.T) {
 		t.Fatalf("init bare: %v\n%s", err, out)
 	}
 	repo := t.TempDir()
-	gitIn(t, repo, "init", "-q", "-b", "main")
-	gitIn(t, repo, "remote", "add", "origin", bare)
-	commitFile(t, repo, "a.txt")
-	gitIn(t, repo, "push", "-q", "origin", "main")
+	testkit.Git(t, repo, "init", "-q", "-b", "main")
+	testkit.Git(t, repo, "remote", "add", "origin", bare)
+	testkit.CommitFile(t, repo, "a.txt", "a.txt\n")
+	testkit.Git(t, repo, "push", "-q", "origin", "main")
 	other := t.TempDir()
-	gitIn(t, other, "clone", "-q", bare, ".")
-	commitFile(t, other, "b.txt")
-	gitIn(t, other, "push", "-q", "origin", "main")
-	gitIn(t, repo, "fetch", "-q", "origin")
+	testkit.Git(t, other, "clone", "-q", bare, ".")
+	testkit.CommitFile(t, other, "b.txt", "b.txt\n")
+	testkit.Git(t, other, "push", "-q", "origin", "main")
+	testkit.Git(t, repo, "fetch", "-q", "origin")
 	t.Chdir(repo)
 	if err := os.WriteFile(filepath.Join(repo, "a.txt"), []byte("dirty"), 0o644); err != nil {
 		t.Fatal(err)
@@ -75,7 +77,7 @@ func TestFastForwardCleanBase(t *testing.T) {
 	if git("rev-parse", "main") == git("rev-parse", "origin/main") {
 		t.Fatal("dirty checkout was fast-forwarded")
 	}
-	gitIn(t, repo, "checkout", "-q", "--", "a.txt")
+	testkit.Git(t, repo, "checkout", "-q", "--", "a.txt")
 	fastForward("origin/main")
 	if git("rev-parse", "main") != git("rev-parse", "origin/main") {
 		t.Fatal("clean base not fast-forwarded")

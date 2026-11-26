@@ -22,7 +22,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/connect"
 	"github.com/Zovaris/smithy/internal/events"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/remote"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/text"
@@ -244,22 +244,19 @@ func foreground(o runOpts) int {
 	api.Version = Version
 	if o.demo {
 		api.Runners = DemoRunner
+		api.Ready = DemoReady
 	}
 	api.Pair = &Pairing{File: DevicesFile()}
-	api.Servers = func() ([]RemoteServer, error) {
-		l, err := remote.Load(remote.File())
-		var out []RemoteServer
-		for _, s := range l.Servers {
-			out = append(out, RemoteServer{Name: s.Name, URL: s.URL, Token: s.Token})
-		}
-		return out, err
-	}
+	api.ServersFile = remote.File()
 	api.Route = api.RouteIntake(RouteBack)
 	_ = api.Resume()
 	tctx, stopTails := context.WithCancel(context.Background())
 	defer stopTails()
 	api.Ctx = tctx
 	go api.RunTails(tctx, time.Second, &Tail{Path: events.File(), Source: "tail:events"}, &Tail{Path: events.ProxyFile(), Source: ProxySource})
+	api.Tend = NewTender()
+	api.Tend.Sources = func() []TendRef { return mergeRefs(TendSources(), api.SessionTendRefs()) }
+	go api.Tend.Run(tctx, 2*time.Minute)
 	conns, cerr := connect.FromConfig()
 	if cerr != nil {
 		fmt.Fprintf(os.Stderr, "%s: chat connectors: %s\n", name, text.Clean(cerr.Error()))
@@ -353,7 +350,7 @@ func StartBackground(port int, idle time.Duration, serveArgs []string) (*Info, e
 	if err != nil {
 		return nil, err
 	}
-	logPath := filepath.Join(ghx.Home(), "daemon.log")
+	logPath := filepath.Join(layout.Home(), "daemon.log")
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
 		return nil, err
 	}

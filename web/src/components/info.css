@@ -1,0 +1,3 @@
+.info { display: grid; gap: 6px; max-height: 60vh; overflow: auto; font-size: 13px; }
+.info .top2 { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.info .lbl { margin-top: 8px; }

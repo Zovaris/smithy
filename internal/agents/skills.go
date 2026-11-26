@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 const skillsUsage = `Finds installed skills, so a skill or a worker can read another skill's SKILL.md directly.
@@ -61,7 +62,7 @@ func SkillCandidates(name, skillDir, top, home string, getenv func(string) strin
 // absolute SKILL.md path; the first folder wins a name both have.
 func UserSkills(home string) map[string]string {
 	out := map[string]string{}
-	for _, d := range []string{filepath.Join(home, ".agents", "skills"), filepath.Join(ghx.Home(), "skills")} {
+	for _, d := range []string{filepath.Join(home, ".agents", "skills"), filepath.Join(layout.Home(), "skills")} {
 		es, _ := os.ReadDir(d)
 		for _, e := range es {
 			f := filepath.Join(d, e.Name(), "SKILL.md")
@@ -79,10 +80,7 @@ func UserSkills(home string) map[string]string {
 // FindSkill returns the absolute, symlink-free path of an installed skill's SKILL.md.
 func FindSkill(name string) (string, bool) {
 	cwd, _ := os.Getwd()
-	home := os.Getenv("HOME")
-	if home == "" {
-		home, _ = os.UserHomeDir()
-	}
+	home := layout.UserHome()
 	for _, f := range SkillCandidates(name, ghx.SkillDir(), ghx.RepoRoot(cwd), home, os.Getenv) {
 		if !isFile(f) {
 			continue
@@ -168,10 +166,7 @@ func HarnessSkillDirs(h, top, home string, getenv func(string) string) []string 
 // load, with the folder to link them into; dir is "" when h is unknown.
 func MissingInHarness(h string) (missing []string, dir string) {
 	cwd, _ := os.Getwd()
-	home := os.Getenv("HOME")
-	if home == "" {
-		home, _ = os.UserHomeDir()
-	}
+	home := layout.UserHome()
 	dirs := HarnessSkillDirs(h, ghx.RepoRoot(cwd), home, os.Getenv)
 	if dirs == nil {
 		return nil, ""
