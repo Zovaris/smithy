@@ -115,6 +115,7 @@ type chatView struct {
 
 	welcome      welcomeStep
 	welcomeAgent string
+	welcomeNote  string // the walk's last saved pick, printed once when it ends
 	welcomeSet   *daemon.Settings
 
 	sess     sessionAPI            // the daemon's sessions endpoints; nil: offline

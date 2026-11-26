@@ -204,8 +204,13 @@ func (m chatView) statusLine(w int) string {
 	}
 	right += where
 	left := ""
-	if n := len(m.noise); n > 0 && time.Since(m.noise[n-1].at) < noiseShown {
-		left = dim.Render(m.noise[n-1].text)
+	for i := len(m.noise) - 1; i >= 0; i-- {
+		if n := m.noise[i]; !n.quiet {
+			if time.Since(n.at) < noiseShown {
+				left = dim.Render(n.text)
+			}
+			break
+		}
 	}
 	if m.offset > 0 {
 		left = t.fg(t.info).Render(fmt.Sprintf("→ %d rows up · end jumps back", m.offset))

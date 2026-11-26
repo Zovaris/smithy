@@ -127,7 +127,7 @@ func (m *chatView) event(kind, session, at string, data json.RawMessage) {
 		}
 	}
 	if t := eventText(kind, session, data); t != "" {
-		m.status(t)
+		m.logNoise(noise{at: time.Now(), text: t, quiet: kind == daemon.KindAsked})
 	}
 }
 

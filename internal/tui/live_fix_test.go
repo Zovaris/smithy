@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/Zovaris/smithy/internal/daemon"
@@ -69,4 +70,33 @@ func TestSkillsModalFitsTheScreenWithManySkills(t *testing.T) {
 	if !strings.Contains(screen(m), "skill-39") || !strings.Contains(screen(m), "install/update") {
 		t.Fatalf("the list scrolls to its end inside the box:\n%s", screen(m))
 	}
+}
+
+func TestPendingDecisionShowsOnce(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 100, 24
+	m = chatStep(m, evNow(1, daemon.KindAsked, daemon.Decision{ID: "d1", Question: "Ship it now?", Options: []string{"yes", "no"}}))
+	if n := strings.Count(screen(m), "Ship it now?"); n != 1 {
+		t.Fatalf("the question shows %d times:\n%s", n, screen(m))
+	}
+}
+
+func TestWelcomeDefaultNotePrintedOnce(t *testing.T) {
+	m := newChatTest(0)
+	m.welcome = welcomeAgents
+	m = chatStep(m, setupSavedMsg{note: "new sessions start with claude"})
+	m.welcome = welcomeModel
+	m = chatStep(m, setupSavedMsg{note: "new sessions start with claude"})
+	m.closeWelcome()
+	if n := strings.Count(screen(m), "new sessions start with claude"); n != 1 {
+		t.Fatalf("note printed %d times:\n%s", n, screen(m))
+	}
+}
+
+// evNow is ev stamped now: an event that happens while the chat is open, not one replayed.
+
+func evNow(seq int64, kind string, data any) daemon.ClientMsg {
+	msg := ev(seq, kind, data)
+	msg.Event.Time = time.Now()
+	return msg
 }

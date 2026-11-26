@@ -39,6 +39,10 @@ func (m *chatView) openWelcome() {
 
 func (m *chatView) closeWelcome() {
 	m.welcome, m.overlay, m.setupNote = welcomeOff, overlayNone, ""
+	if m.welcomeNote != "" {
+		m.system(m.welcomeNote)
+		m.welcomeNote = ""
+	}
 }
 
 func (m chatView) loadWelcomeSettings() tea.Cmd {
