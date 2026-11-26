@@ -65,7 +65,7 @@ export default function Board() {
       {err && <p class="err" role="alert">{err}</p>}
       {!cur ? (
         <div class="card"><p class="hint" style="padding:16px">
-          The Board shows the Markdown task files <code>smithy tasks</code> reads: <code>docs/specs/&lt;list&gt;/NN-slug.md</code>, <code>.docs/specs/</code> or <code>~/.smithy/plans/&lt;repo&gt;/</code>. Make one with <code>smithy tasks add "&lt;title&gt;"</code>.
+          The Board shows the Markdown task files <code>smithy tasks</code> reads: <code>docs/specs/&lt;list&gt;/NN-slug.md</code>, <code>.docs/specs/</code> or <code>~/.smithy/plans/&lt;repo&gt;/</code>. Make one with <code>smithy tasks add "&lt;title&gt;" [dir]</code>.
         </p></div>
       ) : (
         <Tasks

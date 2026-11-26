@@ -405,7 +405,7 @@ func TestMainCommands(t *testing.T) {
 		t.Errorf("set short: %d", c)
 	}
 
-	o, _, c := run(t, "add", dir, "First", "--key", "K-1")
+	o, _, c := run(t, "add", "First", dir, "--key", "K-1")
 	if c != 0 || filepath.Base(strings.TrimSpace(o)) != "01-first.md" {
 		t.Fatalf("add: %d %q", c, o)
 	}

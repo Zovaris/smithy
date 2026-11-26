@@ -305,7 +305,7 @@ func (m Model) empty(v view) []string {
 	case vDone:
 		return []string{"", mut.Render("Nothing finished yet: merged, ready, closed and blocked work lands here."), mut.Render("It reads ~/.smithy/events.jsonl and the cards.")}
 	}
-	return []string{"", mut.Render(meaning[v]), cmd(`smithy tasks add <dir> "<title>"`)}
+	return []string{"", mut.Render(meaning[v]), cmd(`smithy tasks add "<title>" [dir]`)}
 }
 
 // fitCols keeps the columns that fit w, most important first, in their original order.
