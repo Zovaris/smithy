@@ -2,12 +2,12 @@ import { Dialog } from "@zovaris/sephiro/dialog";
 import { SegmentedControl } from "@zovaris/sephiro/segmented-control";
 import "@zovaris/sephiro/css/dialog.css";
 import "@zovaris/sephiro/css/segmented-control.css";
-import "./screens/settings.css";
+import "../../screens/settings.css";
 import { useState } from "preact/hooks";
-import { setSessionModel } from "./actions";
+import { setSessionModel } from "../../lib/actions";
 import { ModelSelect } from "./modelselect";
-import { effortOptions, modelEditable } from "./parity";
-import { agentName, type Sess } from "./store";
+import { effortOptions, modelEditable } from "../../lib/parity";
+import { agentName, type Sess } from "../../lib/store";
 
 // SessionPick is /model and /effort: the open session's model and reasoning effort, for its next
 // turns. Effort shows only for agents that take one (claude, codex), capped at medium as in the TUI.

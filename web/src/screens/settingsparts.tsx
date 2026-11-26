@@ -11,12 +11,12 @@ import "@zovaris/sephiro/css/settings-list.css";
 import "@zovaris/sephiro/css/toggle.css";
 import "./settings.css";
 import { useEffect, useState } from "preact/hooks";
-import { addServer, loadSettings, removeKey, removeServer, runDoctor, setKey, setServe, setSetting, type Settings, unsetSetting } from "../actions";
-import { api, currentServer, pickServer } from "../auth";
-import { controlOf, groupSettings, type SettingRow } from "../parity";
-import { statusLine, useServers } from "../servers";
-import { saveAccent, THEMES, type ThemeName, themeOf } from "../theme";
-import { St } from "../ui";
+import { addServer, loadSettings, removeKey, removeServer, runDoctor, setKey, setServe, setSetting, type Settings, unsetSetting } from "../lib/actions";
+import { api, currentServer, pickServer } from "../lib/auth";
+import { controlOf, groupSettings, type SettingRow } from "../lib/parity";
+import { statusLine, useServers } from "../components/servers";
+import { saveAccent, THEMES, type ThemeName, themeOf } from "../lib/theme";
+import { St } from "../components/ui";
 
 const err = (e: unknown) => String((e as Error).message ?? e);
 const GROUP: Record<string, string> = { notify: "Notifications", linear: "Linear" };

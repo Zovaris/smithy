@@ -1,8 +1,8 @@
 import { GlyphSparkline } from "@zovaris/sephiro/glyph-chart";
 import "@zovaris/sephiro/css/glyph-chart.css";
-import { href } from "./router";
-import { count, stats, usd } from "./stats";
-import { agentName, kindOf, open, sessions, type Sess, type Store } from "./store";
+import { href } from "../lib/router";
+import { count, stats, usd } from "../lib/stats";
+import { agentName, kindOf, open, sessions, type Sess, type Store } from "../lib/store";
 import { split, St } from "./ui";
 
 const live = (s: Sess) => s.status === "working" || s.status === "needs_you";

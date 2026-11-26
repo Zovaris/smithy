@@ -1,8 +1,8 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { suggest, type Cmd } from "./commands";
-import { intent, withImages } from "./parity";
-import { I } from "./icons";
+import { suggest, type Cmd } from "../../lib/commands";
+import { intent, withImages } from "../../lib/parity";
+import { I } from "../../components/icons";
 
 type Props = {
   placeholder: string;

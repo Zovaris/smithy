@@ -3,7 +3,7 @@ import { FileBrowser } from "@zovaris/sephiro/file-browser";
 import "@zovaris/sephiro/css/dialog.css";
 import "@zovaris/sephiro/css/file-browser.css";
 import { useEffect, useState } from "preact/hooks";
-import { listDirs, type DirList } from "./projects";
+import { listDirs, type DirList } from "../lib/projects";
 
 // FolderPicker browses the daemon machine's folders (GET /v1/fs) and hands back the one chosen,
 // so nobody types a path from memory.

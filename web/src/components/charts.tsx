@@ -1,7 +1,7 @@
 // `smithy stats` for the web, drawn with Sephiro's text-glyph charts: the TUI's look.
 import { GlyphBars, GlyphSparkline } from "@zovaris/sephiro/glyph-chart";
 import "@zovaris/sephiro/css/glyph-chart.css";
-import { count, type Stats, usd } from "./stats";
+import { count, type Stats, usd } from "../lib/stats";
 
 export { glyphSparkline as spark } from "@zovaris/sephiro/glyph-chart";
 

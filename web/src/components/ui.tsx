@@ -1,6 +1,6 @@
 import { useState } from "preact/hooks";
-import { decide } from "./live";
-import { kindOf, primary, STATUS_CLASS, STATUS_WORD, type Dec, type Status } from "./store";
+import { decide } from "../lib/live";
+import { kindOf, primary, STATUS_CLASS, STATUS_WORD, type Dec, type Status } from "../lib/store";
 
 export const St = ({ s, word }: { s: Status | "idle" | "ready" | "missing"; word?: string }) => {
   const cls = s === "idle" || s === "missing" ? "idle" : s === "ready" ? "done" : STATUS_CLASS[s];
