@@ -15,9 +15,11 @@ kept every downloaded version and printed the pre-0.21 migration note on every r
 
 - `release.yml` builds only the harness build, published as `smithy-<os>-<arch>`.
 - `install.sh` (and `smithy update`, which runs it) downloads `smithy-<os>-<arch>`, keeps the new
-  version and the one it replaces, and deletes older ones.
-- The `~/.smithy/bin` migration runs once: versions move to `~/.local/share/smithy/versions`, then
-  `~/.smithy/bin` and `~/.smithy/kind` are removed, so later runs say nothing.
+  version and the one it replaces, and deletes older version folders (only names that look like a
+  version, so a folder of the user's stays).
+- The `~/.smithy/bin` migration runs once, after the new binary is in place: versions move to
+  `~/.local/share/smithy/versions` (a version already there wins), then the links smithy wrote and
+  `~/.smithy/kind` are removed, and `~/.smithy/bin` itself only when empty; later runs say nothing.
 - The skill launcher never downloads: it runs the matching version, else `~/.local/bin/smithy` or
   `smithy` on PATH with a `smithy update <version>` notice, else prints the install line and exits 3.
   `warden doctor` names the same `smithy update <version>`.

@@ -29,9 +29,9 @@ binary that is not `~/.local/bin/smithy` (a dev build) unless you pass `--force`
 `~/.local/share/smithy/versions/<version>/` (`$XDG_DATA_HOME`) and links `~/.local/bin/smithy`
 (`$XDG_BIN_HOME`) to it; on Windows `%LOCALAPPDATA%\smithy\versions\<version>\` and
 `%LOCALAPPDATA%\Programs\smithy\smithy.exe`. Keys, the db, config and plans stay in `~/.smithy`.
-It keeps the new version and the one it replaced, nothing older. An install from before v0.21 in
-`~/.smithy/bin` moves there once, and `~/.smithy/bin` and `~/.smithy/kind` go away; later runs say
-nothing about it. The skills never download: with no binary they print the install line, with
+It keeps the new version and the one it replaced, nothing older (a folder there not named like a
+version stays). An install from before v0.21 in `~/.smithy/bin` moves there once, its links and
+`~/.smithy/kind` go away (anything else in `~/.smithy/bin` stays); later runs say nothing about it. The skills never download: with no binary they print the install line, with
 another version they name `smithy update <version>`. It verifies two things before installing:
 
 - **Checksum:** a mismatch always refuses.
