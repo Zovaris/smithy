@@ -333,7 +333,7 @@ type boxFrame struct{ tl, tr, bl, br, lt, rt, h, v, sel string }
 
 func frameGlyphs(uni bool) boxFrame {
 	if uni {
-		return boxFrame{"╭", "╮", "╰", "╯", "├", "┤", "─", "│", "▌"}
+		return boxFrame{"┌", "┐", "└", "┘", "├", "┤", "─", "│", "▌"}
 	}
 	return boxFrame{"+", "+", "+", "+", "+", "+", "-", "|", ">"}
 }

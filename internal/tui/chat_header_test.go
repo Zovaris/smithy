@@ -138,3 +138,14 @@ func TestRunningCountShowsOnlyInTheHeaderPill(t *testing.T) {
 		t.Fatalf("\"running\" shows %d times:\n%s", n, screen(m))
 	}
 }
+
+func TestChatFramesAreSquare(t *testing.T) {
+	g := frameGlyphs(true)
+	if got := g.tl + g.tr + g.bl + g.br; got != "┌┐└┘" {
+		t.Fatalf("chat frame corners %q, want square", got)
+	}
+	m := headerTest()
+	if box := strings.Join(m.overBox(make([]string, 40), []string{"x"}, 160), "\n"); strings.ContainsAny(box, "╭╮╰╯") {
+		t.Fatal("a chat overlay has rounded corners")
+	}
+}
