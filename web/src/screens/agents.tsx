@@ -1,9 +1,12 @@
 import { useLive } from "../live";
 import { href } from "../router";
 import { agentName, ago, sessions } from "../store";
+import { StatsCharts } from "../charts";
+import { stats } from "../stats";
 import { St } from "../ui";
 
-// Agents is every session at a glance with its agent, model and state, and the detected agents.
+// Agents is the forge's stats, every session at a glance with its agent, model and state, and the
+// detected agents.
 export default function Agents() {
   const l = useLive();
   const ss = sessions(l.store);
@@ -15,6 +18,10 @@ export default function Agents() {
         <h2>Agents</h2>
         <p>{working} working · {ss.length} sessions</p>
       </header>
+      <div>
+        <div class="lbl">Stats<span class="sp" /><span class="mono">smithy stats</span></div>
+        <StatsCharts s={stats(l.store)} />
+      </div>
       <div>
         <div class="lbl">Sessions</div>
         <div class="card">
