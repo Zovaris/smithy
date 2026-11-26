@@ -21,7 +21,7 @@ describe("flat design", () => {
   it("gives the stop/send button, chips and small buttons one control height", () => {
     const h = px(rule(".tag"), "height");
     expect(h).toBeGreaterThan(0);
-    for (const sel of [".send", ".pill", ".delta", ".btn.sm", ".icon.s"]) {
+    for (const sel of [".send", ".pill", ".delta", ".btn.sm", ".icon.s", ".meta-bar .btn"]) {
       const b = rule(sel);
       expect([sel, px(b, "height")]).toEqual([sel, h]);
     }
