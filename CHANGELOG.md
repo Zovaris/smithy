@@ -52,6 +52,7 @@ part above `### Details`.
 - Updating no longer repeats the old-install migration note: it runs once, then the old links in `~/.smithy/bin` and `~/.smithy/kind` are gone.
 - `smithy skills install` reports skipped symlinked skills (a checkout) in one line.
 - The chat's agent now knows it runs inside smithy: it is told about smithy's tools, its commands, code mode and that its tool calls show in the chat.
+- TUI fixes from a live check: typing a message while a decision waits keeps its first letter (an option's letter answers only alone, then enter); modals fit short screens with their footer; a waiting decision shows once and the header says "waiting"; old daemon events and `decision_routed` stay off the status line; `/keys` opens a panel with the in-chat commands; long modal intros wrap.
 
 ### Details
 
