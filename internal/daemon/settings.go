@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	authstore "github.com/Zovaris/smithy/internal/auth"
@@ -131,7 +132,12 @@ func (sv *Server) deleteSetting(w http.ResponseWriter, r *http.Request) {
 	if !settingsGuard(w, r) {
 		return
 	}
-	_, found, err := config.Remove(false, r.PathValue("key"))
+	key := r.PathValue("key")
+	if config.Secret(key) {
+		writeJSON(w, 400, map[string]string{"error": key + " is a secret: remove it with DELETE /v1/keys/{service}"})
+		return
+	}
+	_, found, err := config.Remove(false, key)
 	if err != nil {
 		writeJSON(w, 400, map[string]string{"error": text.Clean(err.Error())})
 		return
@@ -174,10 +180,11 @@ func (sv *Server) putServe(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		On *bool `json:"on"`
 	}
-	if !readBody(w, r, &req, `{"on":true|false}`) || req.On == nil {
-		if req.On == nil {
-			writeJSON(w, 400, map[string]string{"error": `body must be {"on":true|false}`})
-		}
+	if !readBody(w, r, &req, `{"on":true|false}`) {
+		return
+	}
+	if req.On == nil {
+		writeJSON(w, 400, map[string]string{"error": `body must be {"on":true|false}`})
 		return
 	}
 	paused := "true"
@@ -190,6 +197,9 @@ func (sv *Server) putServe(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, map[string]bool{"on": *req.On})
 }
+
+// doctorBusy keeps doctor runs to one at a time.
+var doctorBusy sync.Mutex
 
 // runDoctor runs this binary's `smithy doctor` with a 20 s cap.
 func runDoctor(ctx context.Context) []string {
@@ -214,6 +224,11 @@ func (sv *Server) doctor(w http.ResponseWriter, r *http.Request) {
 	if !settingsGuard(w, r) {
 		return
 	}
+	if !doctorBusy.TryLock() {
+		writeJSON(w, 409, map[string]string{"error": "smithy doctor is already running; try again when it ends"})
+		return
+	}
+	defer doctorBusy.Unlock()
 	run := sv.Doctor
 	if run == nil {
 		run = runDoctor

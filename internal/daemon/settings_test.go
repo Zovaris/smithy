@@ -38,6 +38,9 @@ func TestSettingsListSetAndUnset(t *testing.T) {
 	if err := c.SetSetting(ctx, "notify.telegram.token", "x"); err == nil {
 		t.Fatal("a secret key never goes through settings")
 	}
+	if err := c.UnsetSetting(ctx, "notify.telegram.token"); err == nil {
+		t.Fatal("a secret key is never removed through settings")
+	}
 	if err := c.UnsetSetting(ctx, "linear.team"); err != nil {
 		t.Fatal(err)
 	}
