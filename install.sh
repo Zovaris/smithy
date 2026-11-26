@@ -4,7 +4,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.14.1   # pinned
 #   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # skills + binary
 #   ... | sh -s -- --harness   # harness build (smithy-harness-*); --skills for the skills build
-# Asks "harness or skills" on a terminal (default skills); without one it installs skills.
+# Asks harness or skills on a terminal (default harness); without one it installs skills.
 # --update keeps the kind installed before (~/.smithy/kind).
 # Downloads smithy-<os>-<arch> from the GitHub release, checks it against the release's
 # checksums.txt and its build attestation (gh), and puts it in ~/.local/share/smithy/versions/<version>/
@@ -38,9 +38,9 @@ fi
 if [ -z "$kind" ]; then
   tty=${SMITHY_TTY:-/dev/tty}
   if { [ -n "${SMITHY_TTY:-}" ] || [ -t 2 ]; } && { : < "$tty"; } 2>/dev/null; then
-    printf 'smithy install: harness or skills build? [skills] ' >&2
+    printf 'smithy install: which build?\n  1) harness  daemon, TUI and web: run `smithy`\n  2) skills   only the CLI the agent skills call\nchoose [1]: ' >&2
     ans=; read -r ans < "$tty" || true
-    case $ans in h|harness) kind=harness ;; ""|s|skills) kind=skills ;; *) echo "smithy install: answer harness or skills" >&2; exit 3 ;; esac
+    case $ans in ""|1|h|harness) kind=harness ;; 2|s|skills) kind=skills ;; *) echo "smithy install: answer 1 (harness) or 2 (skills)" >&2; exit 3 ;; esac
   else
     kind=skills
   fi
