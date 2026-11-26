@@ -62,6 +62,7 @@ describe("header", () => {
     expect(headerLine("0.25.0", "/home/me/code/skills")).toBe("◆ smithy v0.25.0 · skills");
     expect(headerLine("", "")).toBe("◆ smithy");
     expect(headerLine("v0.25.0", "")).toBe("◆ smithy v0.25.0");
+    expect(headerLine("dev", "")).toBe("◆ smithy dev");
   });
   it("shows the clock as HH:MM", () => {
     expect(clock(new Date(2026, 0, 2, 9, 5))).toBe("09:05");

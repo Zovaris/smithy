@@ -50,7 +50,7 @@ export function groupSettings(rows: SettingRow[]): { group: string; rows: Settin
 }
 
 export function headerLine(version: string, dir: string): string {
-  const v = version ? " v" + version.replace(/^v/, "") : "";
+  const v = version ? " " + version.replace(/^(?=\d)/, "v") : "";
   const p = dir.split("/").filter(Boolean).pop() ?? "";
   return "◆ smithy" + v + (p ? " · " + p : "");
 }
