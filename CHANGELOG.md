@@ -8,6 +8,8 @@ part above `### Details`.
 
 ## Unreleased
 
+## v0.23.0 — 2026-11-25
+
 ### Highlights
 
 - See it run: the [demo](https://github.com/Zovaris/smithy/blob/main/docs/demo.md) walks first run, a session, tool calls, a decision and the web on a phone.
