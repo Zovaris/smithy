@@ -211,7 +211,7 @@ func (m *chatView) meta(id string, s daemon.Session) {
 	m.track(id, s.Status)
 	for i := range m.sessions {
 		if m.sessions[i].id == id {
-			m.sessions[i].title, m.sessions[i].agent, m.sessions[i].model = s.Title, s.Agent, s.Model
+			m.sessions[i].title, m.sessions[i].agent, m.sessions[i].model, m.sessions[i].effort = s.Title, s.Agent, s.Model, s.Effort
 			if s.Dir != "" {
 				m.sessions[i].dir = s.Dir
 			}

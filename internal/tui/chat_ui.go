@@ -4,10 +4,14 @@ package tui
 
 import (
 	"context"
+	"crypto/rand"
+	hexenc "encoding/hex"
 	"encoding/json"
 	"fmt"
 	"image/color"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -56,6 +60,7 @@ type chatTool struct {
 type chatSession struct {
 	id, kind, state          string
 	title, agent, model, now string
+	effort                   string
 	dir                      string // the folder it started in; "" for batch events
 	since, turn              time.Time
 }
@@ -323,12 +328,16 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.agentCommand(arg)
 	case "model":
 		return m.modelCommand(arg)
+	case "effort":
+		return m.effortCommand(arg)
 	case "skills":
 		m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
 		return m, m.loadSetup(false)
 	case "setup":
 		m.openPicker(overlaySetup)
 		return m, m.loadSetup(false)
+	case "ask":
+		return m, m.askDemo(arg)
 	case "answer":
 		if arg == "" {
 			m.system("usage: /answer <text>")
@@ -340,9 +349,40 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 	case "help":
 		m.overlay, m.pal = overlayHelp, palette{}
 	default:
+		if p := m.skillPrompt(name, arg); p != "" {
+			return m.send(p)
+		}
 		m.system("unknown command /" + name)
 	}
 	return m, nil
+}
+
+// skillPrompt is what /name or $name sends for an installed skill: read its SKILL.md and follow it
+// on the rest of the line; "" when name is no installed skill.
+func (m chatView) skillPrompt(name, arg string) string {
+	if m.setupSt == nil {
+		return ""
+	}
+	p := m.setupSt.Paths[name]
+	if p == "" {
+		return ""
+	}
+	out := "Use the " + name + " skill: read " + p + " and follow it."
+	if arg != "" {
+		out += "\n\n" + arg
+	}
+	return out
+}
+
+// skillDir is where a skill lives, for its hint: the folder holding it, with ~ for home.
+func skillDir(path string) string {
+	d := filepath.Dir(filepath.Dir(path))
+	if h, err := os.UserHomeDir(); err == nil && h != "" {
+		if r, ok := strings.CutPrefix(d, h+string(filepath.Separator)); ok {
+			return "~/" + r
+		}
+	}
+	return d
 }
 
 // click focuses what is under the pointer: an option on the strip answers, a transcript row
@@ -829,4 +869,21 @@ func spread(left, right string, w int) string {
 		return left
 	}
 	return left + strings.Repeat(" ", gap) + right
+}
+
+// askDemo pins a sample question (or the one typed) on the decision strip through the daemon,
+// the same path an agent's ask tool takes outside warden, so it can be seen and answered.
+func (m *chatView) askDemo(q string) tea.Cmd {
+	if m.ask == nil {
+		m.system("/ask needs smithy daemon running: it carries the question and the answer")
+		return nil
+	}
+	opts := []string{"yes", "no", "later"}
+	if q == "" {
+		q, opts = "Demo: which answer should this sample question get?", []string{"approve", "reject", "later"}
+	}
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	m.status("asked: answer it on the strip at the top (click, its first letter, or /answer)")
+	return m.ask("ask:demo"+hexenc.EncodeToString(b), q, opts)
 }

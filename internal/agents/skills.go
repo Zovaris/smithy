@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/Zovaris/smithy/internal/ghx"
 )
@@ -40,6 +41,7 @@ func SkillCandidates(name, skillDir, top, home string, getenv func(string) strin
 	}
 	for _, d := range []string{
 		filepath.Join(home, ".agents", "skills"),
+		filepath.Join(envOr(getenv, "SMITHY_HOME", filepath.Join(home, ".smithy")), "skills"),
 		filepath.Join(home, ".claude", "skills"),
 		filepath.Join(home, ".codex", "skills"),
 		filepath.Join(envOr(getenv, "XDG_CONFIG_HOME", filepath.Join(home, ".config")), "opencode", "skills"),
@@ -51,6 +53,25 @@ func SkillCandidates(name, skillDir, top, home string, getenv func(string) strin
 		c = append(c, filepath.Join(d, name, "SKILL.md"))
 	}
 	return c
+}
+
+// UserSkills are the skills of your own in ~/.agents/skills and ~/.smithy/skills, name to the
+// absolute SKILL.md path; the first folder wins a name both have.
+func UserSkills(home string) map[string]string {
+	out := map[string]string{}
+	for _, d := range []string{filepath.Join(home, ".agents", "skills"), filepath.Join(ghx.Home(), "skills")} {
+		es, _ := os.ReadDir(d)
+		for _, e := range es {
+			f := filepath.Join(d, e.Name(), "SKILL.md")
+			if _, dup := out[e.Name()]; dup || strings.HasPrefix(e.Name(), ".") || !isFile(f) {
+				continue
+			}
+			if a, err := filepath.Abs(f); err == nil {
+				out[e.Name()] = a
+			}
+		}
+	}
+	return out
 }
 
 // FindSkill returns the absolute, symlink-free path of an installed skill's SKILL.md.

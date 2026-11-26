@@ -190,7 +190,7 @@ type Asker interface {
 }
 
 // AskTool asks the user a question through the warden card <batch>/<item> (card is
-// "batch/item"): the decision is recorded on smithy daemon (connect returns it, or an error when
+// "batch/item"), or, with no card (a plain chat outside warden), as ask:<key> with no card: the decision is recorded on smithy daemon (connect returns it, or an error when
 // none runs, and then ask refuses), which routes it to the TUI, web and chat; the card shows it as
 // needs_decision. The answer is read only from the daemon, never from the card, which the worker
 // can write. It waits, polling every poll, until the answer or ctx ends.
@@ -201,8 +201,9 @@ func AskTool(card string, poll time.Duration, connect func() (Asker, error)) Too
 			"timeout_minutes": Int("how long to wait, 1-240 (default 60)")}, "question"),
 		Call: func(ctx context.Context, a Args) (string, error) {
 			batch, item, ok := strings.Cut(card, "/")
-			if !ok || !cardPart.MatchString(batch) || !cardPart.MatchString(item) || batch == "." || batch == ".." || item == "." || item == ".." {
-				return "", errors.New("ask needs a warden run (no card for this run); decide by the task's rules and say so in your report")
+			onCard := card != ""
+			if onCard && (!ok || !cardPart.MatchString(batch) || !cardPart.MatchString(item) || batch == "." || batch == ".." || item == "." || item == "..") {
+				return "", errors.New("ask: bad warden card " + strconv.Quote(card))
 			}
 			q, err := a.Line("question", 500, true)
 			if err != nil {
@@ -235,11 +236,21 @@ func AskTool(card string, poll time.Duration, connect func() (Asker, error)) Too
 			if len(opts) > 0 {
 				pairs = append(pairs, "options="+js(opts))
 			}
-			want := "decide:" + batch + "/" + item + "/" + key
+			want := "ask:" + key
+			if onCard {
+				want = "decide:" + batch + "/" + item + "/" + key
+			}
 			if err := asker.Ask(ctx, want, q, opts); err != nil {
 				return "", errors.New("ask: the daemon refused the question (" + err.Error() + "); decide by the task's rules and say so in your report")
 			}
-			if _, err := cards.Set(batch, item, pairs); err != nil {
+			setCard := func(p []string) error {
+				if !onCard {
+					return nil
+				}
+				_, err := cards.Set(batch, item, p)
+				return err
+			}
+			if err := setCard(pairs); err != nil {
 				return "", err
 			}
 			ctx, cancel := context.WithTimeout(ctx, time.Duration(mins)*time.Minute)
@@ -248,13 +259,13 @@ func AskTool(card string, poll time.Duration, connect func() (Asker, error)) Too
 			defer t.Stop()
 			for {
 				if ans, ok, err := asker.Outcome(ctx, want); err == nil && ok {
-					_, _ = cards.Set(batch, item, []string{"state=working", "decision_key="})
+					_ = setCard([]string{"state=working", "decision_key="})
 					return text.Clean(ans), nil
 				}
 				select {
 				case <-ctx.Done():
-					_, _ = cards.Set(batch, item, []string{"state=working", "decision_key="})
-					return "", errors.New("no answer after " + strconv.Itoa(mins) + " minutes; the question stays on the card: decide by the task's rules and say so in your report")
+					_ = setCard([]string{"state=working", "decision_key="})
+					return "", errors.New("no answer after " + strconv.Itoa(mins) + " minutes; decide by the task's rules and say so in your report")
 				case <-t.C:
 				}
 			}
