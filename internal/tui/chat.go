@@ -117,6 +117,7 @@ type chatView struct {
 	dir      string                // the folder sessions start in and @ lists
 	root     string                // dir with symlinks resolved, as the daemon records it
 	allProj  bool                  // the agents panel lists every project, not only dir
+	proj     projectPick           // the project modal a new session opens with
 	branch   string                // its git branch, for the footer
 	webURL   string                // the web UI with its token; "" when unknown
 	files    *fileCache            // the @ popup's file list
@@ -515,6 +516,10 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.open(msg.s.ID)
 		m.status("session " + msg.s.ID + " started with " + msg.s.Agent)
 		return m, nil
+	case projectsMsg:
+		return m.projectsLoaded(msg)
+	case dirsMsg:
+		return m.dirsLoaded(msg)
 	case settingsDoneMsg:
 		for _, l := range msg.lines {
 			m.system(l)
@@ -861,6 +866,8 @@ func (m chatView) View() tea.View {
 		out = m.pickerBox(out, w, m.height)
 	case overlaySkills:
 		out = m.skillsBox(out, w, m.height)
+	case overlayProject:
+		out = m.projectBox(out, w, m.height)
 	case overlayPalette:
 		out = m.paletteBox(out, w, m.height)
 	case overlayHelp:

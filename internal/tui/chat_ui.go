@@ -38,11 +38,12 @@ const (
 	overlayNone chatOverlay = iota
 	overlayAgents
 	overlayPalette
-	overlaySetup  // first run: every agent ready or missing
-	overlayPicker // ctrl+l, /agent, /model
-	overlaySkills // /skills
-	overlayHelp   // ? and /help
-	overlayInfo   // /connect, /remote, /web, /log
+	overlaySetup   // first run: every agent ready or missing
+	overlayPicker  // ctrl+l, /agent, /model
+	overlaySkills  // /skills
+	overlayHelp    // ? and /help
+	overlayInfo    // /connect, /remote, /web, /log
+	overlayProject // which project a new session starts in
 )
 
 // chatTool is the data of a "tool" event: one tool call of a session's turn.
@@ -433,6 +434,8 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.setupKey(msg)
 	case overlayAgents:
 		return m.agentsKey(k)
+	case overlayProject:
+		return m.projectKey(k)
 	case overlayHelp, overlayInfo:
 		switch k {
 		case "esc", "q", "?":

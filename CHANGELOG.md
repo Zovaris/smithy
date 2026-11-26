@@ -11,6 +11,9 @@ part above `### Details`.
 ### New
 
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
+- Each server keeps a list of projects. A new session asks which one it works in, and the
+  project stays fixed for that session. Add projects with a folder picker that browses the
+  server's machine.
 - Settings parity in the TUI: chat gets `/serve on|off`, `/set`, `/unset`, `/keys`, `/key rm`, `/doctor` and `/detach` (quit, the daemon keeps running); the Settings list edits API keys (`key.*` rows) in a masked field.
 - Your own skills in `~/.agents/skills` and `~/.smithy/skills` show in `/skills` next to smithy's, and any installed skill runs from the chat as `/name` or `$name`.
 - In the chat, `!ls` runs a shell command in the session folder and shows its output; ctrl+v attaches a clipboard image to your next message.
@@ -35,6 +38,9 @@ part above `### Details`.
   and writes no card.
 - `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),
   for the web UI.
+- `GET/POST/DELETE /v1/projects` keeps the daemon's projects and default in
+  `~/.smithy/projects.json`; `GET /v1/fs?dir=` lists a folder's subfolders for the picker. A
+  session started with no `dir` uses the default project.
 - **One modal for every picker.** Agent and model (ctrl+l, `/agent`, `/model`, first run), `/skills` and the agents list (tab) open as the same centered box as the ctrl+k palette: filter or title on top, ↑↓ enter esc at the bottom, no per-cell background blocks.
 ### Highlights
 
