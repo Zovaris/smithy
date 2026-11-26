@@ -28,7 +28,7 @@ const maxSkillsArchive = 64 << 20
 // BinaryVersion is set by main; `skills install` downloads the skills of this release.
 var BinaryVersion = "dev"
 
-var installHarnesses = []string{"claude", "codex", "opencode", "gemini", "cursor", "pi", "dsh"}
+var installHarnesses = []string{"claude", "codex", "opencode", "agy", "copilot", "grok", "cursor", "pi", "dsh"}
 
 func harnessName(h string) string {
 	if h == "claude" {
@@ -45,8 +45,12 @@ func harnessMarker(h, home string, getenv func(string) string) string {
 		return filepath.Join(home, ".codex")
 	case "opencode":
 		return filepath.Join(envOr(getenv, "XDG_CONFIG_HOME", filepath.Join(home, ".config")), "opencode")
-	case "gemini":
+	case "agy":
 		return filepath.Join(home, ".gemini")
+	case "copilot":
+		return envOr(getenv, "COPILOT_HOME", filepath.Join(home, ".copilot"))
+	case "grok":
+		return envOr(getenv, "GROK_HOME", filepath.Join(home, ".grok"))
 	case "cursor":
 		return filepath.Join(home, ".cursor")
 	case "pi":

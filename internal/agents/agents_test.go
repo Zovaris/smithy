@@ -43,12 +43,17 @@ func TestBuild(t *testing.T) {
 		{"codex", Options{ReadOnly: true, Model: "m"}, nil, "", []string{"codex", "exec", "--sandbox", "read-only", "-m", "m", "-"}, true, "codex"},
 		{"opencode", Options{}, nil, "", []string{"opencode", "run", "--standalone", "--archived", "--auto", "P"}, false, "opencode"},
 		{"opencode", Options{ReadOnly: true, Model: "a/b"}, nil, "", []string{"opencode", "run", "--standalone", "--archived", "--agent", "plan", "-m", "a/b", "P"}, false, "opencode"},
-		{"gemini", Options{ReadOnly: true}, nil, "", []string{"gemini", "--approval-mode", "plan", "-p", "P"}, false, "gemini"},
+		{"agy", Options{ReadOnly: true}, nil, "", []string{"agy", "--mode", "plan", "-p", "P"}, false, "agy"},
+		{"agy", Options{Model: "m"}, nil, "", []string{"agy", "--mode", "auto", "--dangerously-skip-permissions", "--model", "m", "-p", "P"}, false, "agy"},
+		{"copilot", Options{}, nil, "", []string{"copilot", "--allow-all-tools", "--no-ask-user", "-p", "P"}, false, "copilot"},
+		{"copilot", Options{ReadOnly: true, Model: "m"}, nil, "", []string{"copilot", "--plan", "--no-ask-user", "--model", "m", "-p", "P"}, false, "copilot"},
+		{"grok", Options{}, nil, "", []string{"grok", "--always-approve", "-p", "P"}, false, "grok"},
+		{"grok", Options{ReadOnly: true, Model: "m"}, nil, "", []string{"grok", "-m", "m", "-p", "P"}, false, "grok"},
 		{"cursor", Options{Model: "m"}, nil, "", []string{"agent", "-p", "--force", "--model", "m", "P"}, false, "cursor"},
 		{"pi", Options{ReadOnly: true}, nil, "", []string{"pi", "-p", "--tools", "read", "P"}, false, "pi"},
 		{"claude", Options{Effort: "medium"}, nil, "", []string{"claude", "-p", "--output-format", "json", "--permission-mode", "auto", "--effort", "medium"}, true, "claude-cli"},
 		{"codex", Options{ReadOnly: true, Effort: "low"}, nil, "", []string{"codex", "exec", "--sandbox", "read-only", "-c", "model_reasoning_effort=low", "-"}, true, "codex"},
-		{"gemini", Options{Effort: "medium"}, nil, "", []string{"gemini", "--approval-mode", "yolo", "-p", "P"}, false, "gemini"},
+		{"agy", Options{Effort: "medium"}, nil, "", []string{"agy", "--mode", "auto", "--dangerously-skip-permissions", "-p", "P"}, false, "agy"},
 		{"dsh", Options{ReadOnly: true, Model: "ignored"}, nil, "", []string{"dsh", "headless", "--approval-policy", "never", "--permission-mode", "read-only", "-"}, true, "dsh"},
 	}
 	for _, c := range cases {
@@ -142,10 +147,10 @@ func TestResolveCLI(t *testing.T) {
 	if c := ResolveCLI(env(nil), only("agent", "pi")); c != "cursor" {
 		t.Errorf("first installed = %q", c)
 	}
-	if c := ResolveCLI(env(map[string]string{"AGENT_CLI": "gemini"}), only()); c != "gemini" {
+	if c := ResolveCLI(env(map[string]string{"AGENT_CLI": "agy"}), only()); c != "agy" {
 		t.Errorf("AGENT_CLI = %q", c)
 	}
-	if c := ResolveCLI(env(map[string]string{"AGENT_CLI": "gemini", "AGENT_CMD": "x"}), only()); c != "custom" {
+	if c := ResolveCLI(env(map[string]string{"AGENT_CLI": "agy", "AGENT_CMD": "x"}), only()); c != "custom" {
 		t.Errorf("AGENT_CMD = %q", c)
 	}
 }

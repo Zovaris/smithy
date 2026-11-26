@@ -10,6 +10,7 @@ part above `### Details`.
 
 ### New
 
+- Antigravity CLI (`agy`) replaces Gemini CLI as an agent, and GitHub Copilot CLI and xAI's Grok Build are new agents.
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
 - Each server keeps a list of projects. A new session asks which one it works in, and the
   project stays fixed for that session. Add projects with a folder picker that browses the

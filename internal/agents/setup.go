@@ -21,8 +21,8 @@ const setupUsage = `use-smithy setup: what is installed, model settings, and the
   smithy setup block remove [file]    remove it
   smithy setup path [status|add]      is smithy on PATH; add ~/.local/bin to the shell's startup file
 Default file per harness: claude-* → ~/.claude/CLAUDE.md, codex → $CODEX_HOME/AGENTS.md,
-opencode → $XDG_CONFIG_HOME/opencode/AGENTS.md, gemini → ~/.gemini/GEMINI.md,
-pi → $PI_CODING_AGENT_DIR/AGENTS.md, dsh → $DSH_HOME/AGENTS.md, else ./AGENTS.md (Cursor has
+opencode → $XDG_CONFIG_HOME/opencode/AGENTS.md, agy → ~/.gemini/GEMINI.md,
+copilot → $COPILOT_HOME/copilot-instructions.md, grok → $GROK_HOME/AGENTS.md, pi → $PI_CODING_AGENT_DIR/AGENTS.md, dsh → $DSH_HOME/AGENTS.md, else ./AGENTS.md (Cursor has
 no global file; it reads the project's AGENTS.md).`
 
 const (
@@ -39,8 +39,12 @@ func DefaultFile(h, home, cwd string, getenv func(string) string) string {
 		return filepath.Join(envOr(getenv, "CODEX_HOME", filepath.Join(home, ".codex")), "AGENTS.md")
 	case h == "opencode":
 		return filepath.Join(envOr(getenv, "XDG_CONFIG_HOME", filepath.Join(home, ".config")), "opencode", "AGENTS.md")
-	case h == "gemini":
+	case h == "agy":
 		return filepath.Join(home, ".gemini", "GEMINI.md")
+	case h == "copilot":
+		return filepath.Join(envOr(getenv, "COPILOT_HOME", filepath.Join(home, ".copilot")), "copilot-instructions.md")
+	case h == "grok":
+		return filepath.Join(envOr(getenv, "GROK_HOME", filepath.Join(home, ".grok")), "AGENTS.md")
 	case h == "pi":
 		return filepath.Join(envOr(getenv, "PI_CODING_AGENT_DIR", filepath.Join(home, ".pi", "agent")), "AGENTS.md")
 	case h == "dsh":

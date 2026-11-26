@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// Detect returns the harness name (claude-desktop, claude-cli, codex, opencode, gemini, pi, dsh,
-// cursor or unknown) and the adapter (desktop, cli or any). WARDEN_HARNESS overrides detection.
+// Detect returns the harness name (claude-desktop, claude-cli, codex, opencode, agy, copilot, grok,
+// pi, dsh, cursor or unknown) and the adapter (desktop, cli or any). WARDEN_HARNESS overrides detection.
 // Only variables each harness sets for its own child processes are used, never user settings.
 func Detect() (string, string) {
 	h := os.Getenv("WARDEN_HARNESS")
@@ -29,8 +29,6 @@ func Detect() (string, string) {
 			h = "codex"
 		case env("OPENCODE", "OPENCODE_SESSION_ID"):
 			h = "opencode"
-		case env("GEMINI_CLI"):
-			h = "gemini"
 		case env("PI_CODING_AGENT", "PI_SESSION_ID"):
 			h = "pi"
 		case env("DSH_SESSION_ID"):
@@ -44,8 +42,12 @@ func Detect() (string, string) {
 				h = "codex"
 			case strings.HasPrefix(a, "opencode"):
 				h = "opencode"
-			case strings.HasPrefix(a, "gemini"):
-				h = "gemini"
+			case strings.HasPrefix(a, "agy"), strings.HasPrefix(a, "antigravity"):
+				h = "agy"
+			case strings.HasPrefix(a, "copilot"):
+				h = "copilot"
+			case strings.HasPrefix(a, "grok"):
+				h = "grok"
 			case strings.HasPrefix(a, "pi"):
 				h = "pi"
 			case strings.HasPrefix(a, "dsh"), strings.HasPrefix(a, "deepseek"):

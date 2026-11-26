@@ -51,7 +51,9 @@ launch-all.
 | Claude Code desktop (optional) | `start_session` · `SendMessage` to its `local_…` id · `archive_session` | `smithy wait` with `run_in_background` | "Put it in the card's note." | Below |
 | Codex | `codex exec` (git dir writable, network on) · resume (`codex exec resume <id>`) untested | foreground | "Put it in the card's note." | subagent: `spawn_agent` |
 | OpenCode | `opencode run --standalone --auto` | resumes on background exit | "Put it in the card's note." | has subagents |
-| Gemini CLI | `gemini --approval-mode yolo` | only with `tools.shell.backgroundCompletionBehavior: "inject"` | "Put it in the card's note." | has subagents |
+| Antigravity CLI | `agy --mode auto --dangerously-skip-permissions -p` | foreground | "Put it in the card's note." | subagents untested |
+| Copilot CLI | `copilot --allow-all-tools --no-ask-user -p` | foreground | "Put it in the card's note." | subagents untested |
+| Grok Build | `grok --always-approve -p` | foreground | "Put it in the card's note." | subagents untested |
 | Cursor | `agent -p --force` | foreground | "Put it in the card's note." | has subagents |
 | DeepSeek Harness (dsh) | `dsh headless --approval-policy never` | resumes on background exit | "Put it in the card's note." | has subagents |
 | Pi | `pi -p` | foreground | "Put it in the card's note." | no subagents: `smithy agent --readonly` |

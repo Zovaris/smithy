@@ -24,17 +24,17 @@ import (
 const Usage = `usage: smithy pool add <name> <harness> [<dir>] | list | remove <name> | login <name> | clear <name>
 A pool of your own accounts for smithy agent (off until one is added). Each account is an official
 CLI with its own config dir: claude CLAUDE_CONFIG_DIR, codex CODEX_HOME, opencode XDG_DATA_HOME,
-gemini GEMINI_CLI_HOME, cursor CURSOR_CONFIG_DIR, pi PI_CODING_AGENT_DIR, dsh DSH_HOME. No proxies or relays,
+copilot COPILOT_HOME, grok GROK_HOME, cursor CURSOR_CONFIG_DIR, pi PI_CODING_AGENT_DIR, dsh DSH_HOME. No proxies or relays,
 and only accounts you own: the providers' terms apply to each one.
-  add     <name> <harness> [<dir>]  harness claude, codex, opencode, gemini, cursor, pi or dsh; dir defaults to ~/.smithy/accounts/<name>
+  add     <name> <harness> [<dir>]  harness claude, codex, opencode, copilot, grok, cursor, pi or dsh; dir defaults to ~/.smithy/accounts/<name>
   login   <name>                    runs the CLI interactively with that account's dir so you sign in
   list                              accounts, status (ok or limited until), last used
   remove  <name>                    drops the account (its dir and login stay on disk)
   clear   <name>                    forgets a recorded limit
 smithy agent picks the least recently used account that is not limited, for the CLI it runs
 (AGENT_CLI=pool: any harness). A run that hits a usage limit marks the account limited until its
-reset (5h when the CLI does not say); limits are detected for claude, codex, opencode,
-gemini and pi; cursor and dsh only rotate. A read-only run, or one that left the worktree untouched,
+reset (5h when the CLI does not say); limits are detected for claude, codex, opencode
+and pi; copilot, grok, cursor and dsh only rotate (agy has no config-dir variable, so it can.t be pooled). A read-only run, or one that left the worktree untouched,
 reruns once on the next account; any other exits 75 and blocks its warden card so warden
 relaunches it in the same worktree. With every account limited it exits 75 at once. Files: ~/.smithy/pool.json, ~/.smithy/pool-state.json.`
 
@@ -43,7 +43,8 @@ var Harnesses = map[string]string{
 	"claude":   "CLAUDE_CONFIG_DIR",
 	"codex":    "CODEX_HOME",
 	"opencode": "XDG_DATA_HOME",
-	"gemini":   "GEMINI_CLI_HOME",
+	"copilot":  "COPILOT_HOME",
+	"grok":     "GROK_HOME",
 	"cursor":   "CURSOR_CONFIG_DIR",
 	"pi":       "PI_CODING_AGENT_DIR",
 	"dsh":      "DSH_HOME",
@@ -133,7 +134,7 @@ func Add(name, harness, dir string) (Account, error) {
 		return Account{}, fmt.Errorf("name must start with a letter, digit or _ and use only [A-Za-z0-9._-]")
 	}
 	if Harnesses[harness] == "" {
-		return Account{}, fmt.Errorf("harness %q has no per-account dir smithy knows (claude, codex, opencode, gemini, cursor, pi, dsh)", harness)
+		return Account{}, fmt.Errorf("harness %q has no per-account dir smithy knows (claude, codex, opencode, copilot, grok, cursor, pi, dsh)", harness)
 	}
 	for _, seg := range strings.FieldsFunc(dir, func(r rune) bool { return r == '/' || r == '\\' }) {
 		if seg == ".." {

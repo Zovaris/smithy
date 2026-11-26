@@ -50,8 +50,7 @@ var safeName = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 // Inject writes the kit's files for cli under dir and returns the flags and env that load them.
 // The user's global config is never written: claude gets flags, codex a CODEX_HOME under dir
 // (auth.json linked from the user's home so the login keeps working), opencode an
-// OPENCODE_CONFIG_DIR, gemini a system settings file through GEMINI_CLI_SYSTEM_SETTINGS_PATH,
-// and pi flags.
+// OPENCODE_CONFIG_DIR, and pi flags.
 func Inject(cli string, k Kit, dir string, getenv func(string) string) (Injection, error) {
 	var in Injection
 	for name := range k.MCP {
@@ -183,21 +182,6 @@ func Inject(cli string, k Kit, dir string, getenv func(string) string) (Injectio
 		}
 		in.Env = []string{"OPENCODE_CONFIG_DIR=" + cfg}
 		unsupported("settings")
-	case "gemini":
-		if has["mcp"] || has["settings"] {
-			if settings == nil {
-				settings = map[string]any{}
-			}
-			if has["mcp"] {
-				settings["mcpServers"] = mcpJSON(k.MCP, false)
-			}
-			p := filepath.Join(dir, "gemini-settings.json")
-			if err := writeJSON(p, settings); err != nil {
-				return in, err
-			}
-			in.Env = []string{"GEMINI_CLI_SYSTEM_SETTINGS_PATH=" + p}
-		}
-		unsupported("skills", "system-prompt")
 	case "pi":
 		for _, s := range k.Skills {
 			if _, err := os.Stat(filepath.Join(s, "SKILL.md")); err != nil {

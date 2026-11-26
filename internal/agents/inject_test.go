@@ -127,22 +127,6 @@ func TestInjectOpenCode(t *testing.T) {
 	}
 }
 
-func TestInjectGemini(t *testing.T) {
-	dir := t.TempDir()
-	in, err := Inject("gemini", testKit(t), dir, env(nil))
-	if err != nil {
-		t.Fatal(err)
-	}
-	p := filepath.Join(dir, "gemini-settings.json")
-	if len(in.Args) != 0 || !slices.Contains(in.Env, "GEMINI_CLI_SYSTEM_SETTINGS_PATH="+p) || !reflect.DeepEqual(in.Unsupported, []string{"skills", "system-prompt"}) {
-		t.Fatalf("%+v", in)
-	}
-	m := readJSON(t, p)
-	if m["model"] != "x" || m["mcpServers"].(map[string]any)["smithy"].(map[string]any)["command"] != "/bin/smithy" {
-		t.Fatalf("settings %v", m)
-	}
-}
-
 func TestInjectPi(t *testing.T) {
 	k := testKit(t)
 	in, err := Inject("pi", k, t.TempDir(), env(nil))
@@ -156,7 +140,7 @@ func TestInjectPi(t *testing.T) {
 }
 
 func TestInjectOthersReportEverything(t *testing.T) {
-	for _, cli := range []string{"cursor", "dsh", "custom"} {
+	for _, cli := range []string{"cursor", "dsh", "agy", "copilot", "grok", "custom"} {
 		in, err := Inject(cli, testKit(t), t.TempDir(), env(nil))
 		if err != nil || len(in.Args)+len(in.Env) != 0 || !reflect.DeepEqual(in.Unsupported, []string{"mcp", "settings", "skills", "system-prompt"}) {
 			t.Errorf("%s: %+v %v", cli, in, err)
