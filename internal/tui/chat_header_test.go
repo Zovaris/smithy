@@ -129,3 +129,12 @@ func TestClockTicksOncePerMinute(t *testing.T) {
 		t.Fatal("the clock stops after one tick")
 	}
 }
+
+func TestRunningCountShowsOnlyInTheHeaderPill(t *testing.T) {
+	m := headerTest()
+	m.setPending([]daemon.Decision{{ID: "d1", Question: "Commit?", Options: []string{"commit", "not yet"}}})
+	m.sessions = []chatSession{{id: "s-1", state: "running", title: "add a health endpoint"}}
+	if n := strings.Count(screen(m), "running"); n != 1 {
+		t.Fatalf("\"running\" shows %d times:\n%s", n, screen(m))
+	}
+}

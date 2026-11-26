@@ -847,23 +847,6 @@ func (m chatView) strip(w int) (string, []stripHit) {
 	if n := len(m.pending) - 1; n > 0 {
 		s += t.fg(t.dim).Render(fmt.Sprintf(" +%d more", n))
 	}
-	var run []string
-	for _, x := range m.sessions {
-		if x.state == "running" {
-			name := x.title
-			if name == "" {
-				name = x.id
-			}
-			run = append(run, name)
-		}
-	}
-	right := ""
-	if len(run) > 0 {
-		right = t.fg(t.accent).Render(t.g.on) + t.fg(t.dim).Render(fmt.Sprintf(" %d running %s %s", len(run), t.g.dot, strings.Join(run, " "+t.g.dot+" ")))
-	}
-	if room := w - ansi.StringWidth(s) - m.pad() - 2; room > 12 && right != "" {
-		s = spread(s, ansi.Truncate(right, room, "…")+p, w)
-	}
 	return fill(row, w, s), hits
 }
 
