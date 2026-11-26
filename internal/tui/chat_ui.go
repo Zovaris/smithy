@@ -271,13 +271,6 @@ func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	if m.input.Value() != "" || len([]rune(msg.Text)) != 1 {
 		return false, nil
 	}
-	if len(m.pending) > 0 {
-		for _, o := range m.pending[0].Options {
-			if strings.EqualFold(firstRune(o), msg.Text) {
-				return true, m.answer(o)
-			}
-		}
-	}
 	switch msg.Text {
 	case "v":
 		m.setMode((m.mode + 1) % 3)
@@ -287,6 +280,20 @@ func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		return true, nil
 	}
 	return false, nil
+}
+
+// optionFor is the waiting decision's option whose first letter is t, when t is that letter
+// alone: the letter then enter answers, so a typed message never loses its first letter.
+func (m chatView) optionFor(t string) (string, bool) {
+	if len(m.pending) == 0 || len([]rune(t)) != 1 {
+		return "", false
+	}
+	for _, o := range m.pending[0].Options {
+		if strings.EqualFold(firstRune(o), t) {
+			return o, true
+		}
+	}
+	return "", false
 }
 
 func firstRune(s string) string {
@@ -878,6 +885,6 @@ func (m *chatView) askDemo(q string) tea.Cmd {
 	}
 	b := make([]byte, 4)
 	_, _ = rand.Read(b)
-	m.status("asked: answer it on the strip at the top (click, its first letter, or /answer)")
+	m.status("asked: answer it on the strip at the top (click, its first letter then enter, or /answer)")
 	return m.ask("ask:demo"+hexenc.EncodeToString(b), q, opts)
 }

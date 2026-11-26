@@ -157,7 +157,8 @@ func TestChatStickyStripAnswersDecision(t *testing.T) {
 	if rowOf(t, m, "Merge #142") != headRows {
 		t.Fatal("waiting decision is not the top row")
 	}
-	n, cmd := m.Update(ckey("m"))
+	m = chatStep(m, ckey("m"))
+	n, cmd := m.Update(ckey("enter"))
 	m = n.(chatView)
 	if cmd == nil || len(got) != 1 || got[0] != "d1=merge" {
 		t.Fatalf("decide calls %v", got)

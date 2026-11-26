@@ -32,7 +32,7 @@ A fullscreen chat over a smithy daemon: its events stream into the transcript an
 pinned at the bottom. A lost connection retries and resumes after the last event seen.
 Keys: enter send; pgup/pgdn, wheel or ctrl+u/ctrl+d scroll; home/end top/bottom; click a tool block
 to open it; v (empty input) cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
-option's first letter (empty input) or a click on it answers the decision pinned at the top;
+option's first letter alone then enter, or a click on it, answers the decision pinned at the top;
 / opens every command, /name or $name runs an installed skill, @ a file, ? help; !cmd runs a shell
 command in the session folder; ctrl+v attaches a clipboard image; esc clears the input; ctrl+c quits.
   url           default: the local daemon (token from ~/.smithy/daemon.token), started in the
@@ -663,6 +663,9 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.input.SetValue("")
 			m.popSel = 0
+			if o, ok := m.optionFor(t); ok && len(m.images) == 0 {
+				return m, m.answer(o)
+			}
 			if strings.HasPrefix(t, "/") {
 				return m.command(t)
 			}
