@@ -8,6 +8,8 @@ part above `### Details`.
 
 ## Unreleased
 
+## v0.23.1 — 2026-11-25
+
 ### Highlights
 
 - **One install, everything in it.** `install.sh` no longer asks harness or skills: it installs the full `smithy` binary and copies the skills into every agent it finds, without Node. `--no-skills` skips the skills.
