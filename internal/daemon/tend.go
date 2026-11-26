@@ -27,12 +27,14 @@ import (
 	"github.com/Zovaris/smithy/internal/text"
 )
 
-// TendRef is one PR a warden batch opened: its card names the PR, its plan item the worktree.
+// TendRef is one PR to tend: a warden batch's (its card names the PR, its plan item the
+// worktree) or a chat session's (a pr create it ran printed the PR; Dir is the session's folder).
 type TendRef struct {
-	URL   string `json:"url"`
-	Batch string `json:"batch"`
-	Item  string `json:"item"`
-	Dir   string `json:"dir"`
+	URL     string `json:"url"`
+	Batch   string `json:"batch"`
+	Item    string `json:"item"`
+	Session string `json:"session,omitempty"`
+	Dir     string `json:"dir"`
 }
 
 // TendPR is what the daemon knows of one watched PR. Status: green, waiting, fixing (a tend
@@ -247,6 +249,84 @@ func TendSources() []TendRef {
 	return out
 }
 
+// sessionPRMax caps the PRs one chat session records.
+const sessionPRMax = 20
+
+var prInTextRe = regexp.MustCompile(`https://[A-Za-z0-9.-]+/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+`)
+
+// notePRsLocked records the PRs a session's tool call opened: only a `gh pr create` or
+// `smithy pr create` command's output counts, so a PR it merely viewed is not its to tend.
+func (sv *Server) notePRsLocked(id string, t ToolEvent) {
+	l := sv.sessions[id]
+	if l == nil || t.IsError || !strings.Contains(string(t.Args), "pr create") {
+		return
+	}
+	for _, u := range prInTextRe.FindAllString(t.Output, -1) {
+		if tendPRURL(u) && !slices.Contains(l.s.PRs, u) && len(l.s.PRs) < sessionPRMax {
+			l.s.PRs = append(l.s.PRs, u)
+		}
+	}
+}
+
+// SessionTendRefs is every PR a chat session opened in its own folder's repository (origin):
+// a PR of another repository, or a folder gone or off git, is not tended.
+func (sv *Server) SessionTendRefs() []TendRef {
+	type src struct {
+		id, dir string
+		prs     []string
+	}
+	var all []src
+	sv.mu.Lock()
+	for id, l := range sv.sessions {
+		if len(l.s.PRs) > 0 {
+			all = append(all, src{id, l.s.Dir, slices.Clone(l.s.PRs)})
+		}
+	}
+	sv.mu.Unlock()
+	slices.SortFunc(all, func(a, b src) int { return strings.Compare(a.id, b.id) })
+	var out []TendRef
+	for _, s := range all {
+		if fi, err := os.Stat(s.dir); err != nil || !fi.IsDir() {
+			continue
+		}
+		b, err := exec.Command("git", "-C", s.dir, "remote", "get-url", "origin").Output()
+		repo := repoOf(strings.TrimSpace(string(b)))
+		if err != nil || repo == "" {
+			continue
+		}
+		for _, u := range s.prs {
+			if repoOf(u) == repo {
+				out = append(out, TendRef{URL: u, Session: s.id, Dir: s.dir})
+			}
+		}
+	}
+	return out
+}
+
+var remoteRe = regexp.MustCompile(`^(?:https://|ssh://)?(?:[^@/]+@)?([A-Za-z0-9.-]+)[:/]([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?(?:/.*)?$`)
+
+// repoOf is host/owner/repo of a git remote or a PR URL, "" for anything else.
+func repoOf(u string) string {
+	m := remoteRe.FindStringSubmatch(u)
+	if m == nil || !strings.Contains(m[1], ".") {
+		return ""
+	}
+	return strings.ToLower(m[1] + "/" + m[2] + "/" + m[3])
+}
+
+// mergeRefs is the batch refs, then the session refs no batch card already names.
+func mergeRefs(batch, sessions []TendRef) []TendRef {
+	seen := map[string]bool{}
+	out := make([]TendRef, 0, len(batch)+len(sessions))
+	for _, r := range append(slices.Clone(batch), sessions...) {
+		if !seen[r.URL] {
+			seen[r.URL] = true
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // fetchPRState runs smithy pr-state in the PR's worktree, so gh resolves its repository.
 func fetchPRState(r TendRef) (gitx.PRState, error) {
 	dir, url := r.Dir, r.URL
@@ -304,7 +384,11 @@ func launchTend(r TendRef, action string) (int, string, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return 0, "", err
 	}
-	ts := time.Now().Format("20060102-150405") + "-" + strings.NewReplacer("/", "-", " ", "-").Replace(r.Batch+"-"+r.Item)
+	name := r.Batch + "-" + r.Item
+	if r.Batch == "" {
+		name = r.Session
+	}
+	ts := time.Now().Format("20060102-150405") + "-" + strings.NewReplacer("/", "-", " ", "-").Replace(name)
 	prompt := filepath.Join(dir, ts+".prompt.md")
 	log := filepath.Join(dir, ts+".log")
 	if err := os.WriteFile(prompt, []byte(TendPrompt(r, action)), 0o600); err != nil {
