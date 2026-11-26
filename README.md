@@ -44,7 +44,9 @@ curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh
 ```
 
 The first line installs the skills; pick at least `use-smithy`. The second installs the `smithy`
-binary they run, after verifying its checksum and build attestation. Without Node, install the
+binary, after verifying its checksum and build attestation; it asks for the **harness** build
+(daemon, TUI and web: run `smithy`) or the **skills** build (only the CLI the skills call).
+Skip the question with `sh -s -- --harness` or `sh -s -- --skills`. Without Node, install the
 binary first, then run `smithy skills install` (it copies the release's skills into each harness it finds).
 
 Then, in your agent:

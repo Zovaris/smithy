@@ -15,6 +15,13 @@ part above `### Details`.
 ### Details
 
 - update: new `internal/selfupdate` downloads `install.sh` from `main` over HTTPS (30s timeout, 1 MiB cap) to a temp file and runs `sh <file> --update --<kind> [<version>]`, the kind from the build tag, streaming output and returning its exit code. `--check` reads `releases/latest` (with `GH_TOKEN` when set). A binary other than `~/.local/bin/smithy` (`$XDG_BIN_HOME`) is refused unless `--force`.
+### Fixed
+
+- `install.sh` asks which build you want and defaults to the harness (daemon, TUI and web); the README shows how to update and uninstall.
+
+### Details
+
+- install: the prompt lists `1) harness` and `2) skills`; Enter picks harness (was skills). Tests: `grep` reads the whole pipe so `pipefail` never fails a check on SIGPIPE.
 
 ## v0.23.0 — 2026-11-25
 
