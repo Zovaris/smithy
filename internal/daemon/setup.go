@@ -154,6 +154,9 @@ func (sv *Server) setDefault(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sv *Server) setKit(w http.ResponseWriter, r *http.Request) {
+	if !localOnly(w, r) {
+		return
+	}
 	if code, msg := sameOrigin(r); code != 0 {
 		writeJSON(w, code, map[string]string{"error": msg})
 		return
@@ -200,6 +203,9 @@ func (sv *Server) setKit(w http.ResponseWriter, r *http.Request) {
 // installSkills runs `smithy skills install` (checksum-checked download of this release's
 // skills) for every detected harness, or only req.harness.
 func (sv *Server) installSkills(w http.ResponseWriter, r *http.Request) {
+	if !localOnly(w, r) {
+		return
+	}
 	if code, msg := sameOrigin(r); code != 0 {
 		writeJSON(w, code, map[string]string{"error": msg})
 		return

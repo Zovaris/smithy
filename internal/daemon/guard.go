@@ -22,6 +22,9 @@ func (sv *Server) guardView(w http.ResponseWriter, r *http.Request) {
 
 // guardAddSuggested is POST /v1/guard/suggested: adds every suggested host to guard.fetch_allow.
 func (sv *Server) guardAddSuggested(w http.ResponseWriter, r *http.Request) {
+	if !localOnly(w, r) {
+		return
+	}
 	if code, msg := sameOrigin(r); code != 0 {
 		writeJSON(w, code, map[string]string{"error": msg})
 		return

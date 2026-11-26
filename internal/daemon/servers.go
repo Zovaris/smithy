@@ -26,11 +26,11 @@ type serverRow struct {
 	Err      string            `json:"error,omitempty"`
 }
 
-// localOnly lets only the daemon token through: saved servers' tokens never serve a tailnet
-// login or a paired device.
+// localOnly lets only the daemon token through: saved servers' tokens and this machine's
+// settings never serve a tailnet login or a paired device.
 func localOnly(w http.ResponseWriter, r *http.Request) bool {
 	if r.Header.Get("X-Smithy-Who") != "local" {
-		writeJSON(w, 403, map[string]string{"error": "other servers are reachable with this machine's daemon token only"})
+		writeJSON(w, 403, map[string]string{"error": "this needs this machine's daemon token"})
 		return false
 	}
 	return true
