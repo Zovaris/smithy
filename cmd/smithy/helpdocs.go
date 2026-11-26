@@ -25,6 +25,7 @@ var harnessSummary = map[string]string{
 	"attach":  "watch a daemon live: events, decisions, reconnect and resume",
 	"chat":    "fullscreen chat over a daemon (also bare smithy, which starts the daemon)",
 	"stop":    "stop the local background daemon",
+	"welcome": "the first-run walk again: agents, model, API keys, notifications",
 	"web":     "print or open the daemon's web UI link",
 	"board":   "built-in tracker: add, list, show, set, claim, sync",
 	"pair":    "one-time code another machine trades for a device token",
@@ -40,6 +41,7 @@ var helpDocs = map[string]helpDoc{
 
 	"chat":    {groupDaily, []string{"smithy chat", "smithy chat --standalone", "smithy chat http://127.0.0.1:7477"}, []string{"stop", "daemon", "attach"}},
 	"stop":    {groupDaily, []string{"smithy stop"}, []string{"chat", "daemon"}},
+	"welcome": {groupStart, []string{"smithy welcome"}, []string{"chat", "doctor"}},
 	"daemon":  {groupDaily, []string{"smithy daemon", "smithy daemon --bg", "smithy daemon --once"}, []string{"chat", "stop", "web", "auto"}},
 	"attach":  {groupDaily, []string{"smithy attach"}, []string{"daemon", "chat"}},
 	"servers": {groupDaily, []string{"smithy servers", "smithy servers discover", "smithy servers add home http://100.64.0.2:7478 --code ABCD-2345", "smithy servers use home"}, []string{"pair", "chat"}},

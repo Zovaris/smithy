@@ -10,6 +10,7 @@ part above `### Details`.
 
 ### New
 
+- First run opens a full-screen welcome, then four steps: the agents found on this machine, the model, your API keys and notifications. `smithy welcome` or `/welcome` walks them again.
 - Pick a color theme (steel, frost or plum) with `/theme` in the TUI or from the web's command palette; both read the same `ui.theme` setting, and steel stays the default.
 - Antigravity CLI (`agy`) replaces Gemini CLI as an agent, and GitHub Copilot CLI and xAI's Grok Build are new agents.
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
@@ -55,6 +56,7 @@ part above `### Details`.
 
 ### Fixed
 
+- Typing right after the chat opens no longer lands in the first-run picker: a `/` command goes to the chat (`/set linear.team ENG` used to save the model `ENG`).
 - Updating no longer repeats the old-install migration note: it runs once, then the old links in `~/.smithy/bin` and `~/.smithy/kind` are gone.
 - `smithy skills install` reports skipped symlinked skills (a checkout) in one line.
 

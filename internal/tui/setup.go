@@ -115,8 +115,13 @@ func (m chatView) setupUpdate(msg tea.Msg) (chatView, tea.Cmd, bool) {
 			return m, nil, true
 		}
 		m.setupSt = &msg.s
-		if msg.first && !msg.s.Chosen && m.overlay == overlayNone {
-			m.openPicker(overlaySetup)
+		if msg.first && (!msg.s.Chosen || m.welcome == welcomeSplash) && m.overlay == overlayNone {
+			if m.input.Value() == "" {
+				m.openWelcome()
+				return m, m.loadWelcomeSettings(), true
+			}
+			m.welcome = welcomeOff
+			m.system("/welcome sets smithy up: agents, model, API keys, notifications")
 		}
 		return m, nil, true
 	case setupSavedMsg:
@@ -133,9 +138,20 @@ func (m chatView) setupUpdate(msg tea.Msg) (chatView, tea.Cmd, bool) {
 		if msg.note != "" {
 			m.system(msg.note)
 		}
+		if m.welcome != welcomeOff {
+			n, cmd := m.welcomeSaved()
+			return n, tea.Batch(cmd, n.loadSetup(false)), true
+		}
 		return m, m.loadSetup(false), true
 	case sessionModelSetMsg:
 		m.sessionModelSet(msg)
+		return m, nil, true
+	case welcomeSettingsMsg:
+		if msg.err != nil {
+			m.setupNote = "could not read the settings: " + msg.err.Error()
+		} else {
+			m.welcomeSet = &msg.s
+		}
 		return m, nil, true
 	case themeMsg:
 		return m.themeLoaded(msg), nil, true
@@ -345,6 +361,11 @@ func (m chatView) setupKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if k == "ctrl+c" {
 		return m, tea.Quit
 	}
+	if m.welcome != welcomeOff {
+		if n, cmd, ok := m.welcomeKey(msg); ok {
+			return n, cmd
+		}
+	}
 	if m.overlay == overlaySkills {
 		return m.skillsKey(msg)
 	}
@@ -376,6 +397,7 @@ func (m chatView) setupKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		}
 	case "enter":
 		if m.setupSel < len(rows) {
+			m.welcomeAgent = rows[m.setupSel].Name
 			return m, m.pick(rows[m.setupSel])
 		}
 	}

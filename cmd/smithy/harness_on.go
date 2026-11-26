@@ -31,6 +31,9 @@ func init() {
 	})
 	register("attach", harnessSummary["attach"], tui.AttachUsage, "--", tui.Attach)
 	register("chat", harnessSummary["chat"], tui.ChatUsage, "--standalone --server= --", tui.Chat)
+	register("welcome", harnessSummary["welcome"], tui.WelcomeUsage, "--server= --", func(args []string) int {
+		return tui.Chat(append([]string{"--welcome"}, args...))
+	})
 	register("web", harnessSummary["web"], daemon.WebUsage, "--", func(args []string) int {
 		tok := func() (string, error) { return daemon.LoadToken(daemon.TokenFile(), false) }
 		return daemon.Web(args, daemon.Running, tok, tui.OpenURL, os.Stdout, os.Stderr)

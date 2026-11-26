@@ -9,6 +9,8 @@ Start here
   setup         use-smithy setup: installed skills, settings, instructions block
   status        every task list and batch on this machine
   version       print the version
+  welcome       the first-run walk again: agents, model, API keys, notifications
+                (harness build)
 
 Daily
   attach        watch a daemon live: events, decisions, reconnect and resume
