@@ -218,7 +218,7 @@ func (m chatView) statusLine(w int) string {
 	}
 	right += where
 	left := ""
-	if n := len(m.noise); n > 0 {
+	if n := len(m.noise); n > 0 && time.Since(m.noise[n-1].at) < noiseShown {
 		left = dim.Render(m.noise[n-1].at.Format("15:04") + " " + m.noise[n-1].text)
 	}
 	if m.offset > 0 {
@@ -231,6 +231,9 @@ func (m chatView) statusLine(w int) string {
 	left = ansi.Truncate(left, room, "…")
 	return p + left + strings.Repeat(" ", max(w-2*m.pad()-ansi.StringWidth(left)-ansi.StringWidth(right), 1)) + right + p
 }
+
+// noiseShown is how long a daemon line stays in the status area; /log keeps them all.
+const noiseShown = 20 * time.Second
 
 // footer is the mockups' hint row: the keys on the left; agent, branch and cost on the right.
 func (m chatView) footer(w int) string {
@@ -298,48 +301,57 @@ type boxItem struct {
 	static           bool // shown, never selected
 }
 
-// floatBox is the Palette mockup's panel: a query row and a key row on the focus tier around
-// grouped rows on the overlay tier, the selected row on the border tier.
+// floatBox is the one panel every picker uses: a rounded frame in the border color around a
+// title bar (prompt, query or title on the left, esc on the right), grouped rows with the
+// selected one marked by an accent bar, and a key footer.
 func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem, sel int, foot string) []string {
 	t := m.th
-	tier := func(c color.Color) lipgloss.Style {
-		if c == nil {
-			return lipgloss.NewStyle()
-		}
-		return lipgloss.NewStyle().Background(c)
+	bg := lipgloss.NewStyle()
+	if t.overlay != nil {
+		bg = bg.Background(t.overlay)
 	}
-	row := func(st lipgloss.Style, s string) string { return fill(st, w, s) }
+	edge := t.fg(t.dim)
+	if t.border != nil && t.ramp != nil {
+		edge = t.fg(t.ramp[len(t.ramp)-1])
+	}
+	if t.overlay != nil {
+		edge = edge.Background(t.overlay)
+	}
+	in := max(w-2, 1)
+	g := frameGlyphs(t.uni)
+	line := func(l, r string) string { return edge.Render(l + strings.Repeat(g.h, in) + r) }
+	row := func(s string) string { return edge.Render(g.v) + fill(bg, in, s) + edge.Render(g.v) }
 	dim := t.fg(t.dim)
 	q := t.fg(t.strong).Render(query)
 	if query == "" {
-		q = dim.Render(placeholder)
+		q = t.fg(t.text).Render(placeholder)
 	}
-	out := []string{row(tier(t.focus), spread("  "+t.fg(t.accent).Render(t.g.prompt)+"  "+q, dim.Render("esc")+"  ", w)), row(tier(t.overlay), "")}
-	body := h - 4
+	out := []string{line(g.tl, g.tr), row(spread(" "+t.fg(t.accent).Render(t.g.prompt)+" "+q, dim.Render("esc")+" ", in)), line(g.lt, g.rt)}
+	body := max(h-6, 1)
 	rows := make([]string, 0, len(items))
 	selRow := 0
 	n := 0
 	for _, it := range items {
 		if it.label == "" {
 			if len(rows) > 0 {
-				rows = append(rows, row(tier(t.overlay), ""))
+				rows = append(rows, row(""))
 			}
-			rows = append(rows, row(tier(t.overlay), "  "+dim.Render(ansi.Truncate(it.group, w-4, "…"))))
+			rows = append(rows, row("   "+t.fg(t.muted).Bold(true).Render(ansi.Truncate(it.group, max(in-4, 1), "…"))))
 			continue
 		}
-		st, label := tier(t.overlay), t.fg(t.text)
+		mark, label := "  ", t.fg(t.text)
 		if it.static {
 			label = t.fg(t.muted)
 		} else if n == sel {
-			st, label, selRow = tier(t.border), t.fg(t.strong), len(rows)
+			mark, label, selRow = t.fg(t.accent).Render(g.sel)+" ", t.fg(t.strong).Bold(true), len(rows)
 		}
-		left := "  " + t.fg(it.color).Render(it.glyph) + "  " + label.Render(it.label)
+		left := " " + mark + t.fg(it.color).Render(it.glyph) + "  " + label.Render(it.label)
 		if it.hint != "" {
 			left += "  " + dim.Render(it.hint)
 		}
 		key := t.fg(t.muted).Render(it.key) + "  "
-		left = ansi.Truncate(left, w-ansi.StringWidth(key)-2, "…")
-		rows = append(rows, row(st, spread(left, key, w)))
+		left = ansi.Truncate(left, max(in-ansi.StringWidth(key)-1, 1), "…")
+		rows = append(rows, row(spread(left, key, in)))
 		if !it.static {
 			n++
 		}
@@ -348,11 +360,21 @@ func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem,
 	if selRow >= body {
 		start = selRow - body + 1
 	}
+	out = append(out, row(""))
 	for i := start; i < len(rows) && i < start+body; i++ {
 		out = append(out, rows[i])
 	}
-	out = append(out, row(tier(t.overlay), ""))
-	return append(out, row(tier(t.focus), foot))
+	out = append(out, row(""), line(g.lt, g.rt), row(ansi.Truncate(foot, in, "…")), line(g.bl, g.br))
+	return out
+}
+
+type boxFrame struct{ tl, tr, bl, br, lt, rt, h, v, sel string }
+
+func frameGlyphs(uni bool) boxFrame {
+	if uni {
+		return boxFrame{"╭", "╮", "╰", "╯", "├", "┤", "─", "│", "▌"}
+	}
+	return boxFrame{"+", "+", "+", "+", "+", "+", "-", "|", ">"}
 }
 
 // overBox centers box over the dimmed screen rows, 15% from the top as in the mockup.
@@ -375,7 +397,7 @@ func (m chatView) overBox(screen []string, box []string, w int) []string {
 }
 
 func (m chatView) boxSize(w, h int) (int, int) {
-	return min(88, w-6), max(min(h-4, 30), 8)
+	return max(min(88, w-6, w*9/10), min(w, 20)), max(min(h-4, 30), 10)
 }
 
 func keyHints(t theme, pairs ...string) string {
@@ -400,11 +422,11 @@ func (m chatView) paletteBox(screen []string, w, h int) []string {
 		}
 		items = append(items, boxItem{glyph: it.glyph, color: it.color, label: it.label, hint: it.hint, key: it.key})
 	}
-	foot := spread("  "+keyHints(t, "↑↓", "move", "enter", "run", "tab", "next group"), t.fg(t.dim).Render(fmt.Sprintf("%d results", len(pal)))+"  ", bw)
+	foot := spread("  "+keyHints(t, "↑↓", "move", "enter", "run", "tab", "next group"), t.fg(t.dim).Render(fmt.Sprintf("%d results", len(pal)))+"  ", bw-2)
 	title := "Search actions, sessions, settings"
 	if m.picker != nil {
 		title = m.connectTitle()
-		foot = spread("  "+keyHints(t, "↑↓", "move", "enter", "connect", "esc", "close"), t.fg(t.dim).Render(fmt.Sprintf("%d rows", len(pal)))+"  ", bw)
+		foot = spread("  "+keyHints(t, "↑↓", "move", "enter", "connect", "esc", "close"), t.fg(t.dim).Render(fmt.Sprintf("%d rows", len(pal)))+"  ", bw-2)
 	}
 	return m.overBox(screen, m.floatBox(bw, bh, m.pal.query, title, items, m.pal.sel, foot), w)
 }
