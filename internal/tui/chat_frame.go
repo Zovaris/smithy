@@ -236,7 +236,7 @@ func (m chatView) footer(w int) string {
 	dim, key := t.fg(t.dim), t.fg(t.text)
 	hint := func(k, what string) string { return key.Render(k) + dim.Render(" "+what) }
 	p := strings.Repeat(" ", m.pad())
-	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("v", "mode: "+m.mode.String()), hint("tab", "agents"), hint("ctrl+k", "palette"), hint("?", "help")}
+	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode: "+m.mode.String()), hint("tab", "agents"), hint("ctrl+k", "palette"), hint("?", "help")}
 	var info []string
 	if a := m.agentLabel(); a != "" {
 		info = append(info, a)
@@ -443,7 +443,7 @@ func (m chatView) helpBox(screen []string, w, h int) []string {
 	for _, k := range [][2]string{
 		{"enter", "send; shift+enter or alt+enter for a new line"}, {"/", "commands"}, {"@", "a file from this folder"},
 		{"tab", "agents and sessions"}, {"ctrl+k", "palette"}, {"ctrl+l", "agent and model"},
-		{"v", "minimal · expandable · verbose (empty input)"}, {"pgup pgdn", "scroll; wheel too, home and end"}, {"click", "open a tool block or answer a decision"},
+		{"ctrl+o", "minimal · expandable · verbose"}, {"? enter", "this help (or /help)"}, {"pgup pgdn", "scroll; wheel too, home and end"}, {"click", "open a tool block or answer a decision"},
 		{"letter, enter", "an option's first letter alone answers the decision; typing is a message"},
 		{"/name or $name", "run an installed skill on the rest of the line"}, {"ctrl+c", "quit"},
 	} {

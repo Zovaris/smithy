@@ -68,6 +68,8 @@ func ckey(s string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyBackspace}
 	case "ctrl+k":
 		return tea.KeyPressMsg{Code: 'k', Mod: tea.ModCtrl}
+	case "ctrl+o":
+		return tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl}
 	}
 	r := []rune(s)[0]
 	return tea.KeyPressMsg{Code: r, Text: s}
@@ -94,7 +96,7 @@ func rowOf(t *testing.T, m chatView, s string) int {
 	return -1
 }
 
-func TestChatModesCycleWithV(t *testing.T) {
+func TestChatModesCycleWithCtrlO(t *testing.T) {
 	m := newChatScene()
 	if m.mode != modeMinimal {
 		t.Fatalf("starts in %v", m.mode)
@@ -103,18 +105,18 @@ func TestChatModesCycleWithV(t *testing.T) {
 	if !strings.Contains(out, "✓  Read · Grep · Edit detect.go +6 −1 · Bash go test ok") || strings.Contains(out, "134 lines read") || strings.Contains(out, "typed classes") {
 		t.Fatalf("minimal shows tool details:\n%s", out)
 	}
-	m = chatStep(m, ckey("v"))
+	m = chatStep(m, ckey("ctrl+o"))
 	out = screen(m)
 	if m.mode != modeExpandable || !strings.Contains(out, "✓  Grep  \"LimitError\" in pi") || strings.Contains(out, "134 lines read") {
 		t.Fatalf("expandable:\n%s", out)
 	}
-	m = chatStep(m, ckey("v"))
+	m = chatStep(m, ckey("ctrl+o"))
 	m = chatStep(m, tea.WindowSizeMsg{Width: m.width, Height: 40})
 	out = screen(m)
 	if m.mode != modeVerbose || !strings.Contains(out, "134 lines read") || !strings.Contains(out, "typed classes") || !strings.Contains(out, "turn · 4 tools") {
 		t.Fatalf("verbose:\n%s", out)
 	}
-	if m = chatStep(m, ckey("v")); m.mode != modeMinimal {
+	if m = chatStep(m, ckey("ctrl+o")); m.mode != modeMinimal {
 		t.Fatal("v does not wrap back to minimal")
 	}
 	m = typeIn(m, "av")
@@ -124,7 +126,7 @@ func TestChatModesCycleWithV(t *testing.T) {
 }
 
 func TestChatClickExpandsToolBlock(t *testing.T) {
-	m := chatStep(newChatScene(), ckey("v"))
+	m := chatStep(newChatScene(), ckey("ctrl+o"))
 	m = chatStep(m, tea.MouseClickMsg{X: 5, Y: rowOf(t, m, "Grep"), Button: tea.MouseLeft})
 	if !strings.Contains(screen(m), "class GoUsageLimitError") || m.input.Focused() {
 		t.Fatalf("click did not open and focus the block:\n%s", screen(m))
@@ -281,7 +283,7 @@ func TestChatModeChangeKeepsVirtualized(t *testing.T) {
 			m.msgs[i] = &chatMsg{who: "daemon", tool: &chatTool{Name: "Bash", Arg: fmt.Sprint(i), Status: "ok", Lines: []string{"ok"}}}
 		}
 	}
-	m = chatStep(m, ckey("v"))
+	m = chatStep(m, ckey("ctrl+o"))
 	m.View()
 	wrapped := 0
 	for _, c := range m.msgs {
@@ -299,7 +301,7 @@ func TestChatGolden(t *testing.T) {
 		name string
 		keys []string
 	}{
-		{"minimal", nil}, {"expandable", []string{"v"}}, {"verbose", []string{"v", "v"}},
+		{"minimal", nil}, {"expandable", []string{"ctrl+o"}}, {"verbose", []string{"ctrl+o", "ctrl+o"}},
 		{"agents", []string{"tab"}}, {"palette", []string{"ctrl+k"}},
 	} {
 		m := newChatScene()

@@ -11,7 +11,7 @@
       │   +  New session  your next message starts it                                  /new  │
       │   ▸  Agent and model                                                         ctrl+l  │
       │   ≡  Skills and MCP  what goes into every session                           /skills  │
-      │   ≡  Verbosity: minimal  minimal · expandable · verbose                           v  │
+      │   ≡  Verbosity: minimal  minimal · expandable · verbose                      ctrl+o  │
       │   ●  Agents panel  sessions and waiting items                                   tab  │
       │   →  Open the web UI  same sessions in the browser                             /web  │
       │   →  Connect  http://127.0.0.1:7477                                        /connect  │

@@ -31,9 +31,9 @@ const ChatUsage = `usage: smithy chat [url | --server <name|url> | --standalone]
 A fullscreen chat over a smithy daemon: its events stream into the transcript and the input stays
 pinned at the bottom. A lost connection retries and resumes after the last event seen.
 Keys: enter send; pgup/pgdn, wheel or ctrl+u/ctrl+d scroll; home/end top/bottom; click a tool block
-to open it; v (empty input) cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
+to open it; ctrl+o cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
 option's first letter alone then enter, or a click on it, answers the decision pinned at the top;
-/ opens every command, /name or $name runs an installed skill, @ a file, ? help; !cmd runs a shell
+/ opens every command, /name or $name runs an installed skill, @ a file, ? then enter help; !cmd runs a shell
 command in the session folder; ctrl+v attaches a clipboard image; esc clears the input; ctrl+c quits.
   url           default: the local daemon (token from ~/.smithy/daemon.token), started in the
                 background when none runs; it outlives the chat and exits after daemon.idle_exit
@@ -670,6 +670,10 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.popSel = 0
 			if o, ok := m.optionFor(t); ok && len(m.images) == 0 {
 				return m, m.answer(o)
+			}
+			if t == "?" && len(m.images) == 0 {
+				m.overlay, m.pal = overlayHelp, palette{}
+				return m, nil
 			}
 			if strings.HasPrefix(t, "/") {
 				return m.command(t)

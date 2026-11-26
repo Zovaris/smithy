@@ -174,6 +174,30 @@ func TestWelcomeIntroWraps(t *testing.T) {
 	}
 }
 
+func TestTypingNeverLosesALeadingShortcutLetter(t *testing.T) {
+	for _, s := range []string{"verify the build", "? why does it fail"} {
+		m := newChatTest(0)
+		mode := m.mode
+		m = typeIn(m, s)
+		if m.input.Value() != s || m.mode != mode || m.overlay != overlayNone {
+			t.Fatalf("%q: input %q mode %v overlay %v", s, m.input.Value(), m.mode, m.overlay)
+		}
+	}
+}
+
+func TestCtrlOCyclesTheViewAndLoneQuestionMarkOpensHelp(t *testing.T) {
+	m := newChatTest(0)
+	mode := m.mode
+	m = chatStep(m, tea.KeyPressMsg{Code: 'o', Mod: tea.ModCtrl})
+	if m.mode == mode {
+		t.Fatal("ctrl+o does not cycle the view mode")
+	}
+	m = chatStep(typeIn(m, "?"), ckey("enter"))
+	if m.overlay != overlayHelp {
+		t.Fatal("? then enter does not open help")
+	}
+}
+
 // evNow is ev stamped now: an event that happens while the chat is open, not one replayed.
 
 func evNow(seq int64, kind string, data any) daemon.ClientMsg {

@@ -255,9 +255,13 @@ func (m chatView) toggle(i int) chatView {
 	return m
 }
 
-// shortcut handles the single keys that act only while the input is empty.
+// shortcut handles the chat's chord keys. A printable key always goes to the input, so typing
+// never loses a letter; a lone ? or option letter acts on enter instead.
 func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	switch msg.String() {
+	case "ctrl+o":
+		m.setMode((m.mode + 1) % 3)
+		return true, nil
 	case "tab":
 		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
 		return true, nil
@@ -267,17 +271,6 @@ func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	case "ctrl+l":
 		m.openPicker(overlayPicker)
 		return true, m.loadSetup(false)
-	}
-	if m.input.Value() != "" || len([]rune(msg.Text)) != 1 {
-		return false, nil
-	}
-	switch msg.Text {
-	case "v":
-		m.setMode((m.mode + 1) % 3)
-		return true, nil
-	case "?":
-		m.overlay, m.pal = overlayHelp, palette{}
-		return true, nil
 	}
 	return false, nil
 }
@@ -568,7 +561,7 @@ func (m chatView) palItems() []palItem {
 			m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
 			return m.loadSetup(false)
 		}},
-		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Verbosity: " + m.mode.String(), hint: "minimal · expandable · verbose", key: "v", run: cycle},
+		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Verbosity: " + m.mode.String(), hint: "minimal · expandable · verbose", key: "ctrl+o", run: cycle},
 		palItem{group: "ACTIONS", glyph: t.g.on, color: t.muted, label: "Agents panel", hint: "sessions and waiting items", key: "tab", run: agents},
 		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Open the web UI", hint: "same sessions in the browser", key: "/web", run: func(m *chatView) tea.Cmd { _, c := m.openWeb(); return c }},
 		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Connect", hint: strings.TrimPrefix(m.server+" "+t.g.dot+" "+m.url, " "+t.g.dot+" "), key: "/connect", run: func(m *chatView) tea.Cmd { return m.showConnect() }},

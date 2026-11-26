@@ -177,7 +177,7 @@ func TestSessionEventsRenderInTheirSession(t *testing.T) {
 func TestHelpKeyOpensHelp(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 120, 40
-	m = chatStep(m, ckey("?"))
+	m = chatStep(chatStep(m, ckey("?")), ckey("enter"))
 	if m.overlay != overlayHelp || !strings.Contains(screen(m), "/connect") {
 		t.Fatalf("? help:\n%s", screen(m))
 	}
