@@ -12,6 +12,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/store"
 )
 
@@ -176,7 +177,7 @@ func TestReadyCardBecomesMergeDecisionRoutedToCard(t *testing.T) {
 	if _, err := sv.Answer("merge:b1/i1", "merge", "me"); err != nil {
 		t.Fatal(err)
 	}
-	b, _ := os.ReadFile(filepath.Join(cards.Home(), "b1", "i1.json"))
+	b, _ := os.ReadFile(filepath.Join(layout.WardenHome(), "b1", "i1.json"))
 	var c map[string]any
 	json.Unmarshal(b, &c)
 	if c["answer"] != "merge" || c["answer_id"] != "merge:b1/i1" || c["answered_by"] != "me" {
@@ -202,7 +203,7 @@ func TestDecideCardBecomesDecision(t *testing.T) {
 	if _, err := sv.Answer("decide:b2/i3/queue", "redis", "me"); err != nil {
 		t.Fatal(err)
 	}
-	b, _ := os.ReadFile(filepath.Join(cards.Home(), "b2", "i3.json"))
+	b, _ := os.ReadFile(filepath.Join(layout.WardenHome(), "b2", "i3.json"))
 	var c map[string]any
 	json.Unmarshal(b, &c)
 	if c["answer"] != "redis" || c["state"] != "needs_decision" {

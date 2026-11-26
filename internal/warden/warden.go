@@ -107,7 +107,7 @@ func WaitTurn(args []string) int {
 		return 2
 	}
 	batch, id := pos[0], pos[1]
-	dir := filepath.Join(cards.Home(), batch)
+	dir := filepath.Join(layout.WardenHome(), batch)
 	p, err := readPlan(dir)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, planErr(batch, err))
@@ -245,7 +245,7 @@ type claudeSettings struct {
 }
 
 func claudeFiles() []string {
-	home, _ := os.UserHomeDir()
+	home := layout.UserHome()
 	return []string{filepath.Join(home, ".claude", "settings.json"), filepath.Join(".claude", "settings.json"), filepath.Join(".claude", "settings.local.json")}
 }
 
@@ -431,7 +431,7 @@ func Doctor(args []string) int {
 			r.warn("gh pr merge not in the allow list (auto merges may stop at ready)", `add "Bash(smithy pr merge:*)" (or "Bash(gh pr merge:*)") to permissions.allow in ~/.claude/settings.json, or use merge manual`)
 		}
 	}
-	d := cards.Home()
+	d := layout.WardenHome()
 	if os.MkdirAll(d, 0o755) == nil && writable(d) {
 		r.ok("writable " + d)
 	} else {

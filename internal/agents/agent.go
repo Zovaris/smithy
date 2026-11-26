@@ -17,10 +17,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/pool"
 	"github.com/Zovaris/smithy/internal/usage"
 )
@@ -194,7 +194,7 @@ func AutoDenied(smithy []string) []string {
 		d = append(d, "Edit("+f+")") // Edit rules cover every file-editing tool, Write included
 	}
 	// warden cards change only through smithy's own commands, never the worker's edit tools
-	if h := cards.Home(); filepath.IsAbs(h) {
+	if h := layout.WardenHome(); filepath.IsAbs(h) {
 		d = append(d, "Edit(/"+filepath.ToSlash(h)+"/**/*.json)")
 	}
 	return append(d, poolDenied()...)
@@ -549,7 +549,7 @@ func finish(log string, named bool, account string) {
 	e := events.Event{Kind: "usage", Usage: &u, Account: account}
 	if named {
 		e.Detail = filepath.Base(log)
-		if dir := filepath.Dir(log); realPath(filepath.Dir(dir)) == realPath(cards.Home()) {
+		if dir := filepath.Dir(log); realPath(filepath.Dir(dir)) == realPath(layout.WardenHome()) {
 			e.Batch, e.Item = filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log")
 		}
 	}
@@ -1069,7 +1069,7 @@ func AutoDirs(bins []string) []string {
 			}
 		}
 	}
-	add(ghx.Home())
+	add(layout.Home())
 	for _, b := range bins {
 		if filepath.Base(filepath.Dir(b)) == "scripts" {
 			add(filepath.Dir(filepath.Dir(filepath.Dir(b))))

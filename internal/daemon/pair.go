@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/config"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // PairTTL is how long a pairing code works.
@@ -33,7 +33,7 @@ const PairFailWindow = 15 * time.Minute
 const codeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 
 // DevicesFile is <smithy home>/daemon.devices.json: the paired devices, token hashes only.
-func DevicesFile() string { return filepath.Join(ghx.Home(), "daemon.devices.json") }
+func DevicesFile() string { return filepath.Join(layout.Home(), "daemon.devices.json") }
 
 // Device is one paired client.
 type Device struct {

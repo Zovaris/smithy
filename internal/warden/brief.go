@@ -9,8 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/harness"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 const briefUsage = `usage: smithy brief <batch> <id> [--to <warden-name>] [--subagent]
@@ -270,7 +270,7 @@ func Brief(args []string) int {
 		fmt.Fprintf(os.Stderr, "smithy brief %s %s: "+format+"\n", append([]any{batch, id}, a...)...)
 		return 2
 	}
-	dir := filepath.Join(cards.Home(), batch)
+	dir := filepath.Join(layout.WardenHome(), batch)
 	raw, err := os.ReadFile(filepath.Join(dir, "batch.json"))
 	if err != nil {
 		return fail("no batch.json in %s", dir)

@@ -21,7 +21,7 @@ import (
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/Zovaris/smithy/internal/config"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/text"
@@ -686,7 +686,7 @@ var (
 )
 
 // SessionsDir holds each session's folder (CLI turn logs).
-func SessionsDir() string { return filepath.Join(ghx.Home(), "sessions") }
+func SessionsDir() string { return filepath.Join(layout.Home(), "sessions") }
 
 func sessionErr(w http.ResponseWriter, err error) {
 	switch {

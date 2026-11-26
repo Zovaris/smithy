@@ -8,7 +8,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/config"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/notify"
 )
 
@@ -67,7 +67,7 @@ func FromConfig() ([]Connector, error) {
 		err = errors.New("telegram: notify.telegram.chat must be the numeric id of a supergroup with topics")
 	default:
 		cs = append(cs, &Telegram{Token: tok, Chat: chat, Users: idSet("connect.telegram.users"),
-			OffsetFile: filepath.Join(ghx.Home(), "telegram.offset")})
+			OffsetFile: filepath.Join(layout.Home(), "telegram.offset")})
 	}
 	sc, serr := slackFromConfig()
 	if sc != nil {
@@ -127,7 +127,7 @@ func slackFromConfig() (*Slack, error) {
 }
 
 // File is the hub's state file.
-func File() string { return filepath.Join(ghx.Home(), "connect.json") }
+func File() string { return filepath.Join(layout.Home(), "connect.json") }
 
 // DefaultKinds are notify.Kinds plus the kinds only the daemon sends; the weekly report is
 // opt-in (add report to connect.<name>.kinds).

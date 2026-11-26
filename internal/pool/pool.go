@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/config"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // Usage is the text for `smithy pool --help`.
@@ -70,8 +70,8 @@ type Status struct {
 }
 
 // File is ~/.smithy/pool.json; StateFile is ~/.smithy/pool-state.json.
-func File() string      { return filepath.Join(ghx.Home(), "pool.json") }
-func StateFile() string { return filepath.Join(ghx.Home(), "pool-state.json") }
+func File() string      { return filepath.Join(layout.Home(), "pool.json") }
+func StateFile() string { return filepath.Join(layout.Home(), "pool-state.json") }
 
 var nameRe = regexp.MustCompile(`^[A-Za-z0-9_][A-Za-z0-9._-]*$`)
 
@@ -142,10 +142,10 @@ func Add(name, harness, dir string) (Account, error) {
 		}
 	}
 	if dir == "" {
-		dir = filepath.Join(ghx.Home(), "accounts", name)
+		dir = filepath.Join(layout.Home(), "accounts", name)
 	}
 	if strings.HasPrefix(dir, "~/") {
-		h, _ := os.UserHomeDir()
+		h := layout.UserHome()
 		dir = filepath.Join(h, dir[2:])
 	}
 	dir, err := filepath.Abs(dir)

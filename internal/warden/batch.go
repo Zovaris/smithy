@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
-	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/names"
 	"github.com/Zovaris/smithy/internal/tasks"
 )
@@ -300,12 +300,12 @@ func batchInit(args []string) error {
 	stem := filepath.Base(repo) + "-" + slug
 	name := stem
 	for n := 2; ; n++ {
-		if _, err := os.Stat(filepath.Join(cards.Home(), name)); os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(layout.WardenHome(), name)); os.IsNotExist(err) {
 			break
 		}
 		name = fmt.Sprintf("%s-%d", stem, n)
 	}
-	dir := filepath.Join(cards.Home(), name)
+	dir := filepath.Join(layout.WardenHome(), name)
 	bt := map[string]any{"batch": name, "repo": repo, "stack": false, "production": "", "mode": mode,
 		"merge": merge, "cleanup": cleanup, "tasks_dir": td, "items": items}
 	if isAuto {
@@ -339,9 +339,9 @@ func clash(td string, items []batchItem) error {
 	for _, it := range items {
 		mine[it.Branch] = true
 	}
-	entries, _ := os.ReadDir(cards.Home())
+	entries, _ := os.ReadDir(layout.WardenHome())
 	for _, e := range entries {
-		raw, err := os.ReadFile(filepath.Join(cards.Home(), e.Name(), "batch.json"))
+		raw, err := os.ReadFile(filepath.Join(layout.WardenHome(), e.Name(), "batch.json"))
 		if err != nil {
 			continue
 		}
@@ -366,7 +366,7 @@ func clash(td string, items []batchItem) error {
 
 // finished says an item's card is final (merged, dropped or reported).
 func finished(batch, id string) bool {
-	raw, err := os.ReadFile(filepath.Join(cards.Home(), batch, id+".json"))
+	raw, err := os.ReadFile(filepath.Join(layout.WardenHome(), batch, id+".json"))
 	if err != nil {
 		return false
 	}
@@ -421,7 +421,7 @@ func batchAdd(args []string) error {
 	if len(pos) != 1 || o["--id"] == "" || o["--title"] == "" || o["--intent"] == "" {
 		return fmt.Errorf("add needs <batch>, --id, --title and --intent")
 	}
-	dir := filepath.Join(cards.Home(), pos[0])
+	dir := filepath.Join(layout.WardenHome(), pos[0])
 	var it batchItem
 	if err := editBatch(dir, func(bt map[string]any) error {
 		var err error
@@ -491,7 +491,7 @@ func batchSet(args []string) error {
 	if strings.ContainsAny(args[0], `/\`) || strings.HasPrefix(args[0], ".") {
 		return fmt.Errorf("bad batch name %q", args[0])
 	}
-	dir := filepath.Join(cards.Home(), args[0])
+	dir := filepath.Join(layout.WardenHome(), args[0])
 	if err := editBatch(dir, func(bt map[string]any) error { return setFields(bt, args[1:]) }); err != nil {
 		return err
 	}

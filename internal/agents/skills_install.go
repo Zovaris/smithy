@@ -316,10 +316,7 @@ func skillsInstallMain(args []string) int {
 		fmt.Fprintln(os.Stderr, "smithy skills install: a dev build has no release to download; install a release binary (install.sh)")
 		return 1
 	}
-	home := os.Getenv("HOME")
-	if home == "" {
-		home, _ = os.UserHomeDir()
-	}
+	home := layout.UserHome()
 	err = InstallSkills(SkillsInstall{
 		BaseURL: "https://github.com/Zovaris/smithy/releases/download/v" + strings.TrimPrefix(BinaryVersion, "v"),
 		Client: &http.Client{Timeout: 2 * time.Minute, CheckRedirect: func(r *http.Request, via []*http.Request) error {

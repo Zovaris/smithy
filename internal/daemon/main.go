@@ -22,7 +22,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/connect"
 	"github.com/Zovaris/smithy/internal/events"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/remote"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/text"
@@ -349,7 +349,7 @@ func StartBackground(port int, idle time.Duration, serveArgs []string) (*Info, e
 	if err != nil {
 		return nil, err
 	}
-	logPath := filepath.Join(ghx.Home(), "daemon.log")
+	logPath := filepath.Join(layout.Home(), "daemon.log")
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
 		return nil, err
 	}

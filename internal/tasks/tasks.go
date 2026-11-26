@@ -15,6 +15,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/names"
 )
 
@@ -35,14 +36,6 @@ type Task struct {
 }
 
 func isTask(name string) bool { return taskRe.MatchString(name) }
-
-// PlansHome is where local plans live: $SMELT_PLANS, else <smithy home>/plans.
-func PlansHome() string {
-	if p := os.Getenv("SMELT_PLANS"); p != "" {
-		return p
-	}
-	return filepath.Join(ghx.Home(), "plans")
-}
 
 func repoRoot() string {
 	cwd, _ := os.Getwd()
@@ -81,7 +74,7 @@ func Dirs() []string { return scan(true) }
 // holding tasks.
 func scan(withTasks bool) []string {
 	root := repoRoot()
-	bases := []string{filepath.Join(root, "docs", "specs"), filepath.Join(root, ".docs", "specs"), filepath.Join(PlansHome(), filepath.Base(root))}
+	bases := []string{filepath.Join(root, "docs", "specs"), filepath.Join(root, ".docs", "specs"), filepath.Join(layout.PlansHome(), filepath.Base(root))}
 	for _, d := range strings.Split(os.Getenv("SMELT_TASKS_DIRS"), ":") {
 		if d != "" {
 			if !filepath.IsAbs(d) {
@@ -490,7 +483,7 @@ func Import(file, dir string) ([]string, error) {
 	return paths, nil
 }
 
-func indexFile() string { return filepath.Join(ghx.Home(), "tasks-index.json") }
+func indexFile() string { return filepath.Join(layout.Home(), "tasks-index.json") }
 
 func readIndex() map[string]map[string]string {
 	idx := map[string]map[string]string{}
@@ -501,7 +494,7 @@ func readIndex() map[string]map[string]string {
 }
 
 func writeIndex(idx map[string]map[string]string) {
-	if os.MkdirAll(ghx.Home(), 0o755) != nil {
+	if os.MkdirAll(layout.Home(), 0o755) != nil {
 		return
 	}
 	b, _ := json.MarshalIndent(idx, "", " ")

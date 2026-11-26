@@ -22,6 +22,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/gitx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 const usage = `Optional decision model: flags likely rule breaks and raises question impact. Off until
@@ -96,7 +97,7 @@ func redactURL(s string) string {
 
 const maxFails = 3
 
-func failFile() string { return filepath.Join(ghx.Home(), "decide.fails") }
+func failFile() string { return filepath.Join(layout.Home(), "decide.fails") }
 
 func recordResult(err error) string {
 	if err == nil {
@@ -291,7 +292,7 @@ func Rules(files []string, max int) []string {
 const maxDiff = 12000
 
 func logAnswer(kind, subject string, p map[string]float64, verdict string) {
-	f, err := os.OpenFile(filepath.Join(ghx.Home(), "decide.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	f, err := os.OpenFile(filepath.Join(layout.Home(), "decide.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return
 	}

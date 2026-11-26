@@ -16,7 +16,7 @@ func binDir() string { return layout.BinDir() }
 
 // RCFile is the shell startup file `setup path add` writes to, from $SHELL.
 func RCFile() string {
-	home, _ := os.UserHomeDir()
+	home := layout.UserHome()
 	switch filepath.Base(os.Getenv("SHELL")) {
 	case "zsh":
 		return filepath.Join(home, ".zshrc")

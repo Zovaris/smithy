@@ -1,4 +1,4 @@
-package ghx
+package layout
 
 import (
 	"os"
@@ -28,4 +28,21 @@ func TestHomeRefusesRealUnderTest(t *testing.T) {
 	if Home() == filepath.Join(d, ".smithy") {
 		t.Fatal("Home() honours the real ~/.smithy during tests")
 	}
+}
+
+func TestHome(t *testing.T) {
+	t.Run("env", func(t *testing.T) {
+		t.Setenv("SMITHY_HOME", "/custom/home")
+		if got := Home(); got != "/custom/home" {
+			t.Fatalf("got %q", got)
+		}
+	})
+	t.Run("default", func(t *testing.T) {
+		h := t.TempDir()
+		t.Setenv("SMITHY_HOME", "")
+		t.Setenv("HOME", h)
+		if got, want := Home(), filepath.Join(h, ".smithy"); got != want {
+			t.Fatalf("got %q want %q", got, want)
+		}
+	})
 }

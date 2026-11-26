@@ -20,7 +20,7 @@ import (
 	"unicode"
 
 	"github.com/Zovaris/smithy/internal/config"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // Usage is the text for `smithy auth --help`.
@@ -48,7 +48,7 @@ type entry struct {
 var service = regexp.MustCompile(`^[a-z][a-z0-9_-]*(:[A-Za-z0-9_][A-Za-z0-9._-]*)?$`)
 
 // File is the auth file path.
-func File() string { return filepath.Join(ghx.Home(), "auth.json") }
+func File() string { return filepath.Join(layout.Home(), "auth.json") }
 
 // EnvVar is the env var that holds service's key: <service>.key_env, default SERVICE_API_KEY.
 func EnvVar(svc string) string {

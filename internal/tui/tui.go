@@ -19,7 +19,7 @@ import (
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/decisions"
 	"github.com/Zovaris/smithy/internal/events"
-	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/harmonica"
 )
@@ -260,7 +260,7 @@ func New(noAnim, demo bool) Model {
 	}
 	first := false
 	if !demo {
-		seen := filepath.Join(ghx.Home(), "tui.seen")
+		seen := filepath.Join(layout.Home(), "tui.seen")
 		_, err := os.Stat(seen)
 		if first = os.IsNotExist(err); first {
 			_ = os.MkdirAll(filepath.Dir(seen), 0o700)
@@ -783,7 +783,7 @@ func (m Model) openLog() (tea.Model, tea.Cmd) {
 			m.status = "no log yet at " + p
 			return m, nil
 		}
-		m.showText("log "+home(p), lines)
+		m.showText("log "+layout.Tilde(p), lines)
 		m.text.GotoBottom()
 		return m, nil
 	}
@@ -800,7 +800,7 @@ func (m Model) openLog() (tea.Model, tea.Cmd) {
 		m.status = "no log yet at " + r.logPath
 		return m, nil
 	}
-	m.showText("log "+home(r.logPath), lines)
+	m.showText("log "+layout.Tilde(r.logPath), lines)
 	m.text.GotoBottom()
 	return m, nil
 }

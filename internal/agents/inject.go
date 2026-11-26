@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 // MCPServer is one stdio MCP server given to a driven CLI.
@@ -114,7 +115,7 @@ func Inject(cli string, k Kit, dir string, getenv func(string) string) (Injectio
 		}
 		src := getenv("CODEX_HOME")
 		if src == "" {
-			if h, err := os.UserHomeDir(); err == nil {
+			if h := layout.UserHome(); h != "" {
 				src = filepath.Join(h, ".codex")
 			}
 		}

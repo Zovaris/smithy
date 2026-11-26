@@ -9,13 +9,14 @@ import (
 	"strings"
 
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 )
 
 func tendDir() string {
 	if d := os.Getenv("TEND_HOME"); d != "" {
 		return d
 	}
-	return filepath.Join(ghx.Home(), "tend")
+	return filepath.Join(layout.Home(), "tend")
 }
 
 // seenSet is a persisted set of keys, so a watcher reports each event once across restarts.

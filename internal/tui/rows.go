@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/events"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/text"
 	"github.com/Zovaris/smithy/internal/usage"
 )
@@ -144,7 +145,7 @@ func (m Model) rows2(v view) []row {
 				text = readLines(tk.File, 400)
 			}
 			out = append(out, row{cells: []cell{{s: tk.NN, c: t.muted}, {s: "[" + tk.Status + "]", c: c, bold: true}, {s: tk.Title, c: t.text}},
-				title: tk.NN + " · " + tk.Title, text: text, copy: tk.File, md: strings.Join(text, "\n"), mdTitle: home(tk.File)})
+				title: tk.NN + " · " + tk.Title, text: text, copy: tk.File, md: strings.Join(text, "\n"), mdTitle: layout.Tilde(tk.File)})
 		}
 		return out
 	}
@@ -398,7 +399,7 @@ func (m Model) orchestratorRow() (row, bool) {
 		chip: "orchestrator", chipC: t.accent, search: "orchestrator serve " + sv.SessionDir, copy: sv.SessionLog,
 		title: "orchestrator pid " + fmt.Sprint(sv.SessionPID),
 		detail: [][2]string{{"kind", "orchestrator"}, {"agent", or(sv.Agent)}, {"pid", fmt.Sprint(sv.SessionPID)}, {"elapsed", elapsed},
-			{"task dir", or(home(sv.SessionDir))}, {"session log", or(home(sv.SessionLog))}},
+			{"task dir", or(layout.Tilde(sv.SessionDir))}, {"session log", or(layout.Tilde(sv.SessionLog))}},
 		logPath: logPath,
 		explain: []string{"The headless session smithy auto serve started to run tend auto once on the task dir.",
 			"l opens its session log. Stopping serve never stops it."}}, true
@@ -603,14 +604,6 @@ func (m Model) activityRows() []row {
 	return out
 }
 
-func home(p string) string {
-	h, _ := os.UserHomeDir()
-	if h != "" && strings.HasPrefix(p, h+"/") {
-		return "~" + p[len(h):]
-	}
-	return p
-}
-
 func (m Model) worktreeRows() []row {
 	t := m.th
 	var out []row
@@ -636,9 +629,9 @@ func (m Model) worktreeRows() []row {
 		for _, l := range w.Status {
 			d = append(d, [2]string{"", l})
 		}
-		out = append(out, row{cells: []cell{{s: home(w.Path), c: t.text}, {s: or(w.Branch), c: t.muted}, {s: or(w.Item), c: t.muted},
+		out = append(out, row{cells: []cell{{s: layout.Tilde(w.Path), c: t.text}, {s: or(w.Branch), c: t.muted}, {s: or(w.Item), c: t.muted},
 			{s: age, c: t.muted}, dirty, {s: ab, c: t.muted}, state},
-			copy: w.Path, cmd: "git worktree remove " + sh(w.Path), title: home(w.Path), detail: d, chip: state.s, chipC: state.c})
+			copy: w.Path, cmd: "git worktree remove " + sh(w.Path), title: layout.Tilde(w.Path), detail: d, chip: state.s, chipC: state.c})
 	}
 	return out
 }
@@ -678,7 +671,7 @@ func (m Model) planRows() []row {
 			spec = b.String()
 		}
 		out = append(out, row{cells: []cell{{s: filepath.Base(tl.Dir), c: t.text, bold: true}, {s: bar, c: c}, {s: fmt.Sprintf("%d/%d", done, tl.Total), c: t.muted}},
-			copy: tl.Dir, title: "Plan " + filepath.Base(tl.Dir), detail: d, md: spec, mdTitle: home(filepath.Join(tl.Dir, "spec.md"))})
+			copy: tl.Dir, title: "Plan " + filepath.Base(tl.Dir), detail: d, md: spec, mdTitle: layout.Tilde(filepath.Join(tl.Dir, "spec.md"))})
 	}
 	return out
 }

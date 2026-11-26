@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/pool"
 )
 
@@ -46,7 +46,7 @@ type Probe struct {
 
 // HostProbe looks at this machine.
 func HostProbe() Probe {
-	home, _ := os.UserHomeDir()
+	home := layout.UserHome()
 	return Probe{GOOS: runtime.GOOS, Look: exec.LookPath, Version: func(cli string) (string, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -280,11 +280,11 @@ func nativeSettings(o *Options, gitDir string) (settings, gocache string, err er
 	if top, err := ghx.Run("git", "-C", cwd, "rev-parse", "--show-toplevel"); err == nil {
 		parent = filepath.Dir(top)
 	}
-	sm := ghx.Home()
+	sm := layout.Home()
 	var ro []string
-	o.AddDirs, ro = NativeDirs(o.AddDirs, sm, filepath.Join(sm, "plans"), cards.Home(), parent)
-	home, _ := os.UserHomeDir()
-	gocache = GoCacheDir(realPath(cards.Home()), cwd)
+	o.AddDirs, ro = NativeDirs(o.AddDirs, sm, filepath.Join(sm, "plans"), layout.WardenHome(), parent)
+	home := layout.UserHome()
+	gocache = GoCacheDir(realPath(layout.WardenHome()), cwd)
 	if err := os.MkdirAll(gocache, 0o700); err != nil {
 		return "", "", err
 	}
@@ -304,7 +304,7 @@ func nativeSettings(o *Options, gitDir string) (settings, gocache string, err er
 	if err != nil {
 		return "", "", err
 	}
-	p := SandboxPaths{Cwd: realPath(cwd), Home: home, SmithyHome: sm, Warden: cards.Home(), GoCache: gocache, ReadOnly: ro,
+	p := SandboxPaths{Cwd: realPath(cwd), Home: home, SmithyHome: sm, Warden: layout.WardenHome(), GoCache: gocache, ReadOnly: ro,
 		SigningKey: key, AgentSocket: sock, Secret: secret}
 	if gitDir != "" {
 		p.GitDir = realPath(gitDir)
@@ -315,7 +315,7 @@ func nativeSettings(o *Options, gitDir string) (settings, gocache string, err er
 // PoolDirs are the smithy pool account dirs (each a harness login) and their default root: a
 // sandboxed worker's shell never reads or writes them.
 func PoolDirs() ([]string, error) {
-	out := []string{filepath.Join(ghx.Home(), "accounts")}
+	out := []string{filepath.Join(layout.Home(), "accounts")}
 	as, err := pool.Load()
 	if err != nil {
 		return nil, fmt.Errorf("reading the pool: %v", err)

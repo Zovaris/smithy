@@ -10,12 +10,12 @@ import (
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/Zovaris/smithy/internal/cards"
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/text"
 	"github.com/charmbracelet/x/ansi"
 )
 
-func cardPath(batch, id string) string { return filepath.Join(cards.Home(), batch, id+".json") }
+func cardPath(batch, id string) string { return filepath.Join(layout.WardenHome(), batch, id+".json") }
 
 type rect struct{ x, y, w, h int }
 
