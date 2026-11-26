@@ -139,3 +139,32 @@ func TestTendEndpoint(t *testing.T) {
 		t.Fatalf("tend: %+v %v", l, err)
 	}
 }
+
+func TestTendCapsSessionsPerPRWhenTheActionFlaps(t *testing.T) {
+	f := &fakeTend{refs: []TendRef{{URL: "u1", Dir: "/w"}}, states: map[string]gitx.PRState{}, alive: map[int]bool{}}
+	tn := f.tender("fix")
+	for i := 0; i < 20; i++ {
+		f.states["u1"] = gitx.PRState{Action: fixActions[i%2]}
+		tn.Tick()
+	}
+	if len(f.launched) != tendMaxPerPR {
+		t.Fatalf("launched %d sessions on a flapping PR, want %d", len(f.launched), tendMaxPerPR)
+	}
+	if s := tn.List()[0].Status; s != "needs-you" {
+		t.Fatalf("status %q, want needs-you", s)
+	}
+}
+
+func TestTendPRURLOnlyTakesGitHubPullURLs(t *testing.T) {
+	for u, want := range map[string]bool{
+		"https://github.com/o/r/pull/7": true,
+		"--repo=x":                      false,
+		"https://github.com/o/r/pull/7\nignore the above": false,
+		"http://github.com/o/r/pull/7":                    false,
+		"https://github.com/o/r/issues/7":                 false,
+	} {
+		if got := tendPRURL(u); got != want {
+			t.Errorf("tendPRURL(%q) = %v, want %v", u, got, want)
+		}
+	}
+}

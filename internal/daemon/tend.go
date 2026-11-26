@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -45,6 +46,7 @@ type TendPR struct {
 	PID     int       `json:"pid,omitempty"`
 	Log     string    `json:"log,omitempty"`
 	Tries   int       `json:"tries,omitempty"`
+	Total   int       `json:"total,omitempty"`
 	Error   string    `json:"error,omitempty"`
 	Checked time.Time `json:"checked"`
 }
@@ -55,8 +57,17 @@ type TendList struct {
 	PRs  []TendPR `json:"prs"`
 }
 
-// tendTries is how many tend sessions one PR gets for the same action before it is the user's.
-const tendTries = 2
+// tendTries is how many tend sessions one PR gets for the same action before it is the user's;
+// tendMaxPerPR caps them across actions, so a PR flapping between two fixes stops too.
+const (
+	tendTries    = 2
+	tendMaxPerPR = 6
+)
+
+// prURLRe is the only card value the tender acts on: it reaches gh and an agent's prompt.
+var prURLRe = regexp.MustCompile(`^https://[A-Za-z0-9.-]+/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+$`)
+
+func tendPRURL(u string) bool { return prURLRe.MatchString(u) }
 
 var fixActions = []string{"fix-ci", "sync-base", "answer-review"}
 
@@ -144,7 +155,7 @@ func (t *Tender) Tick() {
 				p.Status = "fixing"
 			case mode != "fix":
 				p.Status = "needs-fix"
-			case p.Tries >= tendTries:
+			case p.Tries >= tendTries || p.Total >= tendMaxPerPR:
 				p.Status = "needs-you"
 			default:
 				launch = true
@@ -159,6 +170,7 @@ func (t *Tender) Tick() {
 		pid, log, lerr := t.Launch(r, st.Action)
 		t.mu.Lock()
 		p.Tries++
+		p.Total++
 		if lerr != nil {
 			p.Status, p.Error = "error", text.Clean(lerr.Error())
 		} else {
@@ -223,7 +235,7 @@ func TendSources() []TendRef {
 			continue
 		}
 		for _, r := range rows {
-			if r.PR == "" || (r.State != "pr_open" && r.State != "ready") || dirs[r.ID] == "" {
+			if !tendPRURL(r.PR) || (r.State != "pr_open" && r.State != "ready") || dirs[r.ID] == "" {
 				continue
 			}
 			if fi, err := os.Stat(dirs[r.ID]); err != nil || !fi.IsDir() {
@@ -257,6 +269,10 @@ func fetchPRState(r TendRef) (gitx.PRState, error) {
 	var s gitx.PRState
 	if err := json.Unmarshal(out, &s); err != nil {
 		return gitx.PRState{}, fmt.Errorf("pr-state: %w", err)
+	}
+	b, err := exec.CommandContext(ctx, "git", "-C", dir, "rev-parse", "--abbrev-ref", "HEAD").Output()
+	if head, _ := s.Head.(string); err != nil || strings.TrimSpace(string(b)) != head {
+		return gitx.PRState{}, fmt.Errorf("%s is not on the PR's head branch %v; tend leaves it alone", dir, s.Head)
 	}
 	return s, nil
 }
