@@ -54,7 +54,7 @@ func (m *chatView) startSplash() tea.Cmd {
 	return splashTick()
 }
 
-// splashFrames is the entry animation: the steel dither fades in, the anvil rises out of it,
+// splashFrames is the entry animation: the welcome's steel field (fieldAt) fades in, the anvil rises out of it,
 // one strike throws sparks and the name settles below. Each frame is a full screen.
 func splashFrames(t theme, w, h int) []string {
 	s := bigPlate
@@ -89,7 +89,7 @@ func splashFrames(t theme, w, h int) []string {
 			}
 			dx, dy := float64(x-cx)/float64(w), float64(y-cy)/float64(2*h)
 			near := clamp01(math.Hypot(dx, dy) * 4)
-			v := (0.22 + 0.14*math.Sin(float64(x)*0.07+float64(y)*0.4) + 0.08*math.Sin(float64(x)*0.023-float64(k)*0.3)) * fade * (0.25 + 0.75*near)
+			v := fieldAt(x, y/2, float64(k)/12) * 0.45 * fade * (0.25 + 0.75*near)
 			return dpick(t.ramp, clamp01(v), x, y)
 		}
 		rows := make([]string, h)

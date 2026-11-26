@@ -120,3 +120,18 @@ func TestSplashWantedOnlyOnAColorTTYWithMotionAndSetting(t *testing.T) {
 		}
 	}
 }
+
+func TestFirstRunWelcomeReplacesTheSplash(t *testing.T) {
+	m := splashChat()
+	m = chatStep(m, tea.WindowSizeMsg{Width: 120, Height: 32})
+	m.openWelcome()
+	if m.splash != nil {
+		t.Fatal("the splash still plays over the first-run welcome")
+	}
+}
+
+func TestSplashAndWelcomeShareOneDitherField(t *testing.T) {
+	if fieldAt(10, 4, 0) != fieldAt(10, 4, 0) || fieldAt(10, 4, 0) == fieldAt(10, 4, 1) {
+		t.Fatal("fieldAt is not a drifting function of the phase")
+	}
+}

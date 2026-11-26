@@ -871,7 +871,7 @@ func (m chatView) visible() (out []string, idx []int) {
 
 func (m chatView) View() tea.View {
 	t := m.th
-	if m.splash != nil && m.overlay != overlaySetup {
+	if m.splash != nil && m.overlay != overlaySetup && m.welcome == welcomeOff {
 		v := tea.NewView(m.splash[0])
 		v.AltScreen = true
 		return v
