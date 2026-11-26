@@ -661,6 +661,18 @@ type SessionList struct {
 
 func (sv *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 	l := SessionList{Sessions: sv.Sessions()}
+	if d := r.URL.Query().Get("dir"); d != "" {
+		if real, err := filepath.EvalSymlinks(d); err == nil {
+			d = real
+		}
+		var in []Session
+		for _, s := range l.Sessions {
+			if InProject(s.Dir, d) {
+				in = append(in, s)
+			}
+		}
+		l.Sessions = in
+	}
 	l.LastAgent, l.LastModel = sv.Defaults()
 	writeJSON(w, 200, l)
 }
@@ -685,4 +697,13 @@ func (sv *Server) SessionsWorking() bool {
 	sv.mu.Lock()
 	defer sv.mu.Unlock()
 	return sv.liveCountLocked() > 0
+}
+
+// InProject reports whether a session started in dir belongs to the project folder root.
+func InProject(dir, root string) bool {
+	if dir == "" || root == "" {
+		return false
+	}
+	dir, root = filepath.Clean(dir), filepath.Clean(root)
+	return dir == root || strings.HasPrefix(dir, strings.TrimSuffix(root, string(filepath.Separator))+string(filepath.Separator))
 }
