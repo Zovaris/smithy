@@ -32,6 +32,13 @@ var slashCommands = []slashCommand{
 	{"setup", "", "first run: every agent ready or missing, with its fix"},
 	{"answer", "<text>", "answer the decision pinned at the top in your words"},
 	{"help", "", "keys and commands"},
+	{"serve", "[on|off]", "serve mode: off launches nothing new (auto.paused)"},
+	{"set", "<key> <value>", "save a setting in your user file (smithy config set)"},
+	{"unset", "<key>", "put a setting back to its default"},
+	{"keys", "", "stored API keys, masked; set them in smithy tui Settings"},
+	{"key", "rm <service>", "remove a stored API key"},
+	{"doctor", "", "run smithy doctor on the daemon's machine"},
+	{"detach", "", "quit and leave the daemon running"},
 	{"quit", "", "leave; a background daemon keeps running"},
 }
 

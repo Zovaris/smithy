@@ -90,6 +90,7 @@ type chatView struct {
 	decide func(id, answer string) tea.Cmd
 
 	setup     setupAPI      // the daemon's setup endpoints; nil: none
+	cfg       settingsAPI   // the daemon's settings endpoints; nil: none
 	setupSt   *daemon.Setup // last GET /v1/setup
 	setupSel  int
 	setupStep setupStep
@@ -383,7 +384,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	}
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
-	m.setup, m.sess = c, c
+	m.setup, m.sess, m.cfg = c, c, c
 	m.dir, _ = os.Getwd()
 	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
@@ -490,6 +491,11 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.meta(msg.s.ID, msg.s)
 		m.open(msg.s.ID)
 		m.status("session " + msg.s.ID + " started with " + msg.s.Agent)
+		return m, nil
+	case settingsDoneMsg:
+		for _, l := range msg.lines {
+			m.system(l)
+		}
 		return m, nil
 	case sessionErrMsg:
 		m.system(m.th.g.fail + " " + msg.what + " failed: " + msg.err.Error())
