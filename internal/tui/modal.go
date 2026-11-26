@@ -145,7 +145,11 @@ func (m chatView) skillsBox(screen []string, w, h int) []string {
 		items = append(items, boxItem{glyph: g, color: c, label: "smithy MCP server", hint: "board, cards and decisions as tools"})
 		for _, sk := range s.Skills {
 			g, c := check(slices.Contains(s.Kit.Skills, sk))
-			items = append(items, boxItem{glyph: g, color: c, label: sk, hint: "skill"})
+			hint := "skill"
+			if p := s.Paths[sk]; p != "" {
+				hint += " · " + skillDir(p)
+			}
+			items = append(items, boxItem{glyph: g, color: c, label: sk, hint: hint})
 		}
 		if len(s.Skills) == 0 {
 			items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: "no smithy skills installed: press i", static: true})

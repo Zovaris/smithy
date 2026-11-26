@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
@@ -27,6 +28,7 @@ type Setup struct {
 	Chosen    bool                      `json:"chosen"` // false on first run: no agent picked or used yet
 	Kit       KitChoice                 `json:"kit"`
 	Skills    []string                  `json:"skills"` // installed skills the kit can link in
+	Paths     map[string]string         `json:"paths"`  // skill name to its SKILL.md, to invoke it from chat
 	Harnesses []agents.HarnessInventory `json:"harnesses"`
 }
 
@@ -59,15 +61,22 @@ func home() string {
 	return h
 }
 
-// installedSkills are the Known skills FindSkill finds, the ones the kit may link in.
-func installedSkills() []string {
-	out := []string{}
+// installedSkills are the Known skills FindSkill finds, then the user's own in ~/.agents/skills
+// and ~/.smithy/skills: the ones the kit may link in or chat may invoke, with their SKILL.md.
+func installedSkills() ([]string, map[string]string) {
+	out, paths := []string{}, map[string]string{}
 	for _, s := range agents.Known {
-		if _, ok := agents.FindSkill(s); ok {
-			out = append(out, s)
+		if p, ok := agents.FindSkill(s); ok {
+			out, paths[s] = append(out, s), p
 		}
 	}
-	return out
+	user := agents.UserSkills(home())
+	for _, s := range slices.Sorted(maps.Keys(user)) {
+		if _, ok := paths[s]; !ok {
+			out, paths[s] = append(out, s), user[s]
+		}
+	}
+	return out, paths
 }
 
 // agentModels is GET /v1/agents/{id}/models[?refresh=1]: the models agent id reports, cached
@@ -89,7 +98,8 @@ func (sv *Server) agentModels(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sv *Server) setup(w http.ResponseWriter, r *http.Request) {
-	s := Setup{Agents: sv.ready(), Skills: installedSkills(), Harnesses: agents.Inventory(home(), os.Getenv)}
+	skills, paths := installedSkills()
+	s := Setup{Agents: sv.ready(), Skills: skills, Paths: paths, Harnesses: agents.Inventory(home(), os.Getenv)}
 	s.Default.Agent, s.Default.Model = sv.Defaults()
 	s.Chosen = s.Default.Agent != ""
 	if s.Default.Agent == "" {
@@ -166,7 +176,7 @@ func (sv *Server) setKit(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "body must be {\"mcp\":true|false,\"skills\":[…]}"})
 		return
 	}
-	have := installedSkills()
+	have, _ := installedSkills()
 	for _, s := range req.Skills {
 		if !slices.Contains(have, s) {
 			writeJSON(w, 400, map[string]string{"error": "skills: " + text.Clean(s) + " is not an installed smithy skill"})

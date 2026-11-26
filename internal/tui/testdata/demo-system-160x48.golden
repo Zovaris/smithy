@@ -6,7 +6,7 @@
          ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
         ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
   1 Overview   2 Agents   3 Incoming   4 Needs you ? 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System   0 History                                     
-   Health · read-only                                                           ╭─ Settings · 82 · enter edits ────────────────────────────────────────────────╮
+   Health · read-only                                                           ╭─ Settings · 88 · enter edits ────────────────────────────────────────────────╮
   Versions                                                                      │ auto.*                                                                       │
   binary  0.15.0                                                                │ ▸ auto.sources           github,linear  user    comma list of issue sources… │
   skills  0.15.0  ✓ match                                                       │   auto.mode              labeled        default labeled: only issues with t… │
@@ -43,6 +43,6 @@
   ok   gh found and authenticated                                               │   warden.stuck_minutes   15             default minutes without a worker he… │
   ok   claude found                                                             │   warden.worker_model    route          default route: pick cheap/mid/stron… │
   ok   worktree root /home/dev/worktrees writable                               │                                                                              │
-  ok   sandbox: native (claude, hosts github.com,api.github.com,api.anthropic…  │ enter edits · u unsets · auth stays in smithy auth                           │
+  ok   sandbox: native (claude, hosts github.com,api.github.com,api.anthropic…  │ enter edits · u unsets · key.* rows are API keys, typed masked               │
                                                                                 ╰──────────────────────────────────────────────────────────────────────────────╯
  ↑↓ move  enter edit  u unset setting  r refresh  l log                                                                               tab views  ? help  q quit 

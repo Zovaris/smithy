@@ -417,7 +417,8 @@ func (m chatView) helpBox(screen []string, w, h int) []string {
 	for _, k := range [][2]string{
 		{"enter", "send; shift+enter or alt+enter for a new line"}, {"/", "commands"}, {"@", "a file from this folder"},
 		{"tab", "agents and sessions"}, {"ctrl+k", "palette"}, {"ctrl+l", "agent and model"},
-		{"v", "minimal · expandable · verbose (empty input)"}, {"pgup pgdn", "scroll; wheel too, home and end"}, {"click", "open a tool block or answer a decision"}, {"ctrl+c", "quit"},
+		{"v", "minimal · expandable · verbose (empty input)"}, {"pgup pgdn", "scroll; wheel too, home and end"}, {"click", "open a tool block or answer a decision"},
+		{"/name or $name", "run an installed skill on the rest of the line"}, {"ctrl+c", "quit"},
 	} {
 		items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: k[0], hint: k[1]})
 	}
@@ -426,6 +427,14 @@ func (m chatView) helpBox(screen []string, w, h int) []string {
 	for _, c := range slashCommands {
 		if q == "" || strings.Contains(c.name+" "+c.desc, q) {
 			items = append(items, boxItem{glyph: "/", color: t.muted, label: "/" + c.name + " " + c.args, hint: c.desc})
+		}
+	}
+	if s := m.setupSt; s != nil && len(s.Skills) > 0 {
+		items = append(items, boxItem{group: "SKILLS · /skills turns them on for every session"})
+		for _, sk := range s.Skills {
+			if p := s.Paths[sk]; p != "" && (q == "" || strings.Contains(sk, q)) {
+				items = append(items, boxItem{glyph: "/", color: t.muted, label: "/" + sk + "  $" + sk, hint: skillDir(p)})
+			}
 		}
 	}
 	foot := "  " + keyHints(t, "↑↓", "scroll", "esc", "close")

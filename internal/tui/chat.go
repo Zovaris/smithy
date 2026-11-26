@@ -33,8 +33,8 @@ pinned at the bottom. A lost connection retries and resumes after the last event
 Keys: enter send; pgup/pgdn, wheel or ctrl+u/ctrl+d scroll; home/end top/bottom; click a tool block
 to open it; v (empty input) cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
 option's first letter (empty input) or a click on it answers the decision pinned at the top;
-/ opens every command, @ a file, ? help; !cmd runs a shell command in the session folder;
-ctrl+v attaches a clipboard image; esc clears the input; ctrl+c quits.
+/ opens every command, /name or $name runs an installed skill, @ a file, ? help; !cmd runs a shell
+command in the session folder; ctrl+v attaches a clipboard image; esc clears the input; ctrl+c quits.
   url           default: the local daemon (token from ~/.smithy/daemon.token), started in the
                 background when none runs; it outlives the chat and exits after daemon.idle_exit
                 (default 30m) with no clients and no running work, or on smithy stop. A
@@ -94,6 +94,7 @@ type chatView struct {
 	ask func(id, question string, options []string) tea.Cmd
 
 	setup     setupAPI      // the daemon's setup endpoints; nil: none
+	cfg       settingsAPI   // the daemon's settings endpoints; nil: none
 	setupSt   *daemon.Setup // last GET /v1/setup
 	setupSel  int
 	setupStep setupStep
@@ -397,7 +398,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	}
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
-	m.setup, m.sess = c, c
+	m.setup, m.sess, m.cfg = c, c, c
 	m.dir, _ = os.Getwd()
 	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
@@ -514,6 +515,11 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.open(msg.s.ID)
 		m.status("session " + msg.s.ID + " started with " + msg.s.Agent)
 		return m, nil
+	case settingsDoneMsg:
+		for _, l := range msg.lines {
+			m.system(l)
+		}
+		return m, nil
 	case sessionErrMsg:
 		m.system(m.th.g.fail + " " + msg.what + " failed: " + msg.err.Error())
 		return m, nil
@@ -614,6 +620,11 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if strings.HasPrefix(t, "!") {
 				return m.bang(strings.TrimSpace(t[1:]))
+			}
+			if name, arg, _ := strings.Cut(t, " "); strings.HasPrefix(name, "$") {
+				if p := m.skillPrompt(name[1:], strings.TrimSpace(arg)); p != "" {
+					return m.send(p)
+				}
 			}
 			if t != "" || len(m.images) > 0 {
 				t, m.images = withImages(t, m.images), nil
