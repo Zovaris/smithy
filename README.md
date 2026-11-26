@@ -160,6 +160,7 @@ from the web or another machine.
 - `/name` or `$name` runs any installed skill; `/skills` lists them.
 - `!cmd` runs a shell command in the session folder; `ctrl+v` attaches a clipboard image.
 - `/set`, `/keys`, `/serve`, `/doctor` change settings from the chat; `/detach` quits and leaves the daemon running.
+- `/theme` picks steel, frost or plum (`ui.theme`, shared with the web).
 - `ctrl+k` opens the palette and `?` shows every key.
 
 `smithy help` lists the commands by task; `smithy help <command>` shows usage, flags and
