@@ -8,9 +8,9 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2604
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -26,13 +26,13 @@ jobs:
         with:
           version: v2.15.0
   test:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2604
     strategy:
       fail-fast: false
       matrix:
         build: [skills, harness]
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -67,9 +67,9 @@ jobs:
           SMITHY_REQUIRE_WEB_BUILD: "1" # the web e2e test runs on the real build, never skips
         run: go test -race -tags harness ./...
   integration:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2604
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -78,14 +78,14 @@ jobs:
           SKIP_GO_TEST: "1"
         run: tests/run.sh
   build:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2604
     strategy:
       fail-fast: false
       matrix:
         # pull requests build one target per OS; main builds every release target
         target: ${{ fromJSON(github.event_name == 'pull_request' && '["darwin/arm64","linux/amd64","windows/amd64"]' || '["darwin/arm64","darwin/amd64","linux/arm64","linux/amd64","windows/amd64"]') }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -103,9 +103,9 @@ jobs:
           GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /dev/null ./cmd/smithy
           GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build -tags harness -trimpath -ldflags "-s -w" -o /dev/null ./cmd/smithy
   web:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2604
     steps:
-      - uses: actions/checkout@v4
+      - uses: useblacksmith/checkout@v1
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -156,7 +156,7 @@ jobs:
   check:
     if: always()
     needs: [lint, test, integration, build, web, demo]
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2604
     steps:
       - name: Every check job passed
         run: |
@@ -164,7 +164,7 @@ jobs:
           echo "results: $r"
           for x in $r; do [ "$x" = success ] || exit 1; done
   windows-launcher:
-    runs-on: windows-latest
+    runs-on: blacksmith-2vcpu-windows-2025
     steps:
       - uses: actions/checkout@v4
       - name: install.sh installs the latest release under Git Bash
