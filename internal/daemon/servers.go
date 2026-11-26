@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/remote"
 )
 
 // RemoteServer is a saved server the web switcher can reach through this daemon.
@@ -119,7 +121,15 @@ func (e errStatus) Error() string { return string(e) }
 
 func (sv *Server) servers() ([]RemoteServer, error) {
 	if sv.Servers == nil {
-		return nil, nil
+		if sv.ServersFile == "" {
+			return nil, nil
+		}
+		l, err := remote.Load(sv.ServersFile)
+		out := make([]RemoteServer, 0, len(l.Servers))
+		for _, s := range l.Servers {
+			out = append(out, RemoteServer{Name: s.Name, URL: s.URL, Token: s.Token})
+		}
+		return out, err
 	}
 	return sv.Servers()
 }
