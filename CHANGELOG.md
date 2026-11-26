@@ -11,6 +11,7 @@ part above `### Details`.
 ### Fixed
 
 - The web is flat: square corners everywhere, one control height for the stop button, chips and small buttons, a wider chat column, and no highlighted row behind "No results." in the command palette.
+- The web's Agents page splits sessions, the CLIs and API agents that are set up, and the missing ones with their install command. New session picks a project (added through a folder browser on the daemon's machine, never a typed path), the agent, its model and effort.
 
 ### Details
 
