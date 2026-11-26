@@ -34,6 +34,7 @@ type welcomeSettingsMsg struct {
 // openWelcome starts the walk at the splash; the steps reuse the agent and model pickers.
 func (m *chatView) openWelcome() {
 	m.welcome, m.overlay, m.setupNote, m.setupSel = welcomeSplash, overlayWelcome, "", 0
+	m.splash, m.splashOn = nil, false
 }
 
 func (m *chatView) closeWelcome() {
@@ -207,6 +208,12 @@ func (m chatView) welcomeNotifyItems() []boxItem {
 	return append(items, boxItem{glyph: t.g.dot, color: t.info, label: "bot token", hint: "smithy auth set telegram, then smithy notify test", static: true})
 }
 
+// fieldAt is the drifting steel field's lightness at cell x, y and phase ph; the welcome and
+// the entry splash both draw it.
+func fieldAt(x, y int, ph float64) float64 {
+	return 0.5 + 0.3*math.Sin(float64(x)/11+ph) + 0.2*math.Cos(float64(y)/4-ph*0.7)
+}
+
 // ditherField fills w×h with the theme ramp drifting by frame, Bayer-dithered so the bands move
 // without jumping; a plain theme gets blank rows.
 func (m chatView) ditherField(w, h int) []string {
@@ -226,8 +233,7 @@ func (m chatView) ditherField(w, h int) []string {
 			}
 		}
 		for x := range w {
-			v := 0.5 + 0.3*math.Sin(float64(x)/11+ph) + 0.2*math.Cos(float64(y)/4-ph*0.7)
-			c := dpick(t.ramp, v, x, y)
+			c := dpick(t.ramp, fieldAt(x, y, ph), x, y)
 			if c != run {
 				flush()
 				run, n = c, 0

@@ -123,7 +123,10 @@ type chatView struct {
 	cost     map[string]float64    // spend per session
 	toks     map[string]int64      // input and output tokens per session
 	streamed map[string]int        // characters of agent text since the turn began, for tok/s
-	effort   string                // agent.effort, shown in the header
+	effort   string                // agent.effort
+	clock    func() time.Time      // the header clock; nil: time.Now
+	splashOn bool                  // play the entry animation at the first window size
+	splash   []string              // the entry animation's frames left; nil once it ends
 	noise    []noise               // daemon events kept out of the transcript
 	dir      string                // the folder sessions start in and @ lists
 	root     string                // dir with symlinks resolved, as the daemon records it
@@ -398,6 +401,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 		p = colorprofile.Ascii
 	}
 	m := newChatView(ch, url, newTheme(true, p, utf8Locale()))
+	m.splashOn = splashWanted(isTTY(os.Stdout), os.Getenv("NO_COLOR"), os.Getenv("SMITHY_REDUCE_MOTION"), config.Get("ui.splash", "true"), config.Get("tui.reduce_motion", "false"))
 	m.where = where
 	m.server = serverName
 	m.connectLoad = defaultConnectLoad(func() (string, string) {
@@ -478,7 +482,7 @@ func (m *chatView) release() {
 }
 
 func (m chatView) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true), m.loadTheme())
+	return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true), m.loadTheme(), clockTick())
 }
 
 func (m chatView) wait() tea.Cmd {
@@ -519,6 +523,8 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, cmd
 	}
 	switch msg := msg.(type) {
+	case clockMsg:
+		return m, clockTick()
 	case chatFrameMsg:
 		m.frame++
 		for i := max(len(m.msgs)-8, 0); i < len(m.msgs); i++ {
@@ -582,7 +588,14 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.input.SetWidth(max(m.width-2*m.pad()-4, 1))
 		m.scroll(0)
-		return m, nil
+		return m, m.startSplash()
+	case splashMsg:
+		if len(m.splash) <= 1 {
+			m.splash = nil
+			return m, nil
+		}
+		m.splash = m.splash[1:]
+		return m, splashTick()
 	case tea.MouseClickMsg:
 		return m.click(msg)
 	case tea.MouseWheelMsg:
@@ -594,6 +607,10 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyPressMsg:
+		if m.splash != nil {
+			m.splash = nil
+			return m, nil
+		}
 		if m.overlay != overlayNone {
 			return m.overlayKey(msg)
 		}
@@ -854,6 +871,11 @@ func (m chatView) visible() (out []string, idx []int) {
 
 func (m chatView) View() tea.View {
 	t := m.th
+	if m.splash != nil && m.overlay != overlaySetup && m.welcome == welcomeOff {
+		v := tea.NewView(m.splash[0])
+		v.AltScreen = true
+		return v
+	}
 	w := max(m.width, 20)
 	out := make([]string, 0, m.height)
 	out = append(out, m.header(w)...)
