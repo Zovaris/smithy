@@ -10,6 +10,7 @@ part above `### Details`.
 
 ### New
 
+- Antigravity CLI (`agy`) replaces Gemini CLI as an agent, and GitHub Copilot CLI and xAI's Grok Build are new agents.
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
 - An agent can ask you a question in a normal chat, not only inside a warden run; `/ask` pins a
   sample question so you can see and try how decisions look.

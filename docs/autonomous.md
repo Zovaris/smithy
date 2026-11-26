@@ -171,10 +171,10 @@ machine, with a fine-grained, repo-scoped GitHub token and a test or least-privi
   | Codex | its workspace-write sandbox, network on (push needs it), approvals off; `auto.sandbox native` turns its network off |
   | OpenCode | smithy's allow-list as `OPENCODE_PERMISSION` rules: bash allow-list, web fetch and outside directories denied, secret files denied for read and edit (also for `--readonly` runs such as the intake planner) |
   | Any CLI over ACP (`AGENT_PROTOCOL=acp`) | each permission request goes through the same allow-list: a command must match an allowed rule and no denied one (no `;`, `&&`, pipes, redirects or `$`), edits stay inside the worktree and off denied paths, reads off secret paths; fetch, delete, move and anything smithy can't classify are rejected |
-  | Others (gemini, pi, cursor, dsh) | their own headless mode, no smithy allow-list |
+  | Others (agy, copilot, grok, pi, cursor, dsh) | their own headless mode, no smithy allow-list |
 
   Only Claude Code and OpenCode can deny reads of `~/.smithy/auth.json` and the other secret
-  files. Codex, gemini, pi, cursor and dsh have no per-path read deny, so they can read
+  files. Codex, agy, copilot, grok, pi, cursor and dsh have no per-path read deny, so they can read
   them; `smithy doctor` says so for the configured CLI. Even for Claude Code and
   OpenCode the shell deny rules match command text (globs such as `~/.s*`, `$HOME` and key file
   names included), so a command that builds the path another way can slip past: only the `native`
@@ -205,7 +205,7 @@ it.
 | Mode | Isolation | Works with |
 |---|---|---|
 | `off` (default) | the allow-list above and the dangerous-command guard only, no OS sandbox | every harness |
-| `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off here (on under `off`), so push and `gh` fail; Gemini CLI is refused (its sandbox can't limit hosts) |
+| `native` | the harness's own OS sandbox: writes only to the worktree and smithy's plans | Claude Code; Codex runs with network off here (on under `off`), so push and `gh` fail; other CLIs are refused |
 
 The API backend (`auto.agent api:<provider>/<model>`) runs its tools on the `--profile auto`
 rules only while `auto.sandbox` is `off` (the default); with `auto.sandbox native` its shell tool
@@ -235,10 +235,13 @@ signed in once in its own config dir.
 | Claude Code | `CLAUDE_CONFIG_DIR` | yes |
 | Codex | `CODEX_HOME` | yes |
 | OpenCode | `XDG_DATA_HOME` | yes |
-| Gemini CLI | `GEMINI_CLI_HOME` | yes |
+| Copilot CLI | `COPILOT_HOME` | no |
+| Grok Build | `GROK_HOME` | no |
 | Cursor CLI | `CURSOR_CONFIG_DIR` | no |
 | Pi | `PI_CODING_AGENT_DIR` | yes |
 | DeepSeek Harness | `DSH_HOME` | no |
+
+Antigravity (`agy`) has no config-dir variable, so it can't be pooled.
 
 Every harness rotates across its accounts. Where the limit is not detected yet, a limited run fails
 like any other error, and the next run picks the next account.
