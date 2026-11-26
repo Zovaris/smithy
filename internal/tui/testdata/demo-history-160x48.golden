@@ -1,12 +1,8 @@
-                                                                                                                                                                
-     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄       ╔═╗╔╦╗╦╔╦╗╦ ╦╦ ╦                             watcher  ● watching github, linear (TES) · next poll 35s · serve pid 4242 claude 
- ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀       ╚═╗║║║║ ║ ╠═╣╚╦╝                             today    ███████████▓▒  69 / 80 launched                                         
-          ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ╚═╝╩ ╩╩ ╩ ╩ ╩ ╩                              agents   5 working · 0 waiting · 2 stuck                                         
-              ▀▀▀▀▀▀▀              DEMO  autonomous forge · dev · smithy       PRs      3 ready for you · 1 CI running                                          
-         ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
-        ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
+ ◆ smithy dev · smithy                                                                                                                  DEMO  ● watching  14:30 
   1 Overview   2 Agents   3 Incoming   4 Needs you ? 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System   0 History                                     
-╭─ History · 49 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+                                                                                                                                                                
+┌─ History · 49 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                                                                                              │
 │   issue       title                                                                                                    PR       outcome   cost       at      │
 │ ▸ 2026-11-22  48 finished · $68.69                                                                                                                   Sun     │
 │   TES-1043    Typed config loader                                                                                      #1043    merged    $1.91      23:51   │
@@ -44,5 +40,9 @@
 │   #424        Drop the legacy CSV importer                                                                             #1024    merged    $0.40      15:22   │
 │   TES-1025    Add SSO for admins                                                                                       #1025    blocked   $1.70      15:16   │
 │   #421        Retry webhooks with backoff                                                                              #1021    merged    $1.90      15:10   │
-╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+│   TES-1023    Upgrade to Go 1.27                                                                                       #1023    merged    $0.59      15:08   │
+│   #418        Rate-limit the export API                                                                                #1018    merged    $1.20      14:20   │
+│   TES-1007    Upgrade to Go 1.27                                                                                       #1007    merged    $2.59      14:19   │
+│   TES-1013    Archive stale branches                                                                                   #1013    merged    $0.62      14:17   │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
  ↑↓ move  enter details  o open  c copy  / filter                                                                                     tab views  ? help  q quit 

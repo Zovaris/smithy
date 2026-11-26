@@ -110,7 +110,7 @@ func TestBordersOnlyOnFocus(t *testing.T) {
 	if got := ansi.Strip(m.box("T", "", false, nil, r, nil)); strings.ContainsAny(got, "╭╮╰╯│─") {
 		t.Fatalf("unfocused box has a border:\n%s", got)
 	}
-	if got := ansi.Strip(m.box("T", "", true, nil, r, nil)); !strings.Contains(got, "╭") {
+	if got := ansi.Strip(m.box("T", "", true, nil, r, nil)); !strings.Contains(got, "┌") {
 		t.Fatalf("focused box has no border:\n%s", got)
 	}
 }
@@ -136,7 +136,6 @@ func TestMotionWhileRunning(t *testing.T) {
 	if !m.running() {
 		t.Fatal("demo has no running item")
 	}
-	m.fx = newFX(1)
 	if !m.busy() {
 		t.Fatal("running items do not keep frames going")
 	}
@@ -181,6 +180,32 @@ func TestSteelRampStaysGreyIn256Colors(t *testing.T) {
 		ic, ok := c.(ansi.IndexedColor)
 		if !ok || ic < 232 {
 			t.Fatalf("ramp[%d] = %#v, want a 256-color grey (232-255)", i, c)
+		}
+	}
+}
+
+func TestDashboardBordersAreSquareAndTitlesBreathe(t *testing.T) {
+	for v := view(0); v < nViews; v++ {
+		m := demo(t, 160, 48)
+		m.view = v
+		out := ansi.Strip(m.render())
+		if strings.ContainsAny(out, "╭╮╰╯") {
+			t.Errorf("%s has rounded corners", viewNames[v])
+		}
+		lines := strings.Split(out, "\n")
+		_, tabY, body, _ := m.frame()
+		if body.y < tabY+2 || strings.TrimSpace(lines[tabY+1]) != "" {
+			t.Errorf("%s: no blank row under the tab bar", viewNames[v])
+		}
+	}
+	m := demo(t, 160, 48)
+	got := strings.Split(ansi.Strip(m.box("T", "", true, nil, rect{0, 0, 20, 6}, []string{"x"})), "\n")
+	if strings.Trim(got[1], "│ ") != "" || !strings.Contains(got[2], "x") {
+		t.Fatalf("no blank row under a box title: %q", got)
+	}
+	for _, s := range []string{m.helpBox(120, 40), m.textBox()} {
+		if strings.ContainsAny(ansi.Strip(s), "╭╮╰╯") {
+			t.Fatal("an overlay has rounded corners")
 		}
 	}
 }

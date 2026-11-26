@@ -33,10 +33,10 @@ Daily
                 whole repo)
   servers       the daemons this machine talks to: list, add, use, discover
                 (harness build)
+  stats         live stats of the forge: agents, incoming issues, what needs
+                you, activity
   stop          stop the local background daemon (harness build)
   tasks         the shared task list (smithy tasks board --all)
-  tui           live dashboard of the forge: agents, incoming issues, what needs
-                you, activity
   wait          wait without tokens for PRs, runs, branches, issues or a batch
   web           print or open the daemon's web UI link (harness build)
 
