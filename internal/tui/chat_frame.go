@@ -334,7 +334,9 @@ func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem,
 			if len(rows) > 0 {
 				rows = append(rows, row(""))
 			}
-			rows = append(rows, row("   "+t.fg(t.muted).Bold(true).Render(ansi.Truncate(it.group, max(in-4, 1), "…"))))
+			for _, l := range strings.Split(ansi.Wordwrap(it.group, max(in-4, 1), ""), "\n") {
+				rows = append(rows, row("   "+t.fg(t.muted).Bold(true).Render(ansi.Truncate(l, max(in-4, 1), "…"))))
+			}
 			continue
 		}
 		mark, label := "  ", t.fg(t.text)

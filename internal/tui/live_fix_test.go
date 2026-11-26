@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestTypingAMessageNeverAnswersTheDecision(t *testing.T) {
@@ -154,6 +155,22 @@ func TestKeysOpensAModalWithInChatCommands(t *testing.T) {
 		return d
 	}(), "\n"), "smithy tui") {
 		t.Fatal("a command description points at smithy tui")
+	}
+}
+
+func TestWelcomeIntroWraps(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 80, 30
+	m.welcome, m.overlay = welcomeAgents, overlaySetup
+	m.setupSt = &daemon.Setup{}
+	out := screen(m)
+	if !strings.Contains(out, "later.") {
+		t.Fatalf("welcome intro cut:\n%s", out)
+	}
+	for _, l := range strings.Split(out, "\n") {
+		if strings.Contains(l, "…") && strings.Contains(l, "ctrl+l") {
+			t.Fatalf("intro truncated: %q", ansi.Strip(l))
+		}
 	}
 }
 
