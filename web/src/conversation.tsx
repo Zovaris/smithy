@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useLayoutEffect, useRef } from "preact/hooks";
 import { I, toolIcon } from "./icons";
 import { prose, agentName, argLine, initials, type Dec, type Item, type Sess, type Tool } from "./store";
@@ -28,7 +29,7 @@ function Tools({ tools }: { tools: Tool[] }) {
 // (folded, open on click) and decisions inline, and a live "working" line while a turn runs.
 // loose are open decisions no session claims (the command guard asks through the daemon with no
 // session id); they show in every session that is working, since any of them may have asked.
-export function Conversation({ s, items, decisions, loose }: { s: Sess; items: Item[]; decisions: Record<string, Dec>; loose: Dec[] }) {
+export function Conversation({ s, items, decisions, loose, extra }: { s: Sess; items: Item[]; decisions: Record<string, Dec>; loose: Dec[]; extra?: ComponentChildren }) {
   const box = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   useLayoutEffect(() => {
@@ -64,6 +65,7 @@ export function Conversation({ s, items, decisions, loose }: { s: Sess; items: I
             </div>
           ),
         )}
+        {extra}
         {loose.map((d) => (
           <div class="agent">
             <div class="av" aria-hidden="true">{initials(s.agent)}</div>

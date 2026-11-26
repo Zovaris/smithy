@@ -263,3 +263,14 @@ button.row2 { width: 100%; text-align: left; }
 
 /* TODO: remove after the Sephiro bump that ships Zovaris/Sephiro#37. Sephiro's palette keeps its highlight on the last option when the filter empties the list. */
 .sph-palette__track:has(.sph-palette__empty) .sph-palette__indicator { opacity: 0 !important; }
+
+/* TUI parity: header mark, clock, shell output, modal key hints, settings rows */
+.meta-bar .brandline { color: var(--t-text-2); font-size: 12px; white-space: nowrap; flex: none; }
+.meta-bar .tag { flex: none; }
+.meta-bar .clock { font-size: 12px; }
+.meta-bar .note { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; cursor: default; }
+.shell { border: 1px solid var(--t-line); background: var(--t-card); margin: 8px 0; }
+.shell > div { display: flex; gap: 8px; align-items: center; padding: 6px 10px; font-size: 12px; border-bottom: 1px solid var(--t-line); }
+.shell pre { margin: 0; padding: 8px 10px; font-size: 12px; max-height: 320px; overflow: auto; white-space: pre-wrap; }
+.composer.bang { border-color: var(--t-wait); }
+

@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { action, suggest, type Cmd } from "./commands";
+import { suggest, type Cmd } from "./commands";
+import { intent, withImages } from "./parity";
 import { I } from "./icons";
 
 type Props = {
@@ -12,13 +13,17 @@ type Props = {
   pills?: ComponentChildren;
   above?: ComponentChildren;
   onSend: (text: string) => Promise<string>;
-  onAction: (name: string) => void;
+  onAction: (name: string, arg?: string) => void;
   onStop?: () => void;
+  onShell?: (cmd: string) => Promise<void>;
+  onImage?: (f: Blob) => Promise<string>;
 };
 
 // Composer is the one input: ↵ sends, ⇧↵ breaks the line, `/` lists smithy's commands and the
-// installed skills. A smithy command alone runs here; anything else goes to the agent.
-export function Composer({ placeholder, skills, working, canSend = true, draft, pills, above, onSend, onAction, onStop }: Props) {
+// installed skills. A smithy command runs here, `!cmd` runs in the session folder and pasted or
+// dropped images go with the next message; anything else goes to the agent.
+export function Composer({ placeholder, skills, working, canSend = true, draft, pills, above, onSend, onAction, onStop, onShell, onImage }: Props) {
+  const [imgs, setImgs] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [sel, setSel] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -66,19 +71,55 @@ export function Composer({ placeholder, skills, working, canSend = true, draft, 
 
   const submit = async () => {
     const t = text.trim();
-    if (!t || busy || !canSend) return;
-    const a = action(t);
-    if (a) {
+    if ((!t && !imgs.length) || busy || !canSend) return;
+    const it = intent(t);
+    if (it.kind === "action") {
       setText("");
-      onAction(a);
+      onAction(it.name, it.arg);
+      return;
+    }
+    if (it.kind === "shell" && onShell) {
+      setText("");
+      setBusy(true);
+      await onShell(it.cmd).catch((x) => setErr(String((x as Error).message ?? x)));
+      setBusy(false);
       return;
     }
     setBusy(true);
     setErr("");
-    const e = await onSend(t).catch((x) => String((x as Error).message ?? x));
+    const e = await onSend(withImages(t, imgs)).catch((x) => String((x as Error).message ?? x));
     setBusy(false);
     if (e) setErr(e);
-    else setText("");
+    else {
+      setText("");
+      setImgs([]);
+    }
+  };
+
+  const attach = async (files: Blob[]) => {
+    if (!onImage) return;
+    for (const f of files.filter((f) => f.type.startsWith("image/"))) {
+      try {
+        const p = await onImage(f);
+        setImgs((l) => [...l, p]);
+      } catch (x) {
+        setErr("paste failed: " + String((x as Error).message ?? x));
+      }
+    }
+  };
+  const onPaste = (e: ClipboardEvent) => {
+    const fs = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+    if (fs.length && onImage) {
+      e.preventDefault();
+      attach(fs);
+    }
+  };
+  const onDrop = (e: DragEvent) => {
+    const fs = [...(e.dataTransfer?.files ?? [])];
+    if (fs.length && onImage) {
+      e.preventDefault();
+      attach(fs);
+    }
   };
 
   const onKey = (e: KeyboardEvent) => {
@@ -103,6 +144,9 @@ export function Composer({ placeholder, skills, working, canSend = true, draft, 
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       submit();
+    } else if (e.key === "Escape" && imgs.length && !text) {
+      e.preventDefault();
+      setImgs([]);
     } else if (e.key === "Escape" && working && onStop) {
       e.preventDefault();
       onStop();
@@ -122,8 +166,18 @@ export function Composer({ placeholder, skills, working, canSend = true, draft, 
           ))}
         </div>
       )}
-      <div class="composer">
+      <div class={"composer" + (text.trimStart().startsWith("!") ? " bang" : "")} onDrop={onDrop} onDragOver={(e) => onImage && e.preventDefault()}>
         {above}
+        {!!imgs.length && (
+          <div class="cmts">
+            {imgs.map((p, i) => (
+              <span class="tag" title={p}>
+                <I n="file" />image {i + 1}
+                <button class="icon s" aria-label={"Remove image " + (i + 1)} onClick={() => setImgs(imgs.filter((x) => x !== p))}>×</button>
+              </span>
+            ))}
+          </div>
+        )}
         <label class="sr" for="msg">Message</label>
         <textarea
           id="msg"
@@ -133,6 +187,7 @@ export function Composer({ placeholder, skills, working, canSend = true, draft, 
           placeholder={placeholder}
           onInput={(e) => setText(e.currentTarget.value)}
           onKeyDown={onKey}
+          onPaste={onPaste}
           enterkeyhint="send"
           autoComplete="off"
         />
@@ -145,13 +200,13 @@ export function Composer({ placeholder, skills, working, canSend = true, draft, 
             </button>
           )}
           <span class="sp" />
-          <span class="hints" aria-hidden="true"><kbd>/</kbd> commands</span>
+          <span class="hints" aria-hidden="true"><kbd>/</kbd> commands{onShell && <> · <kbd>!</kbd> shell</>}</span>
           {working && onStop && !text.trim() ? (
             <button class="send stop" aria-label="Stop" title="Stop (esc)" onClick={onStop}>
               <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" fill="currentColor" stroke="none" /></svg>
             </button>
           ) : (
-            <button class="send" aria-label="Send" disabled={!text.trim() || busy || !canSend} onClick={submit}>
+            <button class="send" aria-label="Send" disabled={(!text.trim() && !imgs.length) || busy || !canSend} onClick={submit}>
               <I n="up" />
             </button>
           )}
