@@ -60,103 +60,86 @@ func (m chatView) pad() int {
 	return 1
 }
 
-// headRows is the header's height: the 16×8-pixel anvil of the dashboard header, four text rows.
-const headRows = 4
+// headRows is the header's height: one bar and a spacer row.
+const headRows = 2
 
-// header is the anvil band: the dashboard's shaded anvil sprite on a still steel dither band,
-// the name beside it and the open session's folder, model, effort, tokens and cost on the right.
-// It never moves: the loader row shows the work, so nothing snaps back when a turn ends.
+// breathSecs is one slow in-and-out of the running pill's dot.
+const breathSecs = 2.0
+
+// header is one bar on the raised surface: the name, version and project on the left, a state
+// pill and the clock in the corner. Model, branch, tokens and cost live in the footer and the
+// current tool in the transcript, so none of them repeat here. Only the pill's dot moves, a slow
+// breath while sessions run; the text never shifts.
 func (m chatView) header(w int) []string {
 	t := m.th
-	name := "smithy"
+	bar := lipgloss.NewStyle().Background(t.raised)
+	if t.plain {
+		bar = lipgloss.NewStyle()
+	}
+	p := strings.Repeat(" ", m.pad())
+	name := bar.Foreground(t.strong).Bold(true).Render("smithy")
 	if Version != "" {
-		name += " " + Version
+		name += bar.Foreground(t.dim).Render(" " + Version)
 	}
-	info := m.headInfo()
-	infoW := ansi.StringWidth(info)
-	p := m.pad()
-	if t.plain || t.ramp == nil || !t.g.unicode {
-		out := make([]string, headRows)
-		out[1] = ansi.Truncate("  "+name, w, "")
-		if info != "" {
-			out[1] = spread(out[1], info+strings.Repeat(" ", p), w)
-		}
-		return out
+	left := bar.Render(p) + bar.Foreground(t.accent).Render(m.diamond()+" ") + name
+	if m.dir != "" {
+		left += bar.Foreground(t.dim).Render(" "+t.g.dot+" ") + bar.Foreground(t.muted).Render(filepath.Base(m.dir))
 	}
-	s := smallPlate
-	ax := p
-	nx := ax + s.w() + 2
-	ix := w - p - infoW
-	if ix < nx+len(name)+3 {
-		info, ix = "", w
+	clock := bar.Foreground(t.text).Render(m.clockNow().Format("15:04")) + bar.Render(p)
+	right := m.pill(bar) + bar.Render("  ") + clock
+	if gap := w - ansi.StringWidth(left) - ansi.StringWidth(right); gap >= 1 {
+		return []string{left + bar.Render(strings.Repeat(" ", gap)) + right, ""}
 	}
-	px := func(x, y int) color.Color {
-		if s.on(x-ax, y) {
-			return dpick([]color.Color{t.ramp[3], t.ramp[4], t.ramp[5], t.muted, t.text, t.strong}, s.shade(x-ax, y), x, y)
-		}
-		v := 0.28 + 0.2*math.Sin(float64(x)*0.09+float64(y)*0.5) + 0.12*math.Sin(float64(x)*0.031)
-		if x < nx+len(name)+3 || x >= ix-2 {
-			v *= 0.3
-		}
-		return dpick(t.ramp, clamp01(v), x, y)
+	if gap := w - ansi.StringWidth(left) - ansi.StringWidth(clock); gap >= 1 {
+		return []string{left + bar.Render(strings.Repeat(" ", gap)) + clock, ""}
 	}
-	nameR, infoR := []rune(name), []rune(info)
-	out := make([]string, headRows)
-	for row := range out {
-		var b strings.Builder
-		for x := 0; x < w; x++ {
-			top, bot := px(x, row*2), px(x, row*2+1)
-			if row == 2 && x >= nx && x < nx+len(nameR) {
-				fg := t.strong
-				if x >= nx+len("smithy") {
-					fg = t.dim
-				}
-				b.WriteString(lipgloss.NewStyle().Foreground(fg).Background(bot).Bold(x < nx+len("smithy")).Render(string(nameR[x-nx])))
-				continue
-			}
-			if row == 2 && x >= ix && x-ix < len(infoR) {
-				b.WriteString(lipgloss.NewStyle().Foreground(t.muted).Background(bot).Render(string(infoR[x-ix])))
-				continue
-			}
-			b.WriteString(lipgloss.NewStyle().Foreground(top).Background(bot).Render("▀"))
-		}
-		out[row] = b.String()
-	}
-	return out
+	return []string{ansi.Truncate(left, w, ""), ""}
 }
 
-// headInfo is the header's right side: folder, model, effort, tokens and cost of the open
-// session, each left out when unknown.
-func (m chatView) headInfo() string {
-	var parts []string
-	if m.dir != "" {
-		parts = append(parts, filepath.Base(m.dir))
+func (m chatView) diamond() string {
+	if m.th.g.unicode {
+		return "◆"
 	}
-	model := ""
+	return "*"
+}
+
+// clockMsg redraws the header clock; it fires on each minute, nothing else runs while idle.
+type clockMsg struct{}
+
+func untilMinute(t time.Time) time.Duration {
+	return t.Truncate(time.Minute).Add(time.Minute).Sub(t)
+}
+
+func clockTick() tea.Cmd {
+	return tea.Tick(untilMinute(time.Now()), func(time.Time) tea.Msg { return clockMsg{} })
+}
+
+// clockNow is the header clock's time.
+func (m chatView) clockNow() time.Time {
+	if m.clock != nil {
+		return m.clock()
+	}
+	return time.Now()
+}
+
+// pill is "idle", or "● N running" with the dot breathing between dim and the accent.
+func (m chatView) pill(bar lipgloss.Style) string {
+	t := m.th
+	n := 0
 	for _, s := range m.sessions {
-		if s.id == m.current && s.model != "" {
-			model = s.model
+		if s.state == "running" {
+			n++
 		}
 	}
-	if model == "" && m.setupSt != nil {
-		model = m.setupSt.Default.Model
-		if model == "" {
-			model = m.setupSt.Default.Agent
-		}
+	if n == 0 {
+		return bar.Foreground(t.dim).Render("idle")
 	}
-	if model != "" {
-		parts = append(parts, model)
+	dot := t.accent
+	if !t.plain && t.ramp != nil {
+		ph := float64(m.frame) / (breathSecs * fps) * 2 * math.Pi
+		dot = lipgloss.Blend1D(8, t.dim, t.accent)[int((1-math.Cos(ph))/2*7+0.5)]
 	}
-	if m.effort != "" {
-		parts = append(parts, m.effort)
-	}
-	if n, ok := m.toks[m.current]; ok {
-		parts = append(parts, kTok(n)+" tok")
-	}
-	if c, ok := m.cost[m.current]; ok {
-		parts = append(parts, fmt.Sprintf("$%.2f", c))
-	}
-	return strings.Join(parts, " "+m.th.g.dot+" ")
+	return bar.Foreground(dot).Render(t.g.on) + bar.Foreground(t.text).Render(fmt.Sprintf(" %d running", n))
 }
 
 // kTok is a token count with a k or M suffix past a thousand.
@@ -219,7 +202,7 @@ func (m chatView) statusLine(w int) string {
 	right += where
 	left := ""
 	if n := len(m.noise); n > 0 {
-		left = dim.Render(m.noise[n-1].at.Format("15:04") + " " + m.noise[n-1].text)
+		left = dim.Render(m.noise[n-1].text)
 	}
 	if m.offset > 0 {
 		left = t.fg(t.info).Render(fmt.Sprintf("→ %d rows up · end jumps back", m.offset))
@@ -232,7 +215,7 @@ func (m chatView) statusLine(w int) string {
 	return p + left + strings.Repeat(" ", max(w-2*m.pad()-ansi.StringWidth(left)-ansi.StringWidth(right), 1)) + right + p
 }
 
-// footer is the mockups' hint row: the keys on the left; agent, branch and cost on the right.
+// footer is the mockups' hint row: the keys on the left; agent, branch, tokens and cost on the right.
 func (m chatView) footer(w int) string {
 	t := m.th
 	dim, key := t.fg(t.dim), t.fg(t.text)
@@ -245,6 +228,9 @@ func (m chatView) footer(w int) string {
 	}
 	if m.branch != "" {
 		info = append(info, m.branch)
+	}
+	if n, ok := m.toks[m.current]; ok {
+		info = append(info, kTok(n)+" tok")
 	}
 	if c, ok := m.cost[m.current]; ok {
 		info = append(info, fmt.Sprintf("$%.2f", c))

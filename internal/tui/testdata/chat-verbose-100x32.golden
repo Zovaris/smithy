@@ -1,9 +1,9 @@
-
-  smithy dev
-
+   ◆ smithy dev                                                                ● 1 running  09:07   
 
     ?   Merge #142 into release/v0.17?   m  merge   l  later                  ● 1 running · TK-29   
 
+     Pi prints its limit errors from packages/ai/src/errors.ts. I'll match those near the end
+     of a failed run.
 
      ✓  Read  internal/pool/detect.go                                          0.1s · 134 lines     
               134 lines read

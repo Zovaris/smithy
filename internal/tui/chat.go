@@ -113,7 +113,8 @@ type chatView struct {
 	cost     map[string]float64    // spend per session
 	toks     map[string]int64      // input and output tokens per session
 	streamed map[string]int        // characters of agent text since the turn began, for tok/s
-	effort   string                // agent.effort, shown in the header
+	effort   string                // agent.effort
+	clock    func() time.Time      // the header clock; nil: time.Now
 	noise    []noise               // daemon events kept out of the transcript
 	dir      string                // the folder sessions start in and @ lists
 	root     string                // dir with symlinks resolved, as the daemon records it
@@ -462,7 +463,7 @@ func (m *chatView) release() {
 }
 
 func (m chatView) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true), m.loadTheme())
+	return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true), m.loadTheme(), clockTick())
 }
 
 func (m chatView) wait() tea.Cmd {
@@ -503,6 +504,8 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, cmd
 	}
 	switch msg := msg.(type) {
+	case clockMsg:
+		return m, clockTick()
 	case chatFrameMsg:
 		m.frame++
 		for i := max(len(m.msgs)-8, 0); i < len(m.msgs); i++ {

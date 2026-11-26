@@ -13,35 +13,89 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-func TestHeaderShowsFolderModelEffortTokensCost(t *testing.T) {
+func headerTest() chatView {
 	m := newChatTest(0)
 	m.width, m.height = 160, 40
-	m.dir, m.effort, m.current = "/work/proj", "medium", "s-1"
+	m.dir, m.effort, m.current, m.branch = "/work/proj", "medium", "s-1", "main"
 	m.setupSt = &daemon.Setup{Default: daemon.AgentChoice{Agent: "claude", Model: "haiku"}}
+	m.clock = func() time.Time { return time.Date(2026, 11, 25, 9, 7, 0, 0, time.Local) }
+	return m
+}
+
+func TestHeaderIsNameProjectStatePillAndClock(t *testing.T) {
+	m := headerTest()
 	c := 0.12
 	m = chatStep(m, sev(1, daemon.KindSessionUsage, "s-1", usage.Usage{Input: 1000, Output: 234, CostUSD: &c}))
-	head := ansi.Strip(strings.Join(m.header(160), "\n"))
-	for _, want := range []string{"proj", "haiku", "medium", "1.2k tok", "$0.12"} {
-		if !strings.Contains(head, want) {
-			t.Errorf("header lacks %q:\n%s", want, head)
+	head := m.header(160)
+	if len(head) != headRows || headRows != 2 {
+		t.Fatalf("header is %d rows (headRows %d), want a 2-row bar", len(head), headRows)
+	}
+	bar := ansi.Strip(head[0])
+	for _, want := range []string{"smithy", "proj", "idle", "09:07"} {
+		if !strings.Contains(bar, want) {
+			t.Errorf("header lacks %q: %q", want, bar)
+		}
+	}
+	for _, gone := range []string{"haiku", "medium", "tok", "$"} {
+		if strings.Contains(bar, gone) {
+			t.Errorf("header repeats %q shown elsewhere: %q", gone, bar)
+		}
+	}
+	if !strings.HasSuffix(strings.TrimRight(bar, " "), "09:07") {
+		t.Errorf("clock is not in the corner: %q", bar)
+	}
+}
+
+func TestEachFactShowsOnceAcrossHeaderStatusAndFooter(t *testing.T) {
+	m := headerTest()
+	c := 0.12
+	m = chatStep(m, sev(1, daemon.KindSessionUsage, "s-1", usage.Usage{Input: 1000, Output: 234, CostUSD: &c}))
+	m.noise = append(m.noise, noise{at: m.clock(), text: "session s-1 started with claude"})
+	all := ansi.Strip(strings.Join(m.header(160), "\n") + "\n" + m.statusLine(160) + "\n" + m.footer(160))
+	for _, fact := range []string{"09:07", "proj", "main", "$0.12", "1.2k tok"} {
+		if n := strings.Count(all, fact); n != 1 {
+			t.Errorf("%q shows %d times:\n%s", fact, n, all)
 		}
 	}
 }
 
-func TestHeaderBandStaysStillWhileWorking(t *testing.T) {
+func TestHeaderPillCountsRunningAndBreathesWithoutToolText(t *testing.T) {
 	m := newChatView(nil, "http://127.0.0.1:7477", newTheme(false, colorprofile.TrueColor, true))
 	m.width, m.height = 120, 30
-	m.sessions = []chatSession{{id: "s-1", state: "running", turn: time.Now()}}
+	m.clock = func() time.Time { return time.Date(2026, 11, 25, 9, 7, 0, 0, time.Local) }
+	m.sessions = []chatSession{{id: "s-1", state: "running", now: "Write health.go", turn: time.Now()}, {id: "s-2", state: "running"}}
 	m.current = "s-1"
-	m.frame = 3
-	a := strings.Join(m.header(120), "\n")
-	m.frame = 41
-	if b := strings.Join(m.header(120), "\n"); a != b {
-		t.Fatal("the header band moves while a session works")
+	bar := ansi.Strip(m.header(120)[0])
+	if !strings.Contains(bar, "2 running") || strings.Contains(bar, "health.go") {
+		t.Fatalf("pill: %q", bar)
 	}
-	m.sessions[0].state = "done"
-	if c := strings.Join(m.header(120), "\n"); c != a {
-		t.Fatal("the header band jumps back when the turn ends")
+	frames := map[string]bool{}
+	for f := 0; f < 2*fps; f++ {
+		m.frame = f
+		frames[m.header(120)[0]] = true
+	}
+	if len(frames) < 3 {
+		t.Fatalf("the pill does not breathe: %d distinct frames", len(frames))
+	}
+	m.frame = 0
+	a := m.header(120)[0]
+	m.frame = 1
+	if b := m.header(120)[0]; ansi.Strip(a) != ansi.Strip(b) {
+		t.Fatal("the bar text moves while running")
+	}
+	m.sessions[0].state, m.sessions[1].state = "done", "done"
+	if bar := ansi.Strip(m.header(120)[0]); !strings.Contains(bar, "idle") {
+		t.Fatalf("no idle pill when done: %q", bar)
+	}
+}
+
+func TestHeaderFitsNarrowTerminals(t *testing.T) {
+	m := headerTest()
+	for _, w := range []int{80, 60, 40, 24} {
+		bar := m.header(w)[0]
+		if ansi.StringWidth(bar) > w || !strings.Contains(ansi.Strip(bar), "smithy") {
+			t.Errorf("width %d: %q", w, ansi.Strip(bar))
+		}
 	}
 }
 
@@ -62,5 +116,16 @@ func TestLoaderIsOneSmallRowWithLiveTokRate(t *testing.T) {
 	lead := strings.TrimLeft(row, " ")
 	if strings.ContainsAny(lead[:4], "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏") {
 		t.Fatalf("loader still the braille spinner: %q", row)
+	}
+}
+
+func TestClockTicksOncePerMinute(t *testing.T) {
+	at := time.Date(2026, 11, 25, 9, 7, 42, 0, time.Local)
+	if d := untilMinute(at); d != 18*time.Second {
+		t.Fatalf("next tick in %v, want 18s", d)
+	}
+	m := headerTest()
+	if _, cmd := m.Update(clockMsg{}); cmd == nil {
+		t.Fatal("the clock stops after one tick")
 	}
 }
