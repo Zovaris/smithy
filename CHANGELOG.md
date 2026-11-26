@@ -35,6 +35,9 @@ part above `### Details`.
   cards. `/tend` labels them `session <id>`; the agents panel shows `PR #n`.
 - The web has an anvil favicon and installs as an app (Chrome, and Add to Home Screen on iOS); its page shell opens offline.
 
+### Fixed
+- `scripts/eval.sh` scores are deterministic: trials share one smithy binary and a private Go cache, so a launcher rebuild or another process pruning the shared cache no longer grades as a task failure, and an agent that never starts stops the eval (exit 1) instead of counting as a fail.
+
 ### Details
 - `web/public/`: `favicon.svg`, PNG icons (192, 512 maskable, 180 apple-touch), `manifest.webmanifest`, `sw.js` (caches only `/` and same-origin static files; never `/v1/`, query strings or non-GET). `index.html` gains description, Open Graph and iOS web-app meta tags.
 - `internal/web`: top-level build files (favicon, manifest, service worker) are served as themselves with `no-cache` instead of the SPA's `index.html`; `.webmanifest` gets `application/manifest+json`.
