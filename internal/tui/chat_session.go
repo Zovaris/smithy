@@ -235,6 +235,23 @@ func (m chatView) listed() []chatSession {
 	return in
 }
 
+func projHint(all bool) string {
+	if all {
+		return "here"
+	}
+	return "all"
+}
+
+// listedAt is the index of session id in the agents panel's rows, -1 when not listed.
+func (m chatView) listedAt(id string) int {
+	for i, s := range m.listed() {
+		if s.id == id && id != "" {
+			return i
+		}
+	}
+	return -1
+}
+
 func (m *chatView) now(id, what string) {
 	for i := range m.sessions {
 		if m.sessions[i].id == id {

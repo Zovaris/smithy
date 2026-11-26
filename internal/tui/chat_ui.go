@@ -817,26 +817,6 @@ func (m chatView) strip(w int) (string, []stripHit) {
 	return fill(row, w, s), hits
 }
 
-func (m chatView) panel(w int, rows []string) []string {
-	t := m.th
-	bg := lipgloss.NewStyle()
-	if t.overlay != nil {
-		bg = bg.Background(t.overlay)
-	}
-	n := m.rows()
-	if len(rows) > n {
-		rows = rows[:n]
-	}
-	out := make([]string, 0, n)
-	for _, r := range rows {
-		out = append(out, bg.Width(w).MaxWidth(w).Render(ansi.Truncate(r, w, "")))
-	}
-	for len(out) < n {
-		out = append(out, bg.Width(w).Render(""))
-	}
-	return out
-}
-
 func spread(left, right string, w int) string {
 	gap := w - ansi.StringWidth(left) - ansi.StringWidth(right)
 	if gap < 1 {

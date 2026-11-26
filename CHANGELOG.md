@@ -16,6 +16,7 @@ part above `### Details`.
 
 - `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),
   for the web UI.
+- **One modal for every picker.** Agent and model (ctrl+l, `/agent`, `/model`, first run), `/skills` and the agents list (tab) open as the same centered box as the ctrl+k palette: filter or title on top, ↑↓ enter esc at the bottom, no per-cell background blocks.
 ### Highlights
 
 - **One binary per platform.** Each release ships one `smithy-<os>-<arch>`, the full build; `install.sh` and `smithy update` keep the current and the previous version only.

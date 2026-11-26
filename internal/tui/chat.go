@@ -782,15 +782,7 @@ func (m chatView) View() tea.View {
 		s, _ := m.strip(w)
 		out = append(out, s, "")
 	}
-	var vis []string
-	switch m.overlay {
-	case overlaySetup, overlayPicker:
-		vis = m.setupPanel(w)
-	case overlaySkills:
-		vis = m.skillsPanel(w)
-	default:
-		vis, _ = m.visible()
-	}
+	vis, _ := m.visible()
 	body := make([]string, 0, m.rows()+2)
 	for range m.rows() - len(vis) {
 		body = append(body, "")
@@ -814,7 +806,11 @@ func (m chatView) View() tea.View {
 	out = append(out, m.footer(w))
 	switch m.overlay {
 	case overlayAgents:
-		out = append(out[:headRows:headRows], m.sidePanel(out[headRows:], w)...)
+		out = m.agentsBox(out, w, m.height)
+	case overlaySetup, overlayPicker:
+		out = m.pickerBox(out, w, m.height)
+	case overlaySkills:
+		out = m.skillsBox(out, w, m.height)
 	case overlayPalette:
 		out = m.paletteBox(out, w, m.height)
 	case overlayHelp:
