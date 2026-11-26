@@ -31,6 +31,7 @@ type Setup struct {
 	Skills    []string                  `json:"skills"` // installed skills the kit can link in
 	Paths     map[string]string         `json:"paths"`  // skill name to its SKILL.md, to invoke it from chat
 	Harnesses []agents.HarnessInventory `json:"harnesses"`
+	Effort    agents.EffortRules        `json:"effort"` // the CLIs that take effort and the levels a session may set
 }
 
 // AgentChoice is the agent (and model, for a CLI) new sessions start with.
@@ -92,7 +93,7 @@ func (sv *Server) agentModels(w http.ResponseWriter, r *http.Request) {
 
 func (sv *Server) setup(w http.ResponseWriter, r *http.Request) {
 	skills, paths := installedSkills()
-	s := Setup{Agents: sv.ready(), Skills: skills, Paths: paths, Harnesses: agents.Inventory(layout.UserHome(), os.Getenv)}
+	s := Setup{Agents: sv.ready(), Skills: skills, Paths: paths, Harnesses: agents.Inventory(layout.UserHome(), os.Getenv), Effort: agents.Effort()}
 	s.Default.Agent, s.Default.Model = sv.Defaults()
 	s.Chosen = s.Default.Agent != ""
 	if s.Default.Agent == "" {

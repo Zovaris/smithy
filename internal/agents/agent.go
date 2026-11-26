@@ -301,6 +301,19 @@ func ClampEffort(e string) (effort string, capped bool) {
 	return MaxEffort, true
 }
 
+// EffortRules are the effort rules clients show: the CLIs that take an effort flag, the levels a
+// session may set, and the cap smithy lowers anything higher to.
+type EffortRules struct {
+	Agents []string `json:"agents"`
+	Levels []string `json:"levels"`
+	Max    string   `json:"max"`
+}
+
+// Effort is the one set of effort rules, from KnownCLIs and Efforts.
+func Effort() EffortRules {
+	return EffortRules{Agents: catalog.Names(func(a catalog.Agent) bool { return a.Effort }), Levels: slices.Clone(Efforts), Max: MaxEffort}
+}
+
 // DefaultEffort is the effort from $AGENT_EFFORT, else the agent.effort setting, clamped.
 func DefaultEffort() string {
 	e := os.Getenv("AGENT_EFFORT")

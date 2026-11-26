@@ -425,12 +425,12 @@ func (sv *Server) queueLocked(l *live, msg, by string) error {
 }
 
 // ValidEffort reports whether effort may be set on a session of agent: "" (the agent.effort
-// setting) or one of agents.Efforts, and only for a CLI that takes an effort flag.
+// setting) or a level agents.ClampEffort keeps as it is, and only for a CLI that takes an effort flag.
 func ValidEffort(agent, effort string) error {
 	if effort == "" {
 		return nil
 	}
-	if !slices.Contains(agents.Efforts, effort) {
+	if e, capped := agents.ClampEffort(effort); capped || e != effort {
 		return fmt.Errorf("effort must be one of %s (smithy caps effort at %s)", strings.Join(agents.Efforts, ", "), agents.MaxEffort)
 	}
 	if !agents.EffortFlags[agent] {
