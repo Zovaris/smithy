@@ -24,7 +24,7 @@ An MCP server on stdin/stdout (harness build) that smithy agent gives every driv
   search       search the working folder (smithy search's engines and caps)
   board_*      list, show, claim and set tasks of the built-in tracker
   secret_call  call an API with secret:<name> through the egress proxy; the key never returns
-  ask          ask the user a decision through smithy daemon (shown on the run's card) and wait
+  ask          ask the user a decision through smithy daemon (on the run's card in warden) and wait
 --readonly keeps search, board_list and board_show. Inputs are validated and output is capped.`
 
 func init() {

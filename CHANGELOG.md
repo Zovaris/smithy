@@ -12,10 +12,17 @@ part above `### Details`.
 
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
 - In the chat, `!ls` runs a shell command in the session folder and shows its output; ctrl+v attaches a clipboard image to your next message.
+- `/model` changes the open session's model; with no session open, `tab` in the list walks every ready agent, so OpenCode's models show up and can be picked.
+- `/effort` sets the open session's reasoning effort (low or medium) for claude and codex.
+- An agent can ask you a question in a normal chat, not only inside a warden run; `/ask` pins a
+  sample question so you can see and try how decisions look.
 
 ### Details
 
 - Chat `!cmd` runs with `$SHELL -c` in the session folder (2 min timeout, output capped at 256 KiB with escape sequences stripped, last 200 lines shown) and never reaches the agent. A ctrl+v image is saved as a PNG in a private per-chat temp dir and its path is appended to the next message; esc on an empty input drops it.
+- `PUT /v1/sessions/{id}/model` (`{"model","effort"}`) sets a session's model and effort; the next message starts a runner with them, and a `session_model` event keeps them across restarts.
+- `POST /v1/asks` accepts `ask:<key>` ids; the MCP `ask` tool uses one when no warden card is set
+  and writes no card.
 - `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),
   for the web UI.
 - **One modal for every picker.** Agent and model (ctrl+l, `/agent`, `/model`, first run), `/skills` and the agents list (tab) open as the same centered box as the ctrl+k palette: filter or title on top, ↑↓ enter esc at the bottom, no per-cell background blocks.

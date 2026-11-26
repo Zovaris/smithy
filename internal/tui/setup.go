@@ -38,6 +38,7 @@ type setupStep int
 const (
 	stepAgent setupStep = iota
 	stepModel
+	stepEffort
 )
 
 type setupLoadedMsg struct {
@@ -132,6 +133,9 @@ func (m chatView) setupUpdate(msg tea.Msg) (chatView, tea.Cmd, bool) {
 			m.system(msg.note)
 		}
 		return m, m.loadSetup(false), true
+	case sessionModelSetMsg:
+		m.sessionModelSet(msg)
+		return m, nil, true
 	case modelsLoadedMsg:
 		if msg.agent != m.modelFor {
 			return m, nil, true
@@ -180,6 +184,7 @@ func (m *chatView) openPicker(o chatOverlay) {
 // and fetches what the agent reports.
 func (m *chatView) askModel(agent string) tea.Cmd {
 	m.overlay, m.setupStep, m.modelFor, m.modelIn, m.setupNote, m.modelSel, m.modelList = overlayPicker, stepModel, agent, "", "", 0, nil
+	m.modelSess = ""
 	return m.loadModels(false)
 }
 
@@ -302,8 +307,17 @@ func (m chatView) agentCommand(arg string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// modelCommand is /model [name] for the current agent: no name asks for it.
 func (m chatView) modelCommand(arg string) (tea.Model, tea.Cmd) {
+	if _, ok := m.sess.(sessionModelAPI); ok {
+		if s := m.openSession(); s != nil && !strings.HasPrefix(s.agent, "api:") {
+			if arg != "" {
+				return m, m.setSessionModel(s.id, arg, s.effort)
+			}
+			cmd := m.askModel(s.agent)
+			m.modelSess = s.id
+			return m, cmd
+		}
+	}
 	if m.setupSt == nil || m.setupSt.Default.Agent == "" {
 		m.system("pick an agent first: /agent")
 		return m, nil
@@ -333,6 +347,9 @@ func (m chatView) setupKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.setupStep == stepModel {
 		return m.modelKey(msg)
+	}
+	if m.setupStep == stepEffort {
+		return m.effortKey(msg)
 	}
 	var rows []agents.Ready
 	if m.setupSt != nil {
@@ -373,6 +390,12 @@ func (m chatView) modelKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+r":
 		m.modelList = nil
 		return m, m.loadModels(true)
+	case "tab":
+		if m.modelSess == "" {
+			if next := m.nextReadyAgent(m.modelFor); next != "" {
+				return m, m.askModel(next)
+			}
+		}
 	case "backspace":
 		if r := []rune(m.modelIn); len(r) > 0 {
 			m.modelIn, m.modelSel = string(r[:len(r)-1]), 0
@@ -385,6 +408,14 @@ func (m chatView) modelKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		mod := rows[m.modelSel].m.ID
+		if m.modelSess != "" {
+			eff := ""
+			if s := m.sessionByID(m.modelSess); s != nil {
+				eff = s.effort
+			}
+			m.overlay = overlayNone
+			return m, m.setSessionModel(m.modelSess, mod, eff)
+		}
 		if strings.HasPrefix(m.modelFor, "api:") {
 			return m, m.saveDefault(m.modelFor+"/"+mod, "")
 		}

@@ -4,6 +4,8 @@ package tui
 
 import (
 	"context"
+	"crypto/rand"
+	hexenc "encoding/hex"
 	"encoding/json"
 	"fmt"
 	"image/color"
@@ -55,6 +57,7 @@ type chatTool struct {
 type chatSession struct {
 	id, kind, state          string
 	title, agent, model, now string
+	effort                   string
 	dir                      string // the folder it started in; "" for batch events
 	since, turn              time.Time
 }
@@ -322,12 +325,16 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.agentCommand(arg)
 	case "model":
 		return m.modelCommand(arg)
+	case "effort":
+		return m.effortCommand(arg)
 	case "skills":
 		m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
 		return m, m.loadSetup(false)
 	case "setup":
 		m.openPicker(overlaySetup)
 		return m, m.loadSetup(false)
+	case "ask":
+		return m, m.askDemo(arg)
 	case "answer":
 		if arg == "" {
 			m.system("usage: /answer <text>")
@@ -826,4 +833,21 @@ func spread(left, right string, w int) string {
 		return left
 	}
 	return left + strings.Repeat(" ", gap) + right
+}
+
+// askDemo pins a sample question (or the one typed) on the decision strip through the daemon,
+// the same path an agent's ask tool takes outside warden, so it can be seen and answered.
+func (m *chatView) askDemo(q string) tea.Cmd {
+	if m.ask == nil {
+		m.system("/ask needs smithy daemon running: it carries the question and the answer")
+		return nil
+	}
+	opts := []string{"yes", "no", "later"}
+	if q == "" {
+		q, opts = "Demo: which answer should this sample question get?", []string{"approve", "reject", "later"}
+	}
+	b := make([]byte, 4)
+	_, _ = rand.Read(b)
+	m.status("asked: answer it on the strip at the top (click, its first letter, or /answer)")
+	return m.ask("ask:demo"+hexenc.EncodeToString(b), q, opts)
 }
