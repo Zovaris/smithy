@@ -94,8 +94,8 @@ func topHelp(w io.Writer, all bool) {
 	}
 	fmt.Fprintln(w)
 	if marked {
-		for _, l := range wrapText("(harness build): get smithy-harness-<os>-<arch> from "+
-			"https://github.com/Zovaris/smithy/releases, or go build -tags harness ./cmd/smithy.", 0) {
+		for _, l := range wrapText("(harness build): the release binary; install it with smithy update, "+
+			"or go build -tags harness ./cmd/smithy.", 0) {
 			fmt.Fprintln(w, l)
 		}
 	}

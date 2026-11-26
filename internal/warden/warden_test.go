@@ -491,7 +491,7 @@ func TestVersionHint(t *testing.T) {
 	old := BinaryVersion
 	defer func() { BinaryVersion = old }()
 	BinaryVersion = "0.14.0"
-	if h := VersionHint(); !strings.Contains(h, "binary v0.14.0 but skills v0.14.1") || !strings.Contains(h, "sh -s 0.14.1") {
+	if h := VersionHint(); !strings.Contains(h, "binary v0.14.0 but skills v0.14.1") || !strings.Contains(h, "smithy update 0.14.1") {
 		t.Fatalf("hint: %q", h)
 	}
 	BinaryVersion = "0.14.1"

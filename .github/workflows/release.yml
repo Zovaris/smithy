@@ -37,13 +37,9 @@ jobs:
           mkdir dist
           for t in darwin/arm64 darwin/amd64 linux/arm64 linux/amd64 windows/amd64; do
             os=${t%/*}; arch=${t#*/}
-            for build in skills harness; do
-              out="dist/smithy-$os-$arch"; tags=""
-              [ "$build" = harness ] && out="dist/smithy-harness-$os-$arch" && tags="-tags harness"
-              [ "$os" = windows ] && out="$out.exe"
-              GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build $tags -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME#v}" -o "$out" ./cmd/smithy
-              [ "$os" = windows ] || gzip -9 "$out"
-            done
+            out="dist/smithy-$os-$arch"; [ "$os" = windows ] && out="$out.exe"
+            GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -tags harness -trimpath -ldflags "-s -w -X main.version=${GITHUB_REF_NAME#v}" -o "$out" ./cmd/smithy
+            [ "$os" = windows ] || gzip -9 "$out"
           done
           sh scripts/fetch-ripgrep.sh dist
           tar -czf dist/smithy-skills.tar.gz -C skills --owner=0 --group=0 --numeric-owner hush ledger scout simple smelt tend use-smithy warden

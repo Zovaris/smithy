@@ -21,7 +21,7 @@ smithy is all-in-one:
 - `smithy update` runs the same `install.sh --update`: the harness binary plus the skills.
 - The skills build stays only as `go build ./cmd/smithy` without tags, for development; its
   dependency rule (standard library only, except `internal/tui`) still holds for untagged code.
-- Release assets are unchanged for now; dropping `smithy-<os>-<arch>` is a separate change.
+- Release assets: superseded by [0015](0015-one-release-asset-per-platform.md), one `smithy-<os>-<arch>` per platform.
 
 ## Consequences
 

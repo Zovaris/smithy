@@ -39,7 +39,7 @@ your yes before it starts sessions.
 
 ## Daemon
 
-The harness build of smithy (`smithy-harness-<os>-<arch>`) adds `smithy daemon`: the
+The release binary of smithy (`smithy-<os>-<arch>`, the harness build) adds `smithy daemon`: the
 autonomous loop plus a local API any client can follow (SSE events, first-answer-wins
 decisions). It is the same for every agent CLI; see [autonomous.md](autonomous.md#daemon-harness-build).
 

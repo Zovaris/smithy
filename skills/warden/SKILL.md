@@ -66,6 +66,8 @@ Production-branch PRs follow use-smithy **Merges**; here such a PR stays `manual
    clean up, recover stuck ones; someone else's PR already covers an item → `dropped` with a
    pointer. Done when no printed card is left unhandled.
 5. **Finish** when every item is `merged`, `reported`, `dropped`, held or waiting on the user, and the batch check and its `fix` item merged. Workers end by `references/acting.md`. Done when the final message is sent.
+6. **Milestone review.** After a milestone batch merges, offer a cheap-model coherence review in
+   rounds (`references/milestone.md`). smelt reviews tasks; warden reviews milestones.
 
 ## Talking to the user
 Only the plan line; batched high decisions, merges and stuck items; and the final message:
