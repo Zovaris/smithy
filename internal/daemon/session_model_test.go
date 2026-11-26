@@ -111,6 +111,21 @@ func TestCLIRunnerPassesEffort(t *testing.T) {
 	}
 }
 
+func TestStartSessionWithEffort(t *testing.T) {
+	sv, url, _ := sessionTest(t, func(ctx context.Context, msg string, h []Exchange, e Emit) (string, error) { return "ok", nil })
+	code, m := post(t, url+"/v1/sessions", `{"agent":"claude","model":"haiku","effort":"low","dir":"`+t.TempDir()+`","message":"hi"}`)
+	if code != 201 || m["effort"] != "low" {
+		t.Fatalf("start with effort: %d %v", code, m)
+	}
+	waitStatus(t, sv, m["id"].(string), StatusDone)
+	if code, m := post(t, url+"/v1/sessions", `{"agent":"opencode","effort":"low","dir":"`+t.TempDir()+`","message":"hi"}`); code != 400 {
+		t.Errorf("opencode takes no effort: %d %v", code, m)
+	}
+	if code, _ := post(t, url+"/v1/sessions", `{"agent":"claude","effort":"max","dir":"`+t.TempDir()+`","message":"hi"}`); code != 400 {
+		t.Errorf("effort over the cap: %d", code)
+	}
+}
+
 func containsStr(xs []string, s string) bool {
 	for _, x := range xs {
 		if x == s {

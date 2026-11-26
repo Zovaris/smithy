@@ -12,6 +12,7 @@ part above `### Details`.
 
 - The web is flat: square corners everywhere, one control height for the stop button, chips and small buttons, a wider chat column, and no highlighted row behind "No results." in the command palette.
 - The web does what the TUI does: every setting with a typed control, API keys, serve, doctor, a model and effort picker per session, `!cmd` and pasted or dropped images in the composer, /ask and /answer, the theme picker, a header like the TUI's, and adding or switching servers with a pairing code.
+- The web's Agents page splits sessions, the CLIs and API agents that are set up, and the missing ones with their install command. New session picks a project (added through a folder browser on the daemon's machine, never a typed path), the agent, its model and effort.
 
 ### Details
 
@@ -36,6 +37,9 @@ part above `### Details`.
   of the session folder's `origin` repository as `TendRef`s with `session` set, after the batch
   cards. `/tend` labels them `session <id>`; the agents panel shows `PR #n`.
 - The web has an anvil favicon and installs as an app (Chrome, and Add to Home Screen on iOS); its page shell opens offline.
+
+### Fixed
+- `scripts/eval.sh` scores are deterministic: trials share one smithy binary and a private Go cache, so a launcher rebuild or another process pruning the shared cache no longer grades as a task failure, and an agent that never starts stops the eval (exit 1) instead of counting as a fail.
 
 ### Details
 - `web/public/`: `favicon.svg`, PNG icons (192, 512 maskable, 180 apple-touch), `manifest.webmanifest`, `sw.js` (caches only `/` and same-origin static files; never `/v1/`, query strings or non-GET). `index.html` gains description, Open Graph and iOS web-app meta tags.

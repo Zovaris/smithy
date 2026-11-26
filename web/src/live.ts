@@ -102,7 +102,7 @@ async function call(method: string, path: string, body: unknown): Promise<any> {
   return j;
 }
 
-export const startSession = (b: { agent: string; model: string; dir: string; message: string }): Promise<Sess> => call("POST", "/v1/sessions", b);
+export const startSession = (b: { agent: string; model: string; effort?: string; dir: string; message: string }): Promise<Sess> => call("POST", "/v1/sessions", b);
 export const sendMessage = (id: string, text: string) => call("POST", `/v1/sessions/${encodeURIComponent(id)}/messages`, { text });
 export const stopSession = (id: string) => call("POST", `/v1/sessions/${encodeURIComponent(id)}/stop`, {});
 
