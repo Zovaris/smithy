@@ -253,6 +253,13 @@ func (c *Client) StopSession(ctx context.Context, id string) error {
 	return c.call(ctx, "POST", "/v1/sessions/"+url.PathEscape(id)+"/stop", map[string]string{}, nil)
 }
 
+// SetSessionModel is PUT /v1/sessions/{id}/model: the model and effort its next turns run with.
+func (c *Client) SetSessionModel(ctx context.Context, id, model, effort string) (Session, error) {
+	var s Session
+	err := c.call(ctx, "PUT", "/v1/sessions/"+url.PathEscape(id)+"/model", map[string]string{"model": model, "effort": effort}, &s)
+	return s, err
+}
+
 // Sessions is GET /v1/sessions.
 func (c *Client) Sessions(ctx context.Context) (SessionList, error) {
 	var l SessionList
@@ -296,4 +303,43 @@ func (c *Client) InstallSkills(ctx context.Context, harness string) (string, err
 	var out struct{ Output string }
 	err := c.call(ctx, "POST", "/v1/setup/skills/install", map[string]string{"harness": harness}, &out)
 	return out.Output, err
+}
+
+// Settings is GET /v1/settings: every setting, the stored API keys (masked) and serve mode.
+func (c *Client) Settings(ctx context.Context) (Settings, error) {
+	var s Settings
+	err := c.call(ctx, "GET", "/v1/settings", nil, &s)
+	return s, err
+}
+
+// SetSetting is PUT /v1/settings/{key}: saves key in the user's file.
+func (c *Client) SetSetting(ctx context.Context, key, value string) error {
+	return c.call(ctx, "PUT", "/v1/settings/"+url.PathEscape(key), map[string]string{"value": value}, nil)
+}
+
+// UnsetSetting is DELETE /v1/settings/{key}: back to its default.
+func (c *Client) UnsetSetting(ctx context.Context, key string) error {
+	return c.call(ctx, "DELETE", "/v1/settings/"+url.PathEscape(key), map[string]string{}, nil)
+}
+
+// SetKey is PUT /v1/keys/{service}: stores service's API key in the auth file.
+func (c *Client) SetKey(ctx context.Context, service, key string) error {
+	return c.call(ctx, "PUT", "/v1/keys/"+url.PathEscape(service), map[string]string{"key": key}, nil)
+}
+
+// RemoveKey is DELETE /v1/keys/{service}.
+func (c *Client) RemoveKey(ctx context.Context, service string) error {
+	return c.call(ctx, "DELETE", "/v1/keys/"+url.PathEscape(service), map[string]string{}, nil)
+}
+
+// SetServe is PUT /v1/serve: off pauses serve (auto.paused true), on resumes it.
+func (c *Client) SetServe(ctx context.Context, on bool) error {
+	return c.call(ctx, "PUT", "/v1/serve", map[string]bool{"on": on}, nil)
+}
+
+// Doctor is GET /v1/doctor: smithy doctor's lines.
+func (c *Client) Doctor(ctx context.Context) ([]string, error) {
+	var out struct{ Lines []string }
+	err := c.call(ctx, "GET", "/v1/doctor", nil, &out)
+	return out.Lines, err
 }

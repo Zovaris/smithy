@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -57,6 +59,7 @@ type chatTool struct {
 type chatSession struct {
 	id, kind, state          string
 	title, agent, model, now string
+	effort                   string
 	dir                      string // the folder it started in; "" for batch events
 	since, turn              time.Time
 }
@@ -140,6 +143,7 @@ func (m *chatView) track(id, kind string) {
 		if s := &m.sessions[i]; s.id == id {
 			if state == "running" && s.state != "running" {
 				s.turn = time.Now()
+				delete(m.streamed, id)
 			}
 			s.kind, s.state = kind, state
 			return
@@ -324,6 +328,8 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.agentCommand(arg)
 	case "model":
 		return m.modelCommand(arg)
+	case "effort":
+		return m.effortCommand(arg)
 	case "skills":
 		m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
 		return m, m.loadSetup(false)
@@ -338,14 +344,49 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, m.answer(arg)
+	case "detach":
+		return m.detach()
+	case "serve", "set", "unset", "key", "keys", "doctor":
+		return m.settingsCommand(name, arg)
 	case "quit":
 		return m, tea.Quit
 	case "help":
 		m.overlay, m.pal = overlayHelp, palette{}
 	default:
+		if p := m.skillPrompt(name, arg); p != "" {
+			return m.send(p)
+		}
 		m.system("unknown command /" + name)
 	}
 	return m, nil
+}
+
+// skillPrompt is what /name or $name sends for an installed skill: read its SKILL.md and follow it
+// on the rest of the line; "" when name is no installed skill.
+func (m chatView) skillPrompt(name, arg string) string {
+	if m.setupSt == nil {
+		return ""
+	}
+	p := m.setupSt.Paths[name]
+	if p == "" {
+		return ""
+	}
+	out := "Use the " + name + " skill: read " + p + " and follow it."
+	if arg != "" {
+		out += "\n\n" + arg
+	}
+	return out
+}
+
+// skillDir is where a skill lives, for its hint: the folder holding it, with ~ for home.
+func skillDir(path string) string {
+	d := filepath.Dir(filepath.Dir(path))
+	if h, err := os.UserHomeDir(); err == nil && h != "" {
+		if r, ok := strings.CutPrefix(d, h+string(filepath.Separator)); ok {
+			return "~/" + r
+		}
+	}
+	return d
 }
 
 // click focuses what is under the pointer: an option on the strip answers, a transcript row

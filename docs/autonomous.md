@@ -53,9 +53,11 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   or `api:<provider>/<model>`, `""` the last used, else `session.agent`; `model` goes to a CLI's
   `--model`; `dir` an absolute existing folder),
   `POST /v1/sessions/{id}/messages` (`{"text"}`, queued behind a running turn),
-  `POST /v1/sessions/{id}/stop` and `GET /v1/sessions` (status `working`, `needs_you`, `done`,
+  `POST /v1/sessions/{id}/stop`, `PUT /v1/sessions/{id}/model` (`{"model","effort"}`: the
+  model and effort the next turns run with; effort `low` or `medium`, only for claude and codex;
+  refused mid-turn and for `api:` sessions) and `GET /v1/sessions` (status `working`, `needs_you`, `done`,
   `failed`). Their events (`session_message`, `session_text`, `session_tool` with args and output,
-  `session_diff`, `session_usage`, `session_status`) stream on `/v1/events` with the session id.
+  `session_diff`, `session_usage`, `session_status`, `session_model`) stream on `/v1/events` with the session id.
   An `api:` session runs smithy's loop inside the daemon: a tool call the auto rules refuse becomes
   the decision `perm:<id>/<n>` (allow/deny) and the session shows `needs_you` until someone
   answers; the secret rules are never asked. Other agents run `smithy agent` once per turn with
@@ -67,7 +69,7 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   `PUT /v1/setup/default` (`{"agent","model"}`), `PUT /v1/setup/kit` (`{"mcp","skills"}`, skills
   must be installed smithy skills) and `POST /v1/setup/skills/install` (`{"harness"}`, empty for
   every detected one) change them. `GET /v1/agents/{id}/models[?refresh=1]` lists the models
-  agent `id` (a CLI or `api:<provider>`) reports, default first, cached for a day. The TUI's first run, `ctrl+l`, `/agent`, `/model`, `/skills`
+  agent `id` (a CLI or `api:<provider>`) reports, default first, cached for a day. The TUI's first run, `ctrl+l`, `/agent`, `/model`, `/effort`, `/skills`
   and the web's Settings screen use these.
 - It tails `~/.smithy/events.jsonl` and the proxy's log into its store (once per line, across
   rotation and restarts) and turns them into decisions: a proxy `secret_ask` is `secret:<id>`

@@ -145,6 +145,7 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 		}
 		if m.lastText(id) != strings.TrimSpace(d.Text) {
 			m.into(id, chatMsg{who: "agent", text: strings.TrimSpace(d.Text)})
+			m.addStreamed(id, len(d.Text))
 		}
 	case daemon.KindSessionText:
 		var d struct{ Text string }
@@ -156,6 +157,7 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 			return true
 		}
 		m.into(id, chatMsg{who: "daemon", text: strings.TrimSpace(d.Text)})
+		m.addStreamed(id, len(d.Text))
 	case daemon.KindSessionTool:
 		var t daemon.ToolEvent
 		if json.Unmarshal(data, &t) == nil && t.Name != "" {
@@ -174,7 +176,13 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 		}
 	case daemon.KindSessionUsage:
 		var u usage.Usage
-		if json.Unmarshal(data, &u) == nil && u.CostUSD != nil {
+		if json.Unmarshal(data, &u) == nil {
+			if m.toks == nil {
+				m.toks = map[string]int64{}
+			}
+			m.toks[id] += u.Input + u.Output
+		}
+		if u.CostUSD != nil {
 			if m.cost == nil {
 				m.cost = map[string]float64{}
 			}
@@ -202,7 +210,7 @@ func (m *chatView) meta(id string, s daemon.Session) {
 	m.track(id, s.Status)
 	for i := range m.sessions {
 		if m.sessions[i].id == id {
-			m.sessions[i].title, m.sessions[i].agent, m.sessions[i].model = s.Title, s.Agent, s.Model
+			m.sessions[i].title, m.sessions[i].agent, m.sessions[i].model, m.sessions[i].effort = s.Title, s.Agent, s.Model, s.Effort
 			if s.Dir != "" {
 				m.sessions[i].dir = s.Dir
 			}

@@ -21,7 +21,8 @@ var slashCommands = []slashCommand{
 	{"new", "", "start a new session; your next message opens it"},
 	{"sessions", "", "agents and sessions: open one, stop it, see what waits on you"},
 	{"agent", "[name]", "the agent new sessions start with"},
-	{"model", "[name]", "the model the agent runs"},
+	{"model", "[name]", "the model the open session runs, else new sessions; tab lists other agents"},
+	{"effort", "[low|medium]", "the open session's reasoning effort, for agents that take one"},
 	{"skills", "", "skills and MCP injected into every session"},
 	{"connect", "", "which daemon this chat talks to, and how to reach another"},
 	{"web", "", "open the web UI in your browser"},
@@ -33,7 +34,23 @@ var slashCommands = []slashCommand{
 	{"ask", "[question]", "pin a sample question on the strip, to see and try how decisions work"},
 	{"answer", "<text>", "answer the decision pinned at the top in your words"},
 	{"help", "", "keys and commands"},
+	{"serve", "[on|off]", "serve mode: off launches nothing new (auto.paused)"},
+	{"set", "<key> <value>", "save a setting in your user file (smithy config set)"},
+	{"unset", "<key>", "put a setting back to its default"},
+	{"keys", "", "stored API keys, masked; set them in smithy tui Settings"},
+	{"key", "rm <service>", "remove a stored API key"},
+	{"doctor", "", "run smithy doctor on the daemon's machine"},
+	{"detach", "", "quit and leave the daemon running"},
 	{"quit", "", "leave; a background daemon keeps running"},
+}
+
+func isCommand(name string) bool {
+	for _, c := range slashCommands {
+		if c.name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // popupItem is one row of the / or @ popup: what tab puts in the input, and its description.
@@ -53,6 +70,13 @@ func (m chatView) popup() []popupItem {
 		for _, c := range slashCommands {
 			if strings.HasPrefix(c.name, q) {
 				out = append(out, popupItem{fill: "/" + c.name + " ", label: "/" + c.name, desc: c.desc})
+			}
+		}
+		if m.setupSt != nil {
+			for _, s := range m.setupSt.Skills {
+				if p := m.setupSt.Paths[s]; p != "" && strings.HasPrefix(s, q) && !isCommand(s) {
+					out = append(out, popupItem{fill: "/" + s + " ", label: "/" + s, desc: "skill · " + skillDir(p)})
+				}
 			}
 		}
 		if len(out) == 1 && out[0].label == v {

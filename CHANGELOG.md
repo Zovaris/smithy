@@ -12,11 +12,26 @@ part above `### Details`.
 
 - Antigravity CLI (`agy`) replaces Gemini CLI as an agent, and GitHub Copilot CLI and xAI's Grok Build are new agents.
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
+- Settings parity in the TUI: chat gets `/serve on|off`, `/set`, `/unset`, `/keys`, `/key rm`, `/doctor` and `/detach` (quit, the daemon keeps running); the Settings list edits API keys (`key.*` rows) in a masked field.
+- Your own skills in `~/.agents/skills` and `~/.smithy/skills` show in `/skills` next to smithy's, and any installed skill runs from the chat as `/name` or `$name`.
+- In the chat, `!ls` runs a shell command in the session folder and shows its output; ctrl+v attaches a clipboard image to your next message.
+- `/model` changes the open session's model; with no session open, `tab` in the list walks every ready agent, so OpenCode's models show up and can be picked.
+- `/effort` sets the open session's reasoning effort (low or medium) for claude and codex.
 - An agent can ask you a question in a normal chat, not only inside a warden run; `/ask` pins a
   sample question so you can see and try how decisions look.
+- The chat header shows the folder, model, effort, tokens and cost; it no longer animates, and
+  the loader is a small four-cell pulse with the live tok/s of the running turn.
 
 ### Details
 
+- Chat tok/s is estimated from streamed agent text (about four characters per token) over the
+  turn's time; tokens and cost come from session usage events.
+- Daemon settings API, this machine's token only: `GET /v1/settings` (every setting, masked API
+  keys, serve on/off), `PUT|DELETE /v1/settings/{key}` (user file; secret keys refused),
+  `PUT|DELETE /v1/keys/{service}`, `PUT /v1/serve` (`auto.paused`), `GET /v1/doctor`.
+- `GET /v1/setup` lists the skills in `~/.agents/skills` and `~/.smithy/skills` (`$SMITHY_HOME/skills`) after the bundled ones, with `paths` (name to SKILL.md); `kit.skills` accepts them and `FindSkill` looks in `~/.smithy/skills`. In the TUI, `/name` or `$name` sends "read <SKILL.md> and follow it" plus the rest of the line; `/` and `/help` list the skills.
+- Chat `!cmd` runs with `$SHELL -c` in the session folder (2 min timeout, output capped at 256 KiB with escape sequences stripped, last 200 lines shown) and never reaches the agent. A ctrl+v image is saved as a PNG in a private per-chat temp dir and its path is appended to the next message; esc on an empty input drops it.
+- `PUT /v1/sessions/{id}/model` (`{"model","effort"}`) sets a session's model and effort; the next message starts a runner with them, and a `session_model` event keeps them across restarts.
 - `POST /v1/asks` accepts `ask:<key>` ids; the MCP `ask` tool uses one when no warden card is set
   and writes no card.
 - `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),

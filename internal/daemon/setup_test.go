@@ -166,3 +166,24 @@ func TestSetupSkillsInstall(t *testing.T) {
 		t.Fatalf("runs: %q", got)
 	}
 }
+
+func TestSetupListsUserSkillFolders(t *testing.T) {
+	_, url, home := setupTest(t)
+	sm := t.TempDir()
+	t.Setenv("SMITHY_HOME", sm)
+	for _, d := range []string{filepath.Join(home, ".agents", "skills", "pdf"), filepath.Join(sm, "skills", "mine"), filepath.Join(home, ".agents", "skills", "nofile")} {
+		os.MkdirAll(d, 0o755)
+	}
+	os.WriteFile(filepath.Join(home, ".agents", "skills", "pdf", "SKILL.md"), []byte("x"), 0o644)
+	os.WriteFile(filepath.Join(sm, "skills", "mine", "SKILL.md"), []byte("x"), 0o644)
+	s := getSetup(t, url)
+	if !slices.Contains(s.Skills, "pdf") || !slices.Contains(s.Skills, "mine") || slices.Contains(s.Skills, "nofile") {
+		t.Fatalf("skills from ~/.agents/skills and ~/.smithy/skills: %v", s.Skills)
+	}
+	if !strings.HasSuffix(s.Paths["mine"], filepath.Join("mine", "SKILL.md")) || !strings.HasSuffix(s.Paths["pdf"], filepath.Join("pdf", "SKILL.md")) {
+		t.Fatalf("paths: %v", s.Paths)
+	}
+	if code, m := put(t, url+"/v1/setup/kit", `{"mcp":true,"skills":["mine"]}`); code != 200 {
+		t.Fatalf("a user skill can be toggled on: %d %v", code, m)
+	}
+}

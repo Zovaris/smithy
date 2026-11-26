@@ -33,6 +33,9 @@ func (m chatView) pickerBox(screen []string, w, h int) []string {
 	if m.setupSt != nil && m.setupStep == stepModel {
 		return m.modelBox(screen, w, h)
 	}
+	if m.setupStep == stepEffort {
+		return m.effortBox(screen, w, h)
+	}
 	title := "Pick an agent"
 	esc := "close"
 	var items []boxItem
@@ -75,7 +78,11 @@ func (m chatView) pickerBox(screen []string, w, h int) []string {
 func (m chatView) modelBox(screen []string, w, h int) []string {
 	t := m.th
 	bw, bh := m.boxSize(w, h)
-	items := []boxItem{{group: "Model for " + m.modelFor}}
+	scope := "new sessions"
+	if m.modelSess != "" {
+		scope = "this session"
+	}
+	items := []boxItem{{group: "Model for " + m.modelFor + " · " + scope}}
 	list := m.modelRows()
 	for _, r := range list {
 		it := boxItem{glyph: t.g.dot, color: t.muted, label: r.m.ID}
@@ -112,7 +119,10 @@ func (m chatView) modelBox(screen []string, w, h int) []string {
 	if count != "" {
 		items[0].group += " · " + count
 	}
-	foot := "  " + keyHints(t, "↑↓", "move", "enter", "save", "ctrl+r", "ask again", "esc", "cancel")
+	foot := "  " + keyHints(t, "↑↓", "move", "enter", "save", "tab", "next agent", "ctrl+r", "ask again", "esc", "cancel")
+	if m.modelSess != "" {
+		foot = "  " + keyHints(t, "↑↓", "move", "enter", "save", "ctrl+r", "ask again", "esc", "cancel")
+	}
 	return m.overBox(screen, m.floatBox(bw, bh, m.modelIn, "Model for "+m.modelFor+" · type to filter", items, m.modelSel, foot), w)
 }
 
@@ -135,7 +145,11 @@ func (m chatView) skillsBox(screen []string, w, h int) []string {
 		items = append(items, boxItem{glyph: g, color: c, label: "smithy MCP server", hint: "board, cards and decisions as tools"})
 		for _, sk := range s.Skills {
 			g, c := check(slices.Contains(s.Kit.Skills, sk))
-			items = append(items, boxItem{glyph: g, color: c, label: sk, hint: "skill"})
+			hint := "skill"
+			if p := s.Paths[sk]; p != "" {
+				hint += " · " + skillDir(p)
+			}
+			items = append(items, boxItem{glyph: g, color: c, label: sk, hint: hint})
 		}
 		if len(s.Skills) == 0 {
 			items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: "no smithy skills installed: press i", static: true})

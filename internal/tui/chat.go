@@ -18,6 +18,7 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/remote"
@@ -32,7 +33,8 @@ pinned at the bottom. A lost connection retries and resumes after the last event
 Keys: enter send; pgup/pgdn, wheel or ctrl+u/ctrl+d scroll; home/end top/bottom; click a tool block
 to open it; v (empty input) cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
 option's first letter (empty input) or a click on it answers the decision pinned at the top;
-/ opens every command, @ a file, ? help; esc clears the input; ctrl+c quits.
+/ opens every command, /name or $name runs an installed skill, @ a file, ? help; !cmd runs a shell
+command in the session folder; ctrl+v attaches a clipboard image; esc clears the input; ctrl+c quits.
   url           default: the local daemon (token from ~/.smithy/daemon.token), started in the
                 background when none runs; it outlives the chat and exits after daemon.idle_exit
                 (default 30m) with no clients and no running work, or on smithy stop. A
@@ -92,6 +94,7 @@ type chatView struct {
 	ask func(id, question string, options []string) tea.Cmd
 
 	setup     setupAPI      // the daemon's setup endpoints; nil: none
+	cfg       settingsAPI   // the daemon's settings endpoints; nil: none
 	setupSt   *daemon.Setup // last GET /v1/setup
 	setupSel  int
 	setupStep setupStep
@@ -100,11 +103,16 @@ type chatView struct {
 	modelIn   string       // the filter typed over the model list
 	modelSel  int          // the selected row of modelRows
 	modelList *models.List // what the agent reported; nil while it loads
+	modelSess string
+	effortSel int
 
 	sess     sessionAPI            // the daemon's sessions endpoints; nil: offline
 	current  string                // the open session, "" before the first message
 	convs    map[string][]*chatMsg // the other sessions' conversations
 	cost     map[string]float64    // spend per session
+	toks     map[string]int64      // input and output tokens per session
+	streamed map[string]int        // characters of agent text since the turn began, for tok/s
+	effort   string                // agent.effort, shown in the header
 	noise    []noise               // daemon events kept out of the transcript
 	dir      string                // the folder sessions start in and @ lists
 	root     string                // dir with symlinks resolved, as the daemon records it
@@ -124,6 +132,11 @@ type chatView struct {
 	connectUse  func(string) error        // saves the default server
 	connectAdd  func(remote.Server) error // saves a discovered server
 	switchTo    *chatSwitch               // set when /connect picked another server
+
+	shell    func(ctx context.Context, dir, line string) (string, error) // runs !cmd; nil: runShell
+	clip     func() ([]byte, error)                                      // reads a clipboard image; nil: readClipImage
+	pasteDir string                                                      // where pasted images are saved; "": temp dir
+	images   []string                                                    // pasted images waiting for the next message
 }
 
 // infoPanel is what a read-only box shows: /connect, /remote, /web, /log.
@@ -385,10 +398,11 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	}
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
-	m.setup, m.sess = c, c
+	m.setup, m.sess, m.cfg = c, c, c
 	m.dir, _ = os.Getwd()
 	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
+	m.effort = config.Get("agent.effort", "medium")
 	if tok != "" {
 		m.webURL = url + "/#token=" + neturl.QueryEscape(tok)
 	} else {
@@ -501,6 +515,11 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.open(msg.s.ID)
 		m.status("session " + msg.s.ID + " started with " + msg.s.Agent)
 		return m, nil
+	case settingsDoneMsg:
+		for _, l := range msg.lines {
+			m.system(l)
+		}
+		return m, nil
 	case sessionErrMsg:
 		m.system(m.th.g.fail + " " + msg.what + " failed: " + msg.err.Error())
 		return m, nil
@@ -523,6 +542,12 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case chatDecidedMsg:
 		m.decided(msg)
+		return m, nil
+	case shellDoneMsg:
+		m.shellDone(msg)
+		return m, nil
+	case clipMsg:
+		m.clipped(msg)
 		return m, nil
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -555,7 +580,13 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
+		case "ctrl+v":
+			return m, m.pasteImage()
 		case "esc":
+			if len(m.images) > 0 && m.input.Value() == "" {
+				m.images = nil
+				return m, nil
+			}
 			if m.input.Value() != "" {
 				m.input.SetValue("")
 				return m, nil
@@ -587,7 +618,16 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.HasPrefix(t, "/") {
 				return m.command(t)
 			}
-			if t != "" {
+			if strings.HasPrefix(t, "!") {
+				return m.bang(strings.TrimSpace(t[1:]))
+			}
+			if name, arg, _ := strings.Cut(t, " "); strings.HasPrefix(name, "$") {
+				if p := m.skillPrompt(name[1:], strings.TrimSpace(arg)); p != "" {
+					return m.send(p)
+				}
+			}
+			if t != "" || len(m.images) > 0 {
+				t, m.images = withImages(t, m.images), nil
 				return m.send(t)
 			}
 			return m, nil
@@ -850,6 +890,9 @@ func (m chatView) composer(w int) []string {
 	p := strings.Repeat(" ", m.pad())
 	bw := w - 2*m.pad()
 	var out []string
+	if c := m.chips(); c != "" {
+		out = append(out, p+fill(raised, bw, "  "+c+"  esc drops")+p)
+	}
 	for _, l := range strings.Split(m.input.View(), "\n") {
 		out = append(out, p+fill(raised, bw, "  "+l)+p)
 	}
