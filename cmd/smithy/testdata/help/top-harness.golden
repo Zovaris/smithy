@@ -55,9 +55,8 @@ Maintenance
                 images, PATH line (lists first)
   update        update the binary and the skills to the latest release
 
-(harness build): get smithy-harness-<os>-<arch> from
-https://github.com/Zovaris/smithy/releases, or go build -tags harness
-./cmd/smithy.
+(harness build): the release binary; install it with smithy update, or go build
+-tags harness ./cmd/smithy.
 Run smithy help <command> for usage and examples. smithy help --all also lists
 the commands the skills call. Not on PATH? smithy setup path.
 Exit codes: 0 success, 1 failure, 2 usage error (3 where a command's help says).
