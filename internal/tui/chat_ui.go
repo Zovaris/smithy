@@ -57,6 +57,7 @@ type chatTool struct {
 type chatSession struct {
 	id, kind, state          string
 	title, agent, model, now string
+	effort                   string
 	dir                      string // the folder it started in; "" for batch events
 	since, turn              time.Time
 }
@@ -325,6 +326,8 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.agentCommand(arg)
 	case "model":
 		return m.modelCommand(arg)
+	case "effort":
+		return m.effortCommand(arg)
 	case "skills":
 		m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
 		return m, m.loadSetup(false)

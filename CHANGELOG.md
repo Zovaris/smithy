@@ -11,6 +11,9 @@ part above `### Details`.
 ### New
 
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
+- In the chat, `!ls` runs a shell command in the session folder and shows its output; ctrl+v attaches a clipboard image to your next message.
+- `/model` changes the open session's model; with no session open, `tab` in the list walks every ready agent, so OpenCode's models show up and can be picked.
+- `/effort` sets the open session's reasoning effort (low or medium) for claude and codex.
 - An agent can ask you a question in a normal chat, not only inside a warden run; `/ask` pins a
   sample question so you can see and try how decisions look.
 - The chat header shows the folder, model, effort, tokens and cost; it no longer animates, and
@@ -20,6 +23,8 @@ part above `### Details`.
 
 - Chat tok/s is estimated from streamed agent text (about four characters per token) over the
   turn's time; tokens and cost come from session usage events.
+- Chat `!cmd` runs with `$SHELL -c` in the session folder (2 min timeout, output capped at 256 KiB with escape sequences stripped, last 200 lines shown) and never reaches the agent. A ctrl+v image is saved as a PNG in a private per-chat temp dir and its path is appended to the next message; esc on an empty input drops it.
+- `PUT /v1/sessions/{id}/model` (`{"model","effort"}`) sets a session's model and effort; the next message starts a runner with them, and a `session_model` event keeps them across restarts.
 - `POST /v1/asks` accepts `ask:<key>` ids; the MCP `ask` tool uses one when no warden card is set
   and writes no card.
 - `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),
