@@ -60,8 +60,8 @@ t "unknown target exits 2" 'W nope:1 --max 0; [ $? -eq 2 ]'
 export SMITHY_HOME="$T/home"
 t "add numbers the next task" '[ "$(basename "$("$S/smithy" tasks add docs/specs/b "Add login")")" = 01-add-login.md ] && [ "$(basename "$("$S/smithy" tasks add docs/specs/b "Rate limit" --blocked-by 01)")" = 02-rate-limit.md ]'
 t "added task is todo and blocked" 'grep -q "^Blocked by: 01" docs/specs/b/02-rate-limit.md && [ "$(basename "$("$S/smithy" tasks next docs/specs/b)")" = 01-add-login.md ]'
-t "board shows the list" '"$S/smithy" tasks board | grep -q "0/2 done, 0 doing, 1 ready"'
-t "board --all finds it from elsewhere" '(cd / && "$S/smithy" tasks board --all) | grep -q "repo/b"'
+t "board shows the list" '"$S/smithy" tasks board | grep "0/2 done, 0 doing, 1 ready"'
+t "board --all finds it from elsewhere" '(cd / && "$S/smithy" tasks board --all) | grep "repo/b"'
 mkdir -p "$T/imp"; printf '# Plan\n\n## 01 · First\nbody\n\n## 02 Second\nBlocked by: 01\nmore\n' > "$T/imp/list.md"
 t "import splits a list into tasks" '"$S/smithy" tasks import "$T/imp/list.md" >/dev/null && [ -f "$T/imp/01-first.md" ] && grep -q "^Blocked by: 01" "$T/imp/02-second.md"'
 t "import refuses to overwrite" '! "$S/smithy" tasks import "$T/imp/list.md"'
@@ -77,13 +77,13 @@ echo a > a.txt; echo b > b.txt
 t "requires paths" '! $S/smithy commit "feat(api): add a"'
 t "commits only given paths" '$S/smithy commit "feat(api): add a" a.txt && [ "$(git status --short)" = "?? b.txt" ]'
 t "commits a git mv rename" 'git mv a.txt c.txt && $S/smithy commit "refactor: rename a to c" a.txt c.txt && [ "$(git status --short)" = "?? b.txt" ] && git ls-files --error-unmatch c.txt >/dev/null'
-t "refuses staged files outside the paths" 'h=$(git rev-parse HEAD); git add b.txt; o=$($S/smithy commit "feat: add c" c.txt 2>&1); echo "$o" | grep -q "already staged: b.txt" && [ "$(git rev-parse HEAD)" = "$h" ]; r=$?; git reset -q b.txt; [ $r -eq 0 ]'
+t "refuses staged files outside the paths" 'h=$(git rev-parse HEAD); git add b.txt; o=$($S/smithy commit "feat: add c" c.txt 2>&1); echo "$o" | grep "already staged: b.txt" && [ "$(git rev-parse HEAD)" = "$h" ]; r=$?; git reset -q b.txt; [ $r -eq 0 ]'
 t "dot refuses earlier staging" 'git add b.txt; ! $S/smithy commit "feat: add all" . >/dev/null 2>&1; r=$?; git reset -q b.txt; [ $r -eq 0 ]'
 t "subdir cwd sees staging outside it" 'mkdir -p sub && echo s > sub/s.txt && git add b.txt && (cd sub && ! $S/smithy commit "feat: add s" s.txt >/dev/null 2>&1); r=$?; git reset -q b.txt; rm -rf sub; [ $r -eq 0 ]'
-t "path outside the repo refused" 'o=$($S/smithy commit "feat: x" .. 2>&1); echo "$o" | grep -q "outside the repo"'
+t "path outside the repo refused" 'o=$($S/smithy commit "feat: x" .. 2>&1); echo "$o" | grep "outside the repo"'
 
 # smithy pr
-t "no template → none" '$S/smithy pr template | grep -q "^none:"'
+t "no template → none" '$S/smithy pr template | grep "^none:"'
 mkdir -p .github; printf '## Summary\n\n## Testing\n' > .github/pull_request_template.md
 t "template found once" '[ "$($S/smithy pr template | wc -l | tr -d " ")" = 1 ]'
 
@@ -104,17 +104,17 @@ t "cleans a branch whose commits landed rebased" '$S/smithy cleanup . t3 "$T/wt3
 mkdir -p docs/specs/pay
 printf '# 01 · A\nStatus: todo\nBlocked by: none\n' > docs/specs/pay/01-a.md
 printf '# 02 · B\nStatus: todo\nBlocked by: 01\n' > docs/specs/pay/02-b.md
-t "next is 01" '"$S/smithy" tasks next | grep -q 01-a.md'
+t "next is 01" '"$S/smithy" tasks next | grep 01-a.md'
 t "02 blocked" '[ "$("$S/smithy" tasks ready | wc -l | tr -d " ")" = 1 ]'
 "$S/smithy" tasks set docs/specs/pay/01-a.md status=done pr=https://x/1 >/dev/null
-t "02 ready after 01 done" '"$S/smithy" tasks next | grep -q 02-b.md'
+t "02 ready after 01 done" '"$S/smithy" tasks next | grep 02-b.md'
 t "rejects bad status" '! "$S/smithy" tasks set docs/specs/pay/02-b.md status=bogus'
 
 mkdir -p .docs/specs/priv elsewhere/x
 printf '# 01 · P\nStatus: todo\nBlocked by: none\n' > .docs/specs/priv/01-p.md
 printf '# 01 · E\nStatus: todo\nBlocked by: none\n' > elsewhere/x/01-e.md
-t "where finds .docs/specs" '"$S/smithy" tasks where | grep -q "/.docs/specs/priv$"'
-t "where honours SMELT_TASKS_DIRS" 'SMELT_TASKS_DIRS=elsewhere "$S/smithy" tasks where | grep -q "/elsewhere/x$"'
+t "where finds .docs/specs" '"$S/smithy" tasks where | grep "/.docs/specs/priv$"'
+t "where honours SMELT_TASKS_DIRS" 'SMELT_TASKS_DIRS=elsewhere "$S/smithy" tasks where | grep "/elsewhere/x$"'
 
 # smithy config + smithy harness
 t "harness override" '[ "$($S/smithy harness)" = "codex any" ]'
@@ -146,10 +146,10 @@ t "router: unset tier prints -" '[ "$($S/smithy route --text "add OAuth login" |
 t "router: needs input" '$S/smithy route; [ $? -eq 2 ]'
 
 # smithy consult
-t "consult builds a tool-less prompt" 'CONSULT_CMD=cat $S/smithy consult "Q1" "A; B" | grep -q "Question: Q1"'
+t "consult builds a tool-less prompt" 'CONSULT_CMD=cat $S/smithy consult "Q1" "A; B" | grep "Question: Q1"'
 echo "ctx-line" > "$T/ctx.md"
-t "consult adds context" 'CONSULT_CMD=cat $S/smithy consult "Q1" "A; B" --context "$T/ctx.md" | grep -q ctx-line'
-t "consult falls back when the harness CLI is missing" 'WARDEN_HARNESS=pi AGENT_CMD="grep -c Question" PATH="/usr/bin:/bin:$(dirname "$(command -v node)")" $S/smithy consult "Q" "A; B" | grep -q 1'
+t "consult adds context" 'CONSULT_CMD=cat $S/smithy consult "Q1" "A; B" --context "$T/ctx.md" | grep ctx-line'
+t "consult falls back when the harness CLI is missing" 'WARDEN_HARNESS=pi AGENT_CMD="grep -c Question" PATH="/usr/bin:/bin:$(dirname "$(command -v node)")" $S/smithy consult "Q" "A; B" | grep 1'
 
 # use-smithy smithy setup block
 printf '# Rules\n' > "$T/AGENTS.md"
@@ -232,8 +232,8 @@ t "install.sh: non-tty installs the skills build" 'LK a "$L/install.sh" 0.0.0 </
 t "install.sh: --harness installs smithy-harness" 'LK b "$L/install.sh" --harness 0.0.0 && grep -q "(smithy-harness-.*\.gz)" "$L/err" && [ "$(cat "$L/kb/kind")" = harness ]'
 t "install.sh: --update keeps the harness kind" 'LK b "$L/install.sh" --update 0.0.0 && grep -q "(smithy-harness-.*\.gz)" "$L/err"'
 t "install.sh: --skills overrides the kept kind" 'LK b "$L/install.sh" --update --skills 0.0.0 && ! grep -q harness "$L/err" && [ "$(cat "$L/kb/kind")" = skills ]'
-t "install.sh: tty answer harness" 'echo harness > "$L/ans"; LK c env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && grep -q "harness or skills" "$L/err" && grep -q "(smithy-harness-" "$L/err"'
-t "install.sh: tty empty answer defaults to skills" ': > "$L/ans"; LK d env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && grep -q "harness or skills" "$L/err" && ! grep -q "(smithy-harness-" "$L/err"'
+t "install.sh: tty answer 2 is skills" 'echo 2 > "$L/ans"; LK c env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && grep -q "which build" "$L/err" && ! grep -q "(smithy-harness-" "$L/err"'
+t "install.sh: tty empty answer defaults to harness" ': > "$L/ans"; LK d env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && grep -q "which build" "$L/err" && grep -q "(smithy-harness-" "$L/err"'
 t "install.sh: non-tty prints the skills install hint" 'LK e "$L/install.sh" 0.0.0 </dev/null && grep -q "skills install" "$L/err"'
 t "install.sh: tty offers skills install, no on n" 'echo n > "$L/ans"; LK f env SMITHY_TTY="$L/ans" "$L/install.sh" --skills 0.0.0 && grep -q "install the skills now" "$L/err" && ! grep -q "skills install failed" "$L/err"'
 t "install.sh: --harness with --skills refused" 'LK e "$L/install.sh" --harness --skills 0.0.0; [ $? -eq 3 ]'

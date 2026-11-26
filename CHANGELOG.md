@@ -8,6 +8,14 @@ part above `### Details`.
 
 ## Unreleased
 
+### Fixed
+
+- `install.sh` asks which build you want and defaults to the harness (daemon, TUI and web); the README shows how to update and uninstall.
+
+### Details
+
+- install: the prompt lists `1) harness` and `2) skills`; Enter picks harness (was skills). Tests: `grep` reads the whole pipe so `pipefail` never fails a check on SIGPIPE.
+
 ## v0.23.0 — 2026-11-25
 
 ### Highlights

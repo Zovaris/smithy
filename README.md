@@ -44,7 +44,9 @@ curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh
 ```
 
 The first line installs the skills; pick at least `use-smithy`. The second installs the `smithy`
-binary they run, after verifying its checksum and build attestation. Without Node, install the
+binary, after verifying its checksum and build attestation; it asks for the **harness** build
+(daemon, TUI and web: run `smithy`) or the **skills** build (only the CLI the skills call).
+Skip the question with `sh -s -- --harness` or `sh -s -- --skills`. Without Node, install the
 binary first, then run `smithy skills install` (it copies the release's skills into each harness it finds).
 
 Then, in your agent:
@@ -54,8 +56,15 @@ Then, in your agent:
 3. **Hand over several tasks** (or `/warden <tasks>`): you get one worker and one PR for each.
 
 Requires git. [`gh`](https://cli.github.com) is recommended; without it, smithy falls back to
-`GH_TOKEN` or prints a compare URL. The binary lands in `~/.local/bin/smithy`; `smithy uninstall`
-removes it again. More options: [docs/install.md](docs/install.md).
+`GH_TOKEN` or prints a compare URL. The binary lands in `~/.local/bin/smithy`. More options:
+[docs/install.md](docs/install.md).
+
+### Update and uninstall
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update   # skills + binary
+smithy uninstall                                                                                  # lists what it removes, then asks
+```
 
 ### For agents
 
