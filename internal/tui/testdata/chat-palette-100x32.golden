@@ -1,8 +1,6 @@
    ◆ smithy dev                                                                ● 1 running  09:07   
 
-    ?   Merge #142 into release/v0.17?   m  merge   l  later                                        
-
-      ╭──────────────────────────────────────────────────────────────────────────────────────╮
+    ? ╭──────────────────────────────────────────────────────────────────────────────────────╮      
       │ › Search actions, sessions, settings                                             esc │
       ├──────────────────────────────────────────────────────────────────────────────────────┤
       │                                                                                      │
@@ -16,17 +14,19 @@
       │   ≡  Verbosity: minimal  minimal · expandable · verbose                           v  │
       │   ●  Agents panel  sessions and waiting items                                   tab  │
       │   →  Open the web UI  same sessions in the browser                             /web  │
-     ›│   →  Connect  http://127.0.0.1:7477                                        /connect  │      
+      │   →  Connect  http://127.0.0.1:7477                                        /connect  │
       │   ·  Daemon log  0 events                                                      /log  │
-     P│   ↓  Jump to latest                                                             end  │
-     o│   ✗  Quit                                                                    ctrl+c  │
-      │                                                                                      │
-     ✓│   SESSIONS                                                                           │s     
+     ›│   ↓  Jump to latest                                                             end  │      
+      │   ✗  Quit                                                                    ctrl+c  │
+     P│                                                                                      │
+     o│   SESSIONS                                                                           │
       │   ✓  TK-6  done                                                                      │
-     D│   ●  TK-29  running                                                                  │
+     ✓│   ●  TK-29  running                                                                  │s     
       │   ✗  TES-9  failed                                                                   │
-      │                                                                                      │477   
-     ›│   SETTINGS                                                                           │      
-      │   ·  chat.mode  minimal                                                              │      
-      │                                                                                      │      
-   ent├──────────────────────────────────────────────────────────────────────────────────────┤      
+     D│                                                                                      │
+      │   SETTINGS                                                                           │
+      │   ·  chat.mode  minimal                                                              │477   
+     ›│                                                                                      │      
+      ├──────────────────────────────────────────────────────────────────────────────────────┤      
+      │  ↑↓ move   enter run   tab next group                                    16 results  │      
+   ent╰──────────────────────────────────────────────────────────────────────────────────────╯      

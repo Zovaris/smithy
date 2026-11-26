@@ -3,9 +3,12 @@
 package tui
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/daemon"
 )
 
 func TestTypingAMessageNeverAnswersTheDecision(t *testing.T) {
@@ -33,5 +36,37 @@ func TestOptionLetterAloneThenEnterAnswers(t *testing.T) {
 	m = chatStep(m, ckey("enter"))
 	if len(got) != 1 || got[0] != "d1=merge" || m.input.Value() != "" {
 		t.Fatalf("letter then enter answers: %v", got)
+	}
+}
+
+func TestSkillsModalFitsTheScreenWithManySkills(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 140, 35
+	s := &daemon.Setup{Paths: map[string]string{}}
+	for i := range 40 {
+		s.Skills = append(s.Skills, fmt.Sprintf("skill-%02d", i))
+	}
+	m.setupSt, m.overlay = s, overlaySkills
+	lines := strings.Split(screen(m), "\n")
+	if len(lines) > m.height {
+		t.Fatalf("screen is %d rows, over %d", len(lines), m.height)
+	}
+	foot, bottom := -1, -1
+	for i, l := range lines {
+		if strings.Contains(l, "install/update") {
+			foot = i
+		}
+		if strings.Contains(l, "+-") && i > foot && foot >= 0 && bottom < 0 {
+			bottom = i
+		}
+	}
+	if foot < 0 || bottom < 0 {
+		t.Fatalf("footer or bottom border cut:\n%s", screen(m))
+	}
+	for range 45 {
+		m = chatStep(m, ckey("down"))
+	}
+	if !strings.Contains(screen(m), "skill-39") || !strings.Contains(screen(m), "install/update") {
+		t.Fatalf("the list scrolls to its end inside the box:\n%s", screen(m))
 	}
 }

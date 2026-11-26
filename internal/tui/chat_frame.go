@@ -316,7 +316,7 @@ func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem,
 		q = t.fg(t.text).Render(placeholder)
 	}
 	out := []string{line(g.tl, g.tr), row(spread(" "+t.fg(t.accent).Render(t.g.prompt)+" "+q, dim.Render("esc")+" ", in)), line(g.lt, g.rt)}
-	body := max(h-6, 1)
+	body := max(h-8, 1)
 	rows := make([]string, 0, len(items))
 	selRow := 0
 	n := 0
@@ -366,7 +366,8 @@ func frameGlyphs(uni bool) boxFrame {
 	return boxFrame{"+", "+", "+", "+", "+", "+", "-", "|", ">"}
 }
 
-// overBox centers box over the dimmed screen rows, 15% from the top as in the mockup.
+// overBox centers box over the dimmed screen rows, 15% from the top as in the mockup, or higher
+// when a tall box would otherwise run past the last row.
 func (m chatView) overBox(screen []string, box []string, w int) []string {
 	out := make([]string, len(screen))
 	for i, r := range screen {
@@ -379,7 +380,7 @@ func (m chatView) overBox(screen []string, box []string, w int) []string {
 	if len(box) > 0 {
 		bw = ansi.StringWidth(box[0])
 	}
-	x, y := (w-bw)/2, max(len(screen)*120/800, 1)
+	x, y := (w-bw)/2, max(min(len(screen)*120/800, len(screen)-len(box)), 1)
 	for i, b := range box {
 		if y+i < len(out) {
 			out[y+i] = splice(out[y+i], b, x, w)
@@ -389,7 +390,7 @@ func (m chatView) overBox(screen []string, box []string, w int) []string {
 }
 
 func (m chatView) boxSize(w, h int) (int, int) {
-	return max(min(88, w-6, w*9/10), min(w, 20)), max(min(h-4, 30), 10)
+	return max(min(88, w-6, w*9/10), min(w, 20)), max(min(h-2, 32), 12)
 }
 
 func keyHints(t theme, pairs ...string) string {

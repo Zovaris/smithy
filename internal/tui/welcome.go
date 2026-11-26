@@ -157,7 +157,7 @@ func (m chatView) welcomeView(w, h int) []string {
 		return m.welcomeField(w, h, 0)
 	}
 	items = append(items, m.noteItems()...)
-	box := m.floatBox(bw, min(bh, len(items)+10), "", title, items, -1, foot)
+	box := m.floatBox(bw, min(bh, len(items)+12), "", title, items, -1, foot)
 	return m.overBox(m.welcomeField(w, h, len(box)), box, w)
 }
 
