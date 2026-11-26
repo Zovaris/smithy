@@ -15,11 +15,14 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 const (
 	shellTimeout  = 2 * time.Minute
 	shellMaxLines = 200
+	shellMaxBytes = 256 << 10
+	clipMaxBytes  = 32 << 20
 )
 
 var errNoImage = errors.New("no image in the clipboard")
@@ -45,8 +48,41 @@ func runShell(ctx context.Context, dir, line string) (string, error) {
 	cmd := exec.CommandContext(ctx, sh, "-c", line)
 	cmd.Dir = dir
 	cmd.Stdin = nil
-	out, err := cmd.CombinedOutput()
-	return string(out), err
+	var out capped
+	out.max = shellMaxBytes
+	cmd.Stdout, cmd.Stderr = &out, &out
+	err := cmd.Run()
+	if out.cut {
+		return string(out.b) + "\n… output cut at 256 KiB", err
+	}
+	return string(out.b), err
+}
+
+// capped keeps the first max bytes written and drops the rest.
+type capped struct {
+	b   []byte
+	max int
+	cut bool
+}
+
+func (c *capped) Write(p []byte) (int, error) {
+	if n := c.max - len(c.b); n < len(p) {
+		c.b, c.cut = append(c.b, p[:max(n, 0)]...), true
+		return len(p), nil
+	}
+	c.b = append(c.b, p...)
+	return len(p), nil
+}
+
+// cleanOutput drops terminal escape sequences and control characters except newline and tab.
+func cleanOutput(s string) string {
+	s = ansi.Strip(s)
+	return strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' || (r >= 0x20 && r != 0x7f && (r < 0x80 || r > 0x9f)) {
+			return r
+		}
+		return -1
+	}, s)
 }
 
 // bang is enter on a `!cmd` line: it runs in the session folder and never reaches the agent.
@@ -66,7 +102,7 @@ func (m chatView) bang(line string) (chatView, tea.Cmd) {
 }
 
 func (m *chatView) shellDone(msg shellDoneMsg) {
-	out := strings.TrimRight(msg.out, "\n")
+	out := strings.TrimRight(cleanOutput(msg.out), "\n")
 	if ls := strings.Split(out, "\n"); len(ls) > shellMaxLines {
 		out = fmt.Sprintf("… %d lines cut\n", len(ls)-shellMaxLines) + strings.Join(ls[len(ls)-shellMaxLines:], "\n")
 	}
@@ -100,20 +136,36 @@ func (m *chatView) clipped(msg clipMsg) {
 		}
 		return
 	}
-	dir := m.pasteDir
-	if dir == "" {
-		dir = filepath.Join(os.TempDir(), "smithy-paste")
-	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		m.status("paste failed: " + err.Error())
+	if len(msg.data) > clipMaxBytes {
+		m.status("paste failed: image over 32 MiB")
 		return
 	}
-	p := filepath.Join(dir, fmt.Sprintf("paste-%d-%d.png", time.Now().UnixNano(), len(m.images)+1))
-	if err := os.WriteFile(p, msg.data, 0o600); err != nil {
+	if m.pasteDir == "" {
+		d, err := os.MkdirTemp("", "smithy-paste-")
+		if err != nil {
+			m.status("paste failed: " + err.Error())
+			return
+		}
+		m.pasteDir = d
+	}
+	p := filepath.Join(m.pasteDir, fmt.Sprintf("paste-%d-%d.png", time.Now().UnixNano(), len(m.images)+1))
+	if err := writeNew(p, msg.data); err != nil {
 		m.status("paste failed: " + err.Error())
 		return
 	}
 	m.images = append(m.images, p)
+}
+
+func writeNew(p string, b []byte) error {
+	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(b); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // withImages appends the attached images' paths to text so the agent reads them.

@@ -15,7 +15,7 @@ part above `### Details`.
 
 ### Details
 
-- Chat `!cmd` runs with `$SHELL -c` in the session folder (2 min timeout, last 200 lines shown) and never reaches the agent. A ctrl+v image is saved as a PNG under the temp dir and its path is appended to the next message; esc on an empty input drops it.
+- Chat `!cmd` runs with `$SHELL -c` in the session folder (2 min timeout, output capped at 256 KiB with escape sequences stripped, last 200 lines shown) and never reaches the agent. A ctrl+v image is saved as a PNG in a private per-chat temp dir and its path is appended to the next message; esc on an empty input drops it.
 - `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),
   for the web UI.
 - **One modal for every picker.** Agent and model (ctrl+l, `/agent`, `/model`, first run), `/skills` and the agents list (tab) open as the same centered box as the ctrl+k palette: filter or title on top, ↑↓ enter esc at the bottom, no per-cell background blocks.

@@ -128,3 +128,38 @@ func TestParseOsascriptPNG(t *testing.T) {
 		t.Fatal("empty parsed")
 	}
 }
+
+func TestShellOutputStripsTerminalEscapes(t *testing.T) {
+	m := newChatTest(0)
+	m.shell = func(context.Context, string, string) (string, error) {
+		return "ok\x1b]52;c;ZXZpbA==\x07\x1b[2Jdone\r\x08\n", nil
+	}
+	m = typeIn(m, "!x")
+	m = cpress(m, ckey("enter"))
+	last := m.msgs[len(m.msgs)-1].text
+	if strings.ContainsAny(last, "\x1b\x07\x08\r") || !strings.Contains(last, "okdone") {
+		t.Fatalf("got %q", last)
+	}
+}
+
+func TestRunShellCapsOutput(t *testing.T) {
+	out, _ := runShell(context.Background(), t.TempDir(), "head -c 5000000 /dev/zero | tr '\\0' a")
+	if len(out) > shellMaxBytes+100 {
+		t.Fatalf("output %d bytes", len(out))
+	}
+}
+
+func TestDefaultPasteDirIsPrivateAndFresh(t *testing.T) {
+	m := newChatTest(0)
+	m.clip = func() ([]byte, error) { return []byte("png"), nil }
+	m = cpress(m, tea.KeyPressMsg{Code: 'v', Mod: tea.ModCtrl})
+	if len(m.images) != 1 {
+		t.Fatal("no image")
+	}
+	d := filepath.Dir(m.images[0])
+	defer os.RemoveAll(d)
+	st, err := os.Stat(d)
+	if err != nil || st.Mode().Perm() != 0o700 || filepath.Base(d) == "smithy-paste" {
+		t.Fatalf("dir %s mode %v err %v", d, st.Mode(), err)
+	}
+}
