@@ -4,6 +4,7 @@ package daemon
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -93,6 +94,34 @@ func (sv *Server) benchExec(args []string) error {
 	return cmd.Run()
 }
 
+func (sv *Server) benchIDs() map[string]bool {
+	rs, _ := bench.Runs(sv.benchDir())
+	ids := map[string]bool{}
+	for _, r := range rs {
+		ids[r.ID] = true
+	}
+	return ids
+}
+
+// benchOutcome is why a finished run has no passing task, "" when it passed any: its exit status,
+// no saved result, or a result where every task failed. The web shows it over the log's last lines.
+func (sv *Server) benchOutcome(err error, before map[string]bool) string {
+	if err != nil {
+		return err.Error()
+	}
+	rs, _ := bench.Runs(sv.benchDir())
+	for _, r := range rs {
+		if before[r.ID] {
+			continue
+		}
+		if r.Passed == 0 {
+			return fmt.Sprintf("no task passed (%d/%d)", r.Passed, r.Total)
+		}
+		return ""
+	}
+	return "the run ended with no result saved"
+}
+
 // benchStart is POST /v1/bench/run: `smithy bench run --agent <a> [--model <m>]` in the
 // background, one at a time; its result lands in the runs list when it ends.
 func (sv *Server) benchStart(w http.ResponseWriter, r *http.Request) {
@@ -120,14 +149,14 @@ func (sv *Server) benchStart(w http.ResponseWriter, r *http.Request) {
 	if req.Model != "" {
 		args = append(args, "--model", req.Model)
 	}
+	before := sv.benchIDs()
 	go func() {
 		err := sv.benchExec(args)
+		msg := sv.benchOutcome(err, before)
 		sv.benchMu.Lock()
 		defer sv.benchMu.Unlock()
 		sv.benchNow.Running = false
-		if err != nil {
-			sv.benchNow.Error = err.Error()
-		}
+		sv.benchNow.Error = msg
 	}()
 	writeJSON(w, 202, map[string]string{"status": "started"})
 }

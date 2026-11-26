@@ -4,6 +4,7 @@ package daemon
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -84,5 +85,47 @@ func TestBenchStartOneAtATime(t *testing.T) {
 	}
 	if s := status(); s.Running {
 		t.Errorf("still running after the run ended: %+v", s)
+	}
+}
+
+// A run that ends with no passing task says why: its exit status, else that nothing passed.
+func TestBenchStatusExplainsAFailedRun(t *testing.T) {
+	sv, hs := newTest(t, filepath.Join(t.TempDir(), "s.db"))
+	sv.BenchDir = t.TempDir()
+	hdr := map[string]string{"Authorization": "Bearer " + testToken}
+	finish := func(run func([]string) error) BenchStatus {
+		t.Helper()
+		sv.BenchRun = run
+		if res := do(t, "POST", hs.URL+"/v1/bench/run", `{"agent":"claude"}`, hdr); res.StatusCode != 202 {
+			t.Fatalf("start: %d", res.StatusCode)
+		}
+		var s BenchStatus
+		for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+			s = BenchStatus{}
+			json.NewDecoder(do(t, "GET", hs.URL+"/v1/bench/status", "", hdr).Body).Decode(&s)
+			if !s.Running {
+				break
+			}
+		}
+		return s
+	}
+	save := func(id string, passed int) func([]string) error {
+		return func([]string) error {
+			r := bench.Result{ID: id, Agent: "claude", Started: time.Now(), Passed: passed, Total: 3}
+			b, _ := json.Marshal(r)
+			return os.WriteFile(filepath.Join(sv.BenchDir, r.ID+".json"), b, 0o644)
+		}
+	}
+	if s := finish(func([]string) error { return errors.New("exit status 2") }); s.Error != "exit status 2" {
+		t.Errorf("a run that exits non-zero: %+v", s)
+	}
+	if s := finish(func([]string) error { return nil }); !strings.Contains(s.Error, "no result") {
+		t.Errorf("a run that saved nothing: %+v", s)
+	}
+	if s := finish(save("29990101-run", 0)); !strings.Contains(s.Error, "0/3") {
+		t.Errorf("a run where no task passed: %+v", s)
+	}
+	if s := finish(save("29990102-run", 2)); s.Error != "" {
+		t.Errorf("a run that passed tasks has no error: %+v", s)
 	}
 }
