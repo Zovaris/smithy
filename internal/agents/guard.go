@@ -11,7 +11,7 @@ import (
 var secretPaths = []string{"~/.smithy/auth.json", "~/.smithy/auth.key", "~/.smithy/accounts/**", "~/.ssh/**", "~/.config/gh/**", "~/.aws/**", "~/.netrc", "~/.git-credentials"}
 
 // SecretGuarded reports whether cli's own config can deny reads of the secret paths: claude
-// (deny rules) and opencode (permission config). codex, gemini, pi, cursor and dsh have no
+// (deny rules) and opencode (permission config). codex, agy, copilot, grok, pi, cursor and dsh have no
 // per-path read deny, so a run on them can read those files.
 func SecretGuarded(cli string) bool {
 	k := Kind(cli)

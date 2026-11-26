@@ -52,7 +52,7 @@ func TestAcquirePicksLeastRecentlyUsedAndSkipsLimited(t *testing.T) {
 	if a, _ := Acquire("pool", now); a.Name != "x" {
 		t.Fatalf("pool picked %s, want the codex account", a.Name)
 	}
-	if _, err := Acquire("gemini", now); !errors.Is(err, ErrNone) {
+	if _, err := Acquire("grok", now); !errors.Is(err, ErrNone) {
 		t.Fatalf("err = %v", err)
 	}
 	if a, _ := Find("x"); a.Env() != "CODEX_HOME="+a.Dir {
@@ -133,7 +133,7 @@ func TestDetectIgnoresRateLimitInATestLog(t *testing.T) {
 	log := filepath.Join(t.TempDir(), "l")
 	now := time.Now()
 	os.WriteFile(log, []byte("--- FAIL: TestRetry (0.01s)\n    client_test.go:40: got error rate_limit, want nil\nFAIL\nexit status 1\n"), 0o600)
-	for _, k := range []string{"claude", "codex", "opencode", "gemini", "pi"} {
+	for _, k := range []string{"claude", "codex", "opencode", "agy", "copilot", "grok", "pi"} {
 		if _, ok := Detect(log, k, 1, now); ok {
 			t.Errorf("%s: a failing test log mentioning rate_limit counted", k)
 		}
@@ -225,7 +225,8 @@ func TestEveryHarnessLogsInWithItsOwnDir(t *testing.T) {
 	bin := t.TempDir()
 	cases := map[string][2]string{
 		"opencode": {"opencode", "XDG_DATA_HOME"},
-		"gemini":   {"gemini", "GEMINI_CLI_HOME"},
+		"copilot":  {"copilot", "COPILOT_HOME"},
+		"grok":     {"grok", "GROK_HOME"},
 		"cursor":   {"agent", "CURSOR_CONFIG_DIR"},
 		"pi":       {"pi", "PI_CODING_AGENT_DIR"},
 		"dsh":      {"dsh", "DSH_HOME"},
@@ -246,6 +247,9 @@ func TestEveryHarnessLogsInWithItsOwnDir(t *testing.T) {
 			t.Fatalf("%s login (%s) rc %d out %q err %q", harness, c[1], rc, out.String(), errb.String())
 		}
 	}
+	if _, err := Add("x", "agy", ""); err == nil {
+		t.Fatal("agy has no config-dir env var to pool")
+	}
 	if _, err := Add("x", "nope", ""); err == nil {
 		t.Fatal("unknown harness accepted")
 	}
@@ -253,7 +257,7 @@ func TestEveryHarnessLogsInWithItsOwnDir(t *testing.T) {
 
 // The texts below are copied from each CLI's source, at the commits named, so a reworded message
 // shows up here as a failing fixture rather than as accounts that never rotate.
-func TestDetectOpenCodeGeminiPi(t *testing.T) {
+func TestDetectOpenCodePi(t *testing.T) {
 	log := filepath.Join(t.TempDir(), "l")
 	now := time.Date(2026, 11, 24, 12, 0, 0, 0, time.UTC)
 	cases := []struct {
@@ -271,13 +275,6 @@ func TestDetectOpenCodeGeminiPi(t *testing.T) {
 		{"opencode", "Error: Claude Code subscription limit reached (five hour). Resets at 2026-11-24T17:00:00.000Z.\n", 1, true, time.Date(2026, 11, 24, 17, 0, 0, 0, time.UTC)},
 		{"opencode", "Error: OpenCode Go usage limit reached.\n", 0, false, time.Time{}},
 		{"opencode", "I explained the usage limit reached message\nError: Session failed\n", 1, false, time.Time{}},
-		// google-gemini/gemini-cli@03862c41 packages/core/src/utils/quotaRetryFailure.test.ts:28 (server
-		// text of a TerminalQuotaError, googleQuotaErrors.ts:318-323), printed by packages/cli/index.ts:197-203
-		// with the prefix "An unexpected critical error occurred: " and exit 1.
-		{"gemini", "An unexpected critical error occurred: You have exhausted your capacity on this model. Your quota will reset after 16h03m18s.\n", 1, true, now.Add(16*time.Hour + 3*time.Minute + 18*time.Second)},
-		{"gemini", "An unexpected critical error occurred: You have exhausted your capacity on this model.\n", 1, true, now.Add(DefaultLimit)},
-		{"gemini", "You have exhausted your capacity on this model. Your quota will reset after 1h.\n", 1, false, time.Time{}},
-		{"gemini", "An unexpected critical error occurred: You have exhausted your capacity on this model.\n", 0, false, time.Time{}},
 		// badlogic/pi-mono@642a705e packages/coding-agent/src/modes/print-mode.ts:151-153 prints the
 		// provider's errorMessage on stderr and exits 1; packages/ai/src/utils/retry.ts:7-34 lists the
 		// account-limit texts, packages/ai/src/api/openai-responses.ts:36 the ChatGPT workspace one.
@@ -326,7 +323,7 @@ func TestPreferredIsTheFirstOrderedHarnessWithAnAccount(t *testing.T) {
 	d := home(t)
 	_, _ = Add("x1", "codex", filepath.Join(d, "x1"))
 	_, _ = Add("c1", "claude", filepath.Join(d, "c1"))
-	if h := Preferred([]string{"gemini", "claude", "codex"}); h != "claude" {
+	if h := Preferred([]string{"agy", "claude", "codex"}); h != "claude" {
 		t.Fatalf("preferred = %q", h)
 	}
 	if h := Preferred(nil); h != "" {

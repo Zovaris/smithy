@@ -60,7 +60,7 @@ func loginArgs(harness string) []string {
 		return []string{"opencode", "auth", "login"}
 	case "cursor":
 		return []string{"agent", "login"}
-	case "gemini", "pi", "dsh":
+	case "copilot", "grok", "pi", "dsh":
 		return []string{harness}
 	}
 	return []string{"claude", "/login"}

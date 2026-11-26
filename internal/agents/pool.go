@@ -107,7 +107,7 @@ func earliestOr(h string, now time.Time) time.Time {
 
 // PoolDropEnv are credentials that would override the account's own login in a pooled run.
 var PoolDropEnv = []string{"CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "CODEX_API_KEY", "CLAUDE_CONFIG_DIR", "CODEX_HOME",
-	"GEMINI_API_KEY", "GOOGLE_API_KEY", "CURSOR_API_KEY", "GEMINI_CLI_HOME", "CURSOR_CONFIG_DIR", "PI_CODING_AGENT_DIR", "DSH_HOME"}
+	"GEMINI_API_KEY", "GOOGLE_API_KEY", "CURSOR_API_KEY", "COPILOT_GITHUB_TOKEN", "XAI_API_KEY", "COPILOT_HOME", "GROK_HOME", "CURSOR_CONFIG_DIR", "PI_CODING_AGENT_DIR", "DSH_HOME"}
 
 // head is cwd's HEAD commit ("" outside a git repo).
 func head(cwd string) string {

@@ -129,7 +129,7 @@ func TestSkillsInstallNamedHarnessOnly(t *testing.T) {
 	home := t.TempDir()
 	os.MkdirAll(filepath.Join(home, ".claude"), 0o755)
 	srv := release(t, goodArchive(t), "")
-	if err := InstallSkills(opts(t, srv, home, "gemini")); err != nil {
+	if err := InstallSkills(opts(t, srv, home, "agy")); err != nil {
 		t.Fatal(err)
 	}
 	if read(t, filepath.Join(home, ".gemini", "skills", "hush", "SKILL.md")) != "hush" {
@@ -207,8 +207,8 @@ func TestSkillsInstallErrors(t *testing.T) {
 }
 
 func TestSkillsInstallArgs(t *testing.T) {
-	hs, err := parseInstallArgs([]string{"--harness", "codex", "--harness=gemini", "claude"})
-	if err != nil || strings.Join(hs, ",") != "codex,gemini,claude" {
+	hs, err := parseInstallArgs([]string{"--harness", "codex", "--harness=agy", "claude"})
+	if err != nil || strings.Join(hs, ",") != "codex,agy,claude" {
 		t.Fatalf("%v %v", hs, err)
 	}
 	if _, err := parseInstallArgs([]string{"--bogus"}); err == nil {

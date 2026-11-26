@@ -50,7 +50,7 @@ type briefBatch struct {
 // harnessRows maps harness.Detect names to the row names of harness.md's per-harness table.
 var harnessRows = map[string]string{
 	"claude-cli": "Claude Code CLI", "claude-desktop": "Claude Code desktop", "codex": "Codex",
-	"opencode": "OpenCode", "gemini": "Gemini CLI", "cursor": "Cursor", "dsh": "DeepSeek Harness", "pi": "Pi",
+	"opencode": "OpenCode", "agy": "Antigravity CLI", "copilot": "Copilot CLI", "grok": "Grok Build", "cursor": "Cursor", "dsh": "DeepSeek Harness", "pi": "Pi",
 }
 
 // boardKey matches a GitHub issue key, owner/repo#n.

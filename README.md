@@ -14,7 +14,9 @@
 [![Codex](https://img.shields.io/badge/Codex-supported-412991?logo=openai&logoColor=white)](#harnesses)
 [![OpenCode](https://img.shields.io/badge/OpenCode-supported-24292f)](#harnesses)
 [![Cursor](https://img.shields.io/badge/Cursor-supported-000000)](#harnesses)
-[![Gemini CLI](https://img.shields.io/badge/Gemini_CLI-supported-4285f4?logo=googlegemini&logoColor=white)](#harnesses)
+[![Antigravity CLI](https://img.shields.io/badge/Antigravity_CLI-supported-4285f4?logo=google&logoColor=white)](#harnesses)
+[![Copilot CLI](https://img.shields.io/badge/Copilot_CLI-supported-24292f?logo=githubcopilot&logoColor=white)](#harnesses)
+[![Grok Build](https://img.shields.io/badge/Grok_Build-supported-000000)](#harnesses)
 
 [Install](#install) · [How it works](#how-it-works) · [Skills](#skills) ·
 [Autonomous mode](#autonomous-mode) · [Harnesses](#harnesses) · [Docs](#docs)
@@ -34,7 +36,7 @@ the failing test first, runs tasks in parallel and keeps every pull request gree
 - **You decide.** Nothing reaches production without your yes.
 - **Learns with your yes.** Lessons backed by evidence go into your repo's standards.
 - **Runs unattended.** Label an issue `auto` and it gets built.
-- **Any harness.** Claude Code, Codex, OpenCode, Cursor, Gemini CLI, Pi and DeepSeek Harness.
+- **Any harness.** Claude Code, Codex, OpenCode, Cursor, Antigravity CLI, Copilot CLI, Grok Build, Pi and DeepSeek Harness.
 
 ## Install
 
@@ -126,7 +128,9 @@ instructions.
 | Codex CLI | `$smelt` | `codex exec` |
 | OpenCode | `@smelt` | `opencode run` |
 | Cursor CLI | `/smelt` | `agent -p` |
-| Gemini CLI | "use smelt" | `gemini -p` |
+| Antigravity CLI (`agy`) | "use smelt" | `agy -p` |
+| GitHub Copilot CLI | "use smelt" | `copilot -p` |
+| Grok Build | "use smelt" | `grok -p` |
 | Pi | `/skill:smelt` | `pi -p` |
 | DeepSeek Harness | `/smelt` | `dsh headless` |
 

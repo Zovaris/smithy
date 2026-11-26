@@ -292,10 +292,10 @@ func TestDoctorFailures(t *testing.T) {
 		}
 	})
 	t.Run("agent CLI found on PATH", func(t *testing.T) {
-		newDoctor(t, "git", "gh", "gemini")
+		newDoctor(t, "git", "gh", "agy")
 		t.Setenv("AGENT_CMD", "")
 		o, c := doctor(t)
-		if c != 0 || !strings.Contains(o, "  ok    agent CLI: gemini") {
+		if c != 0 || !strings.Contains(o, "  ok    agent CLI: agy") {
 			t.Errorf("%d\n%s", c, o)
 		}
 	})
