@@ -18,6 +18,7 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/remote"
@@ -109,6 +110,9 @@ type chatView struct {
 	current  string                // the open session, "" before the first message
 	convs    map[string][]*chatMsg // the other sessions' conversations
 	cost     map[string]float64    // spend per session
+	toks     map[string]int64      // input and output tokens per session
+	streamed map[string]int        // characters of agent text since the turn began, for tok/s
+	effort   string                // agent.effort, shown in the header
 	noise    []noise               // daemon events kept out of the transcript
 	dir      string                // the folder sessions start in and @ lists
 	root     string                // dir with symlinks resolved, as the daemon records it
@@ -398,6 +402,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	m.dir, _ = os.Getwd()
 	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
+	m.effort = config.Get("agent.effort", "medium")
 	if tok != "" {
 		m.webURL = url + "/#token=" + neturl.QueryEscape(tok)
 	} else {

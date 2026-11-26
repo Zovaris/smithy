@@ -18,9 +18,13 @@ part above `### Details`.
 - `/effort` sets the open session's reasoning effort (low or medium) for claude and codex.
 - An agent can ask you a question in a normal chat, not only inside a warden run; `/ask` pins a
   sample question so you can see and try how decisions look.
+- The chat header shows the folder, model, effort, tokens and cost; it no longer animates, and
+  the loader is a small four-cell pulse with the live tok/s of the running turn.
 
 ### Details
 
+- Chat tok/s is estimated from streamed agent text (about four characters per token) over the
+  turn's time; tokens and cost come from session usage events.
 - Daemon settings API, this machine's token only: `GET /v1/settings` (every setting, masked API
   keys, serve on/off), `PUT|DELETE /v1/settings/{key}` (user file; secret keys refused),
   `PUT|DELETE /v1/keys/{service}`, `PUT /v1/serve` (`auto.paused`), `GET /v1/doctor`.

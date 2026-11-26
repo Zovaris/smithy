@@ -143,6 +143,7 @@ func (m *chatView) track(id, kind string) {
 		if s := &m.sessions[i]; s.id == id {
 			if state == "running" && s.state != "running" {
 				s.turn = time.Now()
+				delete(m.streamed, id)
 			}
 			s.kind, s.state = kind, state
 			return
