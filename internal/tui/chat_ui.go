@@ -144,6 +144,7 @@ func (m *chatView) track(id, kind string) {
 		if s := &m.sessions[i]; s.id == id {
 			if state == "running" && s.state != "running" {
 				s.turn = time.Now()
+				delete(m.streamed, id)
 			}
 			s.kind, s.state = kind, state
 			return
@@ -344,6 +345,10 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, m.answer(arg)
+	case "detach":
+		return m.detach()
+	case "serve", "set", "unset", "key", "keys", "doctor":
+		return m.settingsCommand(name, arg)
 	case "quit":
 		return m, tea.Quit
 	case "help":

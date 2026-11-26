@@ -18,6 +18,7 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/remote"
@@ -93,6 +94,7 @@ type chatView struct {
 	ask func(id, question string, options []string) tea.Cmd
 
 	setup     setupAPI      // the daemon's setup endpoints; nil: none
+	cfg       settingsAPI   // the daemon's settings endpoints; nil: none
 	setupSt   *daemon.Setup // last GET /v1/setup
 	setupSel  int
 	setupStep setupStep
@@ -108,6 +110,9 @@ type chatView struct {
 	current  string                // the open session, "" before the first message
 	convs    map[string][]*chatMsg // the other sessions' conversations
 	cost     map[string]float64    // spend per session
+	toks     map[string]int64      // input and output tokens per session
+	streamed map[string]int        // characters of agent text since the turn began, for tok/s
+	effort   string                // agent.effort, shown in the header
 	noise    []noise               // daemon events kept out of the transcript
 	dir      string                // the folder sessions start in and @ lists
 	root     string                // dir with symlinks resolved, as the daemon records it
@@ -394,10 +399,11 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	}
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
-	m.setup, m.sess = c, c
+	m.setup, m.sess, m.cfg = c, c, c
 	m.dir, _ = os.Getwd()
 	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
+	m.effort = config.Get("agent.effort", "medium")
 	if tok != "" {
 		m.webURL = url + "/#token=" + neturl.QueryEscape(tok)
 	} else {
@@ -514,6 +520,11 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.projectsLoaded(msg)
 	case dirsMsg:
 		return m.dirsLoaded(msg)
+	case settingsDoneMsg:
+		for _, l := range msg.lines {
+			m.system(l)
+		}
+		return m, nil
 	case sessionErrMsg:
 		m.system(m.th.g.fail + " " + msg.what + " failed: " + msg.err.Error())
 		return m, nil
