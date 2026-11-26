@@ -81,6 +81,26 @@ func TestDetectReadyAPIKeys(t *testing.T) {
 	}
 }
 
+// The web shows each agent by the name its catalog entry gives it, not a table of its own.
+func TestDetectReadyNamesEveryAgent(t *testing.T) {
+	rs := DetectReady(ReadyDeps{
+		LookPath: func(string) (string, error) { return "", os.ErrNotExist },
+		Getenv:   func(k string) string { return map[string]string{"HOME": t.TempDir()}[k] },
+		Stored:   func(string) string { return "" },
+	})
+	m := readyByName(rs)
+	for name, want := range map[string]string{"claude": "Claude Code", "agy": "Antigravity", "pi": "Pi", "dsh": "dsh", "api:anthropic": "Anthropic API", "api:openrouter": "OpenRouter API"} {
+		if got := m[name].Display; got != want {
+			t.Errorf("%s display = %q, want %q", name, got, want)
+		}
+	}
+	for _, r := range rs {
+		if r.Display == "" {
+			t.Errorf("%s has no display name", r.Name)
+		}
+	}
+}
+
 func TestCLIPathAddsFoldersOffPath(t *testing.T) {
 	home := t.TempDir()
 	local := filepath.Join(home, ".claude", "local")

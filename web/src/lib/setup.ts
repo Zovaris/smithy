@@ -1,7 +1,7 @@
 import { api } from "./auth";
 import { type EffortRules, setEffortRules } from "./parity";
 
-export type Ready = { name: string; kind: "cli" | "api"; ready: boolean; detail: string; fix?: string };
+export type Ready = { name: string; display?: string; kind: "cli" | "api"; ready: boolean; detail: string; fix?: string };
 export type Choice = { agent: string; model?: string };
 export type Kit = { mcp: boolean; skills: string[] };
 export type Harness = {

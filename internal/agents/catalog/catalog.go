@@ -5,6 +5,7 @@ package catalog
 // Agent is one agent CLI and what smithy knows about it.
 type Agent struct {
 	Name    string   // the CLI kind, as AGENT_CLI and settings name it
+	Display string   // how the TUI and the web name it
 	Bin     string   // the executable on PATH
 	Install string   // the one command that installs it
 	Effort  bool     // takes an effort flag; the rest only get $AGENT_EFFORT
@@ -20,24 +21,24 @@ type Agent struct {
 // Known lists every agent CLI in pick order: the first installed one runs when AGENT_CLI and
 // AGENT_CMD are unset.
 var Known = []Agent{
-	{Name: "claude", Bin: "claude", Install: "npm install -g @anthropic-ai/claude-code", Effort: true, Skills: true, Consult: true,
+	{Name: "claude", Display: "Claude Code", Bin: "claude", Install: "npm install -g @anthropic-ai/claude-code", Effort: true, Skills: true, Consult: true,
 		Tier: "claude-cli", Login: []string{"claude", "/login"}, PoolEnv: "CLAUDE_CONFIG_DIR"},
-	{Name: "codex", Bin: "codex", Install: "npm install -g @openai/codex", Effort: true, Skills: true, Consult: true,
+	{Name: "codex", Display: "Codex", Bin: "codex", Install: "npm install -g @openai/codex", Effort: true, Skills: true, Consult: true,
 		Tier: "codex", Login: []string{"codex", "login"}, PoolEnv: "CODEX_HOME"},
-	{Name: "opencode", Bin: "opencode", Install: "npm install -g opencode-ai", Skills: true, Consult: true,
+	{Name: "opencode", Display: "OpenCode", Bin: "opencode", Install: "npm install -g opencode-ai", Skills: true, Consult: true,
 		Tier: "opencode", ACP: []string{"opencode", "acp"}, Models: []string{"opencode", "models"},
 		Login: []string{"opencode", "auth", "login"}, PoolEnv: "XDG_DATA_HOME"},
-	{Name: "agy", Bin: "agy", Install: "curl -fsSL https://antigravity.google/cli/install.sh | bash", Skills: true, Consult: true,
+	{Name: "agy", Display: "Antigravity", Bin: "agy", Install: "curl -fsSL https://antigravity.google/cli/install.sh | bash", Skills: true, Consult: true,
 		Tier: "agy", ACP: []string{"agy", "acp"}},
-	{Name: "copilot", Bin: "copilot", Install: "npm install -g @github/copilot", Skills: true, Consult: true,
+	{Name: "copilot", Display: "Copilot", Bin: "copilot", Install: "npm install -g @github/copilot", Skills: true, Consult: true,
 		Tier: "copilot", ACP: []string{"copilot", "--acp"}, Login: []string{"copilot"}, PoolEnv: "COPILOT_HOME"},
-	{Name: "grok", Bin: "grok", Install: "curl -fsSL https://x.ai/cli/install.sh | bash", Skills: true, Consult: true,
+	{Name: "grok", Display: "Grok", Bin: "grok", Install: "curl -fsSL https://x.ai/cli/install.sh | bash", Skills: true, Consult: true,
 		Tier: "grok", ACP: []string{"grok", "agent", "stdio"}, Login: []string{"grok"}, PoolEnv: "GROK_HOME"},
-	{Name: "cursor", Bin: "agent", Install: "curl https://cursor.com/install -fsS | bash", Skills: true,
+	{Name: "cursor", Display: "Cursor", Bin: "agent", Install: "curl https://cursor.com/install -fsS | bash", Skills: true,
 		Tier: "cursor", Login: []string{"agent", "login"}, PoolEnv: "CURSOR_CONFIG_DIR"},
-	{Name: "pi", Bin: "pi", Install: "npm install -g @mariozechner/pi-coding-agent", Skills: true, Consult: true,
+	{Name: "pi", Display: "Pi", Bin: "pi", Install: "npm install -g @mariozechner/pi-coding-agent", Skills: true, Consult: true,
 		Tier: "pi", Login: []string{"pi"}, PoolEnv: "PI_CODING_AGENT_DIR"},
-	{Name: "dsh", Bin: "dsh", Install: "see github.com/deepseek-ai/dsh-superagent-prototype", Skills: true, Consult: true,
+	{Name: "dsh", Display: "dsh", Bin: "dsh", Install: "see github.com/deepseek-ai/dsh-superagent-prototype", Skills: true, Consult: true,
 		Tier: "dsh", Login: []string{"dsh"}, PoolEnv: "DSH_HOME"},
 }
 

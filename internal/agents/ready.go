@@ -7,17 +7,19 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Zovaris/smithy/internal/agents/catalog"
 	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/Zovaris/smithy/internal/auth"
 )
 
 // Ready is one agent smithy can drive: an installed CLI or an API provider with a stored key.
 type Ready struct {
-	Name   string `json:"name"` // the session agent: a CLI name or api:<provider>
-	Kind   string `json:"kind"` // cli or api
-	Ready  bool   `json:"ready"`
-	Detail string `json:"detail"` // where it was found, or why it is missing
-	Fix    string `json:"fix,omitempty"`
+	Name    string `json:"name"`    // the session agent: a CLI name or api:<provider>
+	Display string `json:"display"` // how the UIs name it: the catalog's name, or "<Provider> API"
+	Kind    string `json:"kind"`    // cli or api
+	Ready   bool   `json:"ready"`
+	Detail  string `json:"detail"` // where it was found, or why it is missing
+	Fix     string `json:"fix,omitempty"`
 }
 
 // ReadyDeps is what DetectReady looks at; DefaultReadyDeps reads this machine.
@@ -40,6 +42,28 @@ var InstallHint = func() map[string]string {
 	}
 	return m
 }()
+
+// apiName is how each API provider is written, for its "<Provider> API" display name.
+var apiName = map[string]string{"anthropic": "Anthropic", "openai": "OpenAI", "gemini": "Gemini", "openrouter": "OpenRouter", "deepseek": "DeepSeek", "ollama": "Ollama"}
+
+// DisplayName is how the TUI and the web name an agent: the catalog's name for a CLI,
+// "<Provider> API" for api:<provider>[/model], else the name itself.
+func DisplayName(name string) string {
+	name = strings.TrimPrefix(name, "acp:")
+	if p, ok := strings.CutPrefix(name, "api:"); ok {
+		p, _, _ = strings.Cut(p, "/")
+		if n := apiName[p]; n != "" {
+			return n + " API"
+		}
+		if p != "" {
+			return strings.ToUpper(p[:1]) + p[1:] + " API"
+		}
+	}
+	if a, ok := catalog.Lookup(name); ok && a.Display != "" {
+		return a.Display
+	}
+	return name
+}
 
 var apiKeyEnv = map[string]string{
 	"anthropic":  "ANTHROPIC_API_KEY",
@@ -89,10 +113,10 @@ func DetectReady(d ReadyDeps) []Ready {
 	var out []Ready
 	for _, c := range CLIs {
 		if p, ok := FindCLI(c, d.LookPath, d.Getenv); ok {
-			out = append(out, Ready{Name: c, Kind: "cli", Ready: true, Detail: p})
+			out = append(out, Ready{Name: c, Display: DisplayName(c), Kind: "cli", Ready: true, Detail: p})
 			continue
 		}
-		out = append(out, Ready{Name: c, Kind: "cli", Detail: Bin(c) + " not found", Fix: InstallHint[c]})
+		out = append(out, Ready{Name: c, Display: DisplayName(c), Kind: "cli", Detail: Bin(c) + " not found", Fix: InstallHint[c]})
 	}
 	ps := make([]string, 0, len(apiloop.Providers))
 	for p := range apiloop.Providers {
@@ -100,7 +124,7 @@ func DetectReady(d ReadyDeps) []Ready {
 	}
 	slices.Sort(ps)
 	for _, p := range ps {
-		r := Ready{Name: "api:" + p, Kind: "api"}
+		r := Ready{Name: "api:" + p, Display: DisplayName("api:" + p), Kind: "api"}
 		svc := apiloop.Providers[p].Service
 		switch {
 		case svc == "":
