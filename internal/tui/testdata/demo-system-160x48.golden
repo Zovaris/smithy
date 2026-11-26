@@ -1,10 +1,4 @@
-                                                                                                                                                                
-     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄       ╔═╗╔╦╗╦╔╦╗╦ ╦╦ ╦                             watcher  ● watching github, linear (TES) · next poll 35s · serve pid 4242 claude 
- ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀       ╚═╗║║║║ ║ ╠═╣╚╦╝                             today    ███████████▓▒  69 / 80 launched                                         
-          ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ╚═╝╩ ╩╩ ╩ ╩ ╩ ╩                              agents   5 working · 0 waiting · 2 stuck                                         
-              ▀▀▀▀▀▀▀              DEMO  autonomous forge · dev · smithy       PRs      3 ready for you · 1 CI running                                          
-         ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
-        ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
+ ◆ smithy dev · smithy                                                                                                                  DEMO  ● watching  14:30 
   1 Overview   2 Agents   3 Incoming   4 Needs you ? 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System   0 History                                     
    Health · read-only                                                           ╭─ Settings · 90 · enter edits ────────────────────────────────────────────────╮
   Versions                                                                      │ auto.*                                                                       │
@@ -43,6 +37,12 @@
   ok   gh found and authenticated                                               │   warden.stuck_minutes   15             default minutes without a worker he… │
   ok   claude found                                                             │   warden.worker_model    route          default route: pick cheap/mid/stron… │
   ok   worktree root /home/dev/worktrees writable                               │                                                                              │
-  ok   sandbox: native (claude, hosts github.com,api.github.com,api.anthropic…  │ enter edits · u unsets · key.* rows are API keys, typed masked               │
+  ok   sandbox: native (claude, hosts github.com,api.github.com,api.anthropic…  │ notify.*                                                                     │
+  warn 2 orphaned worktrees (smithy warden cleanup)                             │   notify.telegram.chat   123456789      user    Telegram chat id serve noti… │
+                                                                                │   notify.style           plain          default Telegram message look: emoj… │
+                                                                                │   notify.kinds           pr_ready,bloc… default comma list of notification … │
+                                                                                │                                                                              │
+                                                                                │                                                                              │
+                                                                                │ enter edits · u unsets · key.* rows are API keys, typed masked               │
                                                                                 ╰──────────────────────────────────────────────────────────────────────────────╯
  ↑↓ move  enter edit  u unset setting  r refresh  l log                                                                               tab views  ? help  q quit 

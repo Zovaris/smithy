@@ -1,10 +1,4 @@
-                                                                                                                                                                
-     ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄       ╔═╗╔╦╗╦╔╦╗╦ ╦╦ ╦                             watcher  ● watching github, linear (TES) · next poll 35s · serve pid 4242 claude 
- ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀       ╚═╗║║║║ ║ ╠═╣╚╦╝                             today    ███████████▓▒  69 / 80 launched                                         
-          ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀         ╚═╝╩ ╩╩ ╩ ╩ ╩ ╩                              agents   5 working · 0 waiting · 2 stuck                                         
-              ▀▀▀▀▀▀▀              DEMO  autonomous forge · dev · smithy       PRs      3 ready for you · 1 CI running                                          
-         ▄▄▄▀▀▀▀▀▀▀▀▀▀▀▄▄▄                                                                                                                                      
-        ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀                                                             14:30:00                                                                
+ ◆ smithy dev · smithy                                                                                                                  DEMO  ● watching  14:30 
   1 Overview   2 Agents   3 Incoming   4 Needs you ? 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System   0 History                                     
 ╭─ Agents · 15 · sort stage ────────────────────────────────────────────────────────────────────────────╮   Preview                                             
 │   issue       title                       repo        model   stage     CI         PR      beat       │  orchestrator pid 5150                                
@@ -23,6 +17,12 @@
 │   TES-200     Add dark mode to the repo…  smithy      cheap   queued    -          -       -          │                                                       
 │   TES-201     Fix flaky login test        atlas       mid     queued    -          -       -          │                                                       
 │   TES-213     Archive stale branches      atlas       mid     merged    ✓ green    #2013   2m ago     │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
+│                                                                                                       │                                                       
 │                                                                                                       │                                                       
 │                                                                                                       │                                                       
 │                                                                                                       │                                                       

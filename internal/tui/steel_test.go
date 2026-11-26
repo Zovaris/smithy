@@ -136,7 +136,6 @@ func TestMotionWhileRunning(t *testing.T) {
 	if !m.running() {
 		t.Fatal("demo has no running item")
 	}
-	m.fx = newFX(1)
 	if !m.busy() {
 		t.Fatal("running items do not keep frames going")
 	}

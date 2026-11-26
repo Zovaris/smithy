@@ -562,43 +562,34 @@ func TestResize(t *testing.T) {
 	}
 }
 
-func TestPlateSize(t *testing.T) {
-	m := demo(t, 160, 48)
-	if rows := m.plateRows(bigPlate); len(rows) != 7 || ansi.StringWidth(rows[3]) != 30 {
-		t.Fatalf("big plate is %d rows", len(rows))
-	}
-	if rows := m.plateRows(smallPlate); len(rows) != 4 || ansi.StringWidth(rows[0]) != 16 {
-		t.Fatalf("small plate is %d rows", len(rows))
-	}
-}
-
-func TestHeaderFrameDeterministic(t *testing.T) {
-	frameAt := func(seed uint64, steps int) string {
-		m := demo(t, 160, 48)
-		m.motion = true
-		m.fx = newFX(seed)
-		m.strike(10)
-		for i := 0; i < steps; i++ {
-			m.fx.step()
-		}
-		return strings.Join(m.plateRows(bigPlate), "\n") + strings.Join(m.wordmark(), "\n")
-	}
-	a := frameAt(42, 6)
-	if a != frameAt(42, 6) || a == frameAt(43, 6) {
-		t.Fatal("frames are not a function of the seed")
-	}
-	still := demo(t, 160, 48)
-	if a == strings.Join(still.plateRows(bigPlate), "\n")+strings.Join(still.wordmark(), "\n") {
-		t.Fatal("a mid-spark frame equals the still one")
-	}
-	for _, w := range []int{160, 110, 109, 80, 79} {
+func TestHeaderIsOneCompactBar(t *testing.T) {
+	for _, w := range []int{160, 110, 80, 60, 40} {
 		m := demo(t, w, 40)
 		head := m.header(w)
-		if len(head) > 7 || !strings.Contains(ansi.Strip(strings.Join(head, "\n")), strings.TrimRight(wordB[0], " ")) {
-			t.Fatalf("width %d: header %d rows or name cut", w, len(head))
+		if len(head) != 1 {
+			t.Fatalf("width %d: header is %d rows, want one bar", w, len(head))
 		}
-		if !strings.Contains(ansi.Strip(strings.Join(head, "\n")), "DEMO") && w >= 80 {
-			t.Fatalf("width %d: no DEMO pill", w)
+		bar := ansi.Strip(head[0])
+		if ansi.StringWidth(head[0]) > w {
+			t.Fatalf("width %d: bar overflows: %q", w, bar)
+		}
+		if strings.ContainsAny(bar, "▀▄█") {
+			t.Fatalf("width %d: the anvil plate is back: %q", w, bar)
+		}
+		if !strings.Contains(bar, "smithy") || !strings.Contains(bar, "14:30") {
+			t.Fatalf("width %d: bar lacks the name or the clock: %q", w, bar)
+		}
+		if w >= 80 {
+			for _, want := range []string{Version, m.snap.Repo, "DEMO", m.watchWord()} {
+				if !strings.Contains(bar, want) {
+					t.Errorf("width %d: bar lacks %q: %q", w, want, bar)
+				}
+			}
+		}
+		for _, gone := range []string{"launched", "working", "CI running", "14:30:00"} {
+			if strings.Contains(bar, gone) {
+				t.Errorf("width %d: bar repeats %q: %q", w, gone, bar)
+			}
 		}
 	}
 }
@@ -608,21 +599,16 @@ func TestMotionStopsWhenIdle(t *testing.T) {
 	m.motion = true
 	m.load = func(time.Time) Snapshot { return Snapshot{At: fixedNow} }
 	m.snap.Batches = nil
-	nm, cmd := m.Update(strikeMsg{})
-	m = nm.(Model)
-	if cmd == nil || !m.framing || len(m.fx.sparks) == 0 {
-		t.Fatal("strike did not start frames and sparks")
-	}
 	for i := 0; i < 400 && m.framing; i++ {
-		nm, _ = m.Update(frameMsg{})
+		nm, _ := m.Update(frameMsg{})
 		m = nm.(Model)
 	}
-	if m.framing || m.fx.busy() {
-		t.Fatal("frames keep running after the sparks died")
+	if nm, cmd := m.Update(tickMsg(fixedNow)); nm.(Model).framing {
+		_ = cmd
+		t.Fatal("an idle tick started frames")
 	}
-	still := demo(t, 160, 48)
-	if nm, cmd := still.Update(strikeMsg{}); cmd != nil || nm.(Model).framing {
-		t.Fatal("reduced motion scheduled frames")
+	if m.Init() == nil {
+		t.Fatal("no refresh loop")
 	}
 }
 
