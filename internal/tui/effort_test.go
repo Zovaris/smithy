@@ -11,7 +11,6 @@ import (
 	"github.com/Zovaris/smithy/internal/daemon"
 )
 
-// fakeSessModel is a sessions API that also sets a session's model and effort.
 type fakeSessModel struct {
 	fakeSessions
 	set []string
@@ -22,7 +21,6 @@ func (f *fakeSessModel) SetSessionModel(_ context.Context, id, model, effort str
 	return daemon.Session{ID: id, Agent: "claude", Model: model, Effort: effort, Status: daemon.StatusDone}, nil
 }
 
-// sessionScene is the models scene with session s-1 (claude) open.
 func sessionScene() (*fakeModels, *fakeSessModel, chatView) {
 	f, m := modelsScene()
 	f.s.Agents = append(f.s.Agents, agents.Ready{Name: "opencode", Kind: "cli", Ready: true})

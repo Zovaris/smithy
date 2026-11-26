@@ -307,8 +307,6 @@ func (m chatView) agentCommand(arg string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// modelCommand is /model [name]: for the open session when there is one (its agent is fixed),
-// else for the agent new sessions start with. No name opens the list.
 func (m chatView) modelCommand(arg string) (tea.Model, tea.Cmd) {
 	if _, ok := m.sess.(sessionModelAPI); ok {
 		if s := m.openSession(); s != nil && !strings.HasPrefix(s.agent, "api:") {

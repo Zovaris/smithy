@@ -10,7 +10,6 @@ import (
 	"github.com/Zovaris/smithy/internal/daemon"
 )
 
-// sessionModelAPI sets a session's model and effort; *daemon.Client is one.
 type sessionModelAPI interface {
 	SetSessionModel(ctx context.Context, id, model, effort string) (daemon.Session, error)
 }
@@ -20,7 +19,6 @@ type sessionModelSetMsg struct {
 	err error
 }
 
-// openSession is the open session's row, nil before the first message.
 func (m *chatView) openSession() *chatSession {
 	if m.current == "" {
 		return nil
@@ -37,7 +35,6 @@ func (m *chatView) sessionByID(id string) *chatSession {
 	return nil
 }
 
-// nextReadyAgent is the ready agent after cur in the setup list, wrapping; "" when none other.
 func (m chatView) nextReadyAgent(cur string) string {
 	if m.setupSt == nil {
 		return ""
@@ -72,7 +69,6 @@ func (m chatView) setSessionModel(id, model, effort string) tea.Cmd {
 	}
 }
 
-// sessionModelSet applies the daemon's answer to a model or effort change.
 func (m *chatView) sessionModelSet(msg sessionModelSetMsg) {
 	if msg.err != nil {
 		m.system("error: " + msg.err.Error())
@@ -90,10 +86,8 @@ func (m *chatView) sessionModelSet(msg sessionModelSetMsg) {
 	m.status("next turns run " + msg.s.Agent + " · " + what + " · effort " + eff)
 }
 
-// effortRows are the effort list: the agent.effort setting, then each effort smithy passes on.
 func effortRows() []string { return append([]string{""}, agents.Efforts...) }
 
-// effortCommand is /effort [low|medium] for the open session's agent, when it takes one.
 func (m chatView) effortCommand(arg string) (tea.Model, tea.Cmd) {
 	s := m.openSession()
 	if s == nil {
@@ -138,7 +132,6 @@ func (m chatView) effortKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// effortBox is the /effort list for the open session.
 func (m chatView) effortBox(screen []string, w, h int) []string {
 	t := m.th
 	bw, bh := m.boxSize(w, h)

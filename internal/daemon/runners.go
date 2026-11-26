@@ -142,13 +142,11 @@ func CLIPrompt(history []Exchange, msg string) string {
 		"---\nThe user's new message:\n\n" + msg
 }
 
-// effortSetter is a runner that passes a reasoning effort to its agent.
 type effortSetter interface{ SetEffort(string) }
 
 // SetEffort sets the effort the next turns pass as $AGENT_EFFORT ("": the agent.effort setting).
 func (r *cliRunner) SetEffort(e string) { r.effort = e }
 
-// env is a turn's environment: the agent, its model and effort, the claude stream flags.
 func (r *cliRunner) env() []string {
 	env := agents.Scrub(os.Environ())
 	env = append(env, "SMITHY_EVENTS=off")
