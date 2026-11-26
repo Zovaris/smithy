@@ -81,6 +81,8 @@ type Server struct {
 	Version string
 	// Ready, when set, replaces agent detection (tests).
 	Ready func() []agents.Ready
+	// Doctor, when set, replaces running `smithy doctor` (tests).
+	Doctor func(context.Context) []string
 	// Models, when set, replaces model discovery (tests).
 	Models func(ctx context.Context, agent string, refresh bool) models.List
 	// SkillsInstall, when set, replaces running `smithy skills install` (tests).
@@ -320,6 +322,13 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("POST /v1/setup/skills/install", sv.installSkills)
 	mux.HandleFunc("GET /v1/agents/{id}/models", sv.agentModels)
 	mux.HandleFunc("GET /v1/bench", sv.benchRuns)
+	mux.HandleFunc("GET /v1/settings", sv.listSettings)
+	mux.HandleFunc("PUT /v1/settings/{key}", sv.putSetting)
+	mux.HandleFunc("DELETE /v1/settings/{key}", sv.deleteSetting)
+	mux.HandleFunc("PUT /v1/keys/{service}", sv.putKey)
+	mux.HandleFunc("DELETE /v1/keys/{service}", sv.deleteKey)
+	mux.HandleFunc("PUT /v1/serve", sv.putServe)
+	mux.HandleFunc("GET /v1/doctor", sv.doctor)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
 	return mux
 }
