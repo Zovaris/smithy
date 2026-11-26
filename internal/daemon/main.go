@@ -260,6 +260,8 @@ func foreground(o runOpts) int {
 	defer stopTails()
 	api.Ctx = tctx
 	go api.RunTails(tctx, time.Second, &Tail{Path: events.File(), Source: "tail:events"}, &Tail{Path: events.ProxyFile(), Source: ProxySource})
+	api.Tend = NewTender()
+	go api.Tend.Run(tctx, 2*time.Minute)
 	conns, cerr := connect.FromConfig()
 	if cerr != nil {
 		fmt.Fprintf(os.Stderr, "%s: chat connectors: %s\n", name, text.Clean(cerr.Error()))
