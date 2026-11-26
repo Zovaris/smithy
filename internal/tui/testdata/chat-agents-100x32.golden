@@ -2,21 +2,21 @@
   smithy dev
 
 
-    ?   ›  Agents · 1 running · 3 sessions                                               esc  -29   
-                                                                                              
-        THIS PROJECT                                                                          
-        ✓  › TK-6  TK-6 · turn                                                          done  
-        ●  TK-29  TK-29 · running                                                        now  
-        ✗  TES-9  TES-9 · failed                                                      failed  
-                                                                                              
-        WAITING ON YOU  1                                                                     
-        ?  Merge #142 into release/v0.17?  merge · later                                      
-                                                                                              
-        ↑↓ move   enter open   s stop   n new session   a all   tab close                     
-
-
-
-     › Add usage-limit detection for Pi (TK-6).                                                     
+    ? ╭──────────────────────────────────────────────────────────────────────────────────────╮-29   
+      │ › Agents · 1 running · 3 sessions                                                esc │
+      ├──────────────────────────────────────────────────────────────────────────────────────┤
+      │                                                                                      │
+      │   THIS PROJECT                                                                       │
+      │ ▌ ✓  › TK-6  TK-6 · turn                                                       done  │
+      │   ●  TK-29  TK-29 · running                                                     now  │
+      │   ✗  TES-9  TES-9 · failed                                                   failed  │
+      │                                                                                      │
+      │   WAITING ON YOU  1                                                                  │
+      │   ?  Merge #142 into release/v0.17?  merge · later                                   │
+      │                                                                                      │
+      ├──────────────────────────────────────────────────────────────────────────────────────┤
+      │  ↑↓ move   enter open   s stop   n new session   a all   tab close                   │
+     ›╰──────────────────────────────────────────────────────────────────────────────────────╯      
 
      Pi prints its limit errors from packages/ai/src/errors.ts. I'll match those near the end
      of a failed run.

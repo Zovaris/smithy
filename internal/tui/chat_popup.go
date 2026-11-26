@@ -187,13 +187,15 @@ func (m chatView) popupKey(msg tea.KeyPressMsg, items []popupItem) (chatView, te
 	return m, nil, true
 }
 
-// popupRows draws the popup as a raised list w wide, the selected row on the border tier.
+// popupRows draws the popup as a raised list w wide, the selected row marked by the accent bar
+// floatBox uses.
 func (m chatView) popupRows(items []popupItem, w int) []string {
 	t := m.th
-	bg, sel := lipgloss.NewStyle(), lipgloss.NewStyle()
+	bg := lipgloss.NewStyle()
 	if t.overlay != nil {
-		bg, sel = bg.Background(t.overlay), sel.Background(t.border)
+		bg = bg.Background(t.overlay)
 	}
+	bar := frameGlyphs(t.uni).sel
 	lw := 0
 	for _, it := range items {
 		lw = max(lw, ansi.StringWidth(it.label))
@@ -203,15 +205,15 @@ func (m chatView) popupRows(items []popupItem, w int) []string {
 	var out []string
 	for i := start; i < len(items) && i < start+room; i++ {
 		it := items[i]
-		label, st := t.fg(t.text), bg
+		label, mark := t.fg(t.text), "  "
 		if i == m.popSel {
-			label, st = t.fg(t.strong).Bold(true), sel
+			label, mark = t.fg(t.strong).Bold(true), t.fg(t.accent).Render(bar)+" "
 		}
-		r := "  " + label.Render(it.label) + strings.Repeat(" ", lw-ansi.StringWidth(it.label))
+		r := mark + label.Render(it.label) + strings.Repeat(" ", lw-ansi.StringWidth(it.label))
 		if it.desc != "" {
 			r += "   " + t.fg(t.dim).Render(it.desc)
 		}
-		out = append(out, fill(st, w, ansi.Truncate(r, w-1, "…")))
+		out = append(out, fill(bg, w, ansi.Truncate(r, w-1, "…")))
 	}
 	return out
 }
