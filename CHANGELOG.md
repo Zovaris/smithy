@@ -8,6 +8,14 @@ part above `### Details`.
 
 ## Unreleased
 
+### Fixed
+
+- The chat's agent now knows it runs inside smithy: it is told about smithy's tools, its commands, code mode and that its tool calls show in the chat.
+
+### Details
+
+- `internal/daemon/prompt.go`: `SystemPrompt` for every chat turn: `--append-system-prompt` for claude, the API loop's system field for `api:` agents (code mode on or off as configured), a marked preamble for other CLIs.
+
 ## v0.23.1 — 2026-11-25
 
 ### Highlights
