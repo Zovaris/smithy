@@ -13,9 +13,13 @@ part above `### Details`.
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
 - An agent can ask you a question in a normal chat, not only inside a warden run; `/ask` pins a
   sample question so you can see and try how decisions look.
+- The chat header shows the folder, model, effort, tokens and cost; it no longer animates, and
+  the loader is a small four-cell pulse with the live tok/s of the running turn.
 
 ### Details
 
+- Chat tok/s is estimated from streamed agent text (about four characters per token) over the
+  turn's time; tokens and cost come from session usage events.
 - `POST /v1/asks` accepts `ask:<key>` ids; the MCP `ask` tool uses one when no warden card is set
   and writes no card.
 - `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),

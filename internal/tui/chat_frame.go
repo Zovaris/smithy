@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -62,44 +63,44 @@ func (m chatView) pad() int {
 // headRows is the header's height: the 16×8-pixel anvil of the dashboard header, four text rows.
 const headRows = 4
 
-// header is the anvil band: the dashboard's shaded anvil sprite on a steel dither band, with the
-// name beside it; the band's waves and the ember streak move only while something runs.
+// header is the anvil band: the dashboard's shaded anvil sprite on a still steel dither band,
+// the name beside it and the open session's folder, model, effort, tokens and cost on the right.
+// It never moves: the loader row shows the work, so nothing snaps back when a turn ends.
 func (m chatView) header(w int) []string {
 	t := m.th
 	name := "smithy"
 	if Version != "" {
 		name += " " + Version
 	}
+	info := m.headInfo()
+	infoW := ansi.StringWidth(info)
+	p := m.pad()
 	if t.plain || t.ramp == nil || !t.g.unicode {
 		out := make([]string, headRows)
 		out[1] = ansi.Truncate("  "+name, w, "")
+		if info != "" {
+			out[1] = spread(out[1], info+strings.Repeat(" ", p), w)
+		}
 		return out
 	}
-	f := 0.0
-	if m.animating() {
-		f = float64(m.frame)
-	}
 	s := smallPlate
-	ax := m.pad()
+	ax := p
 	nx := ax + s.w() + 2
-	ph := headRows * 2
+	ix := w - p - infoW
+	if ix < nx+len(name)+3 {
+		info, infoW, ix = "", 0, w
+	}
 	px := func(x, y int) color.Color {
 		if s.on(x-ax, y) {
 			return dpick([]color.Color{t.ramp[3], t.ramp[4], t.ramp[5], t.muted, t.text, t.strong}, s.shade(x-ax, y), x, y)
 		}
-		v := 0.28 + 0.2*math.Sin(float64(x)*0.09+f*0.18+float64(y)*0.5) + 0.12*math.Sin(float64(x)*0.031-f*0.07)
-		if x < nx+len(name)+3 {
+		v := 0.28 + 0.2*math.Sin(float64(x)*0.09+float64(y)*0.5) + 0.12*math.Sin(float64(x)*0.031)
+		if x < nx+len(name)+3 || x >= ix-2 {
 			v *= 0.3
-		}
-		if f > 0 && y == ph-3 {
-			hx := math.Mod(f*1.3, float64(w+40)) - 20
-			if d := math.Abs(float64(x) - hx); d < 6 && d+(1-bayerAt(x, y))*4 < 5 {
-				return t.accent
-			}
 		}
 		return dpick(t.ramp, clamp01(v), x, y)
 	}
-	nameR := []rune(name)
+	nameR, infoR := []rune(name), []rune(info)
 	out := make([]string, headRows)
 	for row := range out {
 		var b strings.Builder
@@ -113,11 +114,81 @@ func (m chatView) header(w int) []string {
 				b.WriteString(lipgloss.NewStyle().Foreground(fg).Background(bot).Bold(x < nx+len("smithy")).Render(string(nameR[x-nx])))
 				continue
 			}
+			if row == 2 && x >= ix && x-ix < len(infoR) {
+				b.WriteString(lipgloss.NewStyle().Foreground(t.muted).Background(bot).Render(string(infoR[x-ix])))
+				continue
+			}
 			b.WriteString(lipgloss.NewStyle().Foreground(top).Background(bot).Render("▀"))
 		}
 		out[row] = b.String()
 	}
 	return out
+}
+
+// headInfo is the header's right side: folder, model, effort, tokens and cost of the open
+// session, each left out when unknown.
+func (m chatView) headInfo() string {
+	var parts []string
+	if m.dir != "" {
+		parts = append(parts, filepath.Base(m.dir))
+	}
+	model := ""
+	for _, s := range m.sessions {
+		if s.id == m.current && s.model != "" {
+			model = s.model
+		}
+	}
+	if model == "" && m.setupSt != nil {
+		model = m.setupSt.Default.Model
+		if model == "" {
+			model = m.setupSt.Default.Agent
+		}
+	}
+	if model != "" {
+		parts = append(parts, model)
+	}
+	if m.effort != "" {
+		parts = append(parts, m.effort)
+	}
+	if n, ok := m.toks[m.current]; ok {
+		parts = append(parts, kTok(n)+" tok")
+	}
+	if c, ok := m.cost[m.current]; ok {
+		parts = append(parts, fmt.Sprintf("$%.2f", c))
+	}
+	return strings.Join(parts, " "+m.th.g.dot+" ")
+}
+
+// kTok is a token count with a k or M suffix past a thousand.
+func kTok(n int64) string {
+	switch {
+	case n >= 1_000_000:
+		return fmt.Sprintf("%.1fM", float64(n)/1e6)
+	case n >= 1000:
+		return fmt.Sprintf("%.1fk", float64(n)/1e3)
+	}
+	return fmt.Sprint(n)
+}
+
+// addStreamed counts n characters of agent text toward session id's live tok/s.
+func (m *chatView) addStreamed(id string, n int) {
+	if m.streamed == nil {
+		m.streamed = map[string]int{}
+	}
+	m.streamed[id] += n
+}
+
+// tokRate is session id's output rate this turn: streamed characters at about four per token
+// over the time since the turn began; 0 before the first text or second.
+func (m chatView) tokRate(id string) float64 {
+	for _, s := range m.sessions {
+		if s.id == id && !s.turn.IsZero() {
+			if el := time.Since(s.turn).Seconds(); el >= 1 {
+				return float64(m.streamed[id]) / 4 / el
+			}
+		}
+	}
+	return 0
 }
 
 // statusLine is one dim row above the composer: the latest daemon note on the left, where the
@@ -400,15 +471,11 @@ func (m chatView) totalCost() float64 {
 	return c
 }
 
-// spinRow is the transcript's last row while the open session works: the spinner and the
-// shimmer over what it does now, as in Chat-Expandable.
+// spinRow is the transcript's last row while the open session works: a small four-cell
+// pulse, what the session does now, and on the right the live tok/s and the turn's time.
 func (m chatView) spinRow(w int) string {
 	t := m.th
-	spin := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	g := spin[m.frame%len(spin)]
-	if !t.g.unicode {
-		g = []string{"|", "/", "-", "\\"}[m.frame%4]
-	}
+	g := m.pulse()
 	what, since := "working", time.Time{}
 	for _, s := range m.sessions {
 		if s.id == m.current {
@@ -418,14 +485,34 @@ func (m chatView) spinRow(w int) string {
 			since = s.turn
 		}
 	}
-	took := ""
-	if !since.IsZero() {
-		took = fmt.Sprintf("%.1fs", time.Since(since).Seconds())
+	var right []string
+	if r := m.tokRate(m.current); r > 0 {
+		right = append(right, fmt.Sprintf("%.0f tok/s", r))
 	}
-	n := ansi.StringWidth(what)
-	pos := math.Mod(float64(m.frame)*0.6, float64(n+12)) - 6
+	if !since.IsZero() {
+		right = append(right, fmt.Sprintf("%.1fs", time.Since(since).Seconds()))
+	}
 	p := strings.Repeat(" ", m.pad())
-	return spread(p+"  "+t.fg(t.accent).Render(g)+" "+t.shimmer(what, pos), t.fg(t.dim).Render(took)+p+"  ", w)
+	return spread(p+"  "+g+" "+t.fg(t.muted).Render(what), t.fg(t.dim).Render(strings.Join(right, "  "))+p+"  ", w)
+}
+
+// pulse is the loader: four small cells with one lit cell drifting across, dim elsewhere.
+func (m chatView) pulse() string {
+	t := m.th
+	on, off := "▪", "·"
+	if !t.g.unicode {
+		on, off = "*", "."
+	}
+	lit := (m.frame / 3) % 4
+	var b strings.Builder
+	for i := range 4 {
+		if i == lit {
+			b.WriteString(t.fg(t.accent).Render(on))
+		} else {
+			b.WriteString(t.fg(t.dim).Render(off))
+		}
+	}
+	return b.String()
 }
 
 // fill lays s on st's background w cells wide, cut to fit. Unlike Style.Width it keeps the
