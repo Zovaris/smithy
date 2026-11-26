@@ -8,6 +8,15 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
+
+### Details
+
+- `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),
+  for the web UI.
+
 ## v0.23.1 — 2026-11-25
 
 ### Highlights
