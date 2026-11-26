@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/config"
@@ -19,7 +18,7 @@ import (
 const PairUsage = `usage: smithy pair [list | revoke <name>]
 Makes a one-time code (5 minutes, one use) another machine trades for its own device token:
   there: smithy servers add <name> <url>, passing the code with its code flag
-The url is this daemon's daemon.listen address (or its tailscale serve URL, which needs no code).
+The url is this daemon's daemon.listen address, a Tailscale IP (or its tailscale serve URL, which needs no code).
   list     the paired devices
   revoke   forget a device; its token stops working at once`
 
@@ -88,9 +87,9 @@ func PairCmd(args []string, out, errw io.Writer) int {
 	}
 	fmt.Fprintf(out, "pairing code: %s  (one use, until %s)\n", b.Code, b.Expires.Local().Format("15:04:05"))
 	url := "http://<this machine's address>:<port>"
-	if l := config.Get("daemon.listen", ""); l != "" && !strings.HasPrefix(l, "0.0.0.0:") && !strings.HasPrefix(l, "[::]:") {
+	if l := config.Get("daemon.listen", ""); l != "" {
 		url = "http://" + l
-	} else if l == "" {
+	} else {
 		fmt.Fprintln(out, "note: daemon.listen is empty, so other machines cannot reach this daemon directly;\n      smithy config set daemon.listen <tailscale ip>:7478, then smithy stop and smithy")
 	}
 	fmt.Fprintf(out, "on the other machine: smithy servers add <name> %s --code %s\n", url, b.Code)

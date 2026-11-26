@@ -101,7 +101,7 @@ func Cmd(args []string, e Env) int {
 		}
 		if code != "" {
 			if !PrivateURL(u) {
-				fmt.Fprintln(e.Err, "smithy servers: warning: "+u+" is plain http off loopback and Tailscale; the device token crosses the network unencrypted (use a tailscale address or https)")
+				fmt.Fprintln(e.Err, "smithy servers: warning: "+u+" is plain http off loopback and Tailscale; the device token crosses the network unencrypted (a smithy daemon listens directly only on its Tailscale IP; use that, or an https URL such as tailscale serve)")
 			}
 			tok, err := Pair(ctx, u, code, e.Host())
 			if err != nil {

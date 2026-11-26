@@ -82,10 +82,14 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
 - Remote access: `tailscale serve --bg 7477` puts it on your tailnet over HTTPS with the
   identity header; smithy itself only reads `tailscale status --json` (for `smithy servers discover`). Any local process can send that header, so set
   `daemon.allow` only on a machine where every local user is trusted (the dedicated OS user above).
-- Another machine without tailscale serve: set `daemon.listen` to a non-loopback `ip:port`, run
-  `smithy pair` here and `smithy servers add <name> http://<ip>:<port> --code <code>` there. That
-  listener takes only bearer tokens (the daemon token or a paired device's, revoked with `smithy pair
-  revoke`), never the login header. `smithy servers` lists saved daemons with their status,
+- Another machine without tailscale serve: set `daemon.listen` to this machine's Tailscale
+  `ip:port` (100.64.0.0/10 or fd7a:115c:a1e0::/48; the listener is plain HTTP, so any other address
+  is refused, and off a tailnet you put a TLS proxy such as `tailscale serve` in front of the
+  loopback port instead), run `smithy pair` here and `smithy servers add <name> http://<ip>:<port>
+  --code <code>` there. That listener takes only paired devices' bearer tokens (revoked with `smithy
+  pair revoke`), never the daemon token or the login header. Settings routes (`/v1/guard/suggested`,
+  `/v1/setup/kit`, `/v1/setup/skills/install`) and `/v1/servers` need the daemon token, so a device
+  cannot change them. `smithy servers` lists saved daemons with their status,
   `smithy servers discover` finds Tailscale peers running smithy, and `/connect` in the chat or
   the web sidebar switches between them; `--server` / `SMITHY_SERVER` pick one for a run.
 - `smithy attach [url]` follows it in a terminal UI: live events, the decisions waiting on you
