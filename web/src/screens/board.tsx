@@ -1,20 +1,21 @@
 import { SegmentedControl } from "@zovaris/sephiro/segmented-control";
 import "@zovaris/sephiro/css/segmented-control.css";
+import { TaskBoard as Tasks } from "@zovaris/sephiro/task-board";
+import "@zovaris/sephiro/css/task-board.css";
 import { useEffect, useState } from "preact/hooks";
 import { api } from "../auth";
-import { blocked, COLUMNS, loadTasks, moved, moveTask, next, rel, type TaskBoard, type TaskCard, type TaskList } from "../tasks";
+import { blocked, COLUMNS, loadTasks, moved, moveTask, rel, type TaskBoard, type TaskCard, type TaskList } from "../tasks";
 
 type Project = { dir: string; name: string };
 
 // Board is a project's local task files (`smithy tasks`) as columns by status. Drag a card, or
-// use its arrows, to move it; the move writes the file's Status line through the daemon.
+// Shift+Arrow on it, to move it; the move writes the file's Status line through the daemon.
 export default function Board() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [project, setProject] = useState("");
   const [board, setBoard] = useState<TaskBoard | null>(null);
   const [list, setList] = useState("");
   const [err, setErr] = useState("");
-  const [drag, setDrag] = useState("");
 
   useEffect(() => {
     api("/v1/projects").then((r) => (r.ok ? r.json() : null)).then((l) => l && setProjects(l.projects ?? [])).catch(() => {});
@@ -67,42 +68,21 @@ export default function Board() {
           The Board shows the Markdown task files <code>smithy tasks</code> reads: <code>docs/specs/&lt;list&gt;/NN-slug.md</code>, <code>.docs/specs/</code> or <code>~/.smithy/plans/&lt;repo&gt;/</code>. Make one with <code>smithy tasks add "&lt;title&gt;"</code>.
         </p></div>
       ) : (
-        <div class="board">
-          {COLUMNS.map((c) => {
-            const items = cur.tasks.filter((t) => t.status === c.id);
-            return (
-              <div class={"bcol" + (drag ? " drop" : "")} role="group" aria-label={c.label}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const t = cur.tasks.find((x) => x.file === e.dataTransfer?.getData("text/plain"));
-                  setDrag("");
-                  if (t) move(t, c.id);
-                }}>
-                <h3><span class={"st " + ({ todo: "idle", doing: "run", done: "done", dropped: "fail" } as Record<string, string>)[c.id]}>{c.label}</span><span class="sp" /><span class="mono t3">{items.length}</span></h3>
-                {!items.length && <p class="hint">{c.empty}</p>}
-                {items.map((t) => (
-                  <div class={"tcard" + (drag === t.file ? " dragging" : "")} draggable onDragStart={(e) => { e.dataTransfer?.setData("text/plain", t.file); setDrag(t.file); }} onDragEnd={() => setDrag("")}>
-                    <div class="top2">
-                      <span class="mono t3">{t.nn}</span>
-                      <span class="sp" />
-                      <button class="icon s" aria-label={`Move ${t.title} to ${next(t.status, -1) || "nowhere"}`} disabled={!next(t.status, -1)} onClick={() => move(t, next(t.status, -1))}>‹</button>
-                      <button class="icon s" aria-label={`Move ${t.title} to ${next(t.status, 1) || "nowhere"}`} disabled={!next(t.status, 1)} onClick={() => move(t, next(t.status, 1))}>›</button>
-                    </div>
-                    <span class="tt">{t.title}</span>
-                    <span class="t3 tf mono" title={t.file}>{rel(t.file, board.project)}</span>
-                    {(t.blockers.length > 0 || t.pr) && (
-                      <span class="tags">
-                        {t.blockers.length > 0 && <span class={"chip" + (blocked(cur, t) ? " warn" : "")}>after {t.blockers.join(", ")}</span>}
-                        {t.pr && <a class="chip" href={t.pr} target="_blank" rel="noreferrer">PR</a>}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
+        <Tasks
+          label={`Tasks in ${cur.name}`}
+          columns={COLUMNS}
+          tasks={cur.tasks.map((t) => ({
+            id: t.file,
+            column: t.status,
+            title: `${t.nn} · ${t.title}`,
+            path: rel(t.file, board.project),
+            tags: [...(t.blockers.length ? ["after " + t.blockers.join(", ")] : []), ...(t.pr ? ["PR"] : [])],
+            status: t.status === "doing" ? "running" : blocked(cur, t) ? "attention" : undefined,
+            statusLabel: t.status === "doing" ? "In progress" : blocked(cur, t) ? "Blocked" : undefined,
+          }))}
+          onOpen={(id) => { const t = cur.tasks.find((x) => x.file === id); if (t?.pr) open(t.pr, "_blank", "noreferrer"); }}
+          onMove={(id, col) => { const t = cur.tasks.find((x) => x.file === id); if (t) move(t, col); }}
+        />
       )}
     </section>
   );
