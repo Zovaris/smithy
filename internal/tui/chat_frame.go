@@ -125,7 +125,8 @@ func (m chatView) clockNow() time.Time {
 	return time.Now()
 }
 
-// pill is "idle", or "● N running" with the dot breathing between dim and the accent.
+// pill is "idle", "● waiting" while a decision waits on you and nothing runs, or "● N running"
+// with the dot breathing between dim and the accent.
 func (m chatView) pill(bar lipgloss.Style) string {
 	t := m.th
 	n := 0
@@ -133,6 +134,9 @@ func (m chatView) pill(bar lipgloss.Style) string {
 		if s.state == "running" {
 			n++
 		}
+	}
+	if n == 0 && len(m.pending) > 0 {
+		return bar.Foreground(t.warn).Render(t.g.on) + bar.Foreground(t.text).Render(" waiting")
 	}
 	if n == 0 {
 		return bar.Foreground(t.dim).Render("idle")

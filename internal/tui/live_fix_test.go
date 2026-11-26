@@ -81,6 +81,16 @@ func TestPendingDecisionShowsOnce(t *testing.T) {
 	}
 }
 
+func TestHeaderSaysWaitingWhileADecisionWaits(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 100, 24
+	m.setPending([]daemon.Decision{{ID: "d1", Question: "Ship?", Options: []string{"yes"}}})
+	head := strings.Split(screen(m), "\n")[0]
+	if !strings.Contains(head, "waiting") || strings.Contains(head, "idle") {
+		t.Fatalf("header pill: %q", head)
+	}
+}
+
 func TestWelcomeDefaultNotePrintedOnce(t *testing.T) {
 	m := newChatTest(0)
 	m.welcome = welcomeAgents
