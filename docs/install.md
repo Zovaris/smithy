@@ -19,6 +19,12 @@ curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # skills + binary
 ```
 
+Once installed, `smithy update` does the same `--update` for the build that runs (harness or
+skills): it downloads `install.sh` from `main` and runs it, so the same checksum and attestation
+checks apply. `smithy update 0.23.0` pins a version; `smithy update --check` only prints the
+current version and the latest release. It refuses a binary that is not `~/.local/bin/smithy`
+(a dev build) unless you pass `--force`.
+
 [`install.sh`](../install.sh) downloads the binary for your platform from the GitHub release into
 `~/.local/share/smithy/versions/<version>/` (`$XDG_DATA_HOME`) and links `~/.local/bin/smithy`
 (`$XDG_BIN_HOME`) to it; on Windows `%LOCALAPPDATA%\smithy\versions\<version>\` and

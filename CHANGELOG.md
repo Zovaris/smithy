@@ -8,6 +8,14 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- `smithy update` updates the binary and skills to the latest release, keeping the build you installed; `--check` only compares versions.
+
+### Details
+
+- update: new `internal/selfupdate` downloads `install.sh` from `main` over HTTPS (30s timeout, 1 MiB cap) to a temp file and runs `sh <file> --update --<kind> [<version>]`, the kind from the build tag, streaming output and returning its exit code. `--check` reads `releases/latest` (with `GH_TOKEN` when set). A binary other than `~/.local/bin/smithy` (`$XDG_BIN_HOME`) is refused unless `--force`.
+
 ## v0.23.0 — 2026-11-25
 
 ### Highlights

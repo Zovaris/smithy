@@ -54,8 +54,16 @@ Then, in your agent:
 3. **Hand over several tasks** (or `/warden <tasks>`): you get one worker and one PR for each.
 
 Requires git. [`gh`](https://cli.github.com) is recommended; without it, smithy falls back to
-`GH_TOKEN` or prints a compare URL. The binary lands in `~/.local/bin/smithy`; `smithy uninstall`
-removes it again. More options: [docs/install.md](docs/install.md).
+`GH_TOKEN` or prints a compare URL. The binary lands in `~/.local/bin/smithy`. More options:
+[docs/install.md](docs/install.md).
+
+### Update and uninstall
+
+```bash
+smithy update      # skills + binary, same build; --check only compares versions
+# or: curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update
+smithy uninstall   # lists what it removes, then asks
+```
 
 ### For agents
 
