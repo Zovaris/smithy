@@ -148,7 +148,7 @@ export function Composer({ placeholder, skills, working, canSend = true, draft, 
           <span class="hints" aria-hidden="true"><kbd>/</kbd> commands</span>
           {working && onStop && !text.trim() ? (
             <button class="send stop" aria-label="Stop" title="Stop (esc)" onClick={onStop}>
-              <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none" /></svg>
+              <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" fill="currentColor" stroke="none" /></svg>
             </button>
           ) : (
             <button class="send" aria-label="Send" disabled={!text.trim() || busy || !canSend} onClick={submit}>

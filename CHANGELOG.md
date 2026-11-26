@@ -8,6 +8,14 @@ part above `### Details`.
 
 ## Unreleased
 
+### Fixed
+
+- The web is flat: square corners everywhere, one control height for the stop button, chips and small buttons, a wider chat column, and no highlighted row behind "No results." in the command palette.
+
+### Details
+
+- web: @zovaris/sephiro 1.2.0 → 1.4.0; Temper sets every `--sph-radius-*` token to 0; chat, composer and new-session width 720 → 960px; compact controls at 28px. Palette empty-state workaround until Zovaris/Sephiro#37 ships.
+
 ## v0.24.0 — 2026-11-26
 
 ### Highlights
