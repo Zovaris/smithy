@@ -12,6 +12,7 @@ part above `### Details`.
 
 - The daemon keeps warden batch PRs green on its own: red CI, a conflict or open review threads
   start one tend session, and `/tend` in the TUI shows every watched PR. It never merges.
+- The daemon also tends the PRs a chat session opens, and the agents panel shows each session's PRs.
 
 ### Details
 
@@ -21,6 +22,10 @@ part above `### Details`.
   mode's allow-list and `auto.sandbox`, fail closed) with the tend skill; two tries per action,
   then `needs-you`. `GET /v1/tend` reports it; new setting `tend.daemon` (`off`, `watch`, `fix`;
   default `fix`; user settings only; `auto.paused` holds it to `watch`).
+- `internal/daemon`: a session records the PR URLs a `gh pr create` or `smithy pr create` tool call
+  printed (`Session.prs`, replayed from `session_tool` events, 20 at most); the tender adds those
+  of the session folder's `origin` repository as `TendRef`s with `session` set, after the batch
+  cards. `/tend` labels them `session <id>`; the agents panel shows `PR #n`.
 - The web has an anvil favicon and installs as an app (Chrome, and Add to Home Screen on iOS); its page shell opens offline.
 
 ### Details
