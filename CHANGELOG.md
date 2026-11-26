@@ -22,6 +22,10 @@ part above `### Details`.
 - release: build only the harness build, named `smithy-<os>-<arch>`; `smithy-harness-*` is no longer published (ADR 0015).
 - launcher: runs `~/.local/share/smithy/versions/<VERSION>`, else `~/.local/bin/smithy` or `smithy` on PATH with a `smithy update <VERSION>` notice, else prints the install line and exits 3; it no longer reads `~/.smithy/bin` and ignores relative PATH entries.
 - `warden doctor` and the version hint name `smithy update <version>` instead of the install line.
+### New
+
+- **Milestone review in warden.** After a milestone batch merges, warden offers a cheap-model coherence review in rounds (contradictions, duplicated rules, size, docs vs code, TUI vs CLI gaps, or a topic you name); each round's findings go to one fix item.
+
 ### Fixed
 
 - The chat's agent now knows it runs inside smithy: it is told about smithy's tools, its commands, code mode and that its tool calls show in the chat.
