@@ -423,6 +423,9 @@ func (m Model) editBox(w int) string {
 		if e.unset {
 			hint = acc.Render("enter") + " " + mut.Render("unset") + "   " + acc.Render("tab") + " " + mut.Render("user/repo") + "   " + acc.Render("esc") + " " + mut.Render("cancel")
 		}
+		if e.set.APIKey {
+			hint = strings.Replace(hint, "   "+acc.Render("tab")+" "+mut.Render("user/repo"), "", 1)
+		}
 		lines = append(lines, hint)
 	} else {
 		lines = append(lines, acc.Bold(true).Render("Edit "+e.set.Key)+mut.Render("  "+e.kind), "")

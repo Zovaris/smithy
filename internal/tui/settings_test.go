@@ -206,7 +206,7 @@ func TestSettingsAPIKeysEditableMasked(t *testing.T) {
 	m.edit.in.SetValue(secret)
 	m, _ = press(m, "enter")
 	out := ansi.Strip(m.render())
-	if !m.edit.confirm || strings.Contains(out, secret) || !strings.Contains(out, "****q9z1") || !strings.Contains(out, "auth.json") {
+	if !m.edit.confirm || strings.Contains(out, secret) || !strings.Contains(out, "****q9z1") || !strings.Contains(out, "auth.json") || strings.Contains(out, "user/repo") {
 		t.Fatalf("confirm must mask the key:\n%s", out)
 	}
 	m, _ = press(m, "tab")
