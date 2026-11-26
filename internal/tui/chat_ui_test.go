@@ -327,3 +327,25 @@ func TestChatGolden(t *testing.T) {
 		}
 	}
 }
+
+func TestChatAskCommandPostsDemoQuestion(t *testing.T) {
+	var id, q string
+	var opts []string
+	m := newChatScene()
+	m.ask = func(i, question string, o []string) tea.Cmd { id, q, opts = i, question, o; return nil }
+	m.input.SetValue("/ask")
+	m = chatStep(m, ckey("enter"))
+	if !strings.HasPrefix(id, "ask:demo") || q == "" || len(opts) < 2 {
+		t.Fatalf("/ask posted %q %q %v", id, q, opts)
+	}
+	m.input.SetValue("/ask Ship on Friday?")
+	m = chatStep(m, ckey("enter"))
+	if q != "Ship on Friday?" {
+		t.Fatalf("/ask <question> posted %q", q)
+	}
+	m.ask = nil
+	m.input.SetValue("/ask")
+	if out := screen(chatStep(m, ckey("enter"))); !strings.Contains(out, "needs smithy daemon") {
+		t.Fatalf("/ask without a daemon said nothing:\n%s", out)
+	}
+}
