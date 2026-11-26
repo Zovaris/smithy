@@ -24,6 +24,9 @@ func frameTick() tea.Cmd {
 
 // animating reports whether anything on screen moves: a session working or a tool running.
 func (m chatView) animating() bool {
+	if m.welcome != welcomeOff {
+		return true
+	}
 	for _, s := range m.sessions {
 		if s.state == "running" {
 			return true
@@ -367,7 +370,10 @@ func frameGlyphs(uni bool) boxFrame {
 func (m chatView) overBox(screen []string, box []string, w int) []string {
 	out := make([]string, len(screen))
 	for i, r := range screen {
-		out[i] = m.dimmed(r)
+		out[i] = r
+		if m.welcome == welcomeOff {
+			out[i] = m.dimmed(r)
+		}
 	}
 	bw := 0
 	if len(box) > 0 {

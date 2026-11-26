@@ -44,7 +44,10 @@ func (m chatView) pickerBox(screen []string, w, h int) []string {
 	var items []boxItem
 	if m.overlay == overlaySetup {
 		title, esc = "Welcome to smithy", "later"
-		items = append(items, boxItem{group: "Pick the agent new sessions start with; ctrl+l changes it later."})
+		if m.welcome == welcomeAgents {
+			title = "1/4  agents"
+		}
+		items = append(items, boxItem{group: "The agents on this machine. Pick the one new sessions start with; ctrl+l changes it later."})
 	}
 	if m.setupSt == nil {
 		items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: "reading the agents…", static: true})
@@ -85,7 +88,11 @@ func (m chatView) modelBox(screen []string, w, h int) []string {
 	if m.modelSess != "" {
 		scope = "this session"
 	}
-	items := []boxItem{{group: "Model for " + m.modelFor + " · " + scope}}
+	step := ""
+	if m.welcome == welcomeModel {
+		step = "2/4  "
+	}
+	items := []boxItem{{group: step + "Model for " + m.modelFor + " · " + scope}}
 	list := m.modelRows()
 	for _, r := range list {
 		it := boxItem{glyph: t.g.dot, color: t.muted, label: r.m.ID}
@@ -125,6 +132,9 @@ func (m chatView) modelBox(screen []string, w, h int) []string {
 	foot := "  " + keyHints(t, "↑↓", "move", "enter", "save", "tab", "next agent", "ctrl+r", "ask again", "esc", "cancel")
 	if m.modelSess != "" {
 		foot = "  " + keyHints(t, "↑↓", "move", "enter", "save", "ctrl+r", "ask again", "esc", "cancel")
+	}
+	if m.welcome == welcomeModel {
+		foot = "  " + keyHints(t, "↑↓", "move", "enter", "save", "/", "type a command", "esc", "skip")
 	}
 	return m.overBox(screen, m.floatBox(bw, bh, m.modelIn, "Model for "+m.modelFor+" · type to filter", items, m.modelSel, foot), w)
 }

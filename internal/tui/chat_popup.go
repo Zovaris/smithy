@@ -31,6 +31,7 @@ var slashCommands = []slashCommand{
 	{"stop", "", "stop the open session's turn"},
 	{"mode", "[minimal|expandable|verbose]", "how much of each turn the transcript shows"},
 	{"log", "", "daemon events kept out of the transcript"},
+	{"welcome", "", "walk the first-run steps again: agents, model, API keys, notifications"},
 	{"setup", "", "first run: every agent ready or missing, with its fix"},
 	{"ask", "[question]", "pin a sample question on the strip, to see and try how decisions work"},
 	{"answer", "<text>", "answer the decision pinned at the top in your words"},

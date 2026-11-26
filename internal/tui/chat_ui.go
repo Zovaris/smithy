@@ -44,6 +44,7 @@ const (
 	overlayHelp    // ? and /help
 	overlayInfo    // /connect, /remote, /web, /log
 	overlayProject // which project a new session starts in
+	overlayWelcome
 )
 
 // chatTool is the data of a "tool" event: one tool call of a session's turn.
@@ -336,6 +337,9 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 	case "skills":
 		m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
 		return m, m.loadSetup(false)
+	case "welcome":
+		m.openWelcome()
+		return m, tea.Batch(m.loadSetup(false), m.loadWelcomeSettings())
 	case "setup":
 		m.openPicker(overlaySetup)
 		return m, m.loadSetup(false)
@@ -432,7 +436,7 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 	switch m.overlay {
-	case overlaySetup, overlayPicker, overlaySkills:
+	case overlaySetup, overlayPicker, overlaySkills, overlayWelcome:
 		return m.setupKey(msg)
 	case overlayAgents:
 		return m.agentsKey(k)

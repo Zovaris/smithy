@@ -43,6 +43,12 @@ command in the session folder; ctrl+v attaches a clipboard image; esc clears the
                 default /connect or smithy servers use saved, then this machine
   --standalone  run a private daemon inside this process instead; it stops when the chat quits`
 
+// WelcomeUsage is `smithy welcome`: the chat opened on its first-run walk.
+const WelcomeUsage = `usage: smithy welcome [url | --server <name|url>]
+Opens the chat on the first-run walk: a short animated welcome, then the agents found on this
+machine, the model new sessions start with, the stored API keys and the Telegram notifications.
+esc leaves it at any step; /welcome in the chat walks it again.`
+
 // chatWhere is where the daemon the chat talks to runs.
 type chatWhere int
 
@@ -106,6 +112,10 @@ type chatView struct {
 	modelSess string
 	effortSel int
 	themeSel  int
+
+	welcome      welcomeStep
+	welcomeAgent string
+	welcomeSet   *daemon.Settings
 
 	sess     sessionAPI            // the daemon's sessions endpoints; nil: offline
 	current  string                // the open session, "" before the first message
@@ -203,6 +213,7 @@ type chatArgs struct {
 	url        string
 	server     string
 	standalone bool
+	welcome    bool
 	open       string // a session to open once connected (after /connect)
 }
 
@@ -211,6 +222,8 @@ func parseChatArgs(args []string) (chatArgs, error) {
 	for i := 0; i < len(args); i++ {
 		x := args[i]
 		switch {
+		case x == "--welcome":
+			a.welcome = true
 		case x == "--standalone":
 			a.standalone = true
 		case x == "--server":
@@ -406,6 +419,9 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	m.connectAdd = func(s remote.Server) error { return remote.Add(remote.File(), s) }
 	if a.open != "" {
 		m.open(a.open)
+	}
+	if a.welcome {
+		m.welcome = welcomeSplash
 	}
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
@@ -889,6 +905,9 @@ func (m chatView) View() tea.View {
 	out = append(out, m.statusLine(w))
 	out = append(out, m.composer(w)...)
 	out = append(out, m.footer(w))
+	if m.welcome != welcomeOff {
+		out = m.welcomeView(w, m.height)
+	}
 	switch m.overlay {
 	case overlayAgents:
 		out = m.agentsBox(out, w, m.height)
