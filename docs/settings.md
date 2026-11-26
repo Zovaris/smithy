@@ -76,7 +76,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `session.agent` | (empty) | Agent a new session starts with when none is named: a CLI name, `acp:<cli>` or `api:<provider>/<model>`. The agent picker (`ctrl+l`, `/agent`, web Setup) sets it; empty is the last used, else the first installed CLI. |
 | `session.model` | (empty) | Model a new CLI session passes to its agent (`--model`); `/model` sets it; empty is the agent's own default. API agents carry the model in their name. |
 | `kit.mcp` | `true` | `false` stops giving driven CLIs smithy's own MCP server (`smithy mcp`). Toggled by `/skills` in the TUI and the web Setup screen. |
-| `kit.skills` | (empty) | Comma list of installed skills (smithy's, then `~/.agents/skills` and `~/.smithy/skills`) linked into every driven CLI that takes skills (claude, codex, opencode, gemini, pi). Toggled by `/skills`. |
+| `kit.skills` | (empty) | Comma list of installed skills (smithy's, then `~/.agents/skills` and `~/.smithy/skills`) linked into every driven CLI that takes skills (claude, codex, opencode, pi). Toggled by `/skills`. |
 | `ui.splash` | `true` | `false` skips the short dither-and-anvil animation when `smithy` opens; it never plays without a terminal, color or motion, or under 80×24, and any key skips it. |
 | `tui.reduce_motion` | `false` | `true` draws every `smithy tui` frame still: no sparks, shimmer or sliding bars (like `--no-anim` or `SMITHY_REDUCE_MOTION`). |
 | `git.branch` | `{type}/{key}-{slug}` | Branch names (`smithy names`); e.g. `agent/{key}-{slug}`. |
