@@ -64,8 +64,12 @@ export function run(a: string, arg: string, { s, pend, log, detail, setPick, set
   else if (a === "remote") setInfo(remote());
   else if (a === "log") setInfo({ title: "Log", lines: ["#DAEMON LOG · " + log.length + " EVENTS", ...(log.length ? log : ["nothing yet"])] });
   else if (a === "tend") {
-    showTend();
-    setTimeout(() => document.querySelector(".rail.sheet #tend")?.scrollIntoView({ block: "start" }), 300);
+    const side = document.querySelector<HTMLElement>(".rail:not(.sheet) #tend");
+    if (side?.offsetParent) side.scrollIntoView({ block: "start" });
+    else {
+      showTend();
+      setTimeout(() => document.querySelector(".rail.sheet #tend")?.scrollIntoView({ block: "start" }), 300);
+    }
   }
   else if (a === "key" && /^rm\s+\S+$/.test(arg)) {
     const svc = arg.split(/\s+/)[1];
