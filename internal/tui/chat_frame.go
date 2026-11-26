@@ -224,6 +224,7 @@ type boxItem struct {
 	group, glyph     string
 	color            color.Color
 	label, hint, key string
+	static           bool // shown, never selected
 }
 
 // floatBox is the Palette mockup's panel: a query row and a key row on the focus tier around
@@ -252,11 +253,13 @@ func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem,
 			if len(rows) > 0 {
 				rows = append(rows, row(tier(t.overlay), ""))
 			}
-			rows = append(rows, row(tier(t.overlay), "  "+dim.Render(it.group)))
+			rows = append(rows, row(tier(t.overlay), "  "+dim.Render(ansi.Truncate(it.group, w-4, "…"))))
 			continue
 		}
 		st, label := tier(t.overlay), t.fg(t.text)
-		if n == sel {
+		if it.static {
+			label = t.fg(t.muted)
+		} else if n == sel {
 			st, label, selRow = tier(t.border), t.fg(t.strong), len(rows)
 		}
 		left := "  " + t.fg(it.color).Render(it.glyph) + "  " + label.Render(it.label)
@@ -266,7 +269,9 @@ func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem,
 		key := t.fg(t.muted).Render(it.key) + "  "
 		left = ansi.Truncate(left, w-ansi.StringWidth(key)-2, "…")
 		rows = append(rows, row(st, spread(left, key, w)))
-		n++
+		if !it.static {
+			n++
+		}
 	}
 	start := 0
 	if selRow >= body {
@@ -385,111 +390,6 @@ func (m chatView) infoBox(screen []string, w, h int) []string {
 		foot = "  " + keyHints(t, "↑↓", "scroll", "esc", "close")
 	}
 	return m.overBox(screen, m.floatBox(bw, bh, m.info.title, "", items, sel, foot), w)
-}
-
-// sidePanel is the Board mockup: the screen dimmed on the left, the agents panel on the right.
-func (m chatView) sidePanel(screen []string, w int) []string {
-	t := m.th
-	pw := max(min(w*560/1280, w-20), min(44, w))
-	x := w - pw
-	rows := m.agentsRows(pw, len(screen))
-	out := make([]string, len(screen))
-	for i, r := range screen {
-		out[i] = splice(m.dimmed(r), rows[i], x, w)
-	}
-	_ = t
-	return out
-}
-
-// agentsRows draws the panel pw wide and h tall: every session with what it does now, then
-// what waits on you.
-func (m chatView) agentsRows(pw, h int) []string {
-	t := m.th
-	bg, sel := lipgloss.NewStyle(), lipgloss.NewStyle()
-	if t.overlay != nil {
-		bg, sel = bg.Background(t.overlay), sel.Background(t.border)
-	}
-	dim, strong := t.fg(t.dim), t.fg(t.strong)
-	in := pw - 6
-	line := func(st lipgloss.Style, s string) string {
-		return fill(st, pw, "   "+ansi.Truncate(s, in, "…"))
-	}
-	running := 0
-	for _, s := range m.sessions {
-		if s.state == "running" {
-			running++
-		}
-	}
-	sum := fmt.Sprintf("%d running %s %d sessions", running, t.g.dot, len(m.sessions))
-	if c := m.totalCost(); c > 0 {
-		sum += fmt.Sprintf(" %s $%.2f", t.g.dot, c)
-	}
-	rows := []string{line(bg, ""), line(bg, spread(strong.Bold(true).Render("Agents")+"  "+dim.Render(sum), t.fg(t.text).Render("tab")+dim.Render(" close"), in)), line(bg, "")}
-	for i, s := range m.sessions {
-		st := bg
-		if i == m.agentSel {
-			st = sel
-		}
-		g, c := m.sessionGlyph(s.state)
-		title := s.title
-		if title == "" {
-			title = s.id
-		}
-		when := s.state
-		if !s.since.IsZero() && s.state == "running" {
-			when = shortDur(time.Since(s.since).Truncate(time.Minute))
-			if when == "0s" {
-				when = "now"
-			}
-		}
-		var whoParts []string
-		for _, x := range []string{s.agent, s.model, s.id} {
-			if x != "" {
-				whoParts = append(whoParts, x)
-			}
-		}
-		who := strings.Join(whoParts, " "+t.g.dot+" ")
-		var bar string
-		switch s.state {
-		case "running":
-			bar = t.loadingField(16, m.frame/2)
-		case "waiting":
-			bar = t.fg(t.warn).Render(strings.Repeat(t.g.shades[3], 16))
-		case "failed":
-			bar = t.fg(t.err).Render(strings.Repeat(t.g.shades[3], 16))
-		default:
-			bar = t.fg(t.muted).Render(strings.Repeat(t.g.shades[3], 16))
-		}
-		now := s.now
-		if now == "" {
-			now = s.kind
-		}
-		if i == m.current2() {
-			now = t.fg(t.accent).Render(t.g.prompt) + " " + now
-		}
-		rows = append(rows,
-			line(st, spread(t.fg(c).Render(g)+"  "+strong.Bold(true).Render(title), dim.Render(when), in)),
-			line(st, "   "+spread(t.fg(t.muted).Render(who), bar, in-3)),
-			line(st, "   "+t.fg(t.text).Render(now)),
-			line(bg, ""))
-	}
-	if len(m.sessions) == 0 {
-		rows = append(rows, line(bg, dim.Render("no sessions yet: type a message to start one")), line(bg, ""))
-	}
-	if len(m.pending) > 0 {
-		rows = append(rows, line(bg, strong.Bold(true).Render("Waiting on you")+"  "+dim.Render(fmt.Sprintf("%d", len(m.pending)))), line(bg, ""))
-		for _, d := range m.pending {
-			rows = append(rows, line(bg, t.fg(t.warn).Render(t.g.wait)+"  "+t.fg(t.text).Render(d.Question)+"  "+dim.Render(strings.Join(d.Options, " "+t.g.dot+" "))))
-		}
-	}
-	foot := line(bg, keyHints(t, "enter", "open", "s", "stop", "n", "new session", "↑↓", "move"))
-	if len(rows) > h-1 {
-		rows = rows[:h-1]
-	}
-	for len(rows) < h-1 {
-		rows = append(rows, line(bg, ""))
-	}
-	return append(rows, foot)
 }
 
 // current2 is the index of the open session in m.sessions, -1 when none.
