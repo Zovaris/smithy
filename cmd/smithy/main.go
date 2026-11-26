@@ -266,6 +266,10 @@ func main() {
 	if name == "--version" || name == "-v" {
 		name = "version"
 	}
+	if name == "tui" {
+		fmt.Fprintln(os.Stderr, "smithy tui is renamed to smithy stats")
+		name = "stats"
+	}
 	c, ok := commands[name]
 	if !ok {
 		code := unknownCommand(os.Stderr, name)

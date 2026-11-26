@@ -39,7 +39,7 @@ var slashCommands = []slashCommand{
 	{"serve", "[on|off]", "serve mode: off launches nothing new (auto.paused)"},
 	{"set", "<key> <value>", "save a setting in your user file (smithy config set)"},
 	{"unset", "<key>", "put a setting back to its default"},
-	{"keys", "", "stored API keys, masked; set them in smithy tui Settings"},
+	{"keys", "", "stored API keys, masked; set them in smithy stats Settings"},
 	{"key", "rm <service>", "remove a stored API key"},
 	{"doctor", "", "run smithy doctor on the daemon's machine"},
 	{"detach", "", "quit and leave the daemon running"},

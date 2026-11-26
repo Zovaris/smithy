@@ -1,4 +1,4 @@
-// Package tui is `smithy tui`: a live, read-only dashboard of the auto watcher, warden batches,
+// Package tui is the chat and `smithy stats`: a live, read-only dashboard of the auto watcher, warden batches,
 // task lists and pending decisions. It reads local files only.
 package tui
 

@@ -64,7 +64,7 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 			s, err := api.Settings(ctx)
 			out := []string{map[bool]string{true: "serve on", false: "serve off (auto.paused)"}[s.Serve]}
 			if len(s.Keys) == 0 {
-				out = append(out, "no API keys stored; set one in smithy tui, Settings (or smithy auth set <service>)")
+				out = append(out, "no API keys stored; set one in smithy stats, Settings (or smithy auth set <service>)")
 			}
 			for _, k := range s.Keys {
 				out = append(out, k.Service+" "+k.Masked)

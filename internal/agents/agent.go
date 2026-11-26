@@ -183,7 +183,7 @@ func AutoDenied(smithy []string) []string {
 			continue
 		}
 		d = append(d, "Bash("+b+" proxy approve *)", "Bash("+b+" proxy deny *)")
-		for _, c := range []string{"chat", "attach", "web", "tui"} {
+		for _, c := range []string{"chat", "attach", "web", "stats", "tui"} {
 			d = append(d, "Bash("+b+" "+c+")", "Bash("+b+" "+c+" *)")
 		}
 	}

@@ -24,9 +24,9 @@ import (
 	"github.com/charmbracelet/harmonica"
 )
 
-// Usage is the text for `smithy tui --help`.
-const Usage = `usage: smithy tui [--no-anim] [--demo]
-A live dashboard of the autonomous forge. Views: Overview, Agents, Incoming, Needs you,
+// Usage is the text for `smithy stats --help`.
+const Usage = `usage: smithy stats [--no-anim] [--demo]
+Live stats of the autonomous forge. Views: Overview, Agents, Incoming, Needs you,
 Done, Activity, Worktrees, Plans, System, History. It refreshes every 2 s from local files only (no network).
 Keys: tab/shift+tab or 1-9, 0 switch views; up/down (j/k) move inside a view; left/right switch
 panes or cards; enter details or read; esc close; o open; l log; c copy; y copy the action command;
@@ -904,7 +904,7 @@ func shortPR(pr string) string {
 	return pr
 }
 
-// Main runs `smithy tui`.
+// Main runs `smithy stats`.
 func Main(args []string) int {
 	noAnim, demo := false, false
 	for _, a := range args {
@@ -917,12 +917,12 @@ func Main(args []string) int {
 		case "--demo":
 			demo = true
 		default:
-			fmt.Fprintf(os.Stderr, "smithy tui: unexpected argument %s\n%s\n", a, Usage)
+			fmt.Fprintf(os.Stderr, "smithy stats: unexpected argument %s\n%s\n", a, Usage)
 			return 2
 		}
 	}
 	if _, err := tea.NewProgram(New(noAnim, demo)).Run(); err != nil {
-		fmt.Fprintln(os.Stderr, "smithy tui:", err)
+		fmt.Fprintln(os.Stderr, "smithy stats:", err)
 		return 1
 	}
 	return 0

@@ -203,7 +203,7 @@ func (m serveView) lines() []string {
 	} else if m.confirm {
 		out = append(out, " "+t.fg(t.warn).Bold(!t.plain).Render("stop serve? running agents keep going (y/n)"))
 	} else {
-		out = append(out, mut.Render(" esc/q stop "+t.g.dot+" smithy tui for the full dashboard"))
+		out = append(out, mut.Render(" esc/q stop "+t.g.dot+" smithy stats for the full dashboard"))
 	}
 	return out
 }

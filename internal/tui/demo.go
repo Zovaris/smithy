@@ -13,7 +13,7 @@ import (
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
-// Demo is `smithy tui --demo`: a rich, deterministic fake world relative to now, built in memory
+// Demo is `smithy stats --demo`: a rich, deterministic fake world relative to now, built in memory
 // (no file is read or written): 3 repos, 2 sources, 14 agents across every stage, ~30 events an
 // hour for 24 h, CI history, 4 plans and 5 items that need the user.
 func Demo(now time.Time) Snapshot {

@@ -670,7 +670,7 @@ func (m Model) textBox() string {
 func (m Model) helpBox(w, h int) string {
 	t := m.th
 	k, l := t.fg(t.accent), t.fg(t.muted)
-	lines := []string{t.fg(t.accent).Bold(true).Render("smithy tui " + t.g.dot + " help"), ""}
+	lines := []string{t.fg(t.accent).Bold(true).Render("smithy stats " + t.g.dot + " help"), ""}
 	for _, b := range []key.Binding{keys.Next, keys.Prev, keys.Jump, keys.Up, keys.Left, keys.Enter, keys.Close, keys.Open,
 		keys.Log, keys.Copy, keys.Cmd, keys.Accept, keys.Reject, keys.Unset, keys.Sort, keys.Type, keys.Pause, keys.Filter, keys.Refresh, keys.Help, keys.Quit} {
 		lines = append(lines, k.Render(fmt.Sprintf("%-9s", b.Help().Key))+l.Render(b.Help().Desc))

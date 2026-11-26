@@ -39,7 +39,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `auto.hours` | unset (always) | Launch window `HH:MM-HH:MM` in local time (`22:00-07:00` wraps midnight). |
 | `auto.every` | `60` | Seconds between polls of each source. |
 | `auto.retry_stronger` | `true` | `smithy auto report <ref> blocked` on a launched issue puts it back at the head of the queue once, on the next model tier (cheap → mid → strong; unlabeled → strong), instead of reporting it blocked; the retry is a `retry_stronger` event. A second failure, or one already on strong, is reported blocked. |
-| `auto.paused` | `false` | `true` holds `smithy auto take`: nothing launches until it is `false` again (`p` in `smithy tui`). |
+| `auto.paused` | `false` | `true` holds `smithy auto take`: nothing launches until it is `false` again (`p` in `smithy stats`). |
 | `daemon.port` | `7477` | Port of `smithy daemon`'s API (harness build). This listener binds `127.0.0.1` only; `daemon.listen` adds a second one on a Tailscale address. |
 | `daemon.idle_exit` | `30m` | How long the background daemon bare `smithy` starts stays up with no clients (TUI, web, attach) and no running work before it exits on its own. A duration like `30m` or `2h`; `0` or `off`: never. |
 | `daemon.listen` | empty | This machine's Tailscale `ip:port` (100.64.0.0/10 or fd7a:115c:a1e0::/48, e.g. `100.x.y.z:7478`) the daemon also listens on for other machines. The listener is plain HTTP, so any other address is refused: off a tailnet, leave it empty and put a TLS proxy such as `tailscale serve` in front of the loopback port. Every request there needs a paired device's token (`smithy pair`); the daemon token and the Tailscale login header are refused. Empty: loopback only. |
@@ -79,7 +79,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `kit.skills` | (empty) | Comma list of installed skills (smithy's, then `~/.agents/skills` and `~/.smithy/skills`) linked into every driven CLI that takes skills (claude, codex, opencode, pi). Toggled by `/skills`. |
 | `ui.splash` | `true` | `false` skips the short dither-and-anvil animation when `smithy` opens; it never plays without a terminal, color or motion, or under 80×24, and any key skips it. |
 | `ui.theme` | `steel` | Color theme the TUI and web share: `steel`, `frost` or `plum`. `/theme` in the TUI and the web palette set it. |
-| `tui.reduce_motion` | `false` | `true` draws every `smithy tui` frame still: no sparks, shimmer or sliding bars (like `--no-anim` or `SMITHY_REDUCE_MOTION`). |
+| `tui.reduce_motion` | `false` | `true` draws every `smithy` and `smithy stats` frame still: no sparks, shimmer or sliding bars (like `--no-anim` or `SMITHY_REDUCE_MOTION`). |
 | `git.branch` | `{type}/{key}-{slug}` | Branch names (`smithy names`); e.g. `agent/{key}-{slug}`. |
 | `git.worktree` | `{parent}/worktrees/{repo}-{branch}` | Where worktrees go. |
 | `watch.events` / `watch.every` / `watch.max` | `checks,merged,closed,conflict,review,comment,push,new,updated` / `30` / `50` | What wakes a waiting agent on `pr:` and list targets (`actions`, `base` and `alerts` always report), seconds between polls, minutes before a heartbeat. |
