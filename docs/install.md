@@ -1,29 +1,29 @@
 # Install and update
 
-## Skills
+## Install
 
 ```bash
-npx skills add Zovaris/smithy -g                                          # pick skills and agents
-npx skills add Zovaris/smithy -g -y --skill '*' -a claude-code -a codex   # no prompts
-npx skills add Zovaris/smithy@v0.23.0 -g                                  # pin a release
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh                  # latest
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.23.1        # pinned
+curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --no-skills  # binary only
 ```
 
-Drop `-g` to install into the current project only. This needs the
-[skills CLI](https://github.com/vercel-labs/skills) (Node 22.20+) and git.
+One install gets everything: the `smithy` binary (daemon, TUI, web and the CLI the skills call)
+and the skills, which it copies into every agent it finds with `smithy skills install` (no Node
+needed). `--no-skills` skips that step. `--harness` and `--skills` from older scripts are accepted
+and ignored (ADR 0014). `npx skills add Zovaris/smithy -g` still works if you prefer the skills CLI.
 
-## Binary
+## Update
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh              # latest
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.23.0    # pinned
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # skills + binary
+smithy update            # binary + skills to the latest release
+smithy update 0.23.1     # pin a version
+smithy update --check    # print the current and latest version, change nothing
 ```
 
-Once installed, `smithy update` does the same `--update` for the build that runs (harness or
-skills): it downloads `install.sh` from `main` and runs it, so the same checksum and attestation
-checks apply. `smithy update 0.23.0` pins a version; `smithy update --check` only prints the
-current version and the latest release. It refuses a binary that is not `~/.local/bin/smithy`
-(a dev build) unless you pass `--force`.
+`smithy update` downloads `install.sh` from `main` and runs it with `--update`, so the same
+checksum and attestation checks apply (`curl ... | sh -s -- --update` does the same). It refuses a
+binary that is not `~/.local/bin/smithy` (a dev build) unless you pass `--force`.
 
 [`install.sh`](../install.sh) downloads the binary for your platform from the GitHub release into
 `~/.local/share/smithy/versions/<version>/` (`$XDG_DATA_HOME`) and links `~/.local/bin/smithy`
@@ -58,17 +58,11 @@ the installed versions and the `smithy` command (plus the old `~/.smithy/bin`), 
 terminal: `--purge --confirm-purge`). Skills installed with `npx skills` are removed with
 `npx skills remove`.
 
-## Harness build
+## Building from source
 
-The release also ships `smithy-harness-<os>-<arch>`: the same commands plus `smithy daemon`,
-`smithy attach`, `smithy board`, `smithy chat` and `smithy web` (bare `smithy` opens the chat) (ADR 0009). On a terminal `install.sh` asks "harness or
-skills" (Enter picks skills); `--harness` or `--skills` skips the question, and without a terminal
-it installs the skills build and prints how to install the skill files. `--update` keeps the kind you installed (saved in `~/.smithy/kind`) and updates the skills with `npx skills update`, or with `smithy skills install` when Node is missing. Or build
-it with `go build -tags harness ./cmd/smithy`.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --harness
-```
+`go build -tags harness ./cmd/smithy` builds what the release ships. `go build ./cmd/smithy`
+without tags gives the standard-library-only build, kept for development; its harness-only
+commands print how to get the full build (ADR 0014).
 
 ## GitHub access
 
