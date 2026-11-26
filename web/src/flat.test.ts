@@ -29,7 +29,9 @@ describe("flat design", () => {
   it("widens the chat column past 720px", () => {
     for (const sel of [".conv", ".composer", ".hello"]) expect(px(rule(sel), "max-width")).toBeGreaterThanOrEqual(880);
   });
-  it("hides the palette highlight when nothing matches", () => {
-    expect(app).toMatch(/\.sph-palette__track:has\(\.sph-palette__empty\)\s+\.sph-palette__indicator\s*\{[^}]*opacity:\s*0/);
+  it("leaves the empty palette's highlight to Sephiro (Zovaris/Sephiro#37)", () => {
+    const pal = readFileSync(new URL("../node_modules/@zovaris/sephiro/dist/css/command-palette.css", import.meta.url), "utf8");
+    expect(pal).toMatch(/\.sph-palette__indicator\{[^}]*opacity:0/);
+    expect(app).not.toMatch(/sph-palette__/);
   });
 });

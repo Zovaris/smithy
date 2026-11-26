@@ -11,6 +11,7 @@ part above `### Details`.
 ### Fixed
 
 - The web is flat: square corners everywhere, one control height for the stop button, chips and small buttons, a wider chat column, and no highlighted row behind "No results." in the command palette.
+- The web Board shows your local task files by status and moving a card updates its file; running agents, what waits on you and the cost sit in a side panel on every page; Bench can start a run; Agents shows cost, tokens, tok/s and runs per hour as text charts.
 - The web does what the TUI does: every setting with a typed control, API keys, serve, doctor, a model and effort picker per session, `!cmd` and pasted or dropped images in the composer, /ask and /answer, the theme picker, a header like the TUI's, and adding or switching servers with a pairing code.
 - The web's Agents page splits sessions, the CLIs and API agents that are set up, and the missing ones with their install command. New session picks a project (added through a folder browser on the daemon's machine, never a typed path), the agent, its model and effort.
 

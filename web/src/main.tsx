@@ -11,7 +11,7 @@ import { Anvil, I } from "./icons";
 import { sendMessage, start, stopSession, useLive } from "./live";
 import { clock, headerLine } from "./parity";
 import { NewSession } from "./newsession";
-import { Agents, Changes, Decisions } from "./rail";
+import { Changes, Decisions } from "./rail";
 import { go, href, PAGES, type Page, useView } from "./router";
 import { agentName, ago, open, sessions as list, type Sess } from "./store";
 import { initTheme, toggleTheme, current, loadAccent, type ThemeName } from "./theme";
@@ -25,6 +25,8 @@ const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
   setup: lazy(() => import("./screens/setup")),
 };
 const Palette = lazy(() => import("./palette"));
+const AgentsPanel = lazy(() => import("./panel"));
+const Splash = lazy(() => import("./splash"));
 const SideServers = lazy(() => import("./servers").then((m) => ({ default: () => <m.Servers rows={m.useServers()} /> })));
 const SessionPick = lazy(() => import("./sessionpick"));
 type Shell = { cmd: string; output: string; code: number };
@@ -47,7 +49,7 @@ function Gate({ auth }: { auth: Auth }) {
   if (auth.state === "checking") return null;
   return (
     <div class="gate" role="alert">
-      <Anvil />
+      <Suspense fallback={<Anvil />}><Splash /></Suspense>
       {auth.state === "denied" ? (
         <><h2>Not signed in</h2><p class="t2">Run <code>smithy web</code> and open the link it prints.</p></>
       ) : (
@@ -136,6 +138,10 @@ function App() {
   const t = useMemo(() => totals(parse(diff?.patch ?? "")), [diff?.patch]);
   const mine = notes[sid] ?? [];
   const skills = l.setup?.skills ?? [];
+  const [project, setProject] = useState("");
+  useEffect(() => {
+    if (auth.state === "ok") api("/v1/projects").then((r) => (r.ok ? r.json() : null)).then((p) => p && setProject(p.default || p.projects?.[0]?.dir || "")).catch(() => {});
+  }, [auth.state]);
 
   useEffect(() => {
     if (auth.state !== "ok") return;
@@ -184,14 +190,20 @@ function App() {
   if (auth.state !== "ok") return <Gate auth={auth} />;
 
   const title = v.name === "session" ? s?.title ?? "Session" : v.name === "new" ? "New session" : PAGES.find((p) => p.id === v.name)!.label;
-  const rail = !!s;
-  const railBody = s && (
+  const rail = v.name !== "new" || !!ss.length;
+  const railBody = s ? (
     <>
       <Changes diff={diff} comments={mine} onComment={(c) => setNotes({ ...notes, [sid]: [...mine, c] })} onDrop={(c) => setNotes({ ...notes, [sid]: mine.filter((x) => x !== c) })} />
       <Decisions list={l.store.decisions.filter((d) => d.session === s.id || (!d.session && d.answer == null))} sessions={l.store.sessions} />
-      <Agents sessions={ss} host={host()} />
+      <Suspense fallback={null}><AgentsPanel store={l.store} project={s.dir} cur={s.id} host={host()} /></Suspense>
     </>
+  ) : (
+    <Suspense fallback={null}><AgentsPanel store={l.store} project={project} cur="" host={host()} /></Suspense>
   );
+  const panelBtn = (cls: string) =>
+    !s && rail && (
+      <button class={"icon s " + cls} onClick={() => setSheet("rail")} aria-label="Agents panel" title="Agents panel"><I n="bolt" /></button>
+    );
   const delta = (cls: string) =>
     s && (
       <button class={"delta " + cls} onClick={() => setSheet("rail")} aria-label={`Changes: ${t.add} added, ${t.del} removed`}>
@@ -251,6 +263,7 @@ function App() {
         <h1>{title}</h1>
         {s && <St s={s.status} />}
         {delta("")}
+        {panelBtn("")}
       </header>
       {sheet === "side" && <div class="scrim for-side" onClick={() => setSheet("")} />}
       <Sidebar ss={ss} cur={v.name === "session" ? v.id : v.name} pending={pend.length} conn={l.conn} sheet={sheet === "side"} onClose={() => setSheet("")}
@@ -265,6 +278,7 @@ function App() {
           <span class="sp" />
           {s && <span class="tag" title={"Runs on " + host()}><I n="server" sm /><span class="mono">{host()}</span></span>}
           {delta("rail-btn")}
+          {panelBtn("rail-btn")}
           {s && (s.status === "working" || s.status === "needs_you") && (
             <button class="btn sm" onClick={() => stopSession(s.id).catch(() => {})}>Stop<kbd>esc</kbd></button>
           )}

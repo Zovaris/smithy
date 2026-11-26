@@ -77,6 +77,8 @@ type Server struct {
 	Plan func(ctx context.Context, idea string) ([]PlanTask, error)
 	// BenchDir is where bench runs are read from; empty: bench.Dir().
 	BenchDir string
+	// BenchRun, when set, replaces running `smithy <args>` for a web-started bench run (tests).
+	BenchRun func(args []string) error
 	// Runners makes each session's runner; nil: DefaultRunner.
 	Runners RunnerFor
 	// Version is the daemon binary's version, reported in State so a client can warn on a mismatch.
@@ -104,6 +106,8 @@ type Server struct {
 	intakes    map[string]*intakePlan
 	planning   atomic.Bool
 	installing atomic.Bool
+	benchMu    sync.Mutex
+	benchNow   BenchStatus
 	lastSeq    int64
 	wake       chan struct{}
 	sessions   map[string]*live
@@ -339,6 +343,10 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("GET /v1/doctor", sv.doctor)
 	mux.HandleFunc("GET /v1/tend", sv.tendView)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
+	mux.HandleFunc("POST /v1/bench/run", sv.benchStart)
+	mux.HandleFunc("GET /v1/bench/status", sv.benchStatus)
+	mux.HandleFunc("GET /v1/tasks", sv.listTasks)
+	mux.HandleFunc("PUT /v1/tasks/status", sv.moveTask)
 	return mux
 }
 
