@@ -39,15 +39,12 @@ the failing test first, runs tasks in parallel and keeps every pull request gree
 ## Install
 
 ```bash
-npx skills add Zovaris/smithy -g
 curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh
 ```
 
-The first line installs the skills; pick at least `use-smithy`. The second installs the `smithy`
-binary, after verifying its checksum and build attestation; it asks for the **harness** build
-(daemon, TUI and web: run `smithy`) or the **skills** build (only the CLI the skills call).
-Skip the question with `sh -s -- --harness` or `sh -s -- --skills`. Without Node, install the
-binary first, then run `smithy skills install` (it copies the release's skills into each harness it finds).
+This installs the `smithy` binary (daemon, TUI and web: run `smithy`), after verifying its
+checksum and build attestation, then copies the skills into every agent it finds
+(`smithy skills install`; pass `sh -s -- --no-skills` to skip that step). No Node needed.
 
 Then, in your agent:
 
@@ -62,8 +59,9 @@ Requires git. [`gh`](https://cli.github.com) is recommended; without it, smithy 
 ### Update and uninstall
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update   # skills + binary
-smithy uninstall                                                                                  # lists what it removes, then asks
+smithy update      # binary + skills; --check only compares versions
+# or: curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update
+smithy uninstall   # lists what it removes, then asks
 ```
 
 ### For agents

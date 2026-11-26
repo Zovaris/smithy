@@ -53,6 +53,7 @@ Maintenance
   skills        find installed skills (smithy skills --list)
   uninstall     remove smithy: binaries, the skills it installed, daemon,
                 images, PATH line (lists first)
+  update        update the binary and the skills to the latest release
 
 Used by the skills
   adr           next numbered ADR (smithy adr "<title>" [adr-dir])

@@ -8,13 +8,18 @@ part above `### Details`.
 
 ## Unreleased
 
-### Fixed
+### Highlights
 
-- `install.sh` asks which build you want and defaults to the harness (daemon, TUI and web); the README shows how to update and uninstall.
+- **One install, everything in it.** `install.sh` no longer asks harness or skills: it installs the full `smithy` binary and copies the skills into every agent it finds, without Node. `--no-skills` skips the skills.
+
+### New
+
+- `smithy update` updates the binary and the skills to the latest release; `--check` only compares versions.
 
 ### Details
 
-- install: the prompt lists `1) harness` and `2) skills`; Enter picks harness (was skills). Tests: `grep` reads the whole pipe so `pipefail` never fails a check on SIGPIPE.
+- install: `install.sh` always installs `smithy-harness-*` and then runs `smithy skills install` (`--no-skills` skips it); `--harness` and `--skills` are accepted no-ops with a stderr note; `~/.smithy/kind` is gone. ADR 0014 supersedes the skills build as an install choice (ADR 0009); release assets are unchanged.
+- update: new `internal/selfupdate` downloads `install.sh` from `main` over HTTPS (30s timeout, 1 MiB cap) to a temp file and runs `sh <file> --update [<version>]`, streaming output and returning its exit code. `--check` reads `releases/latest` (with `GH_TOKEN` when set). A binary other than `~/.local/bin/smithy` (`$XDG_BIN_HOME`) is refused unless `--force`.
 
 ## v0.23.0 — 2026-11-25
 

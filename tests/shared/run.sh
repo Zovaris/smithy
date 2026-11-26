@@ -186,7 +186,7 @@ cat > "$L/fakegh" <<'EOF'
 #!/bin/sh
 if [ "$1" = release ]; then
   d=; a=; while [ $# -gt 0 ]; do case $1 in -D) d=$2; shift ;; -p) [ -z "$a" ] && a=$2; shift ;; esac; shift; done
-  printf '#!/bin/sh\necho fake-smithy\n' | gzip > "$d/$a"
+  printf '#!/bin/sh\n[ -d "$HOME" ] && echo "$*" >> "$HOME/calls" 2>/dev/null\n[ "$*" = "skills install" ] && [ -n "${FAKE_SKILLS_FAIL:-}" ] && { echo "no harness found" >&2; exit 1; }\necho fake-smithy\n' | gzip > "$d/$a"
   echo "$( (command -v sha256sum >/dev/null 2>&1 && sha256sum "$d/$a" || shasum -a 256 "$d/$a") | awk '{print $1}')  $a" > "$d/checksums.txt"
   exit 0
 fi
@@ -225,26 +225,23 @@ t "launcher: installed binary runs silently" '[ "$(env -u SMITHY_BIN HOME="$L/Hf
 t "install.sh: no gh + bad checksum refuses" 'LN "$L/nogh-bad" e 1; [ $? -eq 3 ] && grep -q "checksum mismatch" "$L/err" && [ ! -e "$L/He/.local/share/smithy/versions/0.0.0/smithy" ]'
 t "install.sh: no gh + empty checksums.txt refuses" 'LN "$L/nogh-bad" g empty; [ $? -eq 3 ] && [ ! -e "$L/Hg/.local/share/smithy/versions/0.0.0/smithy" ]'
 
-# install.sh kind: harness or skills (non-tty → skills; SMITHY_TTY stands in for /dev/tty)
+# install.sh: one build (harness) plus the skills
 mkdir -p "$L/kind"; cp "$L/fakegh" "$L/kind/gh"; printf '#!/bin/sh\nexit 0\n' > "$L/kind/npx"; chmod +x "$L/kind/gh" "$L/kind/npx"
 LK() { h=$1; shift; env -u SMITHY_BIN -u SMITHY_TTY -u XDG_DATA_HOME -u XDG_BIN_HOME HOME="$L/kh$h" SMITHY_HOME="$L/k$h" TMPDIR="$L/tmp" PATH="$L/kind:$L/sys" "$@" 2>"$L/err"; }
-t "install.sh: non-tty installs the skills build" 'LK a "$L/install.sh" 0.0.0 </dev/null && grep -q "(smithy-[a-z]*-[a-z0-9]*\.gz)" "$L/err" && [ "$(cat "$L/ka/kind")" = skills ]'
-t "install.sh: --harness installs smithy-harness" 'LK b "$L/install.sh" --harness 0.0.0 && grep -q "(smithy-harness-.*\.gz)" "$L/err" && [ "$(cat "$L/kb/kind")" = harness ]'
-t "install.sh: --update keeps the harness kind" 'LK b "$L/install.sh" --update 0.0.0 && grep -q "(smithy-harness-.*\.gz)" "$L/err"'
-t "install.sh: --skills overrides the kept kind" 'LK b "$L/install.sh" --update --skills 0.0.0 && ! grep -q harness "$L/err" && [ "$(cat "$L/kb/kind")" = skills ]'
-t "install.sh: tty answer 2 is skills" 'echo 2 > "$L/ans"; LK c env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && grep -q "which build" "$L/err" && ! grep -q "(smithy-harness-" "$L/err"'
-t "install.sh: tty empty answer defaults to harness" ': > "$L/ans"; LK d env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && grep -q "which build" "$L/err" && grep -q "(smithy-harness-" "$L/err"'
-t "install.sh: non-tty prints the skills install hint" 'LK e "$L/install.sh" 0.0.0 </dev/null && grep -q "skills install" "$L/err"'
-t "install.sh: tty offers skills install, no on n" 'echo n > "$L/ans"; LK f env SMITHY_TTY="$L/ans" "$L/install.sh" --skills 0.0.0 && grep -q "install the skills now" "$L/err" && ! grep -q "skills install failed" "$L/err"'
-t "install.sh: --harness with --skills refused" 'LK e "$L/install.sh" --harness --skills 0.0.0; [ $? -eq 3 ]'
+t "install.sh: default installs harness and runs skills install" 'LK a "$L/install.sh" 0.0.0 </dev/null && grep -q "(smithy-harness-.*\.gz)" "$L/err" && grep -qx "skills install" "$L/kha/calls" && [ ! -e "$L/ka/kind" ]'
+t "install.sh: --no-skills skips skills install" 'LK b "$L/install.sh" --no-skills 0.0.0 </dev/null && grep -q "(smithy-harness-.*\.gz)" "$L/err" && ! grep -q "skills install" "$L/khb/calls" 2>/dev/null && grep -q -- "--no-skills" "$L/err"'
+t "install.sh: --skills is an ignored old flag" 'LK c "$L/install.sh" --skills 0.0.0 </dev/null && grep -q -- "--skills is ignored" "$L/err" && grep -q "(smithy-harness-.*\.gz)" "$L/err"'
+t "install.sh: no agent found still installs the binary" 'FAKE_SKILLS_FAIL=1 LK e "$L/install.sh" 0.0.0 </dev/null && grep -q "no harness found" "$L/err" && grep -q "skills install" "$L/err"'
+t "install.sh: --update installs harness and the skills" 'LK d "$L/install.sh" --update 0.0.0 </dev/null && grep -q "(smithy-harness-.*\.gz)" "$L/err" && grep -qx "skills install" "$L/khd/calls"'
+t "install.sh: no build question on a tty" ': > "$L/ans"; LK e env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && ! grep -q "which build" "$L/err"'
 t "install.sh: rejects a bad version" 'env -u SMITHY_BIN HOME="$L/Hbad" SMITHY_HOME="$L/bad" PATH="$L/sys" "$L/install.sh" "../x" 2>"$L/err"; [ $? -eq 3 ] && grep -q "bad version" "$L/err"'
 # standard layout: ~/.local/share/smithy/versions + ~/.local/bin/smithy, migration, uninstall
 LI() { h=$1; shift; env -u SMITHY_BIN -u SMITHY_TTY -u XDG_DATA_HOME -u XDG_BIN_HOME HOME="$L/I$h" SMITHY_HOME="$L/I$h/.smithy" SHELL=/bin/zsh TMPDIR="$L/tmp" PATH="$L/kind:$L/sys" "$@" 2>"$L/err"; }
 t "install.sh: fresh install lands in ~/.local/bin" 'LI a "$L/install.sh" 0.0.0 </dev/null && [ -L "$L/Ia/.local/bin/smithy" ] && [ "$("$L/Ia/.local/bin/smithy")" = fake-smithy ] && [ -x "$L/Ia/.local/share/smithy/versions/0.0.0/smithy" ] && [ ! -e "$L/Ia/.smithy/bin" ]'
 t "install.sh: prints the exact PATH line for zsh" "grep -qF 'export PATH=\"$L/Ia/.local/bin:\$PATH\"' \"\$L/err\" && grep -q 'add this line to .*\.zshrc' \"\$L/err\""
 t "install.sh: respects XDG_DATA_HOME and XDG_BIN_HOME" 'LI x env XDG_DATA_HOME="$L/Ix/d" XDG_BIN_HOME="$L/Ix/b" "$L/install.sh" 0.0.0 </dev/null && [ -x "$L/Ix/d/smithy/versions/0.0.0/smithy" ] && [ -L "$L/Ix/b/smithy" ]'
-t "install.sh: tty yes adds the PATH line once and records it" 'echo y > "$L/ans"; LI y env SMITHY_TTY="$L/ans" "$L/install.sh" --skills 0.0.0 && grep -qF "/Iy/.local/bin:" "$L/Iy/.zshrc" && [ "$(cat "$L/Iy/.smithy/path-added")" = "$L/Iy/.zshrc" ]'
-t "install.sh: PATH offer defaults to no" ': > "$L/ans"; LI n env SMITHY_TTY="$L/ans" "$L/install.sh" --skills 0.0.0 && [ ! -e "$L/In/.zshrc" ]'
+t "install.sh: tty yes adds the PATH line once and records it" 'echo y > "$L/ans"; LI y env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && grep -qF "/Iy/.local/bin:" "$L/Iy/.zshrc" && [ "$(cat "$L/Iy/.smithy/path-added")" = "$L/Iy/.zshrc" ]'
+t "install.sh: PATH offer defaults to no" ': > "$L/ans"; LI n env SMITHY_TTY="$L/ans" "$L/install.sh" 0.0.0 && [ ! -e "$L/In/.zshrc" ]'
 t "install.sh: --update keeps working in the new layout" 'LI a "$L/install.sh" --update 0.0.0 && [ "$("$L/Ia/.local/bin/smithy")" = fake-smithy ]'
 mkdir -p "$L/Im/.smithy/bin/0.0.1" "$L/Im/.smithy/bin/dev/k"; printf '#!/bin/sh\necho old-smithy\n' > "$L/Im/.smithy/bin/0.0.1/smithy"; chmod +x "$L/Im/.smithy/bin/0.0.1/smithy"; ln -s "$L/Im/.smithy/bin/0.0.1/smithy" "$L/Im/.smithy/bin/smithy"
 t "install.sh: migrates ~/.smithy/bin and says so" 'LI m "$L/install.sh" 0.0.0 </dev/null && grep -q "moved the old install" "$L/err" && [ -x "$L/Im/.local/share/smithy/versions/0.0.1/smithy" ] && [ -d "$L/Im/.local/share/smithy/dev/k" ] && [ -L "$L/Im/.smithy/bin/0.0.1" ]'
