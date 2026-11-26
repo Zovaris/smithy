@@ -82,6 +82,27 @@ project. A new session asks which project it works in.
 
 Set them with `/set` or `smithy config set`. Every setting: [settings.md](settings.md).
 
+## Web
+
+`smithy web` prints the link to the web UI the daemon serves and `smithy web open` opens it; the
+token rides in the URL fragment. Behind `tailscale serve`, open `https://<machine>.<tailnet>.ts.net/`.
+The web does what the TUI does:
+
+- **New session**: pick a project (added with a folder browser on the daemon's machine), the
+  agent, its model and effort.
+- **Session**: the chat, with `!cmd`, pasted or dropped images, `/ask` and every TUI command
+  under `/`; `ctrl+k` opens the palette.
+- **Decisions** (`2`), **Agents** (`3`: sessions, ready and missing agents, cost, tokens, tok/s
+  and runs per hour as text charts), **Board** (`4`: local task files by status; moving a card
+  updates the file), **Bench** (`5`: runs, comparisons, start a run) and **Settings** (`6`).
+- A side panel on every page shows running agents, what waits on you and the cost.
+
+Settings in the web match the TUI's: every setting with a typed control, API keys, serve on/off,
+doctor, the theme (`ui.theme`) and saved servers (add one with a pairing code, or switch).
+
+Install it as an app: in Chrome use Install, on iOS Safari use Add to Home Screen. The page shell
+opens offline; the data needs the daemon.
+
 ## Other machines
 
 `smithy chat <url>` or `--server <name>` connects to another daemon. `/remote` shows how to reach
