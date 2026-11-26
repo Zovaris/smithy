@@ -354,6 +354,11 @@ func diffStat(patch string) string {
 
 // status puts text on the status line and in the log.
 func (m *chatView) status(text string) {
+	for _, n := range m.noise {
+		if n.text == text {
+			return
+		}
+	}
 	m.noise = append(m.noise, noise{at: time.Now(), text: text})
 	if len(m.noise) > maxNoise {
 		m.noise = m.noise[len(m.noise)-maxNoise:]
