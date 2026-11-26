@@ -398,7 +398,7 @@ func (sv *Server) finishCycle(res <-chan time.Duration) {
 func (sv *Server) stopped() {
 	msg := "serve stopped"
 	if sv.hb.SessionRunning() {
-		msg += fmt.Sprintf("; orchestrator pid %d keeps running (log %s; smithy tui or smithy cards board shows its workers)", sv.hb.SessionPID, sv.hb.SessionLog)
+		msg += fmt.Sprintf("; orchestrator pid %d keeps running (log %s; smithy stats or smithy cards board shows its workers)", sv.hb.SessionPID, sv.hb.SessionLog)
 	}
 	sv.logf("%s", msg)
 	_ = events.Append(events.Event{Kind: "serve_down", Detail: "serve stopped"})

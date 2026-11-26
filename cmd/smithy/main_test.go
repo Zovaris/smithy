@@ -455,3 +455,17 @@ func TestSearchCode(t *testing.T) {
 		t.Fatalf("bad regex exit %d", code)
 	}
 }
+
+func TestStatsRenamesTui(t *testing.T) {
+	repo, env := sandbox(t)
+	if out, _, code := run(t, repo, env, "stats", "--help"); code != 0 || !strings.Contains(out, "smithy stats") {
+		t.Fatalf("stats --help: code %d, %q", code, out)
+	}
+	out, errOut, code := run(t, repo, env, "tui", "--help")
+	if code != 0 || !strings.Contains(out, "smithy stats") || !strings.Contains(errOut, "renamed to smithy stats") {
+		t.Fatalf("tui alias: code %d, out %q, err %q", code, out, errOut)
+	}
+	if help, _, _ := run(t, repo, env, "--help"); strings.Contains(help, "  tui ") || !strings.Contains(help, "  stats ") {
+		t.Fatalf("help lists tui or misses stats:\n%s", help)
+	}
+}

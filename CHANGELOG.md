@@ -21,6 +21,8 @@ part above `### Details`.
 
 - The README has a clear Usage section (install, update, uninstall) and a Harness section with screenshots; agents get their own install guide in docs/agents.md and every chat key and command is in docs/harness-guide.md.
 - The TUI header is one calm bar: smithy, its version and the project on the left, an idle or "N running" pill that breathes slowly and the clock on the right; model, branch, tokens and cost stay in the footer, so nothing shows twice.
+- `smithy tui` uses the same one-row header: smithy, its version and the repo on the left, the watcher state and the clock on the right. The big anvil plate is gone; the splash stays the only big anvil.
+- `smithy tui` is now `smithy stats`; `smithy tui` still works and says it was renamed. Its panels have square corners and a blank row under each title.
 - smithy opens with a short dither-and-anvil splash (under a second); any key skips it, and `ui.splash = false` turns it off.
 - First run opens a full-screen welcome, then four steps: the agents found on this machine, the model, your API keys and notifications. `smithy welcome` or `/welcome` walks them again.
 - The welcome shows the lit anvil over its dither field, the same one the splash draws, with sparks that hold still under reduced motion.

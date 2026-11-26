@@ -122,7 +122,7 @@ Label an issue `auto` on GitHub or Linear, and smithy builds it unattended and r
 ```bash
 smithy config set auto.sources github,linear
 smithy auto serve      # Esc/q stops it
-smithy tui             # queue, running agents, cost, settings
+smithy stats           # queue, running agents, cost, settings
 ```
 
 The spend is bounded by a daily cap and an hours window. Workers can run in a sandbox, and an

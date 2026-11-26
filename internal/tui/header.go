@@ -1,17 +1,18 @@
 package tui
 
 import (
-	"image/color"
-	"math"
 	"math/rand/v2"
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/colorprofile"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // fps is the frame rate while sparks, the shimmer, the cap meter or a running item move; at rest no frames run.
 const fps = 15
+
+// breathSecs is one slow in-and-out of a running pill's dot.
+const breathSecs = 2.0
 
 // wordB is the Calvin S name.
 var wordB = []string{
@@ -23,13 +24,12 @@ var wordB = []string{
 const (
 	bandHalf  = 3
 	sweepSecs = 2.5
-	idleTicks = 5 // refresh ticks (2 s) between idle strikes
 	gravity   = 55.0
 )
 
 // anvilBig is the 30×14-pixel anvil (7 text rows of half blocks): three rows of headroom for
 // sparks, a flat face that ends in a pointed horn on the left and a square heel on the right, a
-// narrow waist and a wide base on two feet. anvilSmall is the 16×8 one.
+// narrow waist and a wide base on two feet.
 var anvilBig = []string{
 	"                              ",
 	"                              ",
@@ -47,17 +47,6 @@ var anvilBig = []string{
 	"       #######     #######    ",
 }
 
-var anvilSmall = []string{
-	"                ",
-	"  ###########   ",
-	"#############   ",
-	"  ###########   ",
-	"     #####      ",
-	"      ###       ",
-	"    #######     ",
-	"   ###   ###    ",
-}
-
 // sprite is the header anvil in pixels (two per text row) and where sparks fly from.
 type sprite struct {
 	mask  []string
@@ -65,10 +54,7 @@ type sprite struct {
 	hitX  float64
 }
 
-var (
-	bigPlate   = sprite{anvilBig, 3, 16}
-	smallPlate = sprite{anvilSmall, 1, 8}
-)
+var bigPlate = sprite{anvilBig, 3, 16}
 
 func (s sprite) w() int { return len(s.mask[0]) }
 func (s sprite) h() int { return len(s.mask) }
@@ -149,49 +135,40 @@ func (f *fx) step() {
 	}
 }
 
-func (f *fx) busy() bool { return len(f.sparks) > 0 || f.shimmer }
-
-// plateRows draws the header plate for s, with sparks only while motion is on.
-func (m Model) plateRows(s sprite) []string {
-	var sp []spark
-	if m.motion {
-		sp = m.fx.sparks
+// headBar is the one-row header the chat and the dashboard share: ◆ smithy, the version and the
+// project on the left, a state pill and the clock in the corner. When the width runs short the
+// pill goes first, then the left side is cut.
+func (t theme) headBar(w, gutter int, project string, pill func(bar lipgloss.Style) string, clock string) string {
+	bar := lipgloss.NewStyle().Background(t.raised)
+	if t.plain {
+		bar = lipgloss.NewStyle()
 	}
-	t := m.th
-	if m.profile < colorprofile.ANSI256 {
-		t.ramp = nil
+	p := strings.Repeat(" ", gutter)
+	diamond := "*"
+	if t.g.unicode {
+		diamond = "◆"
 	}
-	return t.plate(s, sp)
-}
-
-// wordmark draws the name in steel, dim → base across, with the shimmer band when one sweeps.
-func (m Model) wordmark() []string {
-	t := m.th
-	w := len([]rune(wordB[0]))
-	rich := !t.plain && m.profile >= colorprofile.ANSI256
-	var grad []color.Color
-	if rich {
-		grad = lipgloss.Blend1D(w, t.dim, t.text)
+	name := bar.Foreground(t.strong).Bold(true).Render("smithy")
+	if Version != "" {
+		name += bar.Foreground(t.dim).Render(" " + Version)
 	}
-	shimmer := m.motion && m.fx.shimmer
-	out := make([]string, len(wordB))
-	for y, row := range wordB {
-		var b strings.Builder
-		for x, r := range []rune(row) {
-			switch {
-			case r == ' ' || t.plain:
-				b.WriteRune(r)
-			case !rich:
-				b.WriteString(t.fg(t.strong).Bold(true).Render(string(r)))
-			default:
-				c := grad[x]
-				if shimmer && math.Abs(float64(x)-m.fx.band) < bandHalf && 1-math.Abs(float64(x)-m.fx.band)/bandHalf > bayerAt(x, y) {
-					c = t.strong
-				}
-				b.WriteString(lipgloss.NewStyle().Foreground(c).Bold(true).Render(string(r)))
-			}
+	left := bar.Render(p) + bar.Foreground(t.accent).Render(diamond+" ") + name
+	if project != "" {
+		left += bar.Foreground(t.dim).Render(" "+t.g.dot+" ") + bar.Foreground(t.muted).Render(project)
+	}
+	right := bar.Foreground(t.text).Render(clock) + bar.Render(p)
+	if s := pill(bar); s != "" {
+		if full := s + bar.Render("  ") + right; w-ansi.StringWidth(left)-ansi.StringWidth(full) >= 1 {
+			right = full
 		}
-		out[y] = b.String()
 	}
-	return out
+	lw, rw := ansi.StringWidth(left), ansi.StringWidth(right)
+	if w-lw-rw >= 1 {
+		return left + bar.Render(strings.Repeat(" ", w-lw-rw)) + right
+	}
+	if room := w - rw - 1; room >= 8 {
+		left = ansi.Truncate(left, room, "")
+		return left + bar.Render(strings.Repeat(" ", w-ansi.StringWidth(left)-rw)) + right
+	}
+	return ansi.Truncate(left, w, "")
 }

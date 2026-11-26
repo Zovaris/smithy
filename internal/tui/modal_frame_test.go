@@ -22,7 +22,7 @@ func boxRows(t *testing.T, m chatView) []string {
 	t.Helper()
 	var rows []string
 	for _, l := range strings.Split(screen(m), "\n") {
-		if strings.Contains(l, "╭") || strings.Contains(l, "│") || strings.Contains(l, "├") || strings.Contains(l, "╰") {
+		if strings.Contains(l, "┌") || strings.Contains(l, "│") || strings.Contains(l, "├") || strings.Contains(l, "└") {
 			rows = append(rows, l)
 		}
 	}
@@ -37,8 +37,8 @@ func TestModalHasAFrameTitleBarAndFooter(t *testing.T) {
 		m := framedChat(name, 100)
 		m = sendKey(typeIn(m, "/theme"), ckey("enter"))
 		rows := boxRows(t, m)
-		if !strings.Contains(rows[0], "╭") || !strings.Contains(rows[len(rows)-1], "╰") {
-			t.Fatalf("%s: rounded corners top and bottom:\n%s", name, strings.Join(rows, "\n"))
+		if !strings.Contains(rows[0], "┌") || !strings.Contains(rows[len(rows)-1], "└") {
+			t.Fatalf("%s: square corners top and bottom:\n%s", name, strings.Join(rows, "\n"))
 		}
 		title := rows[1]
 		if !strings.Contains(title, "Theme") || !strings.HasSuffix(strings.TrimRight(strings.TrimSuffix(strings.TrimSpace(title), "│"), " "), "esc") {
@@ -50,7 +50,7 @@ func TestModalHasAFrameTitleBarAndFooter(t *testing.T) {
 		w := ansi.StringWidth(strings.TrimSpace(rows[0]))
 		for _, r := range rows {
 			s := strings.TrimSpace(r)
-			if i := strings.IndexAny(s, "╭│├╰"); i >= 0 {
+			if i := strings.IndexAny(s, "┌│├└"); i >= 0 {
 				s = s[i:]
 			}
 			if got := ansi.StringWidth(strings.TrimRight(s, " ")); got > w+40 {

@@ -66,44 +66,16 @@ func (m chatView) pad() int {
 // headRows is the header's height: one bar and a spacer row.
 const headRows = 2
 
-// breathSecs is one slow in-and-out of the running pill's dot.
-const breathSecs = 2.0
-
 // header is one bar on the raised surface: the name, version and project on the left, a state
 // pill and the clock in the corner. Model, branch, tokens and cost live in the footer and the
 // current tool in the transcript, so none of them repeat here. Only the pill's dot moves, a slow
 // breath while sessions run; the text never shifts.
 func (m chatView) header(w int) []string {
-	t := m.th
-	bar := lipgloss.NewStyle().Background(t.raised)
-	if t.plain {
-		bar = lipgloss.NewStyle()
-	}
-	p := strings.Repeat(" ", m.pad())
-	name := bar.Foreground(t.strong).Bold(true).Render("smithy")
-	if Version != "" {
-		name += bar.Foreground(t.dim).Render(" " + Version)
-	}
-	left := bar.Render(p) + bar.Foreground(t.accent).Render(m.diamond()+" ") + name
+	project := ""
 	if m.dir != "" {
-		left += bar.Foreground(t.dim).Render(" "+t.g.dot+" ") + bar.Foreground(t.muted).Render(filepath.Base(m.dir))
+		project = filepath.Base(m.dir)
 	}
-	clock := bar.Foreground(t.text).Render(m.clockNow().Format("15:04")) + bar.Render(p)
-	right := m.pill(bar) + bar.Render("  ") + clock
-	if gap := w - ansi.StringWidth(left) - ansi.StringWidth(right); gap >= 1 {
-		return []string{left + bar.Render(strings.Repeat(" ", gap)) + right, ""}
-	}
-	if gap := w - ansi.StringWidth(left) - ansi.StringWidth(clock); gap >= 1 {
-		return []string{left + bar.Render(strings.Repeat(" ", gap)) + clock, ""}
-	}
-	return []string{ansi.Truncate(left, w, ""), ""}
-}
-
-func (m chatView) diamond() string {
-	if m.th.g.unicode {
-		return "◆"
-	}
-	return "*"
+	return []string{m.th.headBar(w, m.pad(), project, m.pill, m.clockNow().Format("15:04")), ""}
 }
 
 // clockMsg redraws the header clock; it fires on each minute, nothing else runs while idle.
@@ -372,7 +344,7 @@ type boxFrame struct{ tl, tr, bl, br, lt, rt, h, v, sel string }
 
 func frameGlyphs(uni bool) boxFrame {
 	if uni {
-		return boxFrame{"╭", "╮", "╰", "╯", "├", "┤", "─", "│", "▌"}
+		return boxFrame{"┌", "┐", "└", "┘", "├", "┤", "─", "│", "▌"}
 	}
 	return boxFrame{"+", "+", "+", "+", "+", "+", "-", "|", ">"}
 }

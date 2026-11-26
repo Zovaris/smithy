@@ -1,6 +1,6 @@
 // Package events keeps ~/.smithy/events.jsonl: a bounded, append-only log of what the forge did
 // (polls, queued and skipped issues, launches, stage and CI changes, reports, merges), one JSON
-// line each, for `smithy tui`. It never records issue bodies, keys or tokens.
+// line each, for `smithy stats`. It never records issue bodies, keys or tokens.
 package events
 
 import (
