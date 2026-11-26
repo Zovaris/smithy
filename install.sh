@@ -2,11 +2,11 @@
 # Installs the smithy binary that the smithy skills run. Run it yourself, once per version:
 #   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh            # latest
 #   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s 0.14.1   # pinned
-#   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # skills + binary
-#   ... | sh -s -- --harness   # harness build (smithy-harness-*); --skills for the skills build
-# Asks harness or skills on a terminal (default harness); without one it installs skills.
-# --update keeps the kind installed before (~/.smithy/kind).
-# Downloads smithy-<os>-<arch> from the GitHub release, checks it against the release's
+#   curl -fsSL https://raw.githubusercontent.com/Zovaris/smithy/main/install.sh | sh -s -- --update  # same, as an update
+#   ... | sh -s -- --no-skills   # binary only, skip `smithy skills install`
+# Installs the one shipped build (smithy-harness-*), then runs `smithy skills install`, which copies the
+# skills into every agent it finds. --harness and --skills are accepted and ignored (older scripts).
+# Downloads smithy-harness-<os>-<arch> from the GitHub release, checks it against the release's
 # checksums.txt and its build attestation (gh), and puts it in ~/.local/share/smithy/versions/<version>/
 # ($XDG_DATA_HOME), with ~/.local/bin/smithy ($XDG_BIN_HOME) linking to it; on Windows
 # %LOCALAPPDATA%\smithy\versions and %LOCALAPPDATA%\Programs\smithy. An old ~/.smithy/bin install
@@ -18,34 +18,15 @@ home=${SMITHY_HOME:-$HOME/.smithy}
 case ${XDG_DATA_HOME:-} in /*) data=$XDG_DATA_HOME/smithy ;; *) data=$HOME/.local/share/smithy ;; esac
 case ${XDG_BIN_HOME:-} in /*) bindir=$XDG_BIN_HOME ;; *) bindir=$HOME/.local/bin ;; esac
 limit=${SMITHY_DOWNLOAD_TIMEOUT:-120}
-update=; kind=; version=
+noskills=; version=
 for a in "$@"; do
   case $a in
-    --update) update=1 ;;
-    --harness|--skills) [ -z "$kind" ] || [ "$kind" = "${a#--}" ] || { echo "smithy install: pick one of --harness or --skills" >&2; exit 3; }; kind=${a#--} ;;
+    --update) ;;
+    --no-skills) noskills=1 ;;
+    --harness|--skills) echo "smithy install: $a is ignored; smithy ships one build (harness) with the skills" >&2 ;;
     *) version=$a ;;
   esac
 done
-if [ -n "$update" ]; then
-  if command -v npx >/dev/null 2>&1; then
-    echo "smithy install: updating the skills (npx skills update -g)" >&2
-    npx -y skills update -g >&2 || { echo "smithy install: npx skills update failed" >&2; exit 3; }
-  else
-    skills_by_bin=1
-  fi
-  [ -n "$kind" ] || kind=$(cat "$home/kind" 2>/dev/null || true)
-fi
-if [ -z "$kind" ]; then
-  tty=${SMITHY_TTY:-/dev/tty}
-  if { [ -n "${SMITHY_TTY:-}" ] || [ -t 2 ]; } && { : < "$tty"; } 2>/dev/null; then
-    printf 'smithy install: which build?\n  1) harness  daemon, TUI and web: run `smithy`\n  2) skills   only the CLI the agent skills call\nchoose [1]: ' >&2
-    ans=; read -r ans < "$tty" || true
-    case $ans in ""|1|h|harness) kind=harness ;; 2|s|skills) kind=skills ;; *) echo "smithy install: answer 1 (harness) or 2 (skills)" >&2; exit 3 ;; esac
-  else
-    kind=skills
-  fi
-fi
-case $kind in harness|skills) ;; *) kind=skills ;; esac
 version=${version:-${SMITHY_VERSION:-}}
 version=${version#v}
 
@@ -59,7 +40,7 @@ esac
 case "$(uname -m)" in
   arm64|aarch64) arch=arm64 ;; x86_64|amd64) arch=amd64 ;; *) die "unsupported CPU $(uname -m)" ;;
 esac
-pre=smithy; [ "$kind" = harness ] && pre=smithy-harness
+pre=smithy-harness
 if [ "$os" = windows ]; then
   lad=${LOCALAPPDATA:-$HOME/AppData/Local}; command -v cygpath >/dev/null 2>&1 && lad=$(cygpath -u "$lad")
   data="$lad/smithy"; bindir="$lad/Programs/smithy"
@@ -171,8 +152,7 @@ else
   say "this release ships no ripgrep for $os/$arch; smithy search --code uses git ls-files or rg on PATH"
 fi
 [ -e "$home" ] || { mkdir -p "$home" && : > "$home/.smithy-home"; }  # the marker lets uninstall --purge know the folder is smithy's
-echo "$kind" > "$home/kind"
-say "installed v$version ($kind build) to $vdir/$version/$exe, command $bindir/$exe"
+say "installed v$version to $vdir/$version/$exe, command $bindir/$exe"
 tty=${SMITHY_TTY:-/dev/tty}
 ontty() { { [ -n "${SMITHY_TTY:-}" ] || [ -t 2 ]; } && { : < "$tty"; } 2>/dev/null; }
 case ":$PATH:" in
@@ -202,15 +182,9 @@ case ":$PATH:" in
       fi
     fi ;;
 esac
-if [ -n "$update" ]; then
-  if [ -n "${skills_by_bin:-}" ]; then
-    say "updating the skills without Node (smithy skills install)"
-    "$vdir/$version/$exe" skills install >&2 || die "smithy skills install failed"
-  fi
-elif ontty; then
-  printf 'smithy install: install the skills now (smithy skills install, no Node needed)? [y/N] ' >&2
-  ans=; read -r ans < "$tty" || true
-  case $ans in y|Y|yes) "$vdir/$version/$exe" skills install >&2 || die "smithy skills install failed" ;; esac
+if [ -n "$noskills" ]; then
+  say "skills not installed (--no-skills); install them with: $bindir/$exe skills install"
 else
-  say "install the skill files with: $bindir/$exe skills install (or npx skills add Zovaris/smithy -g)"
+  say "installing the skills into every agent found (smithy skills install)"
+  "$vdir/$version/$exe" skills install >&2 || die "smithy skills install failed"
 fi
