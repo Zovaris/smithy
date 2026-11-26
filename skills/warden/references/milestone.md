@@ -4,7 +4,7 @@ A milestone is a batch (or release branch) whose items all merged. smelt reviews
 this review checks the whole milestone for drift between parts that no single task saw.
 
 ## Offer
-After step 5's final message, when the batch was a milestone (a `release/*` base, or the user
+With step 5's final message (Finish, in SKILL.md's Loop), when the batch was a milestone (a `release/*` base, or the user
 called it one), add one line: "Run a cheap-model coherence review? How many rounds (1..N)?"
 No answer, or under hush: skip it and list it under **Followups**. Never run it unasked.
 
@@ -13,7 +13,7 @@ The user names a topic: that one only. Otherwise warden picks one per round, in 
 skipping topics the milestone didn't touch:
 1. contradictions between skills (two rules that can't both hold);
 2. duplicated rules (the same rule in two places; keep the owner, point from the other);
-3. size: each SKILL.md and reference against the repo's limits, in lines and tokens;
+3. size: each SKILL.md and reference against the repo's limits (`tests/skills.sh` in smithy), in lines and tokens;
 4. docs vs code: commands, flags and paths the docs name that the code lacks, and the reverse;
 5. TUI vs CLI gaps: actions one surface offers that the other doesn't.
 

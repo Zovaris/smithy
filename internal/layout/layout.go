@@ -67,7 +67,7 @@ func Exe() string {
 // Link is the smithy command on PATH.
 func Link() string { return filepath.Join(BinDir(), Exe()) }
 
-// LegacyBin is the pre-0.21 install folder (~/.smithy/bin), kept as links for one release.
+// LegacyBin is the pre-0.21 install folder (~/.smithy/bin); install.sh and updates remove it (ADR 0015).
 func LegacyBin() string { return filepath.Join(ghx.Home(), "bin") }
 
 // SkillsManifest lists, one per line, the skill folders `smithy skills install` wrote.

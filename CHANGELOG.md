@@ -8,6 +8,15 @@ part above `### Details`.
 
 ## Unreleased
 
+### Highlights
+
+- A calmer TUI: one header bar, a short splash, framed pickers and color themes (`/theme`).
+- A guided first run (`smithy welcome`): agents, model, API keys and notifications.
+- Projects per server: each new session asks which project it works in.
+- Settings, keys, shell commands (`!cmd`), images (ctrl+v) and effort right from the chat.
+- New agents: Antigravity CLI, GitHub Copilot CLI and Grok Build.
+- **One binary per platform.** Each release ships one `smithy-<os>-<arch>`, the full build; `install.sh` and `smithy update` keep the current and the previous version only.
+
 ### New
 
 - The TUI header is one calm bar: smithy, its version and the project on the left, an idle or "N running" pill that breathes slowly and the clock on the right; model, branch, tokens and cost stay in the footer, so nothing shows twice.
@@ -33,10 +42,15 @@ part above `### Details`.
   row and a key footer over the dimmed chat.
 - A repeated daemon line, such as serve's missing GitHub CLI note, shows once in the status area
   and leaves it after 20 seconds; `/log` keeps every line.
+- **Milestone review in warden.** After a milestone batch merges, warden offers a cheap-model coherence review in rounds (contradictions, duplicated rules, size, docs vs code, TUI vs CLI gaps, or a topic you name); each round's findings go to one fix item.
 
 ### Fixed
 
 - The settings page loads in well under a second again: `GET /v1/settings` finds the repo settings file once per request instead of running git for every setting.
+- Typing right after the chat opens no longer lands in the first-run picker: a `/` command goes to the chat (`/set linear.team ENG` used to save the model `ENG`).
+- Updating no longer repeats the old-install migration note: it runs once, then the old links in `~/.smithy/bin` and `~/.smithy/kind` are gone.
+- `smithy skills install` reports skipped symlinked skills (a checkout) in one line.
+- The chat's agent now knows it runs inside smithy: it is told about smithy's tools, its commands, code mode and that its tool calls show in the chat.
 
 ### Details
 
@@ -56,31 +70,9 @@ part above `### Details`.
   `~/.smithy/projects.json`; `GET /v1/fs?dir=` lists a folder's subfolders for the picker. A
   session started with no `dir` uses the default project.
 - **One modal for every picker.** Agent and model (ctrl+l, `/agent`, `/model`, first run), `/skills` and the agents list (tab) open as the same centered box as the ctrl+k palette: filter or title on top, ↑↓ enter esc at the bottom, no per-cell background blocks.
-### Highlights
-
-- **One binary per platform.** Each release ships one `smithy-<os>-<arch>`, the full build; `install.sh` and `smithy update` keep the current and the previous version only.
-
-### Fixed
-
-- Typing right after the chat opens no longer lands in the first-run picker: a `/` command goes to the chat (`/set linear.team ENG` used to save the model `ENG`).
-- Updating no longer repeats the old-install migration note: it runs once, then the old links in `~/.smithy/bin` and `~/.smithy/kind` are gone.
-- `smithy skills install` reports skipped symlinked skills (a checkout) in one line.
-
-### Details
-
 - release: build only the harness build, named `smithy-<os>-<arch>`; `smithy-harness-*` is no longer published (ADR 0015).
 - launcher: runs `~/.local/share/smithy/versions/<VERSION>`, else `~/.local/bin/smithy` or `smithy` on PATH with a `smithy update <VERSION>` notice, else prints the install line and exits 3; it no longer reads `~/.smithy/bin` and ignores relative PATH entries.
 - `warden doctor` and the version hint name `smithy update <version>` instead of the install line.
-### New
-
-- **Milestone review in warden.** After a milestone batch merges, warden offers a cheap-model coherence review in rounds (contradictions, duplicated rules, size, docs vs code, TUI vs CLI gaps, or a topic you name); each round's findings go to one fix item.
-
-### Fixed
-
-- The chat's agent now knows it runs inside smithy: it is told about smithy's tools, its commands, code mode and that its tool calls show in the chat.
-
-### Details
-
 - `internal/daemon/prompt.go`: `SystemPrompt` for every chat turn: `--append-system-prompt` for claude, the API loop's system field for `api:` agents (code mode on or off as configured), a marked preamble for other CLIs.
 - `smithy auto serve` no longer prints `poll: github: failed to run git` into the chat when it runs outside a git checkout: it skips the github source there quietly.
 - **Faster CI.** Go and bun caches; the harness tests split into two jobs (TUI and web, the rest); the demo, every cross-build target and the Windows launcher run only on `release/*` pull requests and on `main`; Blacksmith 4vcpu runners for test, build and demo, 2vcpu for lint, integration, web and the check gate.
