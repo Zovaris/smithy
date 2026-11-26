@@ -11,9 +11,11 @@ part above `### Details`.
 ### New
 
 - The agents panel lists the sessions of the folder you run smithy in; `a` shows every project's.
+- Your own skills in `~/.agents/skills` and `~/.smithy/skills` show in `/skills` next to smithy's, and any installed skill runs from the chat as `/name` or `$name`.
 
 ### Details
 
+- `GET /v1/setup` lists the skills in `~/.agents/skills` and `~/.smithy/skills` (`$SMITHY_HOME/skills`) after the bundled ones, with `paths` (name to SKILL.md); `kit.skills` accepts them and `FindSkill` looks in `~/.smithy/skills`. In the TUI, `/name` or `$name` sends "read <SKILL.md> and follow it" plus the rest of the line; `/` and `/help` list the skills.
 - `GET /v1/sessions?dir=` keeps the sessions started in that folder or below (symlinks resolved),
   for the web UI.
 - **One modal for every picker.** Agent and model (ctrl+l, `/agent`, `/model`, first run), `/skills` and the agents list (tab) open as the same centered box as the ctrl+k palette: filter or title on top, ↑↓ enter esc at the bottom, no per-cell background blocks.
