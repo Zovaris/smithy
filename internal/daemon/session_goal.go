@@ -91,6 +91,9 @@ func (sv *Server) SetSessionGoal(id, goal string) (Session, error) {
 	if l == nil {
 		return Session{}, errNoSession
 	}
+	if goal == l.s.Goal && l.s.GoalState == "" {
+		return l.s, nil
+	}
 	if err := sv.setGoalLocked(l, goalEvent{Goal: goal, Base: costOf(l)}); err != nil {
 		return Session{}, err
 	}

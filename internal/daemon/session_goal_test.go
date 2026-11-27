@@ -101,6 +101,13 @@ func TestGoalStopsAtTurnCapAndOnQuestion(t *testing.T) {
 	}
 	mu.Unlock()
 
+	before := len(kinds(t, sv, id))
+	if _, err := sv.SetSessionGoal(id, "ask me first"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sv.SetSessionGoal(id, "ask me first"); err != nil || len(kinds(t, sv, id)) != before+1 {
+		t.Errorf("the same goal again records nothing: %v", err)
+	}
 	s, err := sv.SetSessionGoal(id, "")
 	if err != nil || s.Goal != "" || s.GoalState != "" {
 		t.Errorf("clear: %+v %v", s, err)
