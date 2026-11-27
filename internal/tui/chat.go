@@ -127,6 +127,7 @@ type chatView struct {
 	effort   string                // agent.effort
 	clock    func() time.Time      // the header clock; nil: time.Now
 	splashOn bool                  // play the entry animation at the first window size
+	shimmer  int                   // motion frames left of the top-effort shimmer on the composer
 	still    bool                  // reduced motion: the welcome field and anvil hold still
 	splash   []string              // the entry animation's frames left; nil once it ends
 	noise    []noise               // daemon events kept out of the transcript
@@ -533,6 +534,7 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, clockTick()
 	case chatFrameMsg:
 		m.frame++
+		m.shimmer = max(m.shimmer-1, 0)
 		for i := max(len(m.msgs)-8, 0); i < len(m.msgs); i++ {
 			if c := m.msgs[i]; c.tool != nil && c.tool.Status == "running" {
 				c.lines = nil
@@ -556,6 +558,9 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.projectsLoaded(msg)
 	case dirsMsg:
 		return m.dirsLoaded(msg)
+	case effortDefaultMsg:
+		m.effortDefaultSet(msg)
+		return m, nil
 	case settingsDoneMsg:
 		if msg.panel != nil {
 			m.info, m.overlay, m.pal = *msg.panel, overlayInfo, palette{}
@@ -970,6 +975,9 @@ func (m chatView) composer(w int) []string {
 		out = append(out, p+fill(raised, bw, "  "+c+"  esc drops")+p)
 	}
 	for _, l := range strings.Split(m.input.View(), "\n") {
+		if m.shimmer > 0 {
+			l = t.shimmer(ansi.Strip(l), float64(bw)*float64(shimmerFrames-m.shimmer)/shimmerFrames)
+		}
 		out = append(out, p+fill(raised, bw, "  "+l)+p)
 	}
 	return out
