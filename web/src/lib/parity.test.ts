@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { clock, controlOf, effortOptions, setEffortRules, groupSettings, headerLine, intent, modelEditable, withImages } from "./parity";
+import { clock, controlOf, effortMax, effortOptions, effortSuggest, setEffortRules, groupSettings, headerLine, intent, modelEditable, withImages } from "./parity";
 
 describe("effort, the same rules as the TUI", () => {
+  it("completes /effort with the agent's levels, default first, like the TUI", () => {
+    const l = effortSuggest("/effort ", "claude");
+    expect(l.map((c) => c.fill)).toEqual(["/effort default", "/effort low", "/effort medium"]);
+    expect(l[0].hint).toBe("off: back to the agent.effort setting");
+    expect(l[2].hint).toBe("the top level smithy allows");
+    expect(effortSuggest("/effort l", "").map((c) => c.name)).toEqual(["effort low"]);
+    expect(effortSuggest("/effort low", "claude")).toEqual([]);
+    expect(effortSuggest("/effort low x", "claude")).toEqual([]);
+    expect(effortSuggest("/effort ", "opencode")).toEqual([]);
+    expect(effortSuggest("/effor", "claude")).toEqual([]);
+    expect(effortMax()).toBe("medium");
+  });
   it("offers default, low and medium only to agents with an effort flag", () => {
     expect(effortOptions("claude")).toEqual(["", "low", "medium"]);
     expect(effortOptions("codex")).toEqual(["", "low", "medium"]);

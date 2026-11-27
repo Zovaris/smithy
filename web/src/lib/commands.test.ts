@@ -16,6 +16,19 @@ describe("commands", () => {
     expect(suggest("/se", ["smelt", "scout"]).map((c) => c.name)).toEqual(["sessions", "setup", "serve", "set", "settings", "unset"]);
     expect(suggest("/", []).length).toBe(ACTIONS.length);
   });
+  it("lists the commands first, then the skills marked as skills", () => {
+    const l = suggest("/s", ["scout", "smelt"]);
+    expect(l.slice(-2).map((c) => [c.name, c.kind])).toEqual([["scout", "skill"], ["smelt", "skill"]]);
+    expect(l.slice(0, -2).every((c) => c.kind === "action")).toBe(true);
+    expect(suggest("/te", ["tester"]).map((c) => c.name)).toEqual(["tend", "remote", "tester"]);
+  });
+  it("matches a description from three letters on, and shows where a skill lives", () => {
+    expect(suggest("/daemon", []).map((c) => c.name)).toEqual(["log"]);
+    expect(suggest("/da", []).map((c) => c.name)).toEqual([]);
+    const paths = { smelt: "/Users/me/.claude/skills/smelt/SKILL.md", scout: "/opt/kit/scout/SKILL.md" };
+    expect(suggest("/smelt", ["smelt"], paths)[0]).toEqual({ name: "smelt", hint: "~/.claude/skills", kind: "skill" });
+    expect(suggest("/kit", ["smelt", "scout"], paths).map((c) => c.name)).toEqual(["scout"]);
+  });
   it("stops suggesting once the message goes on", () => {
     expect(suggest("/smelt fix", ["smelt"])).toEqual([]);
     expect(suggest("hello", ["smelt"])).toEqual([]);

@@ -1,12 +1,13 @@
 // The smithy commands the composer and the palette run here, loaded on first use: the TUI's
 // /model, /effort, /theme, /mode, /ask, /answer, /serve, /set, /unset, /key rm, the panels (/help,
 // /log, /remote, /tend) and the ones that open Settings.
-import { removeKey, runShell, sampleAsk, setServe, setSetting, unsetSetting } from "../../lib/actions";
+import { removeKey, runShell, sampleAsk, setServe, setSessionModel, setSetting, unsetSetting } from "../../lib/actions";
 import { ACTIONS } from "../../lib/commands";
 import { nextDetail, type Detail } from "../../lib/detail";
 import type { Info } from "../../components/info";
 import { api } from "../../lib/auth";
 import { decide, stopSession } from "../../lib/live";
+import { effortLevels, effortMax, effortOptions } from "../../lib/parity";
 import { go } from "../../lib/router";
 import type { Dec, Sess } from "../../lib/store";
 import { current, saveAccent, toggleTheme, type ThemeName } from "../../lib/theme";
@@ -14,7 +15,7 @@ import { current, saveAccent, toggleTheme, type ThemeName } from "../../lib/them
 type Ctx = {
   s?: Sess; pend: Dec[]; log: string[]; detail: Detail;
   setPick: (o: boolean) => void; setNote: (n: string) => void; setAccent: (t: ThemeName) => void;
-  setDetail: (d: Detail) => void; setInfo: (i: Info) => void; showTend: () => void;
+  setDetail: (d: Detail) => void; setInfo: (i: Info) => void; showTend: () => void; shimmer: () => void;
 };
 
 const help = (): Info => ({
@@ -34,19 +35,44 @@ function remote(): Info {
   return { title: "Remote", lines };
 }
 
+// effort is /effort as the TUI runs it: a typed level sets the open session's effort, or without a
+// session agent.effort, the default the next session starts with; off and default put it back.
+// The top level plays the composer shimmer.
+function effort(arg: string, { s, setPick, setNote, shimmer }: Ctx) {
+  const typed = arg.toLowerCase();
+  const lvl = typed === "off" || typed === "default" ? "" : typed;
+  const top = () => lvl === effortMax() && shimmer();
+  const fail = (e: unknown) => setNote("error: " + String((e as Error).message ?? e));
+  if (s) {
+    const opts = effortOptions(s.agent);
+    if (!opts.length) setNote(s.agent + " keeps its own effort; /effort works for claude and codex");
+    else if (!arg) setPick(true);
+    else if (!opts.includes(lvl)) setNote("effort must be off or one of " + opts.slice(1).join(", "));
+    else setSessionModel(s.id, s.model ?? "", lvl).then(() => (setNote("next turns run effort " + (lvl || "agent.effort")), top()), fail);
+    return;
+  }
+  const opts = effortLevels();
+  if (!arg) toSettings("agents");
+  else if (!opts.includes(lvl)) setNote("effort must be off or one of " + opts.slice(1).join(", ") + " (smithy caps effort at " + effortMax() + ")");
+  else if (!lvl) unsetSetting("agent.effort").then(() => setNote("agent.effort back to its default (" + effortMax() + "): the next session starts with it"), fail);
+  else setSetting("agent.effort", lvl).then(() => (setNote("saved agent.effort = " + lvl + ": the next session starts with it"), top()), fail);
+}
+
 const toSettings = (part: string) => {
   go({ name: "setup" });
   setTimeout(() => document.getElementById("set-" + part)?.scrollIntoView({ block: "start" }), 300);
 };
 
-export function run(a: string, arg: string, { s, pend, log, detail, setPick, setNote, setAccent, setDetail, setInfo, showTend }: Ctx): void {
+export function run(a: string, arg: string, ctx: Ctx): void {
+  const { s, pend, log, detail, setPick, setNote, setAccent, setDetail, setInfo, showTend } = ctx;
   const say = (p: Promise<unknown>, ok: string) => p.then(() => setNote(ok), (e) => setNote("error: " + String((e as Error).message ?? e)));
   if (a.startsWith("theme:")) {
     arg = a.slice(6);
     a = "theme";
   }
   if (a === "stop" && s) stopSession(s.id).catch(() => {});
-  else if (a === "model" || a === "effort") {
+  else if (a === "effort") effort(arg, ctx);
+  else if (a === "model") {
     if (s) setPick(true);
     else toSettings("agents");
   } else if (a === "theme" && (arg === "light" || arg === "dark" || arg === "toggle")) {
