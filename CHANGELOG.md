@@ -19,6 +19,8 @@ part above `### Details`.
 ### Details
 - TUI: `infoPanel.set` holds one setting row cycled with left/right; `doctorPanel` groups `smithy doctor` output; the header reads `GET /v1/tend` once a minute.
 
+- `/board` in the TUI chat shows your task files by status, like the web Board: move a task with
+  left/right, tab through task dirs, enter opens the file, `o` opens its PR, blockers and PRs show on each row.
 - The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
 
 - `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).

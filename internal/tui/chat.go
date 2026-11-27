@@ -99,9 +99,13 @@ type chatView struct {
 	// ask posts a question to /v1/asks (the /ask demo); nil without a daemon.
 	ask func(id, question string, options []string) tea.Cmd
 
-	setup     setupAPI      // the daemon's setup endpoints; nil: none
-	cfg       settingsAPI   // the daemon's settings endpoints; nil: none
-	setupSt   *daemon.Setup // last GET /v1/setup
+	setup     setupAPI           // the daemon's setup endpoints; nil: none
+	cfg       settingsAPI        // the daemon's settings endpoints; nil: none
+	board     boardAPI           // the daemon's task endpoints; nil: none
+	boardSt   boardView          // the open /board
+	opener    func(string) error // opens a URL; nil: the default browser
+	infoBack  chatOverlay        // where esc on the info panel goes back to
+	setupSt   *daemon.Setup      // last GET /v1/setup
 	setupSel  int
 	setupStep setupStep
 	setupNote string // a fix, an error or install output shown in the open overlay
@@ -432,7 +436,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	}
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
-	m.setup, m.sess, m.cfg = c, c, c
+	m.setup, m.sess, m.cfg, m.board = c, c, c, c
 	m.dir, _ = os.Getwd()
 	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
@@ -564,6 +568,10 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.projectsLoaded(msg)
 	case dirsMsg:
 		return m.dirsLoaded(msg)
+	case boardMsg:
+		return m.boardLoaded(msg)
+	case boardMovedMsg:
+		return m.boardMoved(msg)
 	case effortDefaultMsg:
 		m.effortDefaultSet(msg)
 		return m, nil
@@ -957,6 +965,8 @@ func (m chatView) View() tea.View {
 		out = m.helpBox(out, w, m.height)
 	case overlayInfo:
 		out = m.infoBox(out, w, m.height)
+	case overlayBoard:
+		out = m.boardBox(out, w, m.height)
 	}
 	if len(out) > m.height {
 		out = out[len(out)-m.height:]
