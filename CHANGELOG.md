@@ -9,6 +9,13 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+
+- An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
+
+### Details
+
+- TUI: the top decision strip is gone; the question card (`overlayAsk`) opens when a decision arrives and the composer is empty, or on enter with an empty composer or `/answer`; 1-9, arrows and enter, space on multi-select, esc for later. The pill reads "waiting on you".
+- daemon: decisions carry `multi` and `other`; `/v1/asks` takes `multi` and accepts free text for every non-guard question; the MCP `ask` tool gains a `multi` flag.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
 - The chat header shows the tend mode and how many PRs it tends.
 - `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.

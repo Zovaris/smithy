@@ -1,7 +1,7 @@
 import { useLive } from "../lib/live";
 import { href } from "../lib/router";
 import { open } from "../lib/store";
-import { Decision } from "../components/ui";
+import Decision from "../components/decision";
 
 // Decisions lists every question waiting on you across sessions, then the ones answered lately.
 export default function Decisions() {
