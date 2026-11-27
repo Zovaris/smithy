@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/connect"
 	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/web"
@@ -62,11 +63,14 @@ type State struct {
 
 // Server serves the API over one store.
 type Server struct {
-	st      *store.Store
-	token   string
-	allow   []string
-	log     func(string)
-	started time.Time
+	// Connectors builds the chat connectors from the current config (nil: connect.FromConfig).
+	Connectors func() ([]connect.Connector, error)
+	chatBuf    map[string]string // a chat session's answer so far, sent when its turn ends
+	st         *store.Store
+	token      string
+	allow      []string
+	log        func(string)
+	started    time.Time
 	// Tend, when set, is the PR tender GET /v1/tend reports.
 	Tend *Tender
 	// ServeState, when set, fills State.Serve (the auto loop's heartbeat).
@@ -212,6 +216,10 @@ func (sv *Server) Ask(id, question string, options []string) error {
 
 // Answer records the first answer to id. Later answers get the recorded outcome with Won false.
 // A won answer goes back to its asker through Route.
+// FreeAnswer reports whether decision id takes an answer in the user's own words besides its
+// options: only the ask tool's questions (ask:<key>) do.
+func FreeAnswer(id string) bool { return strings.HasPrefix(id, "ask:") }
+
 func (sv *Server) Answer(id, answer, by string) (Outcome, error) {
 	sv.mu.Lock()
 	o, err := sv.answerLocked(id, answer, by)
@@ -236,7 +244,7 @@ func (sv *Server) answerLocked(id, answer, by string) (Outcome, error) {
 		o.Won = false
 		return o, nil
 	}
-	if len(d.Options) > 0 && !slices.Contains(d.Options, answer) {
+	if len(d.Options) > 0 && !slices.Contains(d.Options, answer) && !FreeAnswer(id) {
 		return Outcome{}, fmt.Errorf("%w: answer must be one of %s", errBadRequest, strings.Join(d.Options, ", "))
 	}
 	o := Outcome{ID: id, Answer: answer, By: by, At: time.Now().UTC()}
@@ -335,6 +343,7 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("GET /v1/agents/{id}/models", sv.agentModels)
 	mux.HandleFunc("GET /v1/bench", sv.benchRuns)
 	mux.HandleFunc("GET /v1/settings", sv.listSettings)
+	mux.HandleFunc("POST /v1/connect/test", sv.connectTest)
 	mux.HandleFunc("PUT /v1/settings/{key}", sv.putSetting)
 	mux.HandleFunc("DELETE /v1/settings/{key}", sv.deleteSetting)
 	mux.HandleFunc("PUT /v1/keys/{service}", sv.putKey)

@@ -15,6 +15,7 @@ import (
 
 	authstore "github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/connect"
 	"github.com/Zovaris/smithy/internal/text"
 )
 
@@ -236,4 +237,36 @@ func (sv *Server) doctor(w http.ResponseWriter, r *http.Request) {
 		run = runDoctor
 	}
 	writeJSON(w, 200, map[string][]string{"lines": run(r.Context())})
+}
+
+// ConnectTestResult is POST /v1/connect/test: one line per channel tried, or why none was.
+type ConnectTestResult struct {
+	Results []string `json:"results"`
+	Error   string   `json:"error,omitempty"`
+}
+
+// connectTest sends a test message through each chat connector built from the current config
+// (so a settings change is tried without a restart), to its notifications and chat channels.
+func (sv *Server) connectTest(w http.ResponseWriter, r *http.Request) {
+	if !settingsGuard(w, r) {
+		return
+	}
+	build := sv.Connectors
+	if build == nil {
+		build = connect.FromConfig
+	}
+	cs, err := build()
+	out := ConnectTestResult{Results: []string{}}
+	if err != nil {
+		out.Error = text.Clean(err.Error())
+	}
+	if len(cs) == 0 && out.Error == "" {
+		out.Error = "no chat connector is set up (connect.<telegram|slack|discord>.notify or .chat, and its token)"
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	for _, l := range (&connect.Hub{Conns: cs}).Test(ctx) {
+		out.Results = append(out.Results, text.Clean(l))
+	}
+	writeJSON(w, 200, out)
 }
