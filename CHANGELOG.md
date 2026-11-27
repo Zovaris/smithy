@@ -8,6 +8,10 @@ part above `### Details`.
 
 ## Unreleased
 
+### Fixed
+
+- ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
+
 ## v0.25.0 — 2026-11-26
 
 ### Highlights
