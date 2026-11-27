@@ -10,13 +10,16 @@ import { parse, totals, withComments, type Comment } from "./lib/diff";
 import { Anvil, I } from "./components/icons";
 import { sendMessage, start, stopSession, useLive } from "./lib/live";
 import { clock, headerLine } from "./lib/parity";
-import { Changes, Decisions } from "./components/rail";
 import { go, href, PAGES, type Page, useView } from "./lib/router";
 import { agentName, ago, open, sessions as list, type Sess } from "./lib/store";
 import { initTheme, toggleTheme, current, loadAccent, type ThemeName } from "./lib/theme";
 import { St } from "./components/ui";
 import type { Info } from "./components/info";
 import type { Detail } from "./lib/detail";
+
+// The rail (diff viewer, decisions) loads after the first paint: it sits beside the chat.
+const Changes = lazy(() => import("./components/rail").then((m) => ({ default: m.Changes })));
+const Decisions = lazy(() => import("./components/rail").then((m) => ({ default: m.Decisions })));
 
 
 const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
@@ -199,11 +202,11 @@ function App() {
   const title = v.name === "session" ? s?.title ?? "Session" : v.name === "new" ? "New session" : PAGES.find((p) => p.id === v.name)!.label;
   const rail = v.name !== "new" || !!ss.length;
   const railBody = s ? (
-    <>
+    <Suspense fallback={null}>
       <Changes diff={diff} comments={mine} onComment={(c) => setNotes({ ...notes, [sid]: [...mine, c] })} onDrop={(c) => setNotes({ ...notes, [sid]: mine.filter((x) => x !== c) })} />
       <Decisions list={l.store.decisions.filter((d) => d.session === s.id || (!d.session && d.answer == null))} sessions={l.store.sessions} />
-      <Suspense fallback={null}><AgentsPanel store={l.store} project={s.dir} cur={s.id} host={host()} /></Suspense>
-    </>
+      <AgentsPanel store={l.store} project={s.dir} cur={s.id} host={host()} />
+    </Suspense>
   ) : (
     <Suspense fallback={null}><AgentsPanel store={l.store} project={project} cur="" host={host()} /></Suspense>
   );
