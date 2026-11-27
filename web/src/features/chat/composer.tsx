@@ -1,12 +1,15 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { suggest, type Cmd } from "../../lib/commands";
-import { intent, withImages } from "../../lib/parity";
+import { effortSuggest, intent, withImages } from "../../lib/parity";
 import { I } from "../../components/icons";
 
 type Props = {
   placeholder: string;
   skills: string[];
+  paths?: Record<string, string>;
+  agent?: string;
+  shimmer?: number;
   working?: boolean;
   canSend?: boolean;
   draft?: string;
@@ -20,17 +23,19 @@ type Props = {
 };
 
 // Composer is the one input: ↵ sends, ⇧↵ breaks the line, `/` lists smithy's commands and the
-// installed skills. A smithy command runs here, `!cmd` runs in the session folder and pasted or
-// dropped images go with the next message; anything else goes to the agent.
-export function Composer({ placeholder, skills, working, canSend = true, draft, pills, above, onSend, onAction, onStop, onShell, onImage }: Props) {
+// installed skills, and `/effort ` the agent's levels. A smithy command runs here, `!cmd` runs in the session folder and pasted or
+// dropped images go with the next message; anything else goes to the agent. A new shimmer count
+// plays a short shimmer, the TUI's sign of the top effort.
+export function Composer({ placeholder, skills, paths, agent = "", shimmer = 0, working, canSend = true, draft, pills, above, onSend, onAction, onStop, onShell, onImage }: Props) {
   const [imgs, setImgs] = useState<string[]>([]);
   const [text, setText] = useState("");
   const [sel, setSel] = useState(0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [menu, setMenu] = useState<"" | "skills">("");
+  const [glow, setGlow] = useState(false);
   const ta = useRef<HTMLTextAreaElement>(null);
-  const list: Cmd[] = menu === "skills" ? skills.map((s) => ({ name: s, hint: "skill", kind: "skill" })) : suggest(text, skills);
+  const list: Cmd[] = menu === "skills" ? skills.map((s) => ({ name: s, hint: "skill", kind: "skill" })) : [...suggest(text, skills, paths), ...effortSuggest(text, agent)];
 
   useEffect(() => {
     if (draft != null) {
@@ -46,6 +51,12 @@ export function Composer({ placeholder, skills, working, canSend = true, draft, 
   }, [text]);
   useEffect(() => setSel(0), [list.length, menu]);
   useEffect(() => {
+    if (!shimmer) return;
+    setGlow(true);
+    const t = setTimeout(() => setGlow(false), 1200);
+    return () => clearTimeout(t);
+  }, [shimmer]);
+  useEffect(() => {
     const on = (e: KeyboardEvent) => {
       const a = document.activeElement;
       if (e.key === "/" && !e.metaKey && !e.ctrlKey && (!a || a === document.body)) {
@@ -60,6 +71,11 @@ export function Composer({ placeholder, skills, working, canSend = true, draft, 
 
   const pick = (c: Cmd) => {
     setMenu("");
+    if (c.fill) {
+      setText(c.fill);
+      ta.current?.focus();
+      return;
+    }
     if (c.kind === "action") {
       setText("");
       onAction(c.name);
@@ -159,14 +175,14 @@ export function Composer({ placeholder, skills, working, canSend = true, draft, 
         <div class="menu" role="listbox" aria-label={menu === "skills" ? "Skills" : "Commands"}>
           {menu === "skills" && <h4>Start the message with a skill</h4>}
           {list.map((c, i) => (
-            <button role="option" aria-selected={i === sel} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)}>
-              <span class="mono">/{c.name}</span>
+            <button role="option" class={c.kind === "skill" ? "skill" : undefined} aria-selected={i === sel} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)}>
+              <span class="mono">{c.kind === "skill" && <span class="sk" aria-label="skill">◆ </span>}/{c.name}</span>
               <span class="t3">{c.hint}</span>
             </button>
           ))}
         </div>
       )}
-      <div class={"composer" + (text.trimStart().startsWith("!") ? " bang" : "")} onDrop={onDrop} onDragOver={(e) => onImage && e.preventDefault()}>
+      <div class={"composer" + (text.trimStart().startsWith("!") ? " bang" : "") + (glow ? " shimmer" : "")} onDrop={onDrop} onDragOver={(e) => onImage && e.preventDefault()}>
         {above}
         {!!imgs.length && (
           <div class="cmts">
