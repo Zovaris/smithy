@@ -8,6 +8,12 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).
+  `/effort ` completes the levels the agent takes, `off` included, and the top level plays a short shimmer.
+- The TUI's `/` menu lists commands first, then skills with their own mark and folder, and matches descriptions too.
+
 ## v0.25.0 — 2026-11-26
 
 ### Highlights
