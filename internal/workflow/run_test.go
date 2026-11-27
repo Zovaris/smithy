@@ -9,7 +9,10 @@ import (
 )
 
 type fake struct {
-	shell   map[string]struct{ out string; exit int }
+	shell map[string]struct {
+		out  string
+		exit int
+	}
 	answers []string
 	cost    float64
 	prompts []string
@@ -54,9 +57,15 @@ func dependabot(t *testing.T) Workflow {
 }
 
 func TestExampleAlertsYes(t *testing.T) {
-	f := &fake{shell: map[string]struct{ out string; exit int }{}, answers: []string{"yes\nPatch bump, tests cover it."}}
+	f := &fake{shell: map[string]struct {
+		out  string
+		exit int
+	}{}, answers: []string{"yes\nPatch bump, tests cover it."}}
 	w := dependabot(t)
-	f.shell[w.Steps[0].Run] = struct{ out string; exit int }{"lodash 4.17.20 high\n", 0}
+	f.shell[w.Steps[0].Run] = struct {
+		out  string
+		exit int
+	}{"lodash 4.17.20 high\n", 0}
 	r := Run(context.Background(), w, f.env())
 	if r.Status != StatusOK {
 		t.Fatalf("status %s: %s", r.Status, r.Error)
@@ -73,7 +82,10 @@ func TestExampleAlertsYes(t *testing.T) {
 }
 
 func TestExampleNoAlertsStops(t *testing.T) {
-	f := &fake{shell: map[string]struct{ out string; exit int }{}}
+	f := &fake{shell: map[string]struct {
+		out  string
+		exit int
+	}{}}
 	w := dependabot(t)
 	r := Run(context.Background(), w, f.env())
 	if r.Status != StatusOK || len(f.prompts) != 0 || len(f.notes) != 0 {
@@ -85,9 +97,15 @@ func TestExampleNoAlertsStops(t *testing.T) {
 }
 
 func TestBadYesNoFails(t *testing.T) {
-	f := &fake{shell: map[string]struct{ out string; exit int }{}, answers: []string{"maybe later"}}
+	f := &fake{shell: map[string]struct {
+		out  string
+		exit int
+	}{}, answers: []string{"maybe later"}}
 	w := dependabot(t)
-	f.shell[w.Steps[0].Run] = struct{ out string; exit int }{"x\n", 0}
+	f.shell[w.Steps[0].Run] = struct {
+		out  string
+		exit int
+	}{"x\n", 0}
 	r := Run(context.Background(), w, f.env())
 	if r.Status != StatusFailed || len(f.notes) != 0 {
 		t.Fatalf("%s %q", r.Status, f.notes)
@@ -118,7 +136,10 @@ func TestExitBranchAndJSON(t *testing.T) {
 	 {"id":"ok","kind":"if","step":"t","exit":0,"then":"done","else":"ask"},
 	 {"id":"ask","kind":"agent","prompt":"why failed: {{t.output}}","answer":"json"},
 	 {"id":"done","kind":"notify","title":"tests","message":"exit {{t.exit}} {{ask.answer}}"}]}`)
-	f := &fake{shell: map[string]struct{ out string; exit int }{"make test": {"FAIL x", 2}}, answers: []string{"Sure: {\"cause\": \"x\"}"}}
+	f := &fake{shell: map[string]struct {
+		out  string
+		exit int
+	}{"make test": {"FAIL x", 2}}, answers: []string{"Sure: {\"cause\": \"x\"}"}}
 	r := Run(context.Background(), w, f.env())
 	if r.Status != StatusOK || len(f.notes) != 1 || f.notes[0] != `tests: exit 2 {"cause":"x"}` {
 		t.Fatalf("%s %s %q", r.Status, r.Error, f.notes)
@@ -144,7 +165,10 @@ func TestCaps(t *testing.T) {
 
 func TestOutputCapped(t *testing.T) {
 	w := parse(t, `{"name":"o","schedule":"@daily","steps":[{"id":"a","kind":"run","run":"big"}]}`)
-	f := &fake{shell: map[string]struct{ out string; exit int }{"big": {strings.Repeat("x", MaxOutput+10), 0}}}
+	f := &fake{shell: map[string]struct {
+		out  string
+		exit int
+	}{"big": {strings.Repeat("x", MaxOutput+10), 0}}}
 	r := Run(context.Background(), w, f.env())
 	if len(r.Steps[0].Output) > MaxOutput+40 {
 		t.Fatalf("output %d bytes", len(r.Steps[0].Output))
