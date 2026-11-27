@@ -13,6 +13,7 @@ part above `### Details`.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
 - The chat header shows the tend mode and how many PRs it tends.
 - `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.
+- A vague product idea ("make me a landing page") now starts with a brainstorm, grilling, spec and tasks before any build, and smithy offers the design or frontend skills you have installed.
 
 ### Fixed
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
@@ -20,6 +21,8 @@ part above `### Details`.
 ### Details
 - TUI: `infoPanel.set` holds one setting row cycled with left/right; `doctorPanel` groups `smithy doctor` output; the header reads `GET /v1/tend` once a minute.
 
+- `/board` in the TUI chat shows your task files by status, like the web Board: move a task with
+  left/right, tab through task dirs, enter opens the file, `o` opens its PR, blockers and PRs show on each row.
 - The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
 
 - `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).
