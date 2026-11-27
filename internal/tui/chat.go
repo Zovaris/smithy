@@ -517,6 +517,9 @@ func (m *chatView) push(c chatMsg) {
 func (m chatView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	n, cmd := m.update(msg)
 	m = n.(chatView)
+	if k, ok := msg.(tea.KeyPressMsg); ok && (k.String() == "ctrl+k" || k.String() == "ctrl+l") {
+		cmd = tea.Batch(cmd, tea.ClearScreen)
+	}
 	if _, ok := msg.(chatFrameMsg); !ok && !m.ticking && m.animating() {
 		m.ticking = true
 		cmd = tea.Batch(cmd, frameTick())
