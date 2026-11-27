@@ -9,6 +9,7 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+- `/goal <text>` pins a goal on the open session, in the TUI and the web composer: each turn carries it, and the daemon keeps the session going until the agent reports it met with evidence, asks you, or hits `session.goal_max_turns` / `session.goal_max_cost`. `/goal` shows it, `/goal clear` drops it; only you set it.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
 - The chat header shows the tend mode and how many PRs it tends.
 - `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.
