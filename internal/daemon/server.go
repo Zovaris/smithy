@@ -37,6 +37,8 @@ type Decision struct {
 	ID       string    `json:"id"`
 	Question string    `json:"question"`
 	Options  []string  `json:"options,omitempty"`
+	Multi    bool      `json:"multi,omitempty"` // several options may be picked; the answer joins them with ", "
+	Other    bool      `json:"other,omitempty"` // a free-text answer is taken besides the options
 	Asked    time.Time `json:"asked"`
 	Outcome  *Outcome  `json:"outcome,omitempty"`
 }
@@ -194,6 +196,12 @@ func (sv *Server) appendLocked(kind, session string, data any) (int64, error) {
 
 // Ask records a pending decision; asking an existing id again is a no-op.
 func (sv *Server) Ask(id, question string, options []string) error {
+	return sv.askDecision(Decision{ID: id, Question: question, Options: options})
+}
+
+// askDecision records d unless its id is already known.
+func (sv *Server) askDecision(d Decision) error {
+	id := d.ID
 	if id == "" {
 		return errors.New("daemon: decision id is empty")
 	}
@@ -202,7 +210,7 @@ func (sv *Server) Ask(id, question string, options []string) error {
 	if _, ok := sv.decisions[id]; ok {
 		return nil
 	}
-	d := Decision{ID: id, Question: question, Options: options, Asked: time.Now().UTC()}
+	d.Asked = time.Now().UTC()
 	if _, err := sv.appendLocked(KindAsked, "", d); err != nil {
 		return err
 	}
@@ -236,7 +244,7 @@ func (sv *Server) answerLocked(id, answer, by string) (Outcome, error) {
 		o.Won = false
 		return o, nil
 	}
-	if len(d.Options) > 0 && !slices.Contains(d.Options, answer) {
+	if len(d.Options) > 0 && !d.Other && !picked(d, answer) {
 		return Outcome{}, fmt.Errorf("%w: answer must be one of %s", errBadRequest, strings.Join(d.Options, ", "))
 	}
 	o := Outcome{ID: id, Answer: answer, By: by, At: time.Now().UTC()}
@@ -550,6 +558,7 @@ func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
 		ID       string   `json:"id"`
 		Question string   `json:"question"`
 		Options  []string `json:"options"`
+		Multi    bool     `json:"multi"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&req); err != nil || req.Question == "" || len(req.Options) > 6 {
 		writeJSON(w, 400, map[string]string{"error": "body must be {\"id\":…,\"question\":…,\"options\":[…]}"})
@@ -566,7 +575,8 @@ func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
 	for _, o := range req.Options {
 		opts = append(opts, line1(o, 200))
 	}
-	if err := sv.Ask(req.ID, line1(req.Question, 500), opts); err != nil {
+	d := Decision{ID: req.ID, Question: line1(req.Question, 500), Options: opts, Multi: req.Multi && len(opts) > 1, Other: !guardID}
+	if err := sv.askDecision(d); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "store failed"})
 		return
 	}
@@ -658,3 +668,20 @@ func (sv *Server) events(w http.ResponseWriter, r *http.Request) {
 }
 
 func sseSafe(s string) string { return strings.NewReplacer("\n", " ", "\r", " ").Replace(s) }
+
+// picked reports whether answer is one of d's options, or for a multi-select decision a ", "
+// list of them.
+func picked(d *Decision, answer string) bool {
+	if slices.Contains(d.Options, answer) {
+		return true
+	}
+	if !d.Multi {
+		return false
+	}
+	for _, a := range strings.Split(answer, ", ") {
+		if !slices.Contains(d.Options, a) {
+			return false
+		}
+	}
+	return true
+}
