@@ -30,8 +30,7 @@ over it. `smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's fo
 nobody to ask (hush, a launched session; warden workers ask warden) → end `blocked: <why>`. Steps 1-4 are for the rest:
 1. Nobody to ask → step 3. Else ask, then `smithy wait timer:<m>` in the background,
    m = `smithy config get ask.timeout` (0: no timer, wait for the answer).
-2. The user answers first → stop the timer (the harness's kill for that background task), use the
-   answer. Only exit 0 printing `timer: <m>m elapsed` means it fired → step 3 with `--by timeout`.
+2. The user answers first → stop the timer (the harness's kill for that background task), use the answer. Only exit 0 printing `timer: <m>m elapsed` means it fired → step 3 with `--by timeout`.
 3. `smithy consult "<q>" "<options>"`: neutral, safest first for security, never "as written" for
    an insecure request. ESCALATE (hard floor) → the user (warden holds the item); nobody → end
    `blocked`. The one consult-failure rule: fails → safest (security: the secure one; else most reversible; name it). Go on.
@@ -60,6 +59,7 @@ Run `smithy skills --list` once per session; skip only when the brief gives the 
 | open PRs kept green, PRs or labeled issues watched | **tend** (accepted issues become task files for warden) |
 | to watch Linear/GitHub issues and build them unattended | **tend** `auto` |
 | no conversation | **hush**; every launched agent's brief names it too |
+| a rough prompt made into a clear one | **refine**: user-only; never start it yourself, suggest `/refine` once at most |
 | every reply | **simple**, if installed, unless the user says "normal mode" (a skill not installed: work plainly, mention it once) |
 
 ## Scripts

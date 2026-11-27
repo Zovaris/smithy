@@ -9,6 +9,7 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+- New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
 - The chat header shows the tend mode and how many PRs it tends.
 - `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.

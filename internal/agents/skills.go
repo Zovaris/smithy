@@ -21,7 +21,7 @@ harness can read the file.
                            Harnesses: claude, codex, opencode, agy, copilot, grok, cursor, pi, dsh`
 
 // Known are the skills of this repo, in the order --list prints them.
-var Known = []string{"use-smithy", "smelt", "warden", "ledger", "scout", "tend", "hush", "simple"}
+var Known = []string{"use-smithy", "smelt", "warden", "ledger", "scout", "tend", "hush", "simple", "refine"}
 
 func envOr(getenv func(string) string, key, def string) string {
 	if v := getenv(key); v != "" {
