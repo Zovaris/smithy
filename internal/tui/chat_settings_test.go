@@ -16,6 +16,7 @@ type fakeSettings struct {
 	set     [][2]string
 	unset   []string
 	removed []string
+	doctor  []string
 }
 
 func (f *fakeSettings) Settings(context.Context) (daemon.Settings, error) {
@@ -38,6 +39,9 @@ func (f *fakeSettings) SetServe(_ context.Context, on bool) error {
 	return nil
 }
 func (f *fakeSettings) Doctor(context.Context) ([]string, error) {
+	if f.doctor != nil {
+		return f.doctor, nil
+	}
 	return []string{"ok   git found"}, nil
 }
 
@@ -84,6 +88,7 @@ func TestSettingsCommandsGoThroughTheDaemon(t *testing.T) {
 	if !strings.Contains(screen(m), "git found") {
 		t.Fatalf("doctor lines missing:\n%s", screen(m))
 	}
+	m = cpress(m, ckey("esc"))
 	m = cpress(typeIn(m, "/keys"), ckey("enter"))
 	if out := screen(m); !strings.Contains(out, "linear ****wxyz") || !strings.Contains(out, "serve on") {
 		t.Fatalf("keys/serve missing:\n%s", out)
@@ -104,7 +109,7 @@ func TestTendPanelShowsEveryWatchedPR(t *testing.T) {
 	m.cfg = &fakeSettings{}
 	m = cpress(typeIn(m, "/tend"), ckey("enter"))
 	out := screen(m)
-	for _, want := range []string{"tend.daemon fix", "pull/7", "fixing", "fix-ci", "pull/8", "green", "session s-abc", "pull/9"} {
+	for _, want := range []string{"tend.daemon  ‹ fix ›", "pull/7", "fixing", "fix-ci", "pull/8", "green", "session s-abc", "pull/9"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("/tend lacks %q:\n%s", want, out)
 		}
