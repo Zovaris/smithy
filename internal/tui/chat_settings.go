@@ -20,6 +20,7 @@ type settingsAPI interface {
 	SetServe(ctx context.Context, on bool) error
 	Doctor(ctx context.Context) ([]string, error)
 	Tend(ctx context.Context) (daemon.TendList, error)
+	ConnectTest(ctx context.Context) (daemon.ConnectTestResult, error)
 }
 
 // settingsDoneMsg is a settings command's result: lines for the transcript, or a panel to open.
@@ -37,7 +38,7 @@ func (m chatView) detach() (tea.Model, tea.Cmd) {
 	return m, tea.Quit
 }
 
-// settingsCommand runs /serve, /set, /unset, /key, /keys, /doctor and /tend through the daemon.
+// settingsCommand runs /serve, /set, /unset, /key, /keys, /doctor, /tend and /channels through the daemon.
 func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 	if m.cfg == nil {
 		m.system("settings need a daemon this chat can reach")
@@ -86,11 +87,28 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 			}
 			return settingsDoneMsg{panel: tendPanel(l)}
 		}
+	case name == "channels" && arg == "test":
+		m.system("sending a test message to every chat channel…")
+		run = func(ctx context.Context) ([]string, error) {
+			r, err := api.ConnectTest(ctx)
+			if r.Error != "" {
+				r.Results = append(r.Results, r.Error)
+			}
+			return r.Results, err
+		}
+	case name == "channels":
+		return m, func() tea.Msg {
+			s, err := api.Settings(context.Background())
+			if err != nil {
+				return sessionErrMsg{what: "/channels", err: err}
+			}
+			return settingsDoneMsg{panel: channelsPanel(s)}
+		}
 	case name == "doctor":
 		m.system("running smithy doctor…")
 		run = api.Doctor
 	default:
-		m.system("usage: /serve on|off · /set <key> <value> · /unset <key> · /keys · /key rm <service> · /doctor · /tend")
+		m.system("usage: /serve on|off · /set <key> <value> · /unset <key> · /keys · /key rm <service> · /doctor · /tend · /channels [test]")
 		return m, nil
 	}
 	return m, func() tea.Msg {
@@ -115,6 +133,29 @@ func keysPanel(s daemon.Settings) *infoPanel {
 	lines = append(lines, "#ADD OR REPLACE ONE", "-> smithy auth set <service>\tin a terminal; the key is read without echo",
 		"#SERVE", map[bool]string{true: "ok serve on\t/serve off pauses new work", false: "serve off (auto.paused)\t/serve on resumes it"}[s.Serve])
 	return &infoPanel{title: "API keys", lines: lines}
+}
+
+// channelsPanel is /channels: each chat connector's notifications and chat channel, how to set
+// them, and the test-send.
+func channelsPanel(s daemon.Settings) *infoPanel {
+	val := map[string]string{}
+	for _, r := range s.Settings {
+		val[r.Key] = r.Value
+	}
+	lines := []string{}
+	for _, svc := range []string{"telegram", "slack", "discord"} {
+		lines = append(lines, "#"+strings.ToUpper(svc))
+		for _, p := range []string{"notify", "chat"} {
+			k := "connect." + svc + "." + p
+			v := val[k]
+			if v == "" {
+				v = "unset"
+			}
+			lines = append(lines, k+" "+v+"\t/set "+k+" <id>")
+		}
+	}
+	lines = append(lines, "#TEST", "-> /channels test\tsends a test message to every channel set, from the current settings")
+	return &infoPanel{title: "Chat channels", lines: lines}
 }
 
 // tendPanel is /tend: the warden batch and chat session PRs the daemon tends, each with its status, tend's next

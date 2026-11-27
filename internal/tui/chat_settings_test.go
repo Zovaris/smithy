@@ -16,6 +16,7 @@ type fakeSettings struct {
 	set     [][2]string
 	unset   []string
 	removed []string
+	tested  int
 }
 
 func (f *fakeSettings) Settings(context.Context) (daemon.Settings, error) {
