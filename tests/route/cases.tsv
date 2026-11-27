@@ -1,0 +1,6 @@
+# prompt<TAB>route: use-smithy's Route table must send each prompt to this smelt route
+make me a landing page	plan brainstorm
+a web for my business	plan brainstorm
+I want an app for my gym	plan brainstorm
+fix the nil panic in internal/cards when the file is empty	debug
+add a --json flag to smithy cards list, spec in tasks/04.md	build
