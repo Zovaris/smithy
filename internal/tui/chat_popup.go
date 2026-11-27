@@ -26,7 +26,7 @@ var slashCommands = []slashCommand{
 	{"model", "[name]", "the model the open session runs, else new sessions; tab lists other agents"},
 	{"effort", "[off|low|medium]", "reasoning effort: the open session's, else the next session's (agent.effort)"},
 	{"skills", "", "skills and MCP injected into every session"},
-	{"theme", "[steel|frost|plum]", "the color theme this TUI and the web share (ui.theme)"},
+	{"theme", "[steel|frost|plum|moss|dune|dusk|rose]", "the color theme this TUI and the web share (ui.theme)"},
 	{"connect", "", "which daemon this chat talks to, and how to reach another"},
 	{"web", "", "open the web UI in your browser"},
 	{"remote", "", "reach this daemon from your phone or another machine"},
