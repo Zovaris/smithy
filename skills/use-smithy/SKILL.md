@@ -28,8 +28,7 @@ over it. `smithy <cmd>` means `<skill-dir>/scripts/smithy <cmd>` (this file's fo
 
 **Decisions** (the stop list). **Hard floor**: never consult, never auto-decided: merging or deploying to the production branch, deleting or irreversibly rewriting user data, real credentials, secrets or logins (values, not auth code), moving or charging real money. Wait for the user;
 nobody to ask (hush, a launched session; warden workers ask warden) → end `blocked: <why>`. Steps 1-4 are for the rest:
-1. Nobody to ask → step 3. Else ask, then `smithy wait timer:<m>` in the background,
-   m = `smithy config get ask.timeout` (0: no timer, wait for the answer).
+1. Nobody to ask → step 3. Else ask, then `smithy wait timer:<m>` in the background, m = `smithy config get ask.timeout` (0: no timer, wait for the answer).
 2. The user answers first → stop the timer (the harness's kill for that background task), use the
    answer. Only exit 0 printing `timer: <m>m elapsed` means it fired → step 3 with `--by timeout`.
 3. `smithy consult "<q>" "<options>"`: neutral, safest first for security, never "as written" for
@@ -53,6 +52,7 @@ Run `smithy skills --list` once per session; skip only when the brief gives the 
 | The user wants… | Use |
 |---|---|
 | a typo, copy, config value, one-line fix, rename in one file | **none**: change it, run the check that covers it (test, lint or build), commit when the task or the repo's flow asks |
+| a vague product idea ("make me a landing page", "a web for my business": no file, stack, or behaviour named) | **smelt** `plan` at its vague-idea path: brainstorm → grill → spec → tasks before any build; offer the design or frontend skills `smithy skills --list` shows that fit |
 | to build, change or fix code | **smelt**: say "Using smelt `<route>` `<speed>`", read its SKILL.md; no plan → `plan`, a plan or task → `build`, a bug → `debug` |
 | several tasks at once | **warden**: costs sessions; propose with the task list, run on a yes (one `tasks.md` of `## NN` sections: `smithy tasks import` first) |
 | a fact, a comparison, "why does X", "can we Y" | **scout** (read-only, cited); "research, then build": scout, then smelt `plan` with its report |

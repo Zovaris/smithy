@@ -12,6 +12,7 @@ part above `### Details`.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
 - The chat header shows the tend mode and how many PRs it tends.
 - `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.
+- A vague product idea ("make me a landing page") now starts with a brainstorm, grilling, spec and tasks before any build, and smithy offers the design or frontend skills you have installed.
 
 ### Fixed
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
