@@ -20,6 +20,9 @@ part above `### Details`.
   maps the same hex onto Sephiro's tokens per `data-accent`, and a test checks they match.
   256-color terminals get each palette's nearest colors; 16-color terminals keep steel's tiers with
   the theme's accent.
+### Fixed
+
+- ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
 
 ## v0.25.0 — 2026-11-26
 
