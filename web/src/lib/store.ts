@@ -8,10 +8,12 @@ export type Usage = { input_tokens?: number; output_tokens?: number; cost_usd?: 
 export type Sess = {
   id: string; agent: string; model?: string; effort?: string; dir: string; title: string;
   status: Status; detail?: string; created: string; updated: string; usage?: Usage;
+  goal?: string; goal_state?: string;
 };
 export type Tool = { id?: string; name: string; args?: unknown; output?: string; is_error?: boolean };
 export type Part = { kind: "text"; text: string } | { kind: "tools"; tools: Tool[] } | { kind: "decision"; id: string };
 export type Item = { kind: "you"; text: string; at: string } | { kind: "agent"; parts: Part[]; at: string };
+
 export type Diff = { stat: string; patch: string; truncated: boolean; at: string };
 export type Dec = { id: string; session: string; question: string; options: string[]; asked: string; answer?: string; by?: string };
 export type Store = {
@@ -92,6 +94,15 @@ export function fold(s: Store, e: Ev): Store {
     case "session_model": {
       if (!sess) return next;
       next.sessions = { ...s.sessions, [id]: { ...sess, model: str(d.model), effort: str(d.effort) } };
+      return next;
+    }
+    case "session_goal": {
+      if (!sess) return next;
+      const goal = str(d.goal), state = str(d.state);
+      next.sessions = { ...s.sessions, [id]: { ...sess, goal, goal_state: state } };
+      const { items, turn } = agentTurn(convo, at);
+      turn.parts.push({ kind: "text", text: "\n\ngoal " + (!goal ? "cleared" : state || "set: " + goal) });
+      next.convo = { ...s.convo, [id]: items };
       return next;
     }
     case "session_usage": {

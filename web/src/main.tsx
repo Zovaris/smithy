@@ -251,9 +251,12 @@ function App() {
             return "";
           }}
           pills={
-            <button class="pill" aria-haspopup="dialog" title="Model and effort (/model, /effort)" onClick={() => setPick(true)}>
-              <I n="term" />{agentName(s.agent)}<span class="hide-s t3">{(s.model || "default") + (s.effort ? " · " + s.effort : "")}</span>
-            </button>
+            <>
+              <button class="pill" aria-haspopup="dialog" title="Model and effort (/model, /effort)" onClick={() => setPick(true)}>
+                <I n="term" />{agentName(s.agent)}<span class="hide-s t3">{(s.model || "default") + (s.effort ? " · " + s.effort : "")}</span>
+              </button>
+              {s.goal && <span class="pill" title={s.goal}>goal {s.goal_state || "on"}</span>}
+            </>
           }
         />
       </>

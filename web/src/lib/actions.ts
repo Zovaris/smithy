@@ -14,6 +14,7 @@ async function call(method: string, path: string, body?: unknown): Promise<any> 
 const sid = (id: string) => "/v1/sessions/" + encodeURIComponent(id);
 
 export const setSessionModel = (id: string, model: string, effort: string): Promise<Sess> => call("PUT", sid(id) + "/model", { model, effort });
+export const setSessionGoal = (id: string, goal: string): Promise<Sess> => call("PUT", sid(id) + "/goal", { goal });
 export const runShell = (id: string, cmd: string): Promise<{ output: string; code: number; error?: string }> => call("POST", sid(id) + "/shell", { cmd });
 
 export async function uploadImage(f: Blob): Promise<string> {
