@@ -10,6 +10,8 @@ part above `### Details`.
 
 ### New
 
+- The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
+
 - `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).
   `/effort ` completes the levels the agent takes, `off` included, and the top level plays a short shimmer.
 - The TUI's `/` menu lists commands first, then skills with their own mark and folder, and matches descriptions too.

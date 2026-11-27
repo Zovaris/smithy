@@ -78,6 +78,15 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 			s, err := api.Settings(ctx)
 			return []string{map[bool]string{true: "serve on", false: "serve off (auto.paused)"}[s.Serve]}, err
 		}
+	case name == "prompt":
+		run = func(ctx context.Context) ([]string, error) {
+			s, err := api.Settings(ctx)
+			state := "override active: it replaces smithy's default system prompt"
+			if !s.Prompt.Active {
+				state = "no override: the default system prompt is in use; write this file to replace it"
+			}
+			return []string{"prompt file " + s.Prompt.Path, state}, err
+		}
 	case name == "tend":
 		return m, func() tea.Msg {
 			l, err := api.Tend(context.Background())
@@ -90,7 +99,7 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 		m.system("running smithy doctor…")
 		run = api.Doctor
 	default:
-		m.system("usage: /serve on|off · /set <key> <value> · /unset <key> · /keys · /key rm <service> · /doctor · /tend")
+		m.system("usage: /serve on|off · /set <key> <value> · /unset <key> · /keys · /key rm <service> · /doctor · /tend · /prompt")
 		return m, nil
 	}
 	return m, func() tea.Msg {
