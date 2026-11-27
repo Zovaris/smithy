@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
@@ -48,6 +49,9 @@ func health(w http.ResponseWriter, _ *http.Request) {
 }
 `
 
+// demoRefined is what the refine skill ends with, so the harness's copy and new-session buttons show.
+const demoRefined = "You want dark mode that follows the system setting.\n\n```refined\n# Goal\nAdd a dark theme that follows the OS setting.\n\n# Context\nThemes live in web/src/theme.\n\n# Constraints\nNo new dependencies.\n\n# Acceptance criteria\n- prefers-color-scheme: dark switches the theme\n\n# Output format\nA PR with screenshots.\n```\n\nCopy it, or start a new chat with it."
+
 func (r demoRunner) Turn(ctx context.Context, msg string, _ []Exchange, e Emit) (string, error) {
 	pause := func() error {
 		select {
@@ -56,6 +60,9 @@ func (r demoRunner) Turn(ctx context.Context, msg string, _ []Exchange, e Emit) 
 		case <-time.After(400 * time.Millisecond):
 			return nil
 		}
+	}
+	if strings.Contains(strings.ToLower(msg), "refine") {
+		return demoRefined, pause()
 	}
 	args := func(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
 	e.Text("Looking at the server first.")
