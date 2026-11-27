@@ -688,6 +688,9 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if o, ok := m.optionFor(t); ok && len(m.images) == 0 {
 				return m, m.answer(o)
 			}
+			if o, ok := m.refineOption(t); ok && len(m.images) == 0 {
+				return m.refineAct(o)
+			}
 			if t == "?" && len(m.images) == 0 {
 				m.overlay, m.pal = overlayHelp, palette{}
 				return m, nil

@@ -412,6 +412,9 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	case msg.Y == head && strip > 0:
 		_, hits := m.strip(max(m.width, 20))
 		for _, h := range hits {
+			if msg.X >= h.x0 && msg.X < h.x1 && len(m.pending) == 0 {
+				return m.refineAct(h.answer)
+			}
 			if msg.X >= h.x0 && msg.X < h.x1 {
 				return m, m.answer(h.answer)
 			}
@@ -819,7 +822,7 @@ func (m chatView) tierRow(i, w int, c color.Color, s string) string {
 func (m chatView) blockRow(i, w int, s string) string { return m.tierRow(i, w, nil, s) }
 
 func (m chatView) stripRows() int {
-	if len(m.pending) == 0 {
+	if len(m.pending) == 0 && m.refined() == "" {
 		return 0
 	}
 	return 2
@@ -830,7 +833,10 @@ func (m chatView) stripRows() int {
 // focus tier, what runs on the right; and where each option sits so a click can answer it.
 func (m chatView) strip(w int) (string, []stripHit) {
 	t := m.th
-	d := m.pending[0]
+	d := daemon.Decision{Question: "refined prompt ready", Options: refineOptions}
+	if len(m.pending) > 0 {
+		d = m.pending[0]
+	}
 	row := lipgloss.NewStyle()
 	if t.raised != nil {
 		row = row.Background(t.raised)
