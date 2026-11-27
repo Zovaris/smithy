@@ -31,6 +31,7 @@ const HINTS: Record<string, string> = {
   keys: "API keys",
   key: "rm <service>",
   doctor: "smithy doctor",
+  prompt: "system prompt file",
   tend: "PRs kept green",
   settings: "settings",
 };
