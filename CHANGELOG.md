@@ -8,6 +8,10 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
+
 ### Fixed
 
 - ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
