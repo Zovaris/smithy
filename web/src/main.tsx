@@ -123,6 +123,7 @@ function App() {
   const [version, setVersion] = useState("");
   const [pick, setPick] = useState(false);
   const [note, setNote] = useState("");
+  const [shim, setShim] = useState(0);
   const [shells, setShells] = useState<Record<string, Shell[]>>({});
   const v = useView();
   const auth = useAuth();
@@ -161,7 +162,7 @@ function App() {
 
   const onAction = (a: string, arg = "") => {
     if (a === "new") go({ name: "new" });
-    else import("./features/chat/slash").then((m) => m.run(a, arg, { s, pend, log: l.store.log, detail, setPick, setNote, setAccent, setDetail, setInfo, showTend: () => setSheet("rail") }));
+    else import("./features/chat/slash").then((m) => m.run(a, arg, { s, pend, log: l.store.log, detail, setPick, setNote, setAccent, setDetail, setInfo, showTend: () => setSheet("rail"), shimmer: () => setShim((n) => n + 1) }));
   };
 
   useEffect(() => {
@@ -218,7 +219,7 @@ function App() {
     );
 
   let center;
-  if (v.name === "new") center = <Suspense fallback={null}><NewSession setup={l.setup} recent={ss} host={host()} onAction={onAction} /></Suspense>;
+  if (v.name === "new") center = <Suspense fallback={null}><NewSession setup={l.setup} recent={ss} host={host()} shimmer={shim} onAction={onAction} /></Suspense>;
   else if (v.name === "session")
     center = s ? (
       <>
@@ -232,6 +233,9 @@ function App() {
         <Composer
           placeholder={`Reply to ${agentName(s.agent)}`}
           skills={skills}
+          paths={l.setup?.paths}
+          agent={s.agent}
+          shimmer={shim}
           working={s.status === "working" || s.status === "needs_you"}
           onStop={() => stopSession(s.id).catch(() => {})}
           onAction={onAction}
@@ -301,7 +305,7 @@ function App() {
       )}
       {pick && s && (
         <Suspense fallback={null}>
-          <SessionPick s={s} open={pick} onClose={() => setPick(false)} />
+          <SessionPick s={s} open={pick} onClose={() => setPick(false)} onTop={() => setShim((n) => n + 1)} />
         </Suspense>
       )}
       {info && (

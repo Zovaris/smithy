@@ -111,7 +111,7 @@ func TestEffortRefusedWhereItDoesNotApply(t *testing.T) {
 	}
 	m.current = ""
 	m2, _ = m.command("/effort")
-	if !strings.Contains(screen(m2.(chatView)), "per session") {
-		t.Fatalf("no session: says effort is per session:\n%s", screen(m2.(chatView)))
+	if !strings.Contains(screen(m2.(chatView)), "next session") {
+		t.Fatalf("no session: /effort sets the next session's default:\n%s", screen(m2.(chatView)))
 	}
 }

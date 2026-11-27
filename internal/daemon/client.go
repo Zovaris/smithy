@@ -331,6 +331,20 @@ func (c *Client) RemoveProject(ctx context.Context, dir string) (ProjectList, er
 	return l, err
 }
 
+// Tasks is GET /v1/tasks: the task lists of the project at dir ("" is the default project).
+func (c *Client) Tasks(ctx context.Context, dir string) (TaskBoard, error) {
+	var b TaskBoard
+	err := c.call(ctx, "GET", "/v1/tasks?project="+url.QueryEscape(dir), nil, &b)
+	return b, err
+}
+
+// MoveTask is PUT /v1/tasks/status: it writes status to the task file's Status line.
+func (c *Client) MoveTask(ctx context.Context, file, status string) (TaskCard, error) {
+	var t TaskCard
+	err := c.call(ctx, "PUT", "/v1/tasks/status", map[string]string{"file": file, "status": status}, &t)
+	return t, err
+}
+
 // ListDirs is GET /v1/fs: the folders inside dir on the daemon's machine ("" is its home).
 func (c *Client) ListDirs(ctx context.Context, dir string) (DirList, error) {
 	var l DirList

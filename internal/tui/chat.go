@@ -99,9 +99,13 @@ type chatView struct {
 	// ask posts a question to /v1/asks (the /ask demo); nil without a daemon.
 	ask func(id, question string, options []string) tea.Cmd
 
-	setup     setupAPI      // the daemon's setup endpoints; nil: none
-	cfg       settingsAPI   // the daemon's settings endpoints; nil: none
-	setupSt   *daemon.Setup // last GET /v1/setup
+	setup     setupAPI           // the daemon's setup endpoints; nil: none
+	cfg       settingsAPI        // the daemon's settings endpoints; nil: none
+	board     boardAPI           // the daemon's task endpoints; nil: none
+	boardSt   boardView          // the open /board
+	opener    func(string) error // opens a URL; nil: the default browser
+	infoBack  chatOverlay        // where esc on the info panel goes back to
+	setupSt   *daemon.Setup      // last GET /v1/setup
 	setupSel  int
 	setupStep setupStep
 	setupNote string // a fix, an error or install output shown in the open overlay
@@ -128,6 +132,7 @@ type chatView struct {
 	effort   string                // agent.effort
 	clock    func() time.Time      // the header clock; nil: time.Now
 	splashOn bool                  // play the entry animation at the first window size
+	shimmer  int                   // motion frames left of the top-effort shimmer on the composer
 	still    bool                  // reduced motion: the welcome field and anvil hold still
 	splash   []string              // the entry animation's frames left; nil once it ends
 	noise    []noise               // daemon events kept out of the transcript
@@ -141,6 +146,8 @@ type chatView struct {
 	popSel   int                   // the selected / or @ popup row
 	agentSel int                   // the selected session in the agents panel
 	info     infoPanel             // the open read-only panel
+	tendMode string                // the daemon's tend mode for the header; "" until read
+	tendPRs  int                   // the PRs it tends
 	frame    int                   // motion frame, advanced only while something runs
 	ticking  bool                  // a frame tick is scheduled
 
@@ -162,6 +169,7 @@ type infoPanel struct {
 	title  string
 	lines  []string
 	scroll bool
+	set    *panelSetting // a setting row on top, cycled with left/right; nil: none
 }
 
 func newChatView(stream <-chan daemon.ClientMsg, url string, th theme) chatView {
@@ -430,7 +438,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
 	m.offerAsk()
-	m.setup, m.sess, m.cfg = c, c, c
+	m.setup, m.sess, m.cfg, m.board = c, c, c, c
 	m.dir, _ = os.Getwd()
 	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
@@ -487,7 +495,7 @@ func (m *chatView) release() {
 }
 
 func (m chatView) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true), m.loadTheme(), clockTick())
+	return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true), m.loadTheme(), clockTick(), m.loadTend())
 }
 
 func (m chatView) wait() tea.Cmd {
@@ -516,6 +524,9 @@ func (m *chatView) push(c chatMsg) {
 func (m chatView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	n, cmd := m.update(msg)
 	m = n.(chatView)
+	if k, ok := msg.(tea.KeyPressMsg); ok && (k.String() == "ctrl+k" || k.String() == "ctrl+l") {
+		cmd = tea.Batch(cmd, tea.ClearScreen)
+	}
 	if _, ok := msg.(chatFrameMsg); !ok && !m.ticking && m.animating() {
 		m.ticking = true
 		cmd = tea.Batch(cmd, frameTick())
@@ -529,9 +540,13 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch msg := msg.(type) {
 	case clockMsg:
-		return m, clockTick()
+		return m, tea.Batch(clockTick(), m.loadTend())
+	case tendStateMsg:
+		m.tendMode, m.tendPRs = msg.l.Mode, len(msg.l.PRs)
+		return m, nil
 	case chatFrameMsg:
 		m.frame++
+		m.shimmer = max(m.shimmer-1, 0)
 		for i := max(len(m.msgs)-8, 0); i < len(m.msgs); i++ {
 			if c := m.msgs[i]; c.tool != nil && c.tool.Status == "running" {
 				c.lines = nil
@@ -555,7 +570,17 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.projectsLoaded(msg)
 	case dirsMsg:
 		return m.dirsLoaded(msg)
+	case boardMsg:
+		return m.boardLoaded(msg)
+	case boardMovedMsg:
+		return m.boardMoved(msg)
+	case effortDefaultMsg:
+		m.effortDefaultSet(msg)
+		return m, nil
 	case settingsDoneMsg:
+		if msg.tend != nil {
+			m.tendMode, m.tendPRs = msg.tend.Mode, len(msg.tend.PRs)
+		}
 		if msg.panel != nil {
 			m.info, m.overlay, m.pal = *msg.panel, overlayInfo, palette{}
 			return m, nil
@@ -941,6 +966,8 @@ func (m chatView) View() tea.View {
 		out = m.infoBox(out, w, m.height)
 	case overlayAsk:
 		out = m.askBox(out, w, m.height)
+	case overlayBoard:
+		out = m.boardBox(out, w, m.height)
 	}
 	if len(out) > m.height {
 		out = out[len(out)-m.height:]
@@ -968,6 +995,9 @@ func (m chatView) composer(w int) []string {
 		out = append(out, p+fill(raised, bw, "  "+c+"  esc drops")+p)
 	}
 	for _, l := range strings.Split(m.input.View(), "\n") {
+		if m.shimmer > 0 {
+			l = t.shimmer(ansi.Strip(l), float64(bw)*float64(shimmerFrames-m.shimmer)/shimmerFrames)
+		}
 		out = append(out, p+fill(raised, bw, "  "+l)+p)
 	}
 	return out

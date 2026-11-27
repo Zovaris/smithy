@@ -3,23 +3,47 @@
 package daemon
 
 import (
+	_ "embed"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/Zovaris/smithy/internal/layout"
 
 	"github.com/Zovaris/smithy/internal/apiloop"
 )
 
-const systemBase = `You run inside smithy, a local harness: the user talks to you from smithy's TUI or web chat, and a smithy daemon runs each of your turns in this folder. You are not "just" Claude Code or another CLI; answer questions about smithy as part of it.
+//go:embed prompt.md
+var systemBase string
 
-What smithy gives you:
-- The mcp__smithy__ tools (ask, board_claim, board_list, board_set, board_show, search, secret_call) come from smithy's own MCP server: the board is smithy's task board, ask puts a question to the user, secret_call calls an API with a key the user stored without showing it to you.
-- The smithy command line: smithy board (tasks), smithy tasks, smithy status, smithy config list / set (settings and models), smithy commit and smithy pr (repo-style commits and PRs), smithy cards and smithy wait (warden batches), smithy update. Run smithy <command> --help for details.
-- Every tool call you make shows in the user's chat as a row with its name, arguments and result.`
+// PromptState says which file the system prompt's base text comes from: the user file at Path
+// when Active, else the default built into smithy.
+type PromptState struct {
+	Path   string `json:"path"`
+	Active bool   `json:"active"`
+}
+
+// PromptStatus is where the user's prompt file lives and whether it replaces the default.
+func PromptStatus() PromptState {
+	_, st := promptBase()
+	return st
+}
+
+func promptBase() (string, PromptState) {
+	st := PromptState{Path: filepath.Join(layout.Home(), "prompt.md")}
+	if b, err := os.ReadFile(st.Path); err == nil && strings.TrimSpace(string(b)) != "" {
+		st.Active = true
+		return strings.TrimRight(string(b), "\n"), st
+	}
+	return strings.TrimRight(systemBase, "\n"), st
+}
 
 // SystemPrompt is what every chat agent is told about smithy: the tools, the commands and
 // whether code mode (run_code) is on for it. Code mode only exists for api: agents.
 func SystemPrompt(agent string, codeMode bool) string {
 	var b strings.Builder
-	b.WriteString(systemBase)
+	base, _ := promptBase()
+	b.WriteString(base)
 	b.WriteString("\n- Code mode (setting agent.code_mode, for api: agents only): ")
 	switch {
 	case !strings.HasPrefix(agent, "api:"):

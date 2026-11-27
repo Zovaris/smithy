@@ -16,6 +16,38 @@ part above `### Details`.
 
 - TUI: the top decision strip is gone; the question card (`overlayAsk`) opens when a decision arrives and the composer is empty, or on enter with an empty composer or `/answer`; 1-9, arrows and enter, space on multi-select, esc for later. The pill reads "waiting on you".
 - daemon: decisions carry `multi` and `other`; `/v1/asks` takes `multi` and accepts free text for every non-guard question; the MCP `ask` tool gains a `multi` flag.
+- `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
+- The chat header shows the tend mode and how many PRs it tends.
+- `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.
+
+### Fixed
+- A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
+
+### Details
+- TUI: `infoPanel.set` holds one setting row cycled with left/right; `doctorPanel` groups `smithy doctor` output; the header reads `GET /v1/tend` once a minute.
+
+- `/board` in the TUI chat shows your task files by status, like the web Board: move a task with
+  left/right, tab through task dirs, enter opens the file, `o` opens its PR, blockers and PRs show on each row.
+- The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
+
+- `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).
+  `/effort ` completes the levels the agent takes, `off` included, and the top level plays a short shimmer.
+- The TUI's `/` menu lists commands first, then skills with their own mark and folder, and matches descriptions too.
+- Four more color themes, moss, dune, dusk and rose, and every theme is now a whole palette
+  (backgrounds, text, borders, accent and status colors), not only a new accent. Pick one with
+  `/theme` in the TUI or the web's command palette.
+- The web composer does the same: `/effort` works without a session, `/effort ` completes the levels,
+  the top level shimmers, and the `/` menu lists commands, then marked skills.
+
+### Details
+
+- `ui.theme` palettes live in `internal/tui/theme.go` (`palettes`); `web/src/theme/temper.css`
+  maps the same hex onto Sephiro's tokens per `data-accent`, and a test checks they match.
+  256-color terminals get each palette's nearest colors; 16-color terminals keep steel's tiers with
+  the theme's accent.
+### Fixed
+
+- ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
 
 ## v0.25.0 — 2026-11-26
 
