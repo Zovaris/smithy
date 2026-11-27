@@ -27,9 +27,11 @@ var slackWSOK = wsURLOK
 // Slack is the Socket Mode connector: one thread per session in Channel (rooted at a message
 // naming the session), Block Kit buttons for decisions, and a Socket Mode websocket for what
 // comes back. Token is the bot token (xoxb-), AppToken the app-level token (xapp-). Only events
-// from Channel and from a user id in Users count: with Users empty it only sends.
+// from Channel (and ChatChan) and from a user id in Users count: with Users empty it only sends.
+// ChatChan ("" for none) is the chat channel: a new message there starts a session in its thread.
 type Slack struct {
 	Base, Token, AppToken, Channel string
+	ChatChan                       string
 	Users                          map[string]bool
 	// Poll is how long Receive waits for an event (default 25 s).
 	Poll   time.Duration
@@ -43,6 +45,25 @@ type Slack struct {
 }
 
 func (s *Slack) Name() string { return "slack" }
+
+// HasChat reports whether a chat channel is set.
+func (s *Slack) HasChat() bool { return s.ChatChan != "" }
+
+// split maps a thread or ref to its channel and ts: a ChatRoot prefix means ChatChan.
+func (s *Slack) split(v string) (string, string) {
+	if rest, ok := strings.CutPrefix(v, ChatRoot); ok && s.ChatChan != "" {
+		return s.ChatChan, rest
+	}
+	return s.Channel, v
+}
+
+// tag is the thread or ref Receive reports for ts in channel.
+func (s *Slack) tag(channel, ts string) string {
+	if channel == s.ChatChan && channel != s.Channel {
+		return ChatRoot + ts
+	}
+	return ts
+}
 
 func (s *Slack) scrub(v string) string {
 	for _, t := range []string{s.Token, s.AppToken} {
@@ -115,10 +136,13 @@ func slackText(n Note) string {
 	if tag := tgTag[n.Kind]; tag != "" {
 		head = "`" + tag + "`  " + head
 	}
-	lines := []string{head}
+	var lines []string
+	if n.Title != "" {
+		lines = append(lines, head)
+	}
 	for _, l := range strings.Split(n.Text, "\n") {
-		if l = strings.TrimSpace(text.Clean(l)); l != "" {
-			lines = append(lines, slackEsc(clip(l, 500)))
+		if l = strings.TrimRight(text.Clean(l), " \t"); strings.TrimSpace(l) != "" || n.Kind == KindChat {
+			lines = append(lines, slackEsc(clip(l, lineCap(n))))
 		}
 	}
 	if u, err := url.Parse(n.URL); err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" {
@@ -165,7 +189,8 @@ func (s *Slack) Thread(ctx context.Context, session, title string) (string, erro
 
 // Send posts n in thread ("" is the channel itself) with one button per option.
 func (s *Slack) Send(ctx context.Context, thread string, n Note, buttons []Button) (string, error) {
-	body := map[string]any{"channel": s.Channel, "text": clip(text.Clean(n.Title), 200), "blocks": slackBlocks(n, buttons),
+	channel, thread := s.split(thread)
+	body := map[string]any{"channel": channel, "text": clip(text.Clean(n.Title+" "+line(n.Text, 120)), 200), "blocks": slackBlocks(n, buttons),
 		"unfurl_links": false, "unfurl_media": false}
 	if thread != "" {
 		body["thread_ts"] = thread
@@ -176,12 +201,13 @@ func (s *Slack) Send(ctx context.Context, thread string, n Note, buttons []Butto
 	if err := s.call(ctx, "chat.postMessage", s.Token, body, &r); err != nil {
 		return "", err
 	}
-	return r.TS, nil
+	return s.tag(channel, r.TS), nil
 }
 
 // Update replaces message ref and removes its buttons.
 func (s *Slack) Update(ctx context.Context, ref string, n Note) error {
-	return s.call(ctx, "chat.update", s.Token, map[string]any{"channel": s.Channel, "ts": ref,
+	channel, ref := s.split(ref)
+	return s.call(ctx, "chat.update", s.Token, map[string]any{"channel": channel, "ts": ref,
 		"text": clip(text.Clean(n.Title), 200), "blocks": slackBlocks(n, nil)}, nil)
 }
 
@@ -261,7 +287,7 @@ type slackEnvelope struct {
 }
 
 func (s *Slack) allowed(channel, user string) bool {
-	return channel == s.Channel && user != "" && s.Users[user]
+	return (channel == s.Channel || (s.ChatChan != "" && channel == s.ChatChan)) && user != "" && s.Users[user]
 }
 
 func (s *Slack) inbound(e slackEnvelope) []Inbound {
@@ -269,13 +295,19 @@ func (s *Slack) inbound(e slackEnvelope) []Inbound {
 	switch e.Type {
 	case "events_api":
 		ev := p.Event
-		if ev.Type == "message" && ev.Subtype == "" && ev.BotID == "" && ev.ThreadTS != "" && ev.ThreadTS != ev.TS &&
-			ev.Text != "" && s.allowed(ev.Channel, ev.User) {
-			return []Inbound{{Thread: ev.ThreadTS, Text: clip(slackUnesc(ev.Text), 4000), By: ev.User}}
+		if ev.Type != "message" || ev.Subtype != "" || ev.BotID != "" || ev.Text == "" || !s.allowed(ev.Channel, ev.User) {
+			return nil
+		}
+		chat := s.ChatChan != "" && ev.Channel == s.ChatChan
+		if ev.ThreadTS != "" && ev.ThreadTS != ev.TS {
+			return []Inbound{{Thread: s.tag(ev.Channel, ev.ThreadTS), Text: clip(slackUnesc(ev.Text), 4000), By: ev.User, Chat: chat}}
+		}
+		if chat {
+			return []Inbound{{Thread: s.tag(ev.Channel, ev.TS), Ref: s.tag(ev.Channel, ev.TS), Text: clip(slackUnesc(ev.Text), 4000), By: ev.User, Chat: true}}
 		}
 	case "interactive":
 		if p.Type == "block_actions" && len(p.Actions) == 1 && len(p.Actions[0].Value) <= 64 && s.allowed(p.Channel.ID, p.User.ID) {
-			return []Inbound{{Button: p.Actions[0].Value, Ref: p.Message.TS, By: p.User.ID}}
+			return []Inbound{{Button: p.Actions[0].Value, Ref: s.tag(p.Channel.ID, p.Message.TS), By: p.User.ID}}
 		}
 	}
 	return nil
