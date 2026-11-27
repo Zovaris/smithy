@@ -20,7 +20,7 @@ type fakeSettings struct {
 }
 
 func (f *fakeSettings) Settings(context.Context) (daemon.Settings, error) {
-	return daemon.Settings{Serve: true, Keys: []daemon.KeyRow{{Service: "linear", Masked: "****wxyz"}}}, nil
+	return daemon.Settings{Serve: true, Prompt: daemon.PromptState{Path: "/home/dev/.smithy/prompt.md", Active: true}, Keys: []daemon.KeyRow{{Service: "linear", Masked: "****wxyz"}}}, nil
 }
 func (f *fakeSettings) SetSetting(_ context.Context, k, v string) error {
 	f.set = append(f.set, [2]string{k, v})
@@ -113,5 +113,15 @@ func TestTendPanelShowsEveryWatchedPR(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Fatalf("/tend lacks %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestPromptCommandShowsTheFileAndOverride(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 160, 48
+	m.cfg = &fakeSettings{}
+	m = cpress(typeIn(m, "/prompt"), ckey("enter"))
+	if out := screen(m); !strings.Contains(out, "/home/dev/.smithy/prompt.md") || !strings.Contains(out, "override active") {
+		t.Fatalf("/prompt missing path or state:\n%s", out)
 	}
 }

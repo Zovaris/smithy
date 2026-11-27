@@ -164,3 +164,14 @@ func BenchmarkLoadSettings(b *testing.B) {
 		}
 	}
 }
+
+func TestSettingsReportThePromptFile(t *testing.T) {
+	_, c := settingsClient(t)
+	st, err := c.Settings(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Prompt.Path != PromptStatus().Path || !strings.HasSuffix(st.Prompt.Path, "prompt.md") || st.Prompt.Active {
+		t.Fatalf("prompt state: %+v", st.Prompt)
+	}
+}
