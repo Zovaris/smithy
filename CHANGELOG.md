@@ -8,6 +8,18 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- Four more color themes, moss, dune, dusk and rose, and every theme is now a whole palette
+  (backgrounds, text, borders, accent and status colors), not only a new accent. Pick one with
+  `/theme` in the TUI or the web's command palette.
+
+### Details
+
+- `ui.theme` palettes live in `internal/tui/theme.go` (`palettes`); `web/src/theme/temper.css`
+  maps the same hex onto Sephiro's tokens per `data-accent`, and a test checks they match.
+  256-color terminals get each palette's nearest colors; 16-color terminals keep steel's tiers with
+  the theme's accent.
 ### Fixed
 
 - ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
