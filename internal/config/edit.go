@@ -19,7 +19,7 @@ var enums = map[string][]string{
 	"auto.mode":      {"labeled", "all"},
 	"auto.sandbox":   {"off", "native"},
 	"tend.daemon":    {"off", "watch", "fix"},
-	"ui.theme":       {"steel", "frost", "plum"},
+	"ui.theme":       {"steel", "frost", "plum", "moss", "dune", "dusk", "rose"},
 }
 
 var bools = map[string]bool{"auto.paused": true, "auto.retry_stronger": true, "auto.sandbox_weaker_net": true, "decide.enabled": true, "guard.enabled": true, "agent.code_mode": true, "tui.reduce_motion": true, "ui.splash": true, "board.linear_sync": true}
