@@ -10,6 +10,9 @@ part above `### Details`.
 
 ### New
 
+- `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).
+  `/effort ` completes the levels the agent takes, `off` included, and the top level plays a short shimmer.
+- The TUI's `/` menu lists commands first, then skills with their own mark and folder, and matches descriptions too.
 - Four more color themes, moss, dune, dusk and rose, and every theme is now a whole palette
   (backgrounds, text, borders, accent and status colors), not only a new accent. Pick one with
   `/theme` in the TUI or the web's command palette.
