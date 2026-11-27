@@ -144,6 +144,12 @@ func (m chatView) popup() []popupItem {
 		if len(out) == 1 && out[0].label == v {
 			return nil
 		}
+		for i, it := range out {
+			if it.label == v {
+				copy(out[1:i+1], out[:i])
+				out[0] = it
+			}
+		}
 		return out
 	}
 	at := strings.LastIndexByte(v, '@')
@@ -230,7 +236,7 @@ func (m chatView) popupKey(msg tea.KeyPressMsg, items []popupItem) (chatView, te
 	case "enter":
 		it := items[min(m.popSel, len(items)-1)]
 		m.popSel = 0
-		if !strings.HasPrefix(it.label, "/") {
+		if !strings.HasPrefix(it.label, "/") || needsArgs(it.label[1:]) {
 			m.input.SetValue(it.fill)
 			m.input.CursorEnd()
 			return m, nil, true
@@ -295,4 +301,14 @@ func (m chatView) popupRows(items []popupItem, w int) []string {
 		out = append(out, fill(bg, w, ansi.Truncate(r, w-1, "…")))
 	}
 	return out
+}
+
+// needsArgs reports whether a command takes required arguments, so enter fills it in instead of running it bare.
+func needsArgs(name string) bool {
+	for _, c := range slashCommands {
+		if c.name == name {
+			return strings.HasPrefix(c.args, "<") || strings.HasPrefix(c.args, "rm ")
+		}
+	}
+	return false
 }

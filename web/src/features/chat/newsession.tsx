@@ -34,7 +34,7 @@ const modelOf = (r: Ready, s: Setup) => (!s.chosen || !isDefault(r, s.default) ?
 // effort, and the first message.
 const Splash = lazy(() => import("../../components/splash"));
 
-export function NewSession({ setup, recent, host, onAction }: { setup: Setup | null; recent: Sess[]; host: string; onAction: (a: string) => void }) {
+export function NewSession({ setup, recent, host, shimmer, onAction }: { setup: Setup | null; recent: Sess[]; host: string; shimmer?: number; onAction: (a: string) => void }) {
   const [projects, setProjects] = useState<ProjectList | null>(null);
   const [perr, setPerr] = useState("");
   const [dir, setDir] = useState("");
@@ -185,6 +185,9 @@ export function NewSession({ setup, recent, host, onAction }: { setup: Setup | n
       <Composer
         placeholder={`Ask ${ag} to…`}
         skills={skills}
+        paths={setup?.paths}
+        agent={cur?.name ?? ""}
+        shimmer={shimmer}
         draft={draft}
         canSend={!!cur && !!dir}
         onSend={send}

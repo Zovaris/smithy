@@ -449,6 +449,19 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case overlayBoard:
 		return m.boardKey(k)
 	case overlayHelp, overlayInfo:
+		if p := m.info.set; p != nil && m.overlay == overlayInfo {
+			switch k {
+			case "left", "h":
+				p.sel = (p.sel + len(p.opts) - 1) % len(p.opts)
+				return m, nil
+			case "right", "l", "space":
+				p.sel = (p.sel + 1) % len(p.opts)
+				return m, nil
+			case "enter":
+				m.overlay = overlayNone
+				return m, m.saveSetting(*p)
+			}
+		}
 		switch k {
 		case "esc", "q", "?":
 			if k == "q" && m.overlay == overlayHelp {

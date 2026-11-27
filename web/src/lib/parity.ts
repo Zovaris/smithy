@@ -1,7 +1,7 @@
 // What the web needs to do what the TUI does: the effort and model rules, what a composer line
 // means (`!cmd`, a smithy command, or a message), images in a message, typed settings and the
 // header line.
-import { ACTIONS } from "./commands";
+import { ACTIONS, type Cmd } from "./commands";
 
 // Which agents take an effort and the levels (new session and the session picker) come from the
 // daemon's GET /v1/setup `effort`; an older daemon without it gets smithy's own rule: claude and
@@ -16,6 +16,24 @@ export function setEffortRules(e?: Partial<EffortRules> | null) {
 
 export function effortOptions(agent: string): string[] {
   return rules.agents.includes(agent.replace(/^acp:/, "")) ? ["", ...rules.levels] : [];
+}
+
+// effortLevels is every level, default ("") first, whatever the agent.
+export const effortLevels = () => ["", ...rules.levels];
+
+// effortMax is the top level smithy allows, the one the composer shimmers on.
+export const effortMax = () => rules.max ?? rules.levels[rules.levels.length - 1];
+
+// effortSuggest completes `/effort ` with the levels agent takes, default first; none once the
+// level is typed out, or for an agent that keeps its own effort. agent "" is before any is known.
+export function effortSuggest(input: string, agent: string): Cmd[] {
+  const m = /^\/effort ([\w-]*)$/.exec(input);
+  if (!m || (agent && !effortOptions(agent).length)) return [];
+  const q = m[1].toLowerCase();
+  const l = ["default", ...rules.levels].filter((e) => e.startsWith(q));
+  if (l.length === 1 && l[0] === q) return [];
+  const hint = (e: string) => (e === "default" ? "off: back to the agent.effort setting" : e === effortMax() ? "the top level smithy allows" : "");
+  return l.map((e) => ({ name: "effort " + e, hint: hint(e), kind: "action", fill: "/effort " + e }));
 }
 
 export const modelEditable = (agent: string) => !agent.startsWith("api:");

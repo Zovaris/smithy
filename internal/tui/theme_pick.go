@@ -83,6 +83,10 @@ func (m chatView) themeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.themeSel = max(m.themeSel-1, 0)
 	case "down", "j":
 		m.themeSel = min(m.themeSel+1, len(Themes)-1)
+	case "left", "h":
+		m.themeSel = (m.themeSel + len(Themes) - 1) % len(Themes)
+	case "right", "l":
+		m.themeSel = (m.themeSel + 1) % len(Themes)
 	case "enter":
 		m.overlay, m.setupStep = overlayNone, stepAgent
 		return m, m.saveTheme(Themes[m.themeSel])
@@ -108,6 +112,6 @@ func (m chatView) themeBox(screen []string, w, h int) []string {
 		}
 		items = append(items, it)
 	}
-	foot := "  " + keyHints(t, "↑↓", "move", "enter", "save", "esc", "cancel")
+	foot := "  " + keyHints(t, "↑↓←→", "move", "enter", "save", "esc", "cancel")
 	return m.overBox(screen, m.floatBox(bw, bh, "", "Theme", items, m.themeSel, foot), w)
 }
