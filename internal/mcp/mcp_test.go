@@ -203,15 +203,19 @@ type fakeAsker struct {
 	asked   map[string]string
 	answers map[string]string
 	askErr  error
+	multi   map[string]bool
 }
 
-func (f *fakeAsker) Ask(_ context.Context, id, q string, _ []string) error {
+func (f *fakeAsker) AskMulti(_ context.Context, id, q string, _ []string, multi bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.askErr != nil {
 		return f.askErr
 	}
 	f.asked[id] = q
+	if f.multi != nil {
+		f.multi[id] = multi
+	}
 	return nil
 }
 
@@ -344,5 +348,24 @@ func TestAskWithoutCardAsksTheDaemon(t *testing.T) {
 	}
 	if ents, _ := os.ReadDir(home); len(ents) != 0 {
 		t.Fatalf("ask without a card wrote warden files: %v", ents)
+	}
+}
+
+func TestAskPassesMulti(t *testing.T) {
+	t.Setenv("WARDEN_HOME", t.TempDir())
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	fa := &fakeAsker{asked: map[string]string{}, answers: map[string]string{}, multi: map[string]bool{}}
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, _ = AskTool("", time.Millisecond, func() (Asker, error) { return fa, nil }).Call(ctx, Args{"question": "q", "options": []any{"a", "b"}, "multi": true})
+	fa.mu.Lock()
+	defer fa.mu.Unlock()
+	if len(fa.multi) != 1 {
+		t.Fatalf("asked %v", fa.multi)
+	}
+	for _, m := range fa.multi {
+		if !m {
+			t.Fatal("multi not passed to the daemon")
+		}
 	}
 }
