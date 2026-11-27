@@ -87,13 +87,13 @@ export function Composer({ placeholder, skills, paths, agent = "", shimmer = 0, 
 
   const submit = async () => {
     const t = text.trim();
-    if ((!t && !imgs.length) || busy || !canSend) return;
     const it = intent(t);
     if (it.kind === "action") {
       setText("");
       onAction(it.name, it.arg);
       return;
     }
+    if ((!t && !imgs.length) || busy || !canSend) return;
     if (it.kind === "shell" && onShell) {
       setText("");
       setBusy(true);
