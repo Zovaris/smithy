@@ -41,6 +41,7 @@ var slashCommands = []slashCommand{
 	{"unset", "<key>", "put a setting back to its default"},
 	{"keys", "", "stored API keys, masked, and how to add or remove one"},
 	{"key", "rm <service>", "remove a stored API key"},
+	{"prompt", "", "the system prompt file (~/.smithy/prompt.md) and whether it replaces the default"},
 	{"doctor", "", "run smithy doctor on the daemon's machine"},
 	{"tend", "", "the batch PRs the daemon keeps green, and what it is doing on each"},
 	{"detach", "", "quit and leave the daemon running"},
