@@ -28,7 +28,7 @@ export async function uploadImage(f: Blob): Promise<string> {
 export const sampleAsk = (q: string) =>
   call("POST", "/v1/asks", { id: "ask:web-" + Date.now().toString(36), question: q || "Ship the sample change?", options: ["yes", "no"] });
 
-export type Settings = { settings: SettingRow[]; keys: { service: string; masked: string }[]; serve: boolean };
+export type Settings = { settings: SettingRow[]; keys: { service: string; masked: string }[]; serve: boolean; prompt?: { path: string; active: boolean } };
 export const loadSettings = (): Promise<Settings> => call("GET", "/v1/settings");
 export const setSetting = (k: string, v: string) => call("PUT", "/v1/settings/" + encodeURIComponent(k), { value: v });
 export const unsetSetting = (k: string) => call("DELETE", "/v1/settings/" + encodeURIComponent(k));

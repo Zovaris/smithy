@@ -41,10 +41,11 @@ type Settings struct {
 	Settings []SettingRow `json:"settings"`
 	Keys     []KeyRow     `json:"keys"`
 	Serve    bool         `json:"serve"`
+	Prompt   PromptState  `json:"prompt"`
 }
 
 func loadSettings() (Settings, error) {
-	out := Settings{Settings: []SettingRow{}, Keys: []KeyRow{}}
+	out := Settings{Settings: []SettingRow{}, Keys: []KeyRow{}, Prompt: PromptStatus()}
 	eff := config.Snapshot()
 	for _, k := range config.Known {
 		v, src, err := eff(k.Key)

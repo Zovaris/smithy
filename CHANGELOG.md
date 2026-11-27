@@ -12,6 +12,8 @@ part above `### Details`.
 
 - `/board` in the TUI chat shows your task files by status, like the web Board: move a task with
   left/right, tab through task dirs, enter opens the file, `o` opens its PR, blockers and PRs show on each row.
+- The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
+
 - `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).
   `/effort ` completes the levels the agent takes, `off` included, and the top level plays a short shimmer.
 - The TUI's `/` menu lists commands first, then skills with their own mark and folder, and matches descriptions too.
