@@ -123,6 +123,10 @@ func (m chatView) effortKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.effortSel = max(m.effortSel-1, 0)
 	case "down", "j":
 		m.effortSel = min(m.effortSel+1, len(rows)-1)
+	case "left", "h":
+		m.effortSel = (m.effortSel + len(rows) - 1) % len(rows)
+	case "right", "l":
+		m.effortSel = (m.effortSel + 1) % len(rows)
 	case "enter":
 		m.overlay = overlayNone
 		if s := m.openSession(); s != nil {
@@ -151,6 +155,6 @@ func (m chatView) effortBox(screen []string, w, h int) []string {
 		items = append(items, it)
 	}
 	items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: "smithy caps effort at " + agents.MaxEffort + "; higher levels are not offered", static: true})
-	foot := "  " + keyHints(t, "↑↓", "move", "enter", "save", "esc", "cancel")
+	foot := "  " + keyHints(t, "↑↓←→", "move", "enter", "save", "esc", "cancel")
 	return m.overBox(screen, m.floatBox(bw, bh, "", "Effort for "+agent, items, m.effortSel, foot), w)
 }
