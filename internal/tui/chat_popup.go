@@ -42,6 +42,7 @@ var slashCommands = []slashCommand{
 	{"keys", "", "stored API keys, masked, and how to add or remove one"},
 	{"key", "rm <service>", "remove a stored API key"},
 	{"doctor", "", "run smithy doctor on the daemon's machine"},
+	{"board", "[task dir]", "the task files by status: move, filter by task dir, open a file or its PR"},
 	{"tend", "", "the batch PRs the daemon keeps green, and what it is doing on each"},
 	{"detach", "", "quit and leave the daemon running"},
 	{"quit", "", "leave; a background daemon keeps running"},
