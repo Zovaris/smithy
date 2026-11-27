@@ -90,6 +90,9 @@ code { font-family: var(--sph-font-mono); font-size: 12.5px; background: var(--t
 .btn.primary { background: var(--t-primary); border-color: var(--t-primary); color: var(--t-on-primary); }
 .btn.primary:hover { opacity: .9; }
 .btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+.btn.on { border-color: var(--t-primary); background: var(--t-raised); }
+.decide .other { display: flex; gap: 8px; }
+.decide .other input { flex: 1; min-width: 0; height: 28px; padding: 0 10px; border: 1px solid var(--t-line-strong); border-radius: 0; background: var(--t-card); font-size: 16px; }
 .btn kbd { background: transparent; border-color: currentColor; opacity: .6; color: inherit; }
 .err { color: var(--t-fail); font-size: 13px; }
 
