@@ -94,7 +94,9 @@ func (m chatView) themeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-var themeHints = map[string]string{"steel": "graphite with the ember accent (default)", "frost": "graphite with a cool teal accent", "plum": "graphite with a violet accent"}
+var themeHints = map[string]string{"steel": "graphite with the ember accent (default)", "frost": "blue slate with a teal accent",
+	"plum": "aubergine with a violet accent", "moss": "forest green with a lime accent", "dune": "warm sand with a saffron accent",
+	"dusk": "indigo night with a periwinkle accent", "rose": "mauve with a pink accent"}
 
 func (m chatView) themeBox(screen []string, w, h int) []string {
 	t := m.th

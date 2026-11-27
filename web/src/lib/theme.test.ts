@@ -3,7 +3,7 @@ import { THEMES, accentOf, themeOf } from "./theme";
 
 describe("theme", () => {
   it("lists steel first, the same names as ui.theme", () => {
-    expect(THEMES.map((t) => t.name)).toEqual(["steel", "frost", "plum"]);
+    expect(THEMES.map((t) => t.name)).toEqual(["steel", "frost", "plum", "moss", "dune", "dusk", "rose"]);
   });
   it("reads ui.theme from GET /v1/settings, steel when unset or unknown", () => {
     expect(themeOf({ settings: [{ key: "ui.theme", value: "plum" }] })).toBe("plum");

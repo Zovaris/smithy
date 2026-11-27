@@ -33,12 +33,16 @@ export function toggleTheme(): Mode {
   return next;
 }
 
-// Color themes are ui.theme, shared with the TUI through the daemon; steel (the ember) is the default.
-export type ThemeName = "steel" | "frost" | "plum";
+// Color themes are ui.theme, shared with the TUI through the daemon; each is a full palette, steel (the ember) the default.
+export type ThemeName = "steel" | "frost" | "plum" | "moss" | "dune" | "dusk" | "rose";
 export const THEMES: { name: ThemeName; hint: string }[] = [
   { name: "steel", hint: "graphite with the ember accent (default)" },
-  { name: "frost", hint: "graphite with a cool teal accent" },
-  { name: "plum", hint: "graphite with a violet accent" },
+  { name: "frost", hint: "blue slate with a teal accent" },
+  { name: "plum", hint: "aubergine with a violet accent" },
+  { name: "moss", hint: "forest green with a lime accent" },
+  { name: "dune", hint: "warm sand with a saffron accent" },
+  { name: "dusk", hint: "indigo night with a periwinkle accent" },
+  { name: "rose", hint: "mauve with a pink accent" },
 ];
 
 export function themeOf(s: { settings?: { key: string; value: string }[] } | null): ThemeName {

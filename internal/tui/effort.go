@@ -4,6 +4,7 @@ package tui
 
 import (
 	"context"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/Zovaris/smithy/internal/agents"
@@ -84,19 +85,93 @@ func (m *chatView) sessionModelSet(msg sessionModelSetMsg) {
 		eff = "agent.effort"
 	}
 	m.status("next turns run " + msg.s.Agent + " · " + what + " · effort " + eff)
+	m.shimmerOn(msg.s.Effort)
+}
+
+// shimmerFrames is how many motion frames the top-effort shimmer plays on the composer.
+const shimmerFrames = 24
+
+// shimmerOn starts the composer shimmer when level is the top effort; reduced motion plays none.
+func (m *chatView) shimmerOn(level string) {
+	if level == agents.MaxEffort && !m.still {
+		m.shimmer = shimmerFrames
+	}
+}
+
+// effortDefaultMsg is agent.effort saved: level, "" when put back to its default.
+type effortDefaultMsg struct {
+	level string
+	err   error
+}
+
+// effortLevel normalizes a typed level: off and default mean "" (the agent.effort default).
+func effortLevel(arg string) string {
+	if a := strings.ToLower(strings.TrimSpace(arg)); a != "off" && a != "default" {
+		return a
+	}
+	return ""
+}
+
+// setDefaultEffort saves agent.effort, the effort the next session starts with.
+func (m chatView) setDefaultEffort(level string) tea.Cmd {
+	api := m.cfg
+	if api == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		if level == "" {
+			return effortDefaultMsg{err: api.UnsetSetting(context.Background(), "agent.effort")}
+		}
+		return effortDefaultMsg{level: level, err: api.SetSetting(context.Background(), "agent.effort", level)}
+	}
+}
+
+func (m *chatView) effortDefaultSet(msg effortDefaultMsg) {
+	if msg.err != nil {
+		m.system("error: " + msg.err.Error())
+		return
+	}
+	if msg.level == "" {
+		m.effort = agents.MaxEffort
+		m.system("agent.effort back to its default (" + agents.MaxEffort + "): the next session starts with it")
+		return
+	}
+	m.effort = msg.level
+	m.system("saved agent.effort = " + msg.level + ": the next session starts with it")
+	m.shimmerOn(msg.level)
 }
 
 func effortRows() []string { return append([]string{""}, agents.Efforts...) }
 
 func (m chatView) effortCommand(arg string) (tea.Model, tea.Cmd) {
+	off := strings.TrimSpace(arg) != "" && effortLevel(arg) == ""
+	arg = effortLevel(arg)
 	s := m.openSession()
 	if s == nil {
-		m.system("effort is per session: send a message first, then /effort; the agent.effort setting is the default")
+		if off {
+			return m, m.setDefaultEffort("")
+		}
+		if arg != "" {
+			if e, capped := agents.ClampEffort(arg); capped || e != arg {
+				m.system("effort must be off or one of " + strings.Join(agents.Efforts, ", ") + " (smithy caps effort at " + agents.MaxEffort + ")")
+				return m, nil
+			}
+			return m, m.setDefaultEffort(arg)
+		}
+		m.overlay, m.setupStep, m.setupNote, m.effortSel = overlayPicker, stepEffort, "", 0
+		for i, e := range effortRows() {
+			if e == m.effort {
+				m.effortSel = i
+			}
+		}
 		return m, nil
 	}
 	if !agents.EffortFlags[s.agent] {
 		m.system(s.agent + " keeps its own effort; /effort works for claude and codex")
 		return m, nil
+	}
+	if off {
+		return m, m.setSessionModel(s.id, s.model, "")
 	}
 	if arg != "" {
 		if err := daemon.ValidEffort(s.agent, arg); err != nil {
@@ -132,6 +207,7 @@ func (m chatView) effortKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if s := m.openSession(); s != nil {
 			return m, m.setSessionModel(s.id, s.model, rows[m.effortSel])
 		}
+		return m, m.setDefaultEffort(rows[m.effortSel])
 	}
 	return m, nil
 }
@@ -139,15 +215,19 @@ func (m chatView) effortKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m chatView) effortBox(screen []string, w, h int) []string {
 	t := m.th
 	bw, bh := m.boxSize(w, h)
-	agent, cur := "", ""
+	agent, cur, scope, title := "", m.effort, " · the next session (agent.effort)", "Effort"
 	if s := m.openSession(); s != nil {
-		agent, cur = s.agent, s.effort
+		agent, cur, scope = s.agent, s.effort, " · this session"
+		title = "Effort for " + agent
 	}
-	items := []boxItem{{group: "Effort for " + agent + " · this session"}}
+	items := []boxItem{{group: title + scope}}
 	for _, e := range effortRows() {
 		it := boxItem{glyph: t.g.dot, color: t.muted, label: e}
 		if e == "" {
 			it.label, it.hint = "default", "the agent.effort setting"
+			if agent == "" {
+				it.hint = "back to " + agents.MaxEffort
+			}
 		}
 		if e == cur {
 			it.key, it.color = t.g.on+" now", t.accent
@@ -156,5 +236,5 @@ func (m chatView) effortBox(screen []string, w, h int) []string {
 	}
 	items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: "smithy caps effort at " + agents.MaxEffort + "; higher levels are not offered", static: true})
 	foot := "  " + keyHints(t, "↑↓←→", "move", "enter", "save", "esc", "cancel")
-	return m.overBox(screen, m.floatBox(bw, bh, "", "Effort for "+agent, items, m.effortSel, foot), w)
+	return m.overBox(screen, m.floatBox(bw, bh, "", title, items, m.effortSel, foot), w)
 }
