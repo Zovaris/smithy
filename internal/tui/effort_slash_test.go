@@ -47,7 +47,7 @@ func TestEffortPickerWithoutSessionSavesTheDefault(t *testing.T) {
 		t.Fatalf("the picker says it sets the next session's default:\n%s", screen(m))
 	}
 	m = run(sendKey(m, ckey("down")), nil)
-	m = sendKey(m, ckey("enter"))
+	sendKey(m, ckey("enter"))
 	if len(fs.set) != 1 || fs.set[0] != [2]string{"agent.effort", "low"} {
 		t.Fatalf("set %v", fs.set)
 	}

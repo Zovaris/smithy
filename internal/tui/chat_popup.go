@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -79,7 +80,7 @@ func (m chatView) slashPopup(q string) []popupItem {
 	for _, c := range slashCommands {
 		add(popupItem{fill: "/" + c.name + " ", label: "/" + c.name, desc: c.desc}, c.name)
 	}
-	cmds := append(first, rest...)
+	cmds := slices.Concat(first, rest)
 	first, rest = nil, nil
 	if m.setupSt != nil {
 		for _, s := range m.setupSt.Skills {
