@@ -8,6 +8,11 @@ part above `### Details`.
 
 ## Unreleased
 
+### New
+
+- `/board` in the TUI chat shows your task files by status, like the web Board: move a task with
+  left/right, tab through task dirs, enter opens the file, `o` opens its PR, blockers and PRs show on each row.
+
 ## v0.25.0 — 2026-11-26
 
 ### Highlights
