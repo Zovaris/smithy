@@ -4,6 +4,7 @@ package tui
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -26,6 +27,140 @@ type settingsAPI interface {
 type settingsDoneMsg struct {
 	lines []string
 	panel *infoPanel
+	tend  *daemon.TendList // a fresh tend state for the header
+}
+
+// tendStateMsg is the tend mode and PR count the header shows.
+type tendStateMsg struct{ l daemon.TendList }
+
+// loadTend reads the tend state for the header; nil without a daemon.
+func (m chatView) loadTend() tea.Cmd {
+	if m.cfg == nil {
+		return nil
+	}
+	api := m.cfg
+	return func() tea.Msg {
+		l, err := api.Tend(context.Background())
+		if err != nil {
+			return nil
+		}
+		return tendStateMsg{l: l}
+	}
+}
+
+// tendTag is the header's tend state: "tend fix · 2 PRs"; "" before the first read.
+func (m chatView) tendTag() string {
+	if m.tendMode == "" {
+		return ""
+	}
+	s := "tend " + m.tendMode
+	switch {
+	case m.tendPRs == 1:
+		s += " · 1 PR"
+	case m.tendPRs > 1:
+		s += " · " + strconv.Itoa(m.tendPRs) + " PRs"
+	}
+	return s
+}
+
+// settingsUsage is one settings command's usage line.
+func settingsUsage(name string) string {
+	for _, c := range slashCommands {
+		if c.name == name {
+			return strings.TrimSpace("/" + name + " " + c.args)
+		}
+	}
+	return "/" + name
+}
+
+// panelSetting is a modal row holding one setting: left/right cycle its value, enter saves it.
+type panelSetting struct {
+	key  string // a config key, or "serve"
+	opts []string
+	sel  int
+}
+
+// saveSetting writes the panel's setting through the daemon.
+func (m chatView) saveSetting(p panelSetting) tea.Cmd {
+	api, v := m.cfg, p.opts[p.sel]
+	return func() tea.Msg {
+		var err error
+		if p.key == "serve" {
+			err = api.SetServe(context.Background(), v == "on")
+		} else {
+			err = api.SetSetting(context.Background(), p.key, v)
+		}
+		if err != nil {
+			return sessionErrMsg{what: "saving " + p.key, err: err}
+		}
+		out := settingsDoneMsg{lines: []string{"saved " + p.key + " = " + v}}
+		if p.key == "tend.daemon" {
+			if l, err := api.Tend(context.Background()); err == nil {
+				out.tend = &l
+			}
+		}
+		return out
+	}
+}
+
+// settingRow is how infoBox draws a setting: its value between arrows.
+func settingRow(p panelSetting) string {
+	return p.key + "  ‹ " + p.opts[p.sel] + " ›\t←→ change · enter saves"
+}
+
+// servePanel is /serve: serve on or off, cycled with left/right.
+func servePanel(on bool) *infoPanel {
+	sel := 1
+	if on {
+		sel = 0
+	}
+	return &infoPanel{title: "Serve", set: &panelSetting{key: "serve", opts: []string{"on", "off"}, sel: sel},
+		lines: []string{"#SERVE", "off launches no new work (auto.paused); running work goes on"}}
+}
+
+// doctorPanel is /doctor: the checks grouped by what they need, each problem with its fix.
+func doctorPanel(lines []string) *infoPanel {
+	type check struct{ label, fix string }
+	var fail, warn, ok []check
+	var last *[]check
+	for _, l := range lines {
+		l = strings.TrimSpace(l)
+		word, rest, _ := strings.Cut(l, " ")
+		rest = strings.TrimSpace(rest)
+		switch {
+		case l == "" || l == "warden doctor":
+		case word == "fix:" && last != nil && len(*last) > 0:
+			(*last)[len(*last)-1].fix = rest
+		case word == "ok":
+			ok, last = append(ok, check{label: rest}), &ok
+		case word == "warn":
+			warn, last = append(warn, check{label: rest}), &warn
+		case word == "FAIL" || word == "bad" || word == "fail" || word == "doctor:":
+			fail, last = append(fail, check{label: rest}), &fail
+		default:
+			ok, last = append(ok, check{label: l}), &ok
+		}
+	}
+	out := []string{}
+	add := func(head, mark string, cs []check) {
+		if len(cs) == 0 {
+			return
+		}
+		out = append(out, "#"+head)
+		for _, c := range cs {
+			out = append(out, mark+c.label)
+			if c.fix != "" {
+				out = append(out, "-> fix: "+c.fix)
+			}
+		}
+	}
+	add("NEEDS A FIX", "!! ", fail)
+	add("WORTH A LOOK", "?? ", warn)
+	add("OK", "ok ", ok)
+	if len(out) == 0 {
+		out = []string{"doctor printed nothing"}
+	}
+	return &infoPanel{title: "Doctor", lines: out, scroll: true}
 }
 
 // detach quits and leaves the daemon running; a standalone daemon lives in this process, so it stays.
@@ -74,9 +209,12 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 			return settingsDoneMsg{panel: keysPanel(s)}
 		}
 	case name == "serve" && arg == "":
-		run = func(ctx context.Context) ([]string, error) {
-			s, err := api.Settings(ctx)
-			return []string{map[bool]string{true: "serve on", false: "serve off (auto.paused)"}[s.Serve]}, err
+		return m, func() tea.Msg {
+			st, err := api.Settings(context.Background())
+			if err != nil {
+				return sessionErrMsg{what: "/serve", err: err}
+			}
+			return settingsDoneMsg{panel: servePanel(st.Serve)}
 		}
 	case name == "prompt":
 		run = func(ctx context.Context) ([]string, error) {
@@ -93,13 +231,19 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 			if err != nil {
 				return sessionErrMsg{what: "/tend", err: err}
 			}
-			return settingsDoneMsg{panel: tendPanel(l)}
+			return settingsDoneMsg{panel: tendPanel(l), tend: &l}
 		}
 	case name == "doctor":
-		m.system("running smithy doctor…")
-		run = api.Doctor
+		m.info, m.overlay, m.pal = infoPanel{title: "Doctor", lines: []string{"running smithy doctor…"}}, overlayInfo, palette{}
+		return m, func() tea.Msg {
+			lines, err := api.Doctor(context.Background())
+			if err != nil {
+				return sessionErrMsg{what: "/doctor", err: err}
+			}
+			return settingsDoneMsg{panel: doctorPanel(lines)}
+		}
 	default:
-		m.system("usage: /serve on|off · /set <key> <value> · /unset <key> · /keys · /key rm <service> · /doctor · /tend · /prompt")
+		m.system("usage: " + settingsUsage(name))
 		return m, nil
 	}
 	return m, func() tea.Msg {
@@ -129,8 +273,9 @@ func keysPanel(s daemon.Settings) *infoPanel {
 // tendPanel is /tend: the warden batch and chat session PRs the daemon tends, each with its status, tend's next
 // action and the CI state; a PR being fixed names its tend session.
 func tendPanel(l daemon.TendList) *infoPanel {
-	lines := []string{"#MODE", "tend.daemon " + l.Mode + "\t/set tend.daemon off|watch|fix"}
-	lines = append(lines, "#PULL REQUESTS")
+	modes := []string{"off", "watch", "fix"}
+	sel := max(slices.Index(modes, l.Mode), 0)
+	lines := []string{"#PULL REQUESTS"}
 	for _, p := range l.PRs {
 		mark := map[string]string{"green": "ok ", "closed": "ok ", "error": "!! ", "needs-you": "!! "}[p.Status]
 		hint := p.Action + " · checks " + p.Checks
@@ -149,5 +294,5 @@ func tendPanel(l daemon.TendList) *infoPanel {
 	if len(l.PRs) == 0 {
 		lines = append(lines, "none: no warden batch or chat session has an open PR to tend")
 	}
-	return &infoPanel{title: "Tend", lines: lines, scroll: true}
+	return &infoPanel{title: "Tend", lines: lines, scroll: true, set: &panelSetting{key: "tend.daemon", opts: modes, sel: sel}}
 }

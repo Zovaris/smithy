@@ -75,7 +75,13 @@ func (m chatView) header(w int) []string {
 	if m.dir != "" {
 		project = filepath.Base(m.dir)
 	}
-	return []string{m.th.headBar(w, m.pad(), project, m.pill, m.clockNow().Format("15:04")), ""}
+	pill := m.pill
+	if tag := m.tendTag(); tag != "" {
+		pill = func(bar lipgloss.Style) string {
+			return bar.Foreground(m.th.dim).Render(tag) + bar.Render("  ") + m.pill(bar)
+		}
+	}
+	return []string{m.th.headBar(w, m.pad(), project, pill, m.clockNow().Format("15:04")), ""}
 }
 
 // clockMsg redraws the header clock; it fires on each minute, nothing else runs while idle.
@@ -445,7 +451,11 @@ func (m chatView) infoBox(screen []string, w, h int) []string {
 	t := m.th
 	bw, bh := m.boxSize(w, h)
 	items := []boxItem{}
-	for _, l := range m.info.lines {
+	lines := m.info.lines
+	if p := m.info.set; p != nil {
+		lines = append([]string{"#SETTING", "-> " + settingRow(*p)}, lines...)
+	}
+	for _, l := range lines {
 		if strings.HasPrefix(l, "#") {
 			items = append(items, boxItem{group: strings.TrimPrefix(l, "#")})
 			continue
@@ -456,16 +466,25 @@ func (m chatView) infoBox(screen []string, w, h int) []string {
 			glyph, c, l = t.g.pass, t.ok, l[3:]
 		case strings.HasPrefix(l, "-> "):
 			glyph, c, l = "→", t.info, l[3:]
+		case strings.HasPrefix(l, "!! "):
+			glyph, c, l = t.g.fail, t.err, l[3:]
+		case strings.HasPrefix(l, "?? "):
+			glyph, c, l = t.g.wait, t.warn, l[3:]
 		}
 		label, hint, _ := strings.Cut(l, "\t")
 		items = append(items, boxItem{glyph: glyph, color: c, label: label, hint: hint})
 	}
 	sel := len(items)
-	if m.info.scroll {
+	if m.info.set != nil {
+		sel = 0
+	} else if m.info.scroll {
 		sel = m.pal.sel
 	}
 	foot := "  " + keyHints(t, "esc", "close")
-	if m.info.scroll {
+	switch {
+	case m.info.set != nil:
+		foot = "  " + keyHints(t, "←→", "change", "enter", "save", "esc", "close")
+	case m.info.scroll:
 		foot = "  " + keyHints(t, "↑↓", "scroll", "esc", "close")
 	}
 	return m.overBox(screen, m.floatBox(bw, bh, m.info.title, "", items, sel, foot), w)

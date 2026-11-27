@@ -9,6 +9,15 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+- `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
+- The chat header shows the tend mode and how many PRs it tends.
+- `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.
+
+### Fixed
+- A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
+
+### Details
+- TUI: `infoPanel.set` holds one setting row cycled with left/right; `doctorPanel` groups `smithy doctor` output; the header reads `GET /v1/tend` once a minute.
 
 - The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
 
