@@ -9,6 +9,17 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+- `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
+- The chat header shows the tend mode and how many PRs it tends.
+- `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.
+
+### Fixed
+- A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
+
+### Details
+- TUI: `infoPanel.set` holds one setting row cycled with left/right; `doctorPanel` groups `smithy doctor` output; the header reads `GET /v1/tend` once a minute.
+
+- The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
 
 - Chat apps get two places each: a notifications channel for alerts and a chat channel where a new message starts a session in its own thread or topic, your replies continue it and its answers come back. `/channels test` and the web settings send a test message to both.
 - A question from the ask tool can be answered in your own words by replying to its message, besides its buttons.
@@ -18,6 +29,8 @@ part above `### Details`.
 - Four more color themes, moss, dune, dusk and rose, and every theme is now a whole palette
   (backgrounds, text, borders, accent and status colors), not only a new accent. Pick one with
   `/theme` in the TUI or the web's command palette.
+- The web composer does the same: `/effort` works without a session, `/effort ` completes the levels,
+  the top level shimmers, and the `/` menu lists commands, then marked skills.
 
 ### Details
 

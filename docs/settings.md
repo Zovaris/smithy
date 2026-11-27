@@ -94,6 +94,15 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 Coming from 0.7 (`~/.agents/`): the first run moves your settings, plans and batches to
 `~/.smithy/` (`smithy config migrate` does it by hand).
 
+## System prompt
+
+Every chat agent the daemon runs gets a short system prompt about smithy: its tools, its commands
+and whether code mode is on. The default ships inside the binary (`internal/daemon/prompt.md`).
+Write your own text to `~/.smithy/prompt.md` (`$SMITHY_HOME/prompt.md`) and it replaces that
+default from the next turn on; the code-mode line is still added after it. A blank file or no
+file keeps the default. `/prompt` in the TUI and the System prompt row in the web settings show
+the path and whether the override is active.
+
 ## GitHub access
 
 smithy reaches GitHub (open, merge, verify and watch PRs, read CI runs) in one of three modes;

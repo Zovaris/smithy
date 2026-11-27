@@ -6,12 +6,12 @@ import "../../screens/settings.css";
 import { useState } from "preact/hooks";
 import { setSessionModel } from "../../lib/actions";
 import { ModelSelect } from "./modelselect";
-import { effortOptions, modelEditable } from "../../lib/parity";
+import { effortMax, effortOptions, modelEditable } from "../../lib/parity";
 import { agentName, type Sess } from "../../lib/store";
 
 // SessionPick is /model and /effort: the open session's model and reasoning effort, for its next
 // turns. Effort shows only for agents that take one (claude, codex), capped at medium as in the TUI.
-export default function SessionPick({ s, open, onClose }: { s: Sess; open: boolean; onClose: () => void }) {
+export default function SessionPick({ s, open, onClose, onTop }: { s: Sess; open: boolean; onClose: () => void; onTop?: () => void }) {
   const [model, setModel] = useState(s.model ?? "");
   const [effort, setEffort] = useState(s.effort ?? "");
   const [err, setErr] = useState("");
@@ -23,6 +23,7 @@ export default function SessionPick({ s, open, onClose }: { s: Sess; open: boole
     setErr("");
     try {
       await setSessionModel(s.id, model, efforts.length ? effort : "");
+      if (efforts.length && effort === effortMax()) onTop?.();
       onClose();
     } catch (e) {
       setErr(String((e as Error).message ?? e));

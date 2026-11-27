@@ -1,4 +1,4 @@
-// The Settings sections the TUI reaches with /set, /keys, /serve, /doctor, /theme and /connect:
+// The Settings sections the TUI reaches with /set, /keys, /serve, /doctor, /prompt, /theme and /connect:
 // every config key with a typed control, stored API keys, serve, doctor, the color theme and the
 // saved servers this daemon reaches.
 import { SegmentedControl } from "@zovaris/sephiro/segmented-control";
@@ -182,6 +182,16 @@ export function More() {
               <span>{st.serve ? "Serve may launch new work" : "Serve launches nothing new (auto.paused)"}</span>
             </div></div>
           </div>
+          {st.prompt && (
+            <div id="set-prompt">
+              <div class="lbl">System prompt</div>
+              <div class="card"><div class="kv">
+                <span class="mono">{st.prompt.path}</span>
+                <span class="sp" />
+                <span class="t3">{st.prompt.active ? "override active: replaces the default" : "no override: the default is in use"}</span>
+              </div></div>
+            </div>
+          )}
           <div id="set-keys"><div class="lbl">API keys</div><Keys st={st} onSaved={saved} /></div>
           <SettingsList
             id="set-settings"

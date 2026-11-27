@@ -141,6 +141,8 @@ type chatView struct {
 	popSel   int                   // the selected / or @ popup row
 	agentSel int                   // the selected session in the agents panel
 	info     infoPanel             // the open read-only panel
+	tendMode string                // the daemon's tend mode for the header; "" until read
+	tendPRs  int                   // the PRs it tends
 	frame    int                   // motion frame, advanced only while something runs
 	ticking  bool                  // a frame tick is scheduled
 
@@ -162,6 +164,7 @@ type infoPanel struct {
 	title  string
 	lines  []string
 	scroll bool
+	set    *panelSetting // a setting row on top, cycled with left/right; nil: none
 }
 
 func newChatView(stream <-chan daemon.ClientMsg, url string, th theme) chatView {
@@ -486,7 +489,7 @@ func (m *chatView) release() {
 }
 
 func (m chatView) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true), m.loadTheme(), clockTick())
+	return tea.Batch(textarea.Blink, m.wait(), m.loadSetup(true), m.loadTheme(), clockTick(), m.loadTend())
 }
 
 func (m chatView) wait() tea.Cmd {
@@ -531,7 +534,10 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch msg := msg.(type) {
 	case clockMsg:
-		return m, clockTick()
+		return m, tea.Batch(clockTick(), m.loadTend())
+	case tendStateMsg:
+		m.tendMode, m.tendPRs = msg.l.Mode, len(msg.l.PRs)
+		return m, nil
 	case chatFrameMsg:
 		m.frame++
 		m.shimmer = max(m.shimmer-1, 0)
@@ -562,6 +568,9 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.effortDefaultSet(msg)
 		return m, nil
 	case settingsDoneMsg:
+		if msg.tend != nil {
+			m.tendMode, m.tendPRs = msg.tend.Mode, len(msg.tend.PRs)
+		}
 		if msg.panel != nil {
 			m.info, m.overlay, m.pal = *msg.panel, overlayInfo, palette{}
 			return m, nil

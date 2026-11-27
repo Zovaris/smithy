@@ -17,10 +17,11 @@ type fakeSettings struct {
 	unset   []string
 	removed []string
 	tested  int
+	doctor  []string
 }
 
 func (f *fakeSettings) Settings(context.Context) (daemon.Settings, error) {
-	return daemon.Settings{Serve: true, Keys: []daemon.KeyRow{{Service: "linear", Masked: "****wxyz"}}}, nil
+	return daemon.Settings{Serve: true, Prompt: daemon.PromptState{Path: "/home/dev/.smithy/prompt.md", Active: true}, Keys: []daemon.KeyRow{{Service: "linear", Masked: "****wxyz"}}}, nil
 }
 func (f *fakeSettings) SetSetting(_ context.Context, k, v string) error {
 	f.set = append(f.set, [2]string{k, v})
@@ -39,6 +40,9 @@ func (f *fakeSettings) SetServe(_ context.Context, on bool) error {
 	return nil
 }
 func (f *fakeSettings) Doctor(context.Context) ([]string, error) {
+	if f.doctor != nil {
+		return f.doctor, nil
+	}
 	return []string{"ok   git found"}, nil
 }
 
@@ -85,6 +89,7 @@ func TestSettingsCommandsGoThroughTheDaemon(t *testing.T) {
 	if !strings.Contains(screen(m), "git found") {
 		t.Fatalf("doctor lines missing:\n%s", screen(m))
 	}
+	m = cpress(m, ckey("esc"))
 	m = cpress(typeIn(m, "/keys"), ckey("enter"))
 	if out := screen(m); !strings.Contains(out, "linear ****wxyz") || !strings.Contains(out, "serve on") {
 		t.Fatalf("keys/serve missing:\n%s", out)
@@ -105,9 +110,19 @@ func TestTendPanelShowsEveryWatchedPR(t *testing.T) {
 	m.cfg = &fakeSettings{}
 	m = cpress(typeIn(m, "/tend"), ckey("enter"))
 	out := screen(m)
-	for _, want := range []string{"tend.daemon fix", "pull/7", "fixing", "fix-ci", "pull/8", "green", "session s-abc", "pull/9"} {
+	for _, want := range []string{"tend.daemon  ‹ fix ›", "pull/7", "fixing", "fix-ci", "pull/8", "green", "session s-abc", "pull/9"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("/tend lacks %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestPromptCommandShowsTheFileAndOverride(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 160, 48
+	m.cfg = &fakeSettings{}
+	m = cpress(typeIn(m, "/prompt"), ckey("enter"))
+	if out := screen(m); !strings.Contains(out, "/home/dev/.smithy/prompt.md") || !strings.Contains(out, "override active") {
+		t.Fatalf("/prompt missing path or state:\n%s", out)
 	}
 }
