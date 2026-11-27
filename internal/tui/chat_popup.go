@@ -6,11 +6,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -22,9 +24,9 @@ var slashCommands = []slashCommand{
 	{"sessions", "", "agents and sessions: open one, stop it, see what waits on you"},
 	{"agent", "[name]", "the agent new sessions start with"},
 	{"model", "[name]", "the model the open session runs, else new sessions; tab lists other agents"},
-	{"effort", "[low|medium]", "the open session's reasoning effort, for agents that take one"},
+	{"effort", "[off|low|medium]", "reasoning effort: the open session's, else the next session's (agent.effort)"},
 	{"skills", "", "skills and MCP injected into every session"},
-	{"theme", "[steel|frost|plum]", "the color theme this TUI and the web share (ui.theme)"},
+	{"theme", "[steel|frost|plum|moss|dune|dusk|rose]", "the color theme this TUI and the web share (ui.theme)"},
 	{"connect", "", "which daemon this chat talks to, and how to reach another"},
 	{"web", "", "open the web UI in your browser"},
 	{"remote", "", "reach this daemon from your phone or another machine"},
@@ -58,7 +60,72 @@ func isCommand(name string) bool {
 }
 
 // popupItem is one row of the / or @ popup: what tab puts in the input, and its description.
-type popupItem struct{ fill, label, desc string }
+// skill marks a skill row, drawn apart from the commands.
+type popupItem struct {
+	fill, label, desc string
+	skill             bool
+}
+
+// slashPopup is the / menu for q: commands, then skills, each whose name holds q (or, from three
+// letters on, whose description does), name-prefix matches first.
+func (m chatView) slashPopup(q string) []popupItem {
+	var first, rest []popupItem
+	add := func(it popupItem, name string) {
+		switch {
+		case strings.HasPrefix(name, q):
+			first = append(first, it)
+		case strings.Contains(name, q) || len(q) >= 3 && strings.Contains(strings.ToLower(it.desc), q):
+			rest = append(rest, it)
+		}
+	}
+	for _, c := range slashCommands {
+		add(popupItem{fill: "/" + c.name + " ", label: "/" + c.name, desc: c.desc}, c.name)
+	}
+	cmds := slices.Concat(first, rest)
+	first, rest = nil, nil
+	if m.setupSt != nil {
+		for _, s := range m.setupSt.Skills {
+			if p := m.setupSt.Paths[s]; p != "" && !isCommand(s) {
+				add(popupItem{fill: "/" + s + " ", label: "/" + s, desc: skillDir(p), skill: true}, s)
+			}
+		}
+	}
+	return append(cmds, append(first, rest...)...)
+}
+
+// effortPopup completes /effort with the levels the current agent takes, default first.
+func (m chatView) effortPopup(q string) []popupItem {
+	if strings.Contains(q, " ") {
+		return nil
+	}
+	agent := ""
+	if s := m.openSession(); s != nil {
+		agent = s.agent
+	} else if m.setupSt != nil {
+		agent = m.setupSt.Default.Agent
+	}
+	if agent != "" && !agents.EffortFlags[agent] {
+		return nil
+	}
+	var out []popupItem
+	for _, e := range append([]string{"default"}, agents.Effort().Levels...) {
+		if !strings.HasPrefix(e, strings.ToLower(q)) {
+			continue
+		}
+		desc := ""
+		switch e {
+		case "default":
+			desc = "off: back to the agent.effort setting"
+		case agents.MaxEffort:
+			desc = "the top level smithy allows"
+		}
+		out = append(out, popupItem{fill: "/effort " + e, label: "/effort " + e, desc: desc})
+	}
+	if len(out) == 1 && out[0].fill == "/effort "+q {
+		return nil
+	}
+	return out
+}
 
 const popupMax = 8
 
@@ -68,21 +135,11 @@ func (m chatView) popup() []popupItem {
 	if m.overlay != overlayNone || strings.Contains(v, "\n") {
 		return nil
 	}
+	if strings.HasPrefix(v, "/effort ") {
+		return m.effortPopup(strings.TrimPrefix(v, "/effort "))
+	}
 	if strings.HasPrefix(v, "/") && !strings.Contains(v, " ") {
-		q := strings.ToLower(v[1:])
-		var out []popupItem
-		for _, c := range slashCommands {
-			if strings.HasPrefix(c.name, q) {
-				out = append(out, popupItem{fill: "/" + c.name + " ", label: "/" + c.name, desc: c.desc})
-			}
-		}
-		if m.setupSt != nil {
-			for _, s := range m.setupSt.Skills {
-				if p := m.setupSt.Paths[s]; p != "" && strings.HasPrefix(s, q) && !isCommand(s) {
-					out = append(out, popupItem{fill: "/" + s + " ", label: "/" + s, desc: "skill · " + skillDir(p)})
-				}
-			}
-		}
+		out := m.slashPopup(strings.ToLower(v[1:]))
 		if len(out) == 1 && out[0].label == v {
 			return nil
 		}
@@ -189,6 +246,14 @@ func (m chatView) popupKey(msg tea.KeyPressMsg, items []popupItem) (chatView, te
 	return m, nil, true
 }
 
+// skillGlyph marks a skill row in the / menu.
+func skillGlyph(t theme) string {
+	if t.uni {
+		return "◆"
+	}
+	return "*"
+}
+
 // popupRows draws the popup as a raised list w wide, the selected row marked by the accent bar
 // floatBox uses.
 func (m chatView) popupRows(items []popupItem, w int) []string {
@@ -211,9 +276,20 @@ func (m chatView) popupRows(items []popupItem, w int) []string {
 		if i == m.popSel {
 			label, mark = t.fg(t.strong).Bold(true), t.fg(t.accent).Render(bar)+" "
 		}
-		r := mark + label.Render(it.label) + strings.Repeat(" ", lw-ansi.StringWidth(it.label))
+		glyph := "  "
+		if it.skill {
+			glyph = t.fg(t.info).Render(skillGlyph(t)) + " "
+			if i != m.popSel {
+				label = t.fg(t.info)
+			}
+		}
+		r := mark + glyph + label.Render(it.label) + strings.Repeat(" ", lw-ansi.StringWidth(it.label))
 		if it.desc != "" {
-			r += "   " + t.fg(t.dim).Render(it.desc)
+			desc := t.fg(t.dim)
+			if it.skill {
+				desc = t.fg(t.muted).Italic(true)
+			}
+			r += "   " + desc.Render(it.desc)
 		}
 		out = append(out, fill(bg, w, ansi.Truncate(r, w-1, "…")))
 	}

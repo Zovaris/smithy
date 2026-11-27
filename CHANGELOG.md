@@ -12,6 +12,22 @@ part above `### Details`.
 
 - `/board` in the TUI chat shows your task files by status, like the web Board: move a task with
   left/right, tab through task dirs, enter opens the file, `o` opens its PR, blockers and PRs show on each row.
+- `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).
+  `/effort ` completes the levels the agent takes, `off` included, and the top level plays a short shimmer.
+- The TUI's `/` menu lists commands first, then skills with their own mark and folder, and matches descriptions too.
+- Four more color themes, moss, dune, dusk and rose, and every theme is now a whole palette
+  (backgrounds, text, borders, accent and status colors), not only a new accent. Pick one with
+  `/theme` in the TUI or the web's command palette.
+
+### Details
+
+- `ui.theme` palettes live in `internal/tui/theme.go` (`palettes`); `web/src/theme/temper.css`
+  maps the same hex onto Sephiro's tokens per `data-accent`, and a test checks they match.
+  256-color terminals get each palette's nearest colors; 16-color terminals keep steel's tiers with
+  the theme's accent.
+### Fixed
+
+- ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
 
 ## v0.25.0 — 2026-11-26
 
