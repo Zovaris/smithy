@@ -16,6 +16,8 @@ part above `### Details`.
 - Four more color themes, moss, dune, dusk and rose, and every theme is now a whole palette
   (backgrounds, text, borders, accent and status colors), not only a new accent. Pick one with
   `/theme` in the TUI or the web's command palette.
+- The web composer does the same: `/effort` works without a session, `/effort ` completes the levels,
+  the top level shimmers, and the `/` menu lists commands, then marked skills.
 
 ### Details
 
