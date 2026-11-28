@@ -97,7 +97,7 @@ Notices (agent picked, serve paused) are one muted status line above the input, 
 on the empty screen; a repeated notice is dropped. The sidebar ends on that same right
 edge, after a fixed 2-col gap; header and footer right chips end there too. `TestBlocksShareOneGrid`
 checks it at 120 and 200 columns. A short session starts at the top under a 2-line intro (title;
-agent, model, branch, started) and grows down; once it fills the screen it stays anchored to the input.
+agent, model, branch) and grows down; once it fills the screen it stays anchored to the input.
 Rhythm: exactly one blank row (the rail runs through it) between blocks; tool rows tight; no
 horizontal rules: hierarchy comes from weight, colour and spacing.
 An agent answer is plain text on the rail; its agent, model, time and rate sit on the prompt heading

@@ -337,9 +337,6 @@ func (m chatView) intro(w int) []string {
 	if m.branch != "" {
 		meta = append(meta, "on "+m.branch)
 	}
-	if !s.since.IsZero() {
-		meta = append(meta, "started "+s.since.Local().Format("15:04"))
-	}
 	return []string{
 		m.lane(w, "", "", nil, "", nil),
 		m.lane(w, "", "", nil, t.Fg(t.Strong).Bold(true).Render(title), nil),
