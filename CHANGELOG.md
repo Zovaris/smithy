@@ -11,6 +11,7 @@ part above `### Details`.
 ### New
 
 - An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
+- A question that takes several picks asks for them in Slack (a multi-select menu), Discord (a select menu) and Telegram (☐/☑ toggles and Done); single-pick questions keep one button per option.
 
 ### Details
 
