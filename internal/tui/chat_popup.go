@@ -48,6 +48,7 @@ var slashCommands = []slashCommand{
 	{"doctor", "", "run smithy doctor on the daemon's machine"},
 	{"channels", "[test]", "chat connectors' notifications and chat channels; test sends a test message to each"},
 	{"board", "[task dir]", "the task files by status: move, filter by task dir, open a file or its PR"},
+	{"sidebar", "", "show or hide the right sidebar: context, cost and linked PRs"},
 	{"links", "[TK-123|#12|PR url]", "this session's PRs and issues, live; with a ref, link it"},
 	{"workflows", "", "workflows: run, watch a run live, steps, history, edit"},
 	{"schedules", "", "schedules: cron, webhook, GitHub and file triggers; on/off, history"},

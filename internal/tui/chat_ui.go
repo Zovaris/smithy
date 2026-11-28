@@ -126,6 +126,7 @@ func (m *chatView) event(kind, session string, at time.Time, data json.RawMessag
 	case daemon.KindAnswered:
 		var o daemon.Outcome
 		if json.Unmarshal(data, &o) == nil {
+			m.keepQA(o.ID, o.Answer)
 			m.unpend(o.ID)
 		}
 	case daemon.KindWorkflowNote:
@@ -155,6 +156,14 @@ func (m *chatView) track(id, kind string) {
 			if state == "running" && s.state != "running" {
 				s.turn = time.Now()
 				delete(m.streamed, id)
+			}
+			if state == "done" && s.state == "running" && !s.turn.IsZero() && m.answered(id) {
+				agent, model := s.agent, s.model
+				if agent == "" && m.setupSt != nil {
+					agent, model = m.setupSt.Default.Agent, m.setupSt.Default.Model
+				}
+				foot := turnFooter(agent, model, time.Since(s.turn).Round(100*time.Millisecond), m.tokRate(id), " "+m.th.g.dot+" ")
+				m.into(id, chatMsg{who: "daemon", kind: "foot", text: foot})
 			}
 			s.kind, s.state = kind, state
 			return
@@ -195,6 +204,7 @@ func (m *chatView) decided(d chatDecidedMsg) {
 		m.system(m.th.g.fail + " answer failed: " + d.err.Error())
 		return
 	}
+	m.keepQA(d.id, m.sent[d.id])
 	m.unpend(d.id)
 }
 
@@ -212,6 +222,10 @@ func (m *chatView) answer(a string) tea.Cmd {
 	if m.decide == nil {
 		return nil
 	}
+	if m.sent == nil {
+		m.sent = map[string]string{}
+	}
+	m.sent[m.pending[0].ID] = a
 	return m.decide(m.pending[0].ID, a)
 }
 
@@ -236,21 +250,26 @@ func (m *chatView) setFocus(i int) {
 	*m.at = anchor{}
 }
 
-// runOf is the first and last message of the run of tool messages around i.
+// runOf is the first and last message of the run of tool messages around i; in minimal the
+// thoughts between them join the run, so it collapses to one activity line.
 func (m chatView) runOf(i int) (a, b int) {
 	a, b = i, i
-	for a > 0 && m.msgs[a-1].tool != nil {
+	for a > 0 && m.inRun(m.msgs[a-1]) {
 		a--
 	}
-	for b < len(m.msgs)-1 && m.msgs[b+1].tool != nil {
+	for b < len(m.msgs)-1 && m.inRun(m.msgs[b+1]) {
 		b++
 	}
 	return a, b
 }
 
+func (m chatView) inRun(c *chatMsg) bool {
+	return c.tool != nil || m.mode == modeMinimal && c.kind == "thinking"
+}
+
 // toggle opens or closes tool message i: the whole run in minimal, one block in expandable.
 func (m chatView) toggle(i int) chatView {
-	if i < 0 || i >= len(m.msgs) || m.msgs[i].tool == nil || m.mode == modeVerbose {
+	if i < 0 || i >= len(m.msgs) || !m.inRun(m.msgs[i]) || m.mode == modeVerbose {
 		return m
 	}
 	if m.mode == modeMinimal {
@@ -301,6 +320,10 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.setMode(next)
+	case "sidebar":
+		m.sideOff = !m.sideOff
+		m.ver++
+		*m.at = anchor{}
 	case "agents", "sessions":
 		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
 	case "new":
@@ -407,7 +430,7 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	const head = headRows
-	inputY := m.height - 1 - m.input.Height()
+	inputY := m.height - 2 - m.input.Height()
 	switch {
 	case m.overlay != overlayNone:
 		return m, nil
@@ -420,6 +443,10 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 		}
 	case msg.Y >= inputY && msg.Y < m.height-1:
 		m.setFocus(-1)
+	case msg.Y == 1:
+		if _, x := m.tabStrip(max(m.width, 20)); msg.X >= x {
+			m.newSession()
+		}
 	case msg.Y >= head && msg.Y < head+m.rows():
 		vis, idx := m.visible()
 		j := msg.Y - head - (m.rows() - len(vis))
@@ -640,6 +667,22 @@ func (m chatView) toolGlyph(status string) (string, color.Color) {
 // render draws message i at width w in the current mode; a row with no rows hides it.
 func (m chatView) render(i, w int) []string {
 	c := m.msgs[i]
+	switch c.kind {
+	case "qa":
+		return m.qaRows(c, w)
+	case "foot":
+		return m.footRows(c)
+	}
+	if c.tool == nil && c.kind == "thinking" && m.mode == modeMinimal {
+		a, _ := m.runOf(i)
+		switch {
+		case m.msgs[a].open:
+			return m.textRows(c, w)
+		case i == a:
+			return m.summary(a, i, w)
+		}
+		return []string{}
+	}
 	if c.tool == nil {
 		if (c.kind == "thinking" || c.kind == "turn") && m.mode != modeVerbose {
 			return []string{}
@@ -662,45 +705,33 @@ func (m chatView) render(i, w int) []string {
 	return m.toolRows(i, w, true, i == b)
 }
 
-// summary is a run of finished tools on one line, as in Chat-Minimal: the worst status, each
-// tool's name (an edit with its file and stat, a command with its first words and result), and
-// the time they took.
+// summary is a run of finished tools and thoughts collapsed to one dim line, "+ 2 commands,
+// 1 thought", with the worst status and the time they took; enter or a click expands it.
 func (m chatView) summary(a, b, w int) []string {
 	t := m.th
-	status, parts, took := "ok", []string{}, 0.0
+	status, tools, thoughts, took := "ok", []chatTool{}, 0, 0.0
 	dim := t.fg(t.dim)
 	for _, c := range m.msgs[a : b+1] {
 		tl := c.tool
+		if tl == nil {
+			if c.kind == "thinking" {
+				thoughts++
+			}
+			continue
+		}
 		if tl.Status == "running" {
 			continue
 		}
 		if tl.Status == "failed" {
 			status = "failed"
 		}
-		part := dim.Render(tl.Name)
-		switch tl.Name {
-		case "Edit", "Write", "Diff", "MultiEdit":
-			if f := lastPart(tl.Arg); f != "" {
-				part += dim.Render(" " + f)
-			}
-			if strings.HasPrefix(tl.Stat, "+") {
-				part += " " + t.fg(t.text).Render(tl.Stat)
-			}
-		case "Bash":
-			part += dim.Render(" " + firstWords(tl.Arg, 2))
-			if tl.Status == "failed" {
-				part += " " + t.fg(t.err).Render("failed")
-			} else {
-				part += " " + t.fg(t.ok).Render("ok")
-			}
-		}
-		parts = append(parts, part)
+		tools = append(tools, *tl)
 		var f float64
 		if _, err := fmt.Sscanf(tl.Took, "%fs", &f); err == nil {
 			took += f
 		}
 	}
-	if len(parts) == 0 {
+	if len(tools)+thoughts == 0 {
 		return []string{}
 	}
 	g, col := m.toolGlyph(status)
@@ -709,23 +740,8 @@ func (m chatView) summary(a, b, w int) []string {
 		right = dim.Render(fmt.Sprintf("%.1fs", took))
 	}
 	p := strings.Repeat(" ", m.pad())
-	line := spread(p+"  "+t.fg(col).Render(g)+"  "+strings.Join(parts, dim.Render(" "+t.g.dot+" ")), right+p+"  ", w)
+	line := spread(p+"  "+t.fg(col).Render(g)+"  "+dim.Render(activityLabel(tools, thoughts)), right+p+"  ", w)
 	return []string{m.blockRow(a, w, ansi.Truncate(line, w, "…")), ""}
-}
-
-func lastPart(p string) string {
-	if i := strings.LastIndexByte(p, '/'); i >= 0 {
-		return p[i+1:]
-	}
-	return p
-}
-
-func firstWords(s string, n int) string {
-	f := strings.Fields(s)
-	if len(f) > n {
-		f = f[:n]
-	}
-	return strings.Join(f, " ")
 }
 
 // toolLine colors one line of a tool's output: added lines ok, removed lines failed, hunk

@@ -64,6 +64,7 @@ type chatMsg struct {
 	who, at, text, kind string
 	tool                *chatTool
 	open                bool
+	ans                 string
 	width, ver          int
 	lines               []string
 }
@@ -130,28 +131,31 @@ type chatView struct {
 	convs    map[string][]*chatMsg // the other sessions' conversations
 	cost     map[string]float64    // spend per session
 	toks     map[string]int64      // input and output tokens per session
-	streamed map[string]int        // characters of agent text since the turn began, for tok/s
-	effort   string                // agent.effort
-	clock    func() time.Time      // the header clock; nil: time.Now
-	splashOn bool                  // play the entry animation at the first window size
-	shimmer  int                   // motion frames left of the top-effort shimmer on the composer
-	still    bool                  // reduced motion: the welcome field and anvil hold still
-	splash   []string              // the entry animation's frames left; nil once it ends
-	noise    []noise               // daemon events kept out of the transcript
-	dir      string                // the folder sessions start in and @ lists
-	root     string                // dir with symlinks resolved, as the daemon records it
-	allProj  bool                  // the agents panel lists every project, not only dir
-	proj     projectPick           // the project modal a new session opens with
-	branch   string                // its git branch, for the footer
-	webURL   string                // the web UI with its token; "" when unknown
-	files    *fileCache            // the @ popup's file list
-	popSel   int                   // the selected / or @ popup row
-	agentSel int                   // the selected session in the agents panel
-	info     infoPanel             // the open read-only panel
-	tendMode string                // the daemon's tend mode for the header; "" until read
-	tendPRs  int                   // the PRs it tends
-	frame    int                   // motion frame, advanced only while something runs
-	ticking  bool                  // a frame tick is scheduled
+	ctx      map[string]int64
+	sideOff  bool
+	sent     map[string]string
+	streamed map[string]int   // characters of agent text since the turn began, for tok/s
+	effort   string           // agent.effort
+	clock    func() time.Time // the header clock; nil: time.Now
+	splashOn bool             // play the entry animation at the first window size
+	shimmer  int              // motion frames left of the top-effort shimmer on the composer
+	still    bool             // reduced motion: the welcome field and anvil hold still
+	splash   []string         // the entry animation's frames left; nil once it ends
+	noise    []noise          // daemon events kept out of the transcript
+	dir      string           // the folder sessions start in and @ lists
+	root     string           // dir with symlinks resolved, as the daemon records it
+	allProj  bool             // the agents panel lists every project, not only dir
+	proj     projectPick      // the project modal a new session opens with
+	branch   string           // its git branch, for the footer
+	webURL   string           // the web UI with its token; "" when unknown
+	files    *fileCache       // the @ popup's file list
+	popSel   int              // the selected / or @ popup row
+	agentSel int              // the selected session in the agents panel
+	info     infoPanel        // the open read-only panel
+	tendMode string           // the daemon's tend mode for the header; "" until read
+	tendPRs  int              // the PRs it tends
+	frame    int              // motion frame, advanced only while something runs
+	ticking  bool             // a frame tick is scheduled
 
 	server      string                    // the saved server name, local or URL this chat talks to
 	picker      *connectPicker            // /connect's state while its box is open
@@ -775,7 +779,7 @@ func eventText(kind, session string, data json.RawMessage) string {
 // line and the gap under it, the composer, the footer and the spinner row while the open
 // session works.
 func (m chatView) rows() int {
-	n := m.height - headRows - 2 - m.input.Height() - 1
+	n := m.height - headRows - 2 - m.input.Height() - 2
 	if m.working() {
 		n -= 2
 	}
@@ -800,7 +804,7 @@ func (m *chatView) scroll(d int) {
 // mode or the message changes.
 func (m chatView) wrap(i int) []string {
 	c := m.msgs[i]
-	w := max(m.width, 20)
+	w := m.tw()
 	if c.lines != nil && c.width == w && c.ver == m.ver {
 		return c.lines
 	}
@@ -892,8 +896,8 @@ var pathLike = regexp.MustCompile(`^[\w.~-]*(/[\w.-]+)+\.[A-Za-z]\w{0,5}$|^[\w-]
 // costs the rows scrolled since the previous one, not the whole transcript.
 func (m chatView) seek() (i, r int) {
 	a := m.at
-	if a.width != max(m.width, 20) || (a.offset == 0 && a.i != len(m.msgs)-1) {
-		*a = anchor{i: len(m.msgs) - 1, width: max(m.width, 20)}
+	if a.width != m.tw() || (a.offset == 0 && a.i != len(m.msgs)-1) {
+		*a = anchor{i: len(m.msgs) - 1, width: m.tw()}
 	}
 	i, r = a.i, a.r+m.offset-a.offset
 	for i >= 0 && r >= len(m.wrap(i)) {
@@ -960,7 +964,7 @@ func (m chatView) View() tea.View {
 			}
 		}
 	}
-	out = append(out, body...)
+	out = append(out, m.besideSide(body)...)
 	out = append(out, m.statusLine(w), "")
 	out = append(out, m.composer(w)...)
 	out = append(out, m.footer(w))
@@ -1014,12 +1018,17 @@ func (m chatView) composer(w int) []string {
 	if c := m.chips(); c != "" {
 		out = append(out, p+fill(raised, bw, "  "+c+"  esc drops")+p)
 	}
+	edge := t.fg(t.accent).Inherit(raised).Render("▎")
+	if !t.g.unicode {
+		edge = t.fg(t.accent).Inherit(raised).Render("|")
+	}
 	for _, l := range strings.Split(m.input.View(), "\n") {
 		if m.shimmer > 0 {
 			l = t.shimmer(ansi.Strip(l), float64(bw)*float64(shimmerFrames-m.shimmer)/shimmerFrames)
 		}
-		out = append(out, p+fill(raised, bw, "  "+l)+p)
+		out = append(out, p+fill(raised, bw, edge+" "+l)+p)
 	}
+	out = append(out, p+fill(raised, bw, edge+"   "+t.fg(t.dim).Inherit(raised).Render(m.agentModel()))+p)
 	return out
 }
 
