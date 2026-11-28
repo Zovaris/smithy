@@ -1,0 +1,11 @@
+.shell { border: 1px solid var(--t-line); border-radius: 0; background: var(--t-card); margin: 8px 0; }
+.shell > header { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; font-size: 13px; }
+.shell > header .p { color: var(--t-ember); font: 12.5px var(--sph-font-mono); }
+.shell > header .c { font: 500 12.5px var(--sph-font-mono); color: var(--t-text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shell > header .m { font: 12px var(--sph-font-mono); color: var(--t-text-3); }
+.shell > header .ok { color: var(--t-ok); }
+.shell > header .fail { color: var(--t-fail); }
+.shell .out { margin: 0 12px 10px 16px; padding: 2px 0 2px 12px; border-left: 2px solid var(--t-line-strong); font: 12px/1.6 var(--sph-font-mono); color: var(--t-text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.shell .out .e { color: var(--t-fail); }
+.shell .more { display: block; margin: 0 12px 10px 30px; padding: 0; border: 0; background: none; font: 12px var(--sph-font-mono); color: var(--t-text-3); cursor: pointer; }
+.shell .more:hover, .shell .more:focus-visible { color: var(--t-text); }
