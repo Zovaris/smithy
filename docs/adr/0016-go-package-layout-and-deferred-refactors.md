@@ -34,7 +34,9 @@ Target layout for later releases, each in its own PR:
 - `internal/api`: the daemon's wire types and client, so the TUI and other clients stop importing
   the whole daemon. Done in v0.26: the request and response types and `Client` moved there and the
   daemon aliases them; the TUI still imports the daemon for event kinds, the shell and token files.
-- `internal/tui` split into `kit` (widgets, theme), `stats` (dashboard panels) and `chat`.
+- `internal/tui` split into `kit` (widgets, theme), `stats` (dashboard panels) and `chat`. Done in
+  v0.26: `kit` holds the themes, dither ramp, charts, header and text helpers; the modal stays in
+  `chat`, since every modal is drawn by and acts on the chat view.
 - `internal/agents` split into `sandbox` (native and API sandboxes, guard) and `skills` (find,
   install, inventory). Done in v0.26: `internal/agents/sandbox` and `internal/agents/skills`
   import nothing from `agents`; the guard and native settings that read a run's `Options` stay
