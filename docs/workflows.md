@@ -109,6 +109,25 @@ on yes a `github pr` step pushes the branch and opens the PR.
 | `wait` | `for` (a duration), or `check` (a command polled every `every`, default 30s, until it exits 0; `timeout` caps it) | the check's last output |
 | `github` | `action`: `alerts`, `prs`, `issues` (read), `comment` and `label` (with `pr`), `issue` (`title`, `body`), `pr` (pushes the branch and opens a PR with `title`, `body`), `merge` (with `pr`). Run with `gh`, no shell | gh's output |
 | `file` | `op`: `read`, `write` or `append`; `path`; `content`. Only inside the workflow's `files` folders (symlinks resolved) | the text read, or the bytes written |
+| `code` | `code`: JavaScript that reads `steps`, `inputs` and `vars` (no templates) | its `return` value, or else its last expression: strings bare, the rest as JSON |
+
+### Code steps
+
+A `code` step shapes data between steps without a shell. Its JavaScript sees `steps.<id>` for
+every earlier step (`output` as text, `json` when the output parses as JSON, else `null`, `exit`,
+`answer`, `status`), `inputs`, `vars`, and `item` and `index` inside a `foreach`. `lines(text)`
+splits text into its non-empty trimmed lines and `json(text)` parses it. `await` works. Later
+steps read the result as `{{steps.<id>.output}}`. An error fails the step with the JS message
+and, when QuickJS knows it, the line; `timeout`, `retry`, `on_error` and `when` work as for any
+step. `smithy workflow example` adds `stale-prs`:
+
+```json
+{"id": "prs", "kind": "run", "run": "gh pr list --state open --limit 100 --json number,title,url,updatedAt"},
+{"id": "stale", "kind": "code",
+ "code": "const cutoff = Date.now() - Number(inputs.days || 14) * 864e5;\nreturn steps.prs.json\n  .filter(p => Date.parse(p.updatedAt) < cutoff)\n  .map(p => ({number: p.number, title: p.title, url: p.url}));"},
+{"id": "any", "kind": "if", "if": {"step": "stale", "match": "\\{"}, "else": "stop"},
+{"id": "tell", "kind": "notify", "title": "Stale PRs", "message": "{{steps.stale.output}}"}
+```
 
 A condition tests one value: `value` (a template) or, when empty, step `step`'s answer (its output
 when it has none). Exactly one test: `exit` (step `step`'s exit code), `match` (regex), `equals`
@@ -146,6 +165,10 @@ text (PR bodies, web pages) can be steered, so keep it read-only and its answer 
 - `file` steps go through Go's `os.Root`: no path or symlink inside a files folder reaches outside
   it, and a write never follows a symlink. `github pr` refuses to push main, master or a detached HEAD.
 - One yes covers one ask: inside a loop, put the ask inside the loop to approve each try.
+- `code` steps run in code mode's sandbox: QuickJS in WebAssembly with no filesystem, network,
+  process, timers or tools, 64 MB of memory and 30 s at most (less when the step's `timeout` is
+  shorter). They see step outputs, inputs and variables, never the environment or secrets, and
+  take no templates, so no step output becomes code.
 - Shell steps go through the guard (`guard.block`, `guard.allow`). Nobody is there to answer, so a
   blocked command fails the step.
 - Agent steps run read-only through `smithy agent` with the auto profile (a `"write": true`
