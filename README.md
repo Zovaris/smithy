@@ -172,10 +172,12 @@ Run `smithy` to open a chat with any agent CLI above. A local daemon runs the se
 TUI and the web are two views of it, so you can leave and come back, or open the same sessions
 from your phone.
 
-- Sessions per project; `tab` lists them.
+- Session tabs per project, a sidebar with context, spend and the session's PRs and issues, live.
 - Modals for agent, model, skills and settings; `ctrl+k` opens the palette.
-- `/name` runs any installed skill; `!cmd` runs a shell command.
-- Three themes (steel, frost, plum) and a first-run welcome.
+- `/name` runs any installed skill; `!cmd` runs a shell command; `/goal` keeps a session going until it is done.
+- Workflows you run with `/run` or a click, and schedules that start them on a cron, a webhook,
+  a GitHub event or a file change ([docs/workflows.md](docs/workflows.md)).
+- Seven themes and a first-run welcome.
 - `/detach` quits and keeps the daemon running.
 
 | First run | Working session |
@@ -201,6 +203,7 @@ Every key and command: [docs/harness-guide.md](docs/harness-guide.md).
 - [Autonomous mode](docs/autonomous.md)
 - [Harnesses](docs/harnesses.md)
 - [Chat and TUI guide](docs/harness-guide.md)
+- [Workflows and schedules](docs/workflows.md)
 - [For AI agents](docs/agents.md)
 - [API backend and benchmark](docs/api-backend.md)
 - [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)
