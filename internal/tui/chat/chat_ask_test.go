@@ -23,12 +23,12 @@ func askScene() (chatView, *[]string) {
 
 func TestAskCardOpensOnEnterAndAnswersByNumber(t *testing.T) {
 	m, got := askScene()
-	if strings.Contains(screen(m), "Waiting on you") {
+	if strings.Contains(screen(m), "Questions") {
 		t.Fatal("card open before asked")
 	}
 	m = chatStep(m, ckey("enter"))
 	out := screen(m)
-	for _, s := range []string{"Waiting on you", "Merge #142 into release/v0.17?", "1  merge", "2  later", "Other"} {
+	for _, s := range []string{"Questions", "Merge #142 into release/v0.17?", "merge", "later", "Type your own answer"} {
 		if !strings.Contains(out, s) {
 			t.Fatalf("card missing %q:\n%s", s, out)
 		}
@@ -113,7 +113,7 @@ func TestAskCardShowsOtherOnMultiSelect(t *testing.T) {
 	m.setPending([]api.Decision{{ID: "d9", Question: "Which checks?", Options: []string{"lint", "unit tests", "e2e", "screenshots"}, Multi: true}})
 	m.width, m.height = 140, 40
 	m = chatStep(m, ckey("enter"))
-	if !strings.Contains(screen(m), "Other:") {
+	if !strings.Contains(screen(m), "Type your own answer") {
 		t.Fatalf("Other row cut off:\n%s", screen(m))
 	}
 }

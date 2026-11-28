@@ -64,7 +64,7 @@ func TestConnectPickerGroupsServers(t *testing.T) {
 	m := connectScene(t)
 	m = runCmd(m, m.showConnect())
 	out := screen(m)
-	for _, want := range []string{"SERVERS", "local", "this machine", "claude", "home", "opencode", "fix login", "nightly docs", "cloud", "offline", "TAILSCALE", "mac", "Enter host"} {
+	for _, want := range []string{"Servers", "local", "this machine", "claude", "home", "opencode", "fix login", "nightly docs", "cloud", "offline", "Tailscale", "mac", "Enter host"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in\n%s", want, out)
 		}
@@ -155,7 +155,7 @@ func TestConnectEscClosesPicker(t *testing.T) {
 		t.Fatal("esc closes it")
 	}
 	m.overlay = overlayPalette
-	if strings.Contains(screen(m), "TAILSCALE") {
+	if strings.Contains(screen(m), "Tailscale") {
 		t.Fatal("the palette is back to actions")
 	}
 }

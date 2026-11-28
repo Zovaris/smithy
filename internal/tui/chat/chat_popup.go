@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/tui/kit"
@@ -326,11 +325,8 @@ func skillGlyph(t kit.Theme) string {
 // floatBox uses.
 func (m chatView) popupRows(items []popupItem, w int) []string {
 	t := m.th
-	bg := lipgloss.NewStyle()
-	if t.Overlay != nil {
-		bg = bg.Background(t.Overlay)
-	}
-	bar := frameGlyphs(t.Uni).sel
+	bg, focus := on(t.Raised), on(t.Focus)
+	bar := railGlyph(t.G.Unicode)
 	lw := 0
 	for _, it := range items {
 		lw = max(lw, ansi.StringWidth(it.label))
@@ -340,9 +336,9 @@ func (m chatView) popupRows(items []popupItem, w int) []string {
 	var out []string
 	for i := start; i < len(items) && i < start+room; i++ {
 		it := items[i]
-		label, mark := t.Fg(t.Text), "  "
+		label, mark, st := t.Fg(t.Text), "  ", bg
 		if i == m.popSel {
-			label, mark = t.Fg(t.Strong).Bold(true), t.Fg(t.Accent).Render(bar)+" "
+			label, mark, st = t.Fg(t.Strong).Bold(true), t.Fg(t.Accent).Render(bar)+" ", focus
 		}
 		glyph := "  "
 		if it.skill {
@@ -359,7 +355,10 @@ func (m chatView) popupRows(items []popupItem, w int) []string {
 			}
 			r += "   " + desc.Render(it.desc)
 		}
-		out = append(out, fill(bg, w, ansi.Truncate(r, w-1, "…")))
+		out = append(out, fill(st, w, ansi.Truncate(r, w-1, "…")))
+	}
+	if t.G.Unicode && !t.Plain {
+		out = append([]string{t.Fg(t.Accent).Render(strings.Repeat("▄", w))}, out...)
 	}
 	return out
 }

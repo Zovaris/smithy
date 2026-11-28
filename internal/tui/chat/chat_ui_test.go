@@ -128,7 +128,7 @@ func TestChatModesCycleWithCtrlO(t *testing.T) {
 	}
 	m = chatStep(m, ckey("ctrl+o"))
 	out = screen(m)
-	if m.mode != modeExpandable || !strings.Contains(out, "✓  Grep  \"LimitError\" in pi") || strings.Contains(out, "134 lines read") {
+	if m.mode != modeExpandable || !strings.Contains(out, "▪ Grep  \"LimitError\" in pi") || strings.Contains(out, "134 lines read") {
 		t.Fatalf("expandable:\n%s", out)
 	}
 	m = chatStep(m, ckey("ctrl+o"))
@@ -165,7 +165,7 @@ func TestChatClickExpandsToolBlock(t *testing.T) {
 func TestChatClickMinimalSummaryOpensRun(t *testing.T) {
 	m := newChatScene()
 	m = chatStep(m, tea.MouseClickMsg{X: 5, Y: rowOf(t, m, "+ 1 command"), Button: tea.MouseLeft})
-	if out := screen(m); !strings.Contains(out, "✓  Bash") || strings.Contains(out, "+ 1 command") {
+	if out := screen(m); !strings.Contains(out, "▪ Bash") || strings.Contains(out, "+ 1 command") {
 		t.Fatalf("summary click did not open the run:\n%s", out)
 	}
 }
@@ -181,7 +181,7 @@ func TestChatDecideErrorIsShown(t *testing.T) {
 func TestChatAgentsOverlay(t *testing.T) {
 	m := chatStep(newChatScene(), ckey("tab"))
 	out := screen(m)
-	for _, s := range []string{"Agents", "1 running", "●  TK-29", "✗  TES-9", "WAITING ON YOU", "?  Merge #142"} {
+	for _, s := range []string{"Agents", "1 running", "▪  TK-29", "✗  TES-9", "Waiting on you", "?  Merge #142"} {
 		if !strings.Contains(out, s) {
 			t.Fatalf("agents overlay missing %q:\n%s", s, out)
 		}
@@ -198,7 +198,7 @@ func TestChatAgentsOverlay(t *testing.T) {
 func TestChatPalette(t *testing.T) {
 	m := chatStep(newChatScene(), ckey("ctrl+k"))
 	out := screen(m)
-	for _, s := range []string{"WAITING ON YOU", "ACTIONS", "SESSIONS", "SETTINGS", "Merge #142", "Verbosity: minimal", "TK-29"} {
+	for _, s := range []string{"Waiting on you", "Actions", "Sessions", "Settings", "Merge #142", "Verbosity: minimal", "TK-29"} {
 		if !strings.Contains(out, s) {
 			t.Fatalf("palette missing %q:\n%s", s, out)
 		}

@@ -31,7 +31,7 @@ func TestDoctorOpensGroupedModalNotTranscript(t *testing.T) {
 		}
 	}
 	out := screen(m)
-	for _, want := range []string{"NEEDS A FIX", "gh missing", "brew install gh", "WORTH A LOOK", "sandbox off", "smithy config set auto.sandbox native", "OK", "git found"} {
+	for _, want := range []string{"Needs a fix", "gh missing", "brew install gh", "Worth a look", "sandbox off", "smithy config set auto.sandbox native", "Ok", "git found"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("doctor modal lacks %q:\n%s", want, out)
 		}

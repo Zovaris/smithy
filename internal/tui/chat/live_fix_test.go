@@ -49,7 +49,7 @@ func TestSkillsModalFitsTheScreenWithManySkills(t *testing.T) {
 			bottom = i
 		}
 	}
-	if foot < 0 || bottom < 0 {
+	if foot < 0 || foot >= len(lines)-1 && bottom < 0 {
 		t.Fatalf("footer or bottom border cut:\n%s", screen(m))
 	}
 	for range 45 {

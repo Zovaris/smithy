@@ -210,11 +210,11 @@ func TestPaletteIsAFloatingBox(t *testing.T) {
 	m.width, m.height = 160, 48
 	m = chatStep(m, ckey("ctrl+k"))
 	out := screen(m)
-	if !strings.Contains(out, "results") || !strings.Contains(out, "WAITING ON YOU") || !strings.Contains(out, "tab next group") {
+	if !strings.Contains(out, "results") || !strings.Contains(out, "Waiting on you") || !strings.Contains(out, "tab next group") {
 		t.Fatalf("palette:\n%s", out)
 	}
-	row := strings.Split(out, "\n")[rowOf(t, m, "WAITING ON YOU")]
-	if strings.Index(row, "WAITING") < 20 {
+	row := strings.Split(out, "\n")[rowOf(t, m, "Waiting on you")]
+	if strings.Index(row, "Waiting") < 20 {
 		t.Fatalf("palette is not centered: %q", row)
 	}
 }

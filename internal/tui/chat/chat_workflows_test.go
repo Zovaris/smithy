@@ -79,7 +79,7 @@ func TestWorkflowsModal(t *testing.T) {
 		t.Fatalf("r runs: %v", f.runs)
 	}
 	m = cpress(m, ckey("enter"))
-	if out = screen(m); m.overlay != overlayInfo || !strings.Contains(out, "judge") || !strings.Contains(out, "patch bump") || !strings.Contains(out, "STEPS") || !strings.Contains(out, `stale`) || !strings.Contains(out, `[{"number":7}]`) {
+	if out = screen(m); m.overlay != overlayInfo || !strings.Contains(out, "judge") || !strings.Contains(out, "patch bump") || !strings.Contains(out, "Steps") || !strings.Contains(out, `stale`) || !strings.Contains(out, `[{"number":7}]`) {
 		t.Fatalf("enter shows steps and runs:\n%s", out)
 	}
 	m = cpress(m, ckey("backspace"))

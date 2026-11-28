@@ -294,7 +294,7 @@ func (m chatView) qaRows(c *chatMsg, w int) []string {
 	for _, l := range strings.Split(ansi.Wrap(c.text, bw, ""), "\n") {
 		out = append(out, g+"    "+t.Fg(t.Text).Render(l))
 	}
-	out = append(out, g+"    "+t.Fg(t.Accent).Render(t.G.Pass+" ")+t.Fg(t.Strong).Bold(true).Render(c.ans))
+	out = append(out, g+"    "+t.Fg(t.Accent).Render("→ ")+t.Fg(t.Strong).Bold(true).Render(c.ans))
 	return append(out, "")
 }
 
@@ -359,7 +359,7 @@ func (m chatView) sideLinks(s chatSession, iw int) (rows, urls []string) {
 			default:
 				col, badge = t.Warn, dim.Render("ci ")+t.Fg(t.Warn).Render(t.Spinner(m.frame))
 			}
-			head(p.URL, fmt.Sprintf("#%d", p.Number), col, kit.Short(p.Title, iw-12))
+			head(p.URL, fmt.Sprintf("PR #%d", p.Number), col, kit.Short(p.Title, iw-12))
 			state := dim.Render(strings.ToLower(p.State))
 			if badge != "" {
 				state = badge + dim.Render(" "+t.G.Dot+" ") + state

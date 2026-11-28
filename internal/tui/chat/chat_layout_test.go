@@ -141,7 +141,7 @@ func TestComposerShowsAgentAndFooterContext(t *testing.T) {
 	m.ctx = map[string]int64{"s1": 29400}
 	m.sideOff = true
 	comp := ansi.Strip(strings.Join(m.composer(140), "\n"))
-	if !strings.Contains(comp, "claude "+m.th.G.Dot+" haiku") || !strings.Contains(comp, "|") {
+	if !strings.Contains(comp, " claude ") || !strings.Contains(comp, " haiku ") || !strings.Contains(comp, "|") {
 		t.Fatalf("composer lacks the accent bar or agent · model:\n%s", comp)
 	}
 	foot := ansi.Strip(m.footer(140))

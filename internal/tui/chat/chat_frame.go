@@ -219,7 +219,7 @@ func (m chatView) footer(w int) string {
 		return m.chip(" "+k+" ", t.Strong, t.Overlay, false) + t.Fg(t.Muted).Render(" "+what)
 	}
 	p := strings.Repeat(" ", m.pad())
-	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode"), hint("tab", "agents"), hint("/", "commands"), hint("?", "help"), hint("ctrl+n/p", "tabs"), hint("ctrl+s", "select")}
+	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode"), hint("tab", "agents"), hint("ctrl+n/p", "tabs"), hint("?", "help"), hint("ctrl+s", "select")}
 	if m.busy(m.current) {
 		hints = append([]string{hint("esc", "interrupt")}, hints...)
 	}
@@ -349,14 +349,17 @@ func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem,
 
 // groupName is a group heading in sentence case: "KEYS" reads "Keys".
 func groupName(g string) string {
-	head, rest, _ := strings.Cut(g, " ")
-	if head == strings.ToUpper(head) && len(head) > 1 {
-		head = head[:1] + strings.ToLower(head[1:])
+	ws := strings.Split(g, " ")
+	for i, w := range ws {
+		if w != "" && w == strings.ToUpper(w) && w != strings.ToLower(w) {
+			ws[i] = strings.ToLower(w)
+		}
 	}
-	if rest != "" {
-		return head + " " + rest
+	s := strings.Join(ws, " ")
+	if s != "" {
+		s = strings.ToUpper(s[:1]) + s[1:]
 	}
-	return head
+	return s
 }
 
 type boxFrame struct{ tl, tr, bl, br, lt, rt, h, v, sel string }
@@ -385,7 +388,9 @@ func (m chatView) overBox(screen []string, box []string, w int) []string {
 		bw = ansi.StringWidth(box[0])
 	}
 	x, y := (w-bw)/2, max(min(len(screen)*120/800, len(screen)-len(box)-1), 1)
-	y += m.mo.lift()
+	if m.mo.shown == m.overlay {
+		y = max(min(y+m.mo.lift(), len(screen)-len(box)), y)
+	}
 	sh := t.Shade()
 	for i, b := range box {
 		if y+i >= len(out) {

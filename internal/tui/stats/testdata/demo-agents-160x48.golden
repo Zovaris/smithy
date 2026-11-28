@@ -1,4 +1,4 @@
- ◆ smithy dev · smithy                                                                                                                  DEMO  ● watching  14:30 
+ ◆ smithy  dev · smithy                                                                                                                 DEMO  ▪ watching  14:30 
   1 Overview   2 Agents   3 Incoming   4 Needs you ? 8   5 Done   6 Activity   7 Worktrees   8 Plans   9 System   0 History                                     
                                                                                                                                                                 
 ┌─ Agents · 15 · sort stage ────────────────────────────────────────────────────────────────────────────┐   Preview                                             
@@ -9,7 +9,7 @@
 │   TES-211     Typed config loader         ledger-web  strong  blocked   ✗ red      #2011   38m ago    │  timeline                                             
 │   TES-209     Add SSO for admins          smithy      cheap   ready     ✓ green    #2009   1m ago     │  no events yet                                        
 │   TES-210     Speed up cold start         atlas       mid     ready     ✓ green    #2010   2m ago     │                                                       
-│   TES-207     Upgrade to Go 1.27          atlas       mid     pr_open   ● running  #2007   1m ago     │  log  l opens it all                                  
+│   TES-207     Upgrade to Go 1.27          atlas       mid     pr_open   ▪ running  #2007   1m ago     │  log  l opens it all                                  
 │   TES-208     Drop the legacy CSV impor…  ledger-web  strong  pr_open   ✓ green    #2008   1m ago     │  no log yet                                           
 │   TES-206     Split the billing service   smithy      cheap   checking  -          -       1m ago     │                                                       
 │   TES-205     Retry webhooks with backo…  ledger-web  strong  checking  -          -       1m ago     │                                                       
