@@ -63,6 +63,27 @@ func (s Step) Summary() string {
 		out = s.Title + ": " + s.Message
 	case KindCall:
 		out = s.Workflow
+	case KindJudge:
+		out = fmt.Sprintf("%s against %d criteria", s.Subject, len(s.Criteria))
+	case KindLoop:
+		out = fmt.Sprintf("%d steps until %s", len(s.Do), s.Until)
+	case KindSession:
+		out = s.Prompt
+	case KindSmelt, KindWarden:
+		out = s.Task
+	case KindHTTP:
+		out = strings.TrimSpace(strings.ToUpper(s.Method) + " " + s.URL)
+	case KindPar:
+		out = fmt.Sprintf("%d branches", len(s.Branches))
+	case KindWait:
+		out = s.For + s.Check
+	case KindGitHub:
+		out = strings.TrimSpace(s.Action + " " + s.PR)
+	case KindFile:
+		out = s.Op + " " + s.Path
+	}
+	if s.Kind == KindAgent && s.Items != "" {
+		out = "each of " + s.Items + ": " + out
 	}
 	if s.When != nil {
 		out += " (when " + s.When.String() + ")"

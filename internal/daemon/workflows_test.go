@@ -161,3 +161,17 @@ func TestScheduleHookAskReply(t *testing.T) {
 		t.Fatalf("%d %v", r.code, r.out)
 	}
 }
+
+func TestWorkflowSessionStep(t *testing.T) {
+	sv, _, _ := workflowTest(t)
+	made := []string{}
+	sv.Runners = func(agent, _, dir, _ string) (Runner, error) {
+		made = append(made, agent)
+		return &fakeRunner{fn: okRun}, nil
+	}
+	os.WriteFile(filepath.Join(sv.Workflows.Store.Dir, "chat.json"), []byte(`{"name":"chat","dir":"`+t.TempDir()+`","allow_write":true,"steps":[{"id":"s","kind":"session","prompt":"hello from a workflow"}]}`), 0o600)
+	r, err := sv.Workflows.Start(context.Background(), "chat", workflow.Invocation{Trigger: "cli"})
+	if err != nil || r.Status != workflow.StatusOK || r.Steps[0].Output == "" || len(made) != 1 {
+		t.Fatalf("%v %+v made=%v", err, r, made)
+	}
+}

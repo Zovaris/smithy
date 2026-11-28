@@ -26,9 +26,29 @@ const (
 	KindAsk     = "ask"
 	KindNotify  = "notify"
 	KindCall    = "call"
+	KindJudge   = "judge"
+	KindLoop    = "loop"
+	KindSession = "session"
+	KindSmelt   = "smelt"
+	KindWarden  = "warden"
+	KindHTTP    = "http"
+	KindPar     = "parallel"
+	KindWait    = "wait"
+	KindGitHub  = "github"
+	KindFile    = "file"
 )
 
-var kinds = []string{KindRun, KindAgent, KindIf, KindSwitch, KindSet, KindJSON, KindForeach, KindAsk, KindNotify, KindCall}
+var kinds = []string{KindRun, KindAgent, KindIf, KindSwitch, KindSet, KindJSON, KindForeach, KindAsk, KindNotify, KindCall,
+	KindJudge, KindLoop, KindSession, KindSmelt, KindWarden, KindHTTP, KindPar, KindWait, KindGitHub, KindFile}
+
+// GitHub actions; the write ones need allow_write, pr and merge an ask step before them.
+var (
+	ghRead  = map[string]bool{"alerts": true, "prs": true, "issues": true}
+	ghWrite = map[string]bool{"comment": true, "label": true, "issue": true, "pr": true, "merge": true}
+)
+
+// MaxLoop caps a loop's tries.
+const MaxLoop = 10
 
 // Stop as a branch or on_error target ends the run; Continue as on_error goes on to the next step.
 const (
@@ -62,6 +82,8 @@ type Workflow struct {
 	MaxMinutes  int               `json:"max_minutes,omitempty"`
 	MaxAgents   int               `json:"max_agents,omitempty"`
 	MaxCostUSD  float64           `json:"max_cost_usd,omitempty"`
+	AllowWrite  bool              `json:"allow_write,omitempty"`
+	Files       []string          `json:"files,omitempty"`
 	Steps       []Step            `json:"steps"`
 }
 
@@ -110,6 +132,39 @@ type Step struct {
 
 	Workflow string            `json:"workflow,omitempty"`
 	With     map[string]string `json:"with,omitempty"`
+
+	Write    bool     `json:"write,omitempty"`
+	Subject  string   `json:"subject,omitempty"`
+	Criteria []string `json:"criteria,omitempty"`
+	Pass     float64  `json:"pass,omitempty"`
+	Until    *Cond    `json:"until,omitempty"`
+	Max      int      `json:"max,omitempty"`
+	Task     string   `json:"task,omitempty"`
+	Speed    string   `json:"speed,omitempty"`
+	Agent    string   `json:"agent,omitempty"`
+
+	Method   string            `json:"method,omitempty"`
+	URL      string            `json:"url,omitempty"`
+	Headers  map[string]string `json:"headers,omitempty"`
+	Body     string            `json:"body,omitempty"`
+	Branches [][]Step          `json:"branches,omitempty"`
+	For      string            `json:"for,omitempty"`
+	Check    string            `json:"check,omitempty"`
+	Every    string            `json:"every,omitempty"`
+	Action   string            `json:"action,omitempty"`
+	PR       string            `json:"pr,omitempty"`
+	Label    string            `json:"label,omitempty"`
+	Op       string            `json:"op,omitempty"`
+	Content  string            `json:"content,omitempty"`
+}
+
+// children are a step's nested blocks: a foreach's or loop's do, a parallel's branches.
+func (s Step) children() [][]Step {
+	out := [][]Step{}
+	if len(s.Do) > 0 {
+		out = append(out, s.Do)
+	}
+	return append(out, s.Branches...)
 }
 
 // Retry runs a failed step again up to Count times, waiting Backoff (doubling) between tries.
@@ -183,10 +238,15 @@ func (w Workflow) Validate() error {
 	if err := collect(w.Steps, ids); err != nil {
 		return fmt.Errorf("workflow %s: %w", w.Name, err)
 	}
-	v := validator{ids: ids}
+	v := validator{ids: ids, write: w.AllowWrite, files: len(w.Files) > 0}
 	for _, t := range w.Outputs {
 		if err := v.tmpl(t); err != nil {
 			return fmt.Errorf("workflow %s: outputs: %w", w.Name, err)
+		}
+	}
+	for _, t := range w.Vars {
+		if err := v.tmpl(t); err != nil {
+			return fmt.Errorf("workflow %s: vars: %w", w.Name, err)
 		}
 	}
 	if err := v.block(w.Steps); err != nil {
@@ -204,14 +264,21 @@ func collect(steps []Step, ids map[string]bool) error {
 			return fmt.Errorf("step id %q used twice", s.ID)
 		}
 		ids[s.ID] = true
-		if err := collect(s.Do, ids); err != nil {
-			return err
+		for _, c := range s.children() {
+			if err := collect(c, ids); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
-type validator struct{ ids map[string]bool }
+type validator struct {
+	ids          map[string]bool
+	write, files bool
+	secretOK     bool
+	asks         map[string]bool
+}
 
 func (v validator) tmpl(text string) error {
 	if strings.Count(text, "{{") != len(tmplRe.FindAllString(text, -1)) {
@@ -220,6 +287,9 @@ func (v validator) tmpl(text string) error {
 	for _, m := range tmplRe.FindAllStringSubmatch(text, -1) {
 		if m[1] != "" && !v.ids[m[1]] {
 			return fmt.Errorf("template %s names no step", m[0])
+		}
+		if m[7] != "" && !v.secretOK {
+			return fmt.Errorf("%s works only in an http step's headers and body", m[0])
 		}
 	}
 	return nil
@@ -260,6 +330,11 @@ func (v validator) cond(c *Cond) error {
 
 func (v validator) block(steps []Step) error {
 	pos := map[string]int{}
+	asks := map[string]bool{}
+	for k := range v.asks {
+		asks[k] = true
+	}
+	v.asks = asks
 	for i, s := range steps {
 		pos[s.ID] = i
 	}
@@ -276,6 +351,9 @@ func (v validator) block(steps []Step) error {
 			return nil
 		}
 		err := v.step(s, target)
+		if s.Kind == KindAsk {
+			v.asks[s.ID] = true
+		}
 		if err == nil && s.OnError != "" {
 			err = target("on_error", s.OnError, Stop, Continue)
 		}
@@ -333,6 +411,17 @@ func (v validator) step(s Step, target func(string, string, ...string) error) er
 		}
 		if len(s.Schema) > 0 && s.Answer != "json" {
 			return fmt.Errorf("schema needs answer json")
+		}
+		if s.Write && !v.write {
+			return fmt.Errorf("a writing agent needs \"allow_write\": true on the workflow")
+		}
+		if s.Items != "" {
+			if s.Parallel < 0 || s.Parallel > MaxParallel || s.Limit < 0 || s.Limit > MaxItems {
+				return fmt.Errorf("parallel is 0-%d and limit 0-%d", MaxParallel, MaxItems)
+			}
+			if err := v.tmpl(s.Items); err != nil {
+				return err
+			}
 		}
 		return v.tmpl(s.Prompt)
 	case KindIf:
@@ -420,10 +509,144 @@ func (v validator) step(s Step, target func(string, string, ...string) error) er
 				return err
 			}
 		}
+	case KindJudge:
+		if s.Subject == "" || len(s.Criteria) == 0 {
+			return fmt.Errorf("judge needs subject and criteria")
+		}
+		if s.Pass < 0 || s.Pass > 1 {
+			return fmt.Errorf("pass is a score from 0 to 1")
+		}
+		return v.tmpl(s.Subject + strings.Join(s.Criteria, " "))
+	case KindLoop:
+		if len(s.Do) == 0 || s.Until == nil {
+			return fmt.Errorf("loop needs do and until")
+		}
+		if s.Max < 0 || s.Max > MaxLoop {
+			return fmt.Errorf("max is 1-%d", MaxLoop)
+		}
+		if err := v.block(s.Do); err != nil {
+			return err
+		}
+		return v.cond(s.Until)
+	case KindSession, KindSmelt, KindWarden:
+		text := s.Prompt
+		if s.Kind != KindSession {
+			text = s.Task
+		}
+		if strings.TrimSpace(text) == "" {
+			return fmt.Errorf("%s needs %s", s.Kind, map[string]string{KindSession: "a prompt", KindSmelt: "a task", KindWarden: "a task"}[s.Kind])
+		}
+		if !v.write {
+			return fmt.Errorf("%s changes code: the workflow needs \"allow_write\": true", s.Kind)
+		}
+		if s.Kind != KindWarden && !v.askedBefore(s) && (strings.Contains(text, "{{inputs.") || strings.Contains(text, "{{steps.")) {
+			return fmt.Errorf("a %s prompt built from inputs or step outputs can be steered: put an ask step before it and gate it with when: {step: <ask>, equals: yes}", s.Kind)
+		}
+		if s.Kind == KindWarden && !v.askedBefore(s) {
+			return fmt.Errorf("warden starts sessions that cost money: put an ask step before it and gate it with when: {step: <ask>, equals: yes}")
+		}
+		if s.Speed != "" && s.Speed != "fast" && s.Speed != "normal" && s.Speed != "full" {
+			return fmt.Errorf("speed is fast, normal or full")
+		}
+		return v.tmpl(text)
+	case KindHTTP:
+		m := strings.ToUpper(s.Method)
+		if m == "" {
+			m = "GET"
+		}
+		if !map[string]bool{"GET": true, "POST": true, "PUT": true, "PATCH": true, "DELETE": true}[m] {
+			return fmt.Errorf("method is GET, POST, PUT, PATCH or DELETE")
+		}
+		if m != "GET" && !v.write {
+			return fmt.Errorf("%s changes things elsewhere: the workflow needs \"allow_write\": true", m)
+		}
+		if !strings.HasPrefix(s.URL, "https://") && !strings.HasPrefix(s.URL, "http://") {
+			return fmt.Errorf("url must start with https:// or http://")
+		}
+		if strings.HasPrefix(s.URL, "http://") && strings.Contains(fmt.Sprint(s.Headers)+s.Body, "{{secret.") {
+			return fmt.Errorf("a secret goes only over https")
+		}
+		if err := v.tmpl(s.URL); err != nil {
+			return err
+		}
+		sv := v
+		sv.secretOK = true
+		for k, h := range s.Headers {
+			if k == "" || strings.ContainsAny(k, " :\r\n") {
+				return fmt.Errorf("header name %q", k)
+			}
+			if err := sv.tmpl(h); err != nil {
+				return err
+			}
+		}
+		return sv.tmpl(s.Body)
+	case KindPar:
+		if len(s.Branches) < 2 {
+			return fmt.Errorf("parallel needs two or more branches")
+		}
+		for _, b := range s.Branches {
+			if len(b) == 0 {
+				return fmt.Errorf("a parallel branch is empty")
+			}
+			if err := v.block(b); err != nil {
+				return err
+			}
+		}
+	case KindWait:
+		if (s.For == "") == (s.Check == "") {
+			return fmt.Errorf("wait needs exactly one of for (a duration) or check (a command polled until it exits 0)")
+		}
+		for _, d := range []string{s.For, s.Every} {
+			if d != "" {
+				if x, err := time.ParseDuration(d); err != nil || x <= 0 {
+					return fmt.Errorf("duration %q: use one like 30s", d)
+				}
+			}
+		}
+		if strings.Contains(s.Check, "{{") {
+			return fmt.Errorf("check commands take no templates")
+		}
+	case KindGitHub:
+		switch {
+		case ghRead[s.Action]:
+		case ghWrite[s.Action]:
+			if !v.write {
+				return fmt.Errorf("github %s changes the repo: the workflow needs \"allow_write\": true", s.Action)
+			}
+			if (s.Action == "merge" || s.Action == "pr") && !v.askedBefore(s) {
+				return fmt.Errorf("github %s needs an ask step before it and when: {step: <ask>, equals: yes}", s.Action)
+			}
+		default:
+			return fmt.Errorf("github action is alerts, prs, issues, comment, label, issue, pr or merge")
+		}
+		return v.tmpl(s.PR + s.Body + s.Title + s.Label)
+	case KindFile:
+		if !v.files {
+			return fmt.Errorf("file needs the folders it may use in the workflow's \"files\"")
+		}
+		switch s.Op {
+		case "read":
+		case "write", "append":
+			if !v.write {
+				return fmt.Errorf("file %s needs \"allow_write\": true", s.Op)
+			}
+		default:
+			return fmt.Errorf("file op is read, write or append")
+		}
+		if s.Path == "" {
+			return fmt.Errorf("file needs a path")
+		}
+		return v.tmpl(s.Path + s.Content)
 	default:
 		return fmt.Errorf("kind is one of %s, not %q", strings.Join(kinds, ", "), s.Kind)
 	}
 	return nil
+}
+
+// askedBefore reports whether s runs only on a yes from an earlier ask step in its block.
+func (v validator) askedBefore(s Step) bool {
+	c := s.When
+	return c != nil && v.asks[c.Step] && c.Value == "" && strings.EqualFold(c.Equals, "yes")
 }
 
 func (s Step) timeout() time.Duration {

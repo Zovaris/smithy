@@ -28,6 +28,7 @@ const (
 type AgentCall struct {
 	Dir, Prompt, Model, Effort string
 	Timeout                    time.Duration
+	Write                      bool
 }
 
 // Env is what a run reaches the outside through. Guard returns the block pattern a command
@@ -44,6 +45,15 @@ type Env struct {
 	Getenv   func(string) string
 	Now      func() time.Time
 	Progress func(Record)
+	// Session starts a chat session on the daemon with prompt (nil: session, smelt and warden
+	// steps fail); it returns the session's id.
+	Session func(ctx context.Context, dir, agent, prompt string) (string, error)
+	// Secret reads a stored key for {{secret.name}} ("" when unknown).
+	Secret func(name string) string
+	// Exec runs argv without a shell (github steps); nil: os/exec.
+	Exec func(ctx context.Context, dir string, argv []string) (string, int, error)
+	// Fetch does an http step's request; nil: net/http with the guard's fetch allow-list.
+	Fetch func(ctx context.Context, method, url string, headers map[string]string, body string) (int, string, error)
 }
 
 // Invocation is how a run was started: its trigger and inputs.
@@ -166,7 +176,7 @@ func (r *runner) scope(given map[string]string) *scope {
 	for k, v := range given {
 		in[k] = v
 	}
-	sc := &scope{mu: &sync.Mutex{}, steps: map[string]StepResult{}, vars: map[string]string{}, inputs: in, env: r.env.Getenv, secrets: r.secrets}
+	sc := &scope{mu: &sync.Mutex{}, steps: map[string]StepResult{}, vars: map[string]string{}, inputs: in, env: r.env.Getenv, secret: r.env.Secret, secrets: r.secrets}
 	keys := sortedKeys(r.w.Vars)
 	for _, k := range keys {
 		sc.vars[k] = sc.render(r.w.Vars[k], false, 0)
@@ -190,12 +200,14 @@ func exitTested(steps []Step) map[string]bool {
 	var walk func([]Step)
 	walk = func(ss []Step) {
 		for _, s := range ss {
-			for _, c := range []*Cond{s.When, s.If} {
+			for _, c := range []*Cond{s.When, s.If, s.Until} {
 				if c != nil && c.Exit != nil {
 					m[c.Step] = true
 				}
 			}
-			walk(s.Do)
+			for _, ch := range s.children() {
+				walk(ch)
+			}
 		}
 	}
 	walk(steps)
@@ -417,6 +429,8 @@ func (r *runner) exec(ctx context.Context, s Step, sc *scope, res *StepResult) e
 		return r.env.Notify(r.w.Name, r.secrets.redact(title), r.secrets.redact(msg))
 	case KindCall:
 		return r.call(sctx, s, sc, res)
+	default:
+		return r.more(sctx, s, sc, res)
 	}
 	return nil
 }
@@ -439,12 +453,24 @@ func (r *runner) stepEnv(sc *scope) []string {
 }
 
 func (r *runner) agent(ctx context.Context, s Step, sc *scope, res *StepResult) error {
+	if s.Items != "" {
+		one := s
+		one.Items, one.ID = "", s.ID+"_item"
+		return r.foreach(ctx, Step{ID: s.ID, Kind: KindForeach, Items: s.Items, Lines: s.Lines, Parallel: s.Parallel, Limit: s.Limit, Do: []Step{one}}, sc, res)
+	}
+	if err := r.takeAgent(s.ID); err != nil {
+		return err
+	}
+	return r.ask1(ctx, s, sc, res)
+}
+
+func (r *runner) takeAgent(id string) error {
 	r.lim.mu.Lock()
 	switch {
 	case r.lim.agents >= r.w.maxAgents():
-		r.lim.capped = fmt.Sprintf("max_agents %d reached before step %s", r.w.maxAgents(), s.ID)
+		r.lim.capped = fmt.Sprintf("max_agents %d reached before step %s", r.w.maxAgents(), id)
 	case r.lim.cost >= r.w.maxCost():
-		r.lim.capped = fmt.Sprintf("max_cost_usd %.2f reached before step %s", r.w.maxCost(), s.ID)
+		r.lim.capped = fmt.Sprintf("max_cost_usd %.2f reached before step %s", r.w.maxCost(), id)
 	default:
 		r.lim.agents++
 	}
@@ -453,6 +479,10 @@ func (r *runner) agent(ctx context.Context, s Step, sc *scope, res *StepResult) 
 	if capped {
 		return errCapped
 	}
+	return nil
+}
+
+func (r *runner) ask1(ctx context.Context, s Step, sc *scope, res *StepResult) error {
 	prompt := sc.render(s.Prompt, true, 0)
 	if prompt != s.Prompt {
 		prompt += dataNote
@@ -470,7 +500,7 @@ func (r *runner) agent(ctx context.Context, s Step, sc *scope, res *StepResult) 
 		}
 	}
 	res.Input = prompt
-	ans, cost, err := r.env.Agent(ctx, AgentCall{Dir: r.w.Dir, Prompt: prompt, Model: s.Model, Effort: s.Effort, Timeout: s.timeout()})
+	ans, cost, err := r.env.Agent(ctx, AgentCall{Dir: r.w.Dir, Prompt: prompt, Model: s.Model, Effort: s.Effort, Timeout: s.timeout(), Write: s.Write})
 	r.lim.mu.Lock()
 	r.lim.cost += cost
 	r.lim.mu.Unlock()

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	smithyauth "github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/connect"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/workflow"
@@ -83,6 +84,11 @@ func (sv *Server) NewWorkflows(st workflow.Store) *workflow.Scheduler {
 		Store:  st,
 		GitHub: workflow.GitHubEvents,
 		Env: workflow.Env{Shell: workflow.Shell, Agent: workflow.Agent, Guard: workflow.Guard, Ask: sv.workflowAsk,
+			Secret: workflowSecret,
+			Session: func(_ context.Context, dir, agent, prompt string) (string, error) {
+				s, err := sv.StartSession(agent, dir, prompt, "workflow")
+				return s.ID, err
+			},
 			Notify: func(wf, title, text string) error {
 				_, err := sv.Append(KindWorkflowNote, "", workflowNote{Workflow: wf, Title: title, Text: text})
 				return err
@@ -472,4 +478,13 @@ func (sv *Server) workflowAsk(ctx context.Context, id, question string, options 
 		case <-time.After(300 * time.Millisecond):
 		}
 	}
+}
+
+// workflowSecret is {{secret.name}}: a key stored with smithy auth set ("" when none).
+func workflowSecret(name string) string {
+	k, _, err := smithyauth.Get(name)
+	if err != nil {
+		return ""
+	}
+	return k
 }

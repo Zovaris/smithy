@@ -1,6 +1,7 @@
 import { useEffect, useState } from "preact/hooks";
 import { useLive } from "../lib/live";
-import { loadWorkflow, loadWorkflows, ms, result, runWorkflow, saveWorkflow, summary, validateWorkflow, type RunRecord, type Step, type StepResult, type WorkflowDetail, type WorkflowList } from "../lib/workflows";
+import { href } from "../lib/router";
+import { loadWorkflow, loadWorkflows, ms, opensSession, result, runWorkflow, saveWorkflow, summary, validateWorkflow, type RunRecord, type Step, type StepResult, type WorkflowDetail, type WorkflowList } from "../lib/workflows";
 
 const when = (t?: string) => (t ? new Date(t).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
@@ -23,6 +24,7 @@ export function Results({ steps }: { steps: StepResult[] }) {
       {steps.map((s) => (
         <li>
           <code>{s.id}</code> <span class={s.status === "failed" ? "err" : "t3"}>{s.status}</span> <span class="t3">{ms(s.duration_ms)}{s.attempts ? ` · ${s.attempts} tries` : ""}</span> {result(s)}
+          {opensSession(s) && <> <a href={href({ name: "session", id: s.output ?? "" })}>open the session</a></>}
           {(s.input || s.output) && s.kind !== "iteration" && (
             <details>
               <summary class="t3">input and output</summary>
