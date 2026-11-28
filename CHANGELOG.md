@@ -46,7 +46,7 @@ part above `### Details`.
 - The agents' system prompt is shorter and direct, and no longer names the CLI underneath.
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
 - ctrl+k and ctrl+l redraw the whole TUI, so clearing the terminal no longer leaves a dimmed screen.
-- A `!cmd` run is part of the session: the TUI, the web and a reopened `smithy chat --session` all show it. A run keeps 500 lines (64 KiB), folds to 20 with "N more lines", and when it was longer the open view ends with one line saying the rest was cut.
+- A `!cmd` run is part of the session: the TUI, the web and a reopened `smithy chat --session` all show it. A run keeps its first and last 250 lines (64 KiB in all) with one `… N lines cut …` line between them, so errors printed last still show, and folds to 20 lines with "N more lines".
 - `smithy tui` is gone: run `smithy stats`. The `tui.reduce_motion` setting is now `ui.reduce_motion`; a saved `tui.reduce_motion` still works.
 
 ### Details
