@@ -238,7 +238,9 @@ func (m chatView) agentsBox(screen []string, w, h int) []string {
 				parts = append(parts, x)
 			}
 		}
-		if len(s.prs) > 0 {
+		if s.links != nil && (len(s.links.PRs) > 0 || len(s.links.Issues) > 0) {
+			parts = append(parts, linksHint(*s.links, " "+t.g.dot+" "))
+		} else if len(s.prs) > 0 {
 			nums := make([]string, len(s.prs))
 			for i, u := range s.prs {
 				nums[i] = "#" + u[strings.LastIndex(u, "/")+1:]

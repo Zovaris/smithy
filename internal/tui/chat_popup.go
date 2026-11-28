@@ -47,6 +47,7 @@ var slashCommands = []slashCommand{
 	{"doctor", "", "run smithy doctor on the daemon's machine"},
 	{"channels", "[test]", "chat connectors' notifications and chat channels; test sends a test message to each"},
 	{"board", "[task dir]", "the task files by status: move, filter by task dir, open a file or its PR"},
+	{"links", "[TK-123|#12|PR url]", "this session's PRs and issues, live; with a ref, link it"},
 	{"tend", "", "the batch PRs the daemon keeps green, and what it is doing on each"},
 	{"detach", "", "quit and leave the daemon running"},
 	{"quit", "", "leave; a background daemon keeps running"},

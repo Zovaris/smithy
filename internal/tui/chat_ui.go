@@ -66,6 +66,7 @@ type chatSession struct {
 	effort                   string
 	dir                      string // the folder it started in; "" for batch events
 	prs                      []string
+	links                    *daemon.SessionLinks
 	since, turn              time.Time
 }
 
@@ -337,6 +338,8 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.detach()
 	case "board", "tasks":
 		return m.openBoard(arg)
+	case "links":
+		return m.linksCommand(arg)
 	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "prompt", "channels":
 		return m.settingsCommand(name, arg)
 	case "quit":
