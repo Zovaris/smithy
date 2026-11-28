@@ -13,7 +13,7 @@ const HINTS: Record<string, string> = {
   effort: "session effort",
   goal: "session goal",
   skills: "skills and MCP",
-  theme: "steel, frost, plum, light or dark",
+  theme: "steel, frost, plum, moss, dune, dusk, rose, light or dark",
   mode: "transcript detail",
   connect: "servers",
   remote: "from another machine",
