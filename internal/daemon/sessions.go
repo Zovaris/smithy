@@ -72,6 +72,7 @@ type Session struct {
 	Updated time.Time    `json:"updated"`
 	Usage   *usage.Usage `json:"usage,omitempty"`
 	PRs     []string     `json:"prs,omitempty"`
+	Links   []string     `json:"links,omitempty"`
 	Parent  string       `json:"parent,omitempty"`
 	// Goal is pinned by a person (/goal); the daemon continues the session toward it.
 	Goal      string `json:"goal,omitempty"`
@@ -119,6 +120,7 @@ type live struct {
 	asks     int
 	stopped  bool
 	lastDiff string
+	links    *SessionLinks
 	mail     []Mail
 	sent     []time.Time
 	goalBase float64
@@ -209,6 +211,8 @@ func (sv *Server) applySession(e store.Event) {
 		if json.Unmarshal(e.Data, &t) == nil {
 			sv.notePRsLocked(e.Session, t)
 		}
+	case KindSessionLink, KindSessionLinks:
+		sv.applyLinks(e)
 	case KindSessionMail:
 		sv.applyMailLocked(e)
 	case KindSessionUsage:

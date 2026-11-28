@@ -76,6 +76,8 @@ type Server struct {
 	started    time.Time
 	// Tend, when set, is the PR tender GET /v1/tend reports.
 	Tend *Tender
+	// Links, when set, keeps each session's PR and issue links live (GET /v1/sessions/{id}/links).
+	Links *Linker
 	// Workflows, when set, is the scheduler behind /v1/workflows.
 	Workflows *workflow.Scheduler
 	// ServeState, when set, fills State.Serve (the auto loop's heartbeat).
@@ -173,7 +175,7 @@ func (sv *Server) apply(e store.Event) {
 		}
 	case KindIntake:
 		sv.applyIntake(e.Data)
-	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool, KindSessionMail, KindSessionGoal:
+	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool, KindSessionMail, KindSessionGoal, KindSessionLink, KindSessionLinks:
 		sv.applySession(e)
 	case KindRouted:
 		var r struct{ ID string }
@@ -347,6 +349,9 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("POST /v1/sessions/{id}/messages", sv.sendSession)
 	mux.HandleFunc("POST /v1/sessions/{id}/stop", sv.stopSession)
 	mux.HandleFunc("PUT /v1/sessions/{id}/model", sv.setSessionModel)
+	mux.HandleFunc("GET /v1/sessions/{id}/links", sv.getLinks)
+	mux.HandleFunc("POST /v1/sessions/{id}/links", sv.addLink)
+	mux.HandleFunc("GET /v1/links", sv.projectWork)
 	mux.HandleFunc("GET /v1/sessions/{id}/mail", sv.sessionMail)
 	mux.HandleFunc("POST /v1/bus/send", sv.busSend)
 	mux.HandleFunc("GET /v1/bus/inbox", sv.busInbox)
