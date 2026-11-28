@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -84,6 +85,42 @@ func TestRunOwnsACycleThatOutlastsTheGrace(t *testing.T) {
 	}
 	if !src.done.Load() {
 		t.Fatal("Run returned while its cycle was still running")
+	}
+}
+
+func TestRunStopsAfterTheCycleCap(t *testing.T) {
+	home(t)
+	fakeSmithy(t)
+	oldG, oldC := cycleGrace, cycleCap
+	cycleGrace, cycleCap = 20*time.Millisecond, 50*time.Millisecond
+	t.Cleanup(func() { cycleGrace, cycleCap = oldG, oldC })
+	src := &blockingSource{started: make(chan struct{}), release: make(chan struct{})}
+	t.Cleanup(func() { close(src.release) })
+	Sources["slow"] = func(Settings) (Source, error) { return src, nil }
+	t.Cleanup(func() { delete(Sources, "slow") })
+	if err := config.Set(config.UserFile(), "auto.sources", "slow"); err != nil {
+		t.Fatal(err)
+	}
+	var logs []string
+	var mu sync.Mutex
+	sv, err := NewServer(ServeOptions{Agent: "claude"}, func(l string) { mu.Lock(); logs = append(logs, l); mu.Unlock() })
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	ret := make(chan error, 1)
+	go func() { ret <- sv.Run(ctx) }()
+	<-src.started
+	cancel()
+	select {
+	case <-ret:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run hung on a stuck cycle")
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !strings.Contains(strings.Join(logs, "\n"), "stopping without it") {
+		t.Fatalf("logs %q", logs)
 	}
 }
 

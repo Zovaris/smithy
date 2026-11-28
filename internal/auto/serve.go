@@ -391,14 +391,23 @@ func (sv *Server) Run(ctx context.Context) error {
 // cycleGrace is how long Run waits for a cycle still in flight when it stops.
 var cycleGrace = 30 * time.Second
 
+// cycleCap is how much longer Run waits, after cycleGrace, for a cycle that is still running.
+var cycleCap = 2 * time.Minute
+
 // finishCycle waits for the cycle in flight so Run never returns while it still reads settings
-// or sources; a cycle still running after cycleGrace is logged and still waited for.
+// or sources. A cycle still running after cycleGrace is logged and waited for up to cycleCap
+// more; past that Run stops anyway and says so, rather than hang.
 func (sv *Server) finishCycle(res <-chan time.Duration) {
 	select {
 	case <-res:
+		return
 	case <-time.After(cycleGrace):
-		sv.logf("serve: a cycle was still running %s after stop; waiting for it", cycleGrace)
-		<-res
+		sv.logf("serve: a cycle was still running %s after stop; waiting up to %s more", cycleGrace, cycleCap)
+	}
+	select {
+	case <-res:
+	case <-time.After(cycleCap):
+		sv.logf("serve: a cycle was still running %s after stop; stopping without it", cycleGrace+cycleCap)
 	}
 }
 
@@ -509,10 +518,13 @@ func (sv *Server) Cycle() time.Duration {
 		}
 	}
 	_ = sv.beat()
-	if sv.note != nil {
+	sv.beatMu.Lock()
+	ended := sv.ended
+	if sv.note != nil && !ended {
 		sv.flushes.Add(1)
 		go func() { defer sv.flushes.Done(); sv.note.Flush(now()) }()
 	}
+	sv.beatMu.Unlock()
 	return time.Duration(s.Every) * time.Second
 }
 
