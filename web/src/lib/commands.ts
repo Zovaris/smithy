@@ -22,6 +22,8 @@ const HINTS: Record<string, string> = {
   decisions: "decisions",
   bench: "bench",
   workflows: "workflows",
+  schedules: "schedules",
+  run: "<workflow> run it",
   log: "daemon log",
   welcome: "first-run steps",
   setup: "agents ready or missing",

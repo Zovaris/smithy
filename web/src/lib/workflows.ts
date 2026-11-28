@@ -40,13 +40,25 @@ export type StepResult = {
   cost_usd?: number;
   steps?: StepResult[];
 };
-export type RunRecord = { workflow: string; trigger?: string; inputs?: Record<string, string>; outputs?: Record<string, string>; started: string; ended?: string; status: string; error?: string; cost_usd?: number; steps: StepResult[] };
+export type RunRecord = { workflow: string; trigger?: string; schedule?: string; inputs?: Record<string, string>; outputs?: Record<string, string>; started: string; ended?: string; status: string; error?: string; cost_usd?: number; steps: StepResult[] };
 export type Workflow = {
   name: string;
   description?: string;
-  schedule?: string;
-  webhook?: boolean;
+  inputs?: Record<string, string>;
   steps: Step[];
+  file: string;
+  schedules?: string[];
+  last?: RunRecord;
+  error?: string;
+};
+export type Schedule = {
+  name: string;
+  description?: string;
+  workflow: string;
+  cron?: string;
+  webhook?: boolean;
+  github?: { event: string; label?: string };
+  watch?: string;
   file: string;
   enabled: boolean;
   changed?: boolean;
@@ -54,8 +66,9 @@ export type Workflow = {
   last?: RunRecord;
   error?: string;
 };
+export type ScheduleDetail = { info: Schedule; source: string; history: RunRecord[]; hook?: string };
 export type WorkflowList = { workflows: Workflow[]; running: string[] };
-export type WorkflowDetail = { info: Workflow; source: string; history: RunRecord[]; running: boolean; live?: RunRecord; hook?: string };
+export type WorkflowDetail = { info: Workflow; source: string; history: RunRecord[]; running: boolean; live?: RunRecord };
 
 async function call<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await api(path, init);
@@ -69,21 +82,23 @@ const at = (name: string) => "/v1/workflows/" + encodeURIComponent(name);
 
 export const loadWorkflows = () => call<WorkflowList>("/v1/workflows");
 export const loadWorkflow = (name: string) => call<WorkflowDetail>(at(name));
-export const runWorkflow = (name: string) => call<{ status: string }>(at(name) + "/run", json("POST", "{}"));
-export const setWorkflow = (name: string, on: boolean) => call<Workflow>(at(name) + (on ? "/enable" : "/disable"), json("POST", "{}"));
+export const runWorkflow = (name: string, inputs: Record<string, string> = {}) => call<{ status: string }>(at(name) + "/run", json("POST", JSON.stringify({ inputs })));
+const sat = (name: string) => "/v1/schedules/" + encodeURIComponent(name);
+export const loadSchedules = () => call<{ schedules: Schedule[] }>("/v1/schedules");
+export const loadSchedule = (name: string) => call<ScheduleDetail>(sat(name));
+export const setSchedule = (name: string, on: boolean) => call<Schedule>(sat(name) + (on ? "/enable" : "/disable"), json("POST", "{}"));
 export const saveWorkflow = (name: string, source: string) => call<Workflow>(at(name), json("PUT", source));
 export const validateWorkflow = (source: string) => call<{ ok: boolean; error?: string }>("/v1/workflows/validate", json("POST", source));
 
-// state is a workflow's one-word state, the way the TUI and `smithy workflow list` name it.
-export function state(w: Workflow, running: string[]): "running" | "error" | "changed" | "on" | "off" {
-  if (running.includes(w.name)) return "running";
-  if (w.error) return "error";
-  if (w.changed) return "changed";
-  return w.enabled ? "on" : "off";
+// state is a schedule's one-word state, the way the TUI and `smithy schedule list` name it.
+export function state(s: Schedule): "error" | "changed" | "on" | "off" {
+  if (s.error) return "error";
+  if (s.changed) return "changed";
+  return s.enabled ? "on" : "off";
 }
 
-// triggers names how a workflow starts: by hand always, its schedule, its webhook.
-export const triggers = (w: Workflow) => ["manual", ...(w.schedule ? [w.schedule] : []), ...(w.webhook ? ["webhook"] : [])].join(" · ");
+// trigger names what starts a schedule.
+export const trigger = (s: Schedule) => s.cron || (s.webhook ? "webhook" : s.github ? `github ${s.github.event}${s.github.label ? " " + s.github.label : ""}` : `watch ${s.watch ?? ""}`);
 
 const one = (t = "", n = 90) => {
   const x = t.split(/\s+/).filter(Boolean).join(" ");

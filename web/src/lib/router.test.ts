@@ -20,6 +20,6 @@ describe("route", () => {
     for (const v of [{ name: "session", id: "s-1/x" } as const, { name: "agents" } as const]) expect(route(href(v))).toEqual(v);
   });
   it("lists the pages in shortcut order", () => {
-    expect(PAGES.map((p) => p.key)).toEqual(["2", "3", "4", "5", "6", "7"]);
+    expect(PAGES.map((p) => p.key)).toEqual(["2", "3", "4", "5", "6", "7", "8"]);
   });
 });

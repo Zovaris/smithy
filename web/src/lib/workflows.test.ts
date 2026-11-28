@@ -1,19 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { ms, result, state, summary, triggers, type Workflow } from "./workflows";
+import { ms, result, state, summary, trigger, type Schedule } from "./workflows";
 
-const w = (o: Partial<Workflow>): Workflow => ({ name: "d", schedule: "0 17 * * *", steps: [], file: "/x/d.json", enabled: false, ...o });
+const sc = (o: Partial<Schedule>): Schedule => ({ name: "d", workflow: "d", cron: "0 17 * * *", file: "/x/d.json", enabled: false, ...o });
 
 describe("workflows", () => {
-  it("names the state the way the TUI does", () => {
-    expect(state(w({}), [])).toBe("off");
-    expect(state(w({ enabled: true }), [])).toBe("on");
-    expect(state(w({ changed: true }), [])).toBe("changed");
-    expect(state(w({ error: "bad" }), [])).toBe("error");
-    expect(state(w({ enabled: true }), ["d"])).toBe("running");
-  });
-  it("lists the triggers", () => {
-    expect(triggers(w({ webhook: true }))).toBe("manual · 0 17 * * * · webhook");
-    expect(triggers(w({ schedule: "" }))).toBe("manual");
+  it("names a schedule's state and trigger the way the TUI does", () => {
+    expect(state(sc({}))).toBe("off");
+    expect(state(sc({ enabled: true }))).toBe("on");
+    expect(state(sc({ changed: true }))).toBe("changed");
+    expect(state(sc({ error: "bad" }))).toBe("error");
+    expect(trigger(sc({}))).toBe("0 17 * * *");
+    expect(trigger(sc({ cron: "", github: { event: "issue_labeled", label: "bug" } }))).toBe("github issue_labeled bug");
+    expect(trigger(sc({ cron: "", watch: "~/x" }))).toBe("watch ~/x");
   });
   it("writes a step and its result as one line", () => {
     expect(summary({ id: "i", kind: "if", if: { step: "a", match: "\\S" }, else: "stop" })).toBe("a ~ /\\S/ → next, else stop");

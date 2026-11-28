@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 
 // A view is what the center column shows: a session's conversation, the new-session page, or one
 // of the overview pages (agents, board, decisions, setup, bench).
-export type Page = "agents" | "board" | "decisions" | "setup" | "bench" | "workflows";
+export type Page = "agents" | "board" | "decisions" | "setup" | "bench" | "workflows" | "schedules";
 export type View = { name: "session"; id: string } | { name: "new" } | { name: Page };
 
 export const PAGES: { id: Page; label: string; key: string }[] = [
@@ -12,6 +12,7 @@ export const PAGES: { id: Page; label: string; key: string }[] = [
   { id: "bench", label: "Bench", key: "5" },
   { id: "setup", label: "Settings", key: "6" },
   { id: "workflows", label: "Workflows", key: "7" },
+  { id: "schedules", label: "Schedules", key: "8" },
 ];
 
 // Old links (#/sessions?s=<id>) keep working.

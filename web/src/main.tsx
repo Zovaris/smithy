@@ -28,6 +28,7 @@ const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
   board: lazy(() => import("./screens/board")),
   bench: lazy(() => import("./screens/bench")),
   workflows: lazy(() => import("./screens/workflows")),
+  schedules: lazy(() => import("./screens/schedules")),
   setup: lazy(() => import("./screens/setup")),
 };
 const Palette = lazy(() => import("./components/palette"));
@@ -40,7 +41,7 @@ const InfoPanel = lazy(() => import("./components/info"));
 const NewSession = lazy(() => import("./features/chat/newsession").then((m) => ({ default: m.NewSession })));
 type Shell = { cmd: string; output: string; code: number };
 
-const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", workflows: "layers", setup: "gear" };
+const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", workflows: "layers", schedules: "clock", setup: "gear" };
 
 type Auth = { state: "checking" } | { state: "ok" } | { state: "denied" } | { state: "down"; error: string };
 
