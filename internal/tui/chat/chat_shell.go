@@ -15,27 +15,36 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/charmbracelet/x/ansi"
 )
 
 const (
-	shellMaxLines = 200
-	shellFold     = 20
-	clipMaxBytes  = 32 << 20
+	shellFold    = 20
+	clipMaxBytes = 32 << 20
 )
 
 var errNoImage = errors.New("no image in the clipboard")
 
-// shellBlock is a `!cmd` in the transcript: run is nil while it runs.
+// shellBlock is a `!cmd` in the transcript: run is nil while it runs; id is the session_shell
+// event's once the daemon has it.
 type shellBlock struct {
-	cmd, dir string
-	run      *daemon.ShellRun
+	cmd, dir, id string
+	run          *daemon.ShellRun
+}
+
+var _ sessionShellAPI = (*api.Client)(nil)
+
+// sessionShellAPI runs a `!cmd` through the daemon, which keeps it in the session transcript.
+type sessionShellAPI interface {
+	Shell(ctx context.Context, id, cmd string) (api.ShellRun, error)
 }
 
 type shellDoneMsg struct {
 	c   *chatMsg
 	run daemon.ShellRun
+	err error
 }
 
 type clipMsg struct {
@@ -54,7 +63,9 @@ func cleanOutput(s string) string {
 	}, s)
 }
 
-// bang is enter on a `!cmd` line: it runs in the session folder and never reaches the agent.
+// bang is enter on a `!cmd` line: it runs in the session folder and never reaches the agent. In a
+// session the daemon runs it and keeps it in the transcript, so the web and a reopened chat show
+// it too; before the first message it runs here.
 func (m chatView) bang(line string) (chatView, tea.Cmd) {
 	if line == "" {
 		return m, nil
@@ -62,6 +73,14 @@ func (m chatView) bang(line string) (chatView, tea.Cmd) {
 	m.offset = 0
 	m.push(chatMsg{who: "daemon", kind: "shell", sh: &shellBlock{cmd: line, dir: m.dir}})
 	c := m.msgs[len(m.msgs)-1]
+	if sa, ok := m.sess.(sessionShellAPI); ok && m.current != "" {
+		id := m.current
+		c.sh.dir = ""
+		return m, func() tea.Msg {
+			r, err := sa.Shell(context.Background(), id, line)
+			return shellDoneMsg{c: c, run: r, err: err}
+		}
+	}
 	run, dir := m.shell, m.dir
 	if run == nil {
 		run = daemon.RunShell
@@ -73,18 +92,57 @@ func (m chatView) bang(line string) (chatView, tea.Cmd) {
 
 func (m *chatView) shellDone(msg shellDoneMsg) {
 	r := msg.run
-	if len(r.Lines) > shellMaxLines {
-		r.Lines = append([]daemon.ShellLine{{Text: fmt.Sprintf("… %d lines cut", len(r.Lines)-shellMaxLines)}}, r.Lines[len(r.Lines)-shellMaxLines:]...)
+	if msg.err != nil {
+		r = daemon.ShellRun{Cmd: msg.c.sh.cmd, Code: -1, Err: msg.err.Error()}
 	}
+	m.fillShell(msg.c, r)
+}
+
+// fillShell puts run r into block c unless it already has one.
+func (m *chatView) fillShell(c *chatMsg, r daemon.ShellRun) {
+	if c.sh.run != nil {
+		return
+	}
+	r.Lines = append([]daemon.ShellLine(nil), r.Lines...)
 	for i, l := range r.Lines {
 		r.Lines[i].Text = strings.TrimRight(cleanOutput(l.Text), "\r")
 	}
-	if r.Cut {
-		r.Lines = append(r.Lines, daemon.ShellLine{Text: "… output cut at 256 KiB"})
+	c.sh.run, c.sh.id, c.lines = &r, r.ID, nil
+	if r.Dir != "" {
+		c.sh.dir = r.Dir
 	}
-	msg.c.sh.run, msg.c.lines = &r, nil
 	*m.at = anchor{}
 	m.offset = 0
+}
+
+// shellEvent is a session_shell event: it fills the block this chat is waiting on for the same
+// command, skips one it already shows, and otherwise adds the block (another client's run, or
+// the transcript of a reopened chat).
+func (m *chatView) shellEvent(id string, r daemon.ShellRun) {
+	msgs := m.convs[id]
+	if id == m.current {
+		msgs = m.msgs
+	}
+	for _, c := range msgs {
+		if c.sh != nil && r.ID != "" && c.sh.id == r.ID {
+			return
+		}
+	}
+	if id == m.current {
+		for _, c := range msgs {
+			if c.sh != nil && c.sh.run == nil && c.sh.cmd == r.Cmd {
+				m.fillShell(c, r)
+				return
+			}
+		}
+	}
+	c := &chatMsg{who: "daemon", kind: "shell", sh: &shellBlock{cmd: r.Cmd, dir: r.Dir}}
+	m.into(id, *c)
+	all := m.convs[id]
+	if id == m.current {
+		all = m.msgs
+	}
+	m.fillShell(all[len(all)-1], r)
 }
 
 // shellRows is a `!cmd` block: the command, its status, time and folder (when not the
@@ -105,7 +163,7 @@ func (m chatView) shellRows(i, w int) []string {
 	case r == nil:
 		meta = append(meta, t.Fg(t.Warn).Render("running"))
 	default:
-		meta = append(meta, dim.Render(shellTook(r.Took)))
+		meta = append(meta, dim.Render(shellTook(time.Duration(r.TookMS)*time.Millisecond)))
 		switch {
 		case r.Err != "":
 			meta = append(meta, t.Fg(t.Err).Render(r.Err))
@@ -126,8 +184,10 @@ func (m chatView) shellRows(i, w int) []string {
 		lines = []daemon.ShellLine{{Text: "(no output)"}}
 	}
 	more := 0
-	if !c.open && len(lines) > shellFold+2 {
+	if !c.open && len(lines) > shellFold {
 		more, lines = len(lines)-shellFold, lines[:shellFold]
+	} else if sh.run.Cut {
+		lines = append(lines[:len(lines):len(lines)], daemon.ShellLine{Text: api.ShellCutNote})
 	}
 	rule := p + "  " + dim.Render(t.G.Pipe) + " "
 	for _, l := range lines {
@@ -140,7 +200,7 @@ func (m chatView) shellRows(i, w int) []string {
 		}
 	}
 	if more > 0 {
-		rows = append(rows, m.blockRow(i, w, rule+dim.Render(fmt.Sprintf("… %d more lines · click or enter to open", more))))
+		rows = append(rows, m.blockRow(i, w, rule+dim.Render(fmt.Sprintf("… %d more %s · click or enter to open", more, "line"+plural(more)))))
 	}
 	return append(rows, "")
 }

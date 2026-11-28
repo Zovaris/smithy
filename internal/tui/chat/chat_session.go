@@ -205,6 +205,11 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 			m.into(id, chatMsg{who: "daemon", tool: &ct})
 			m.now(id, ct.Name+" "+ct.Arg)
 		}
+	case daemon.KindSessionShell:
+		var r daemon.ShellRun
+		if json.Unmarshal(data, &r) == nil && r.Cmd != "" {
+			m.shellEvent(id, r)
+		}
 	case daemon.KindSessionDiff:
 		var d struct {
 			Stat, Patch string

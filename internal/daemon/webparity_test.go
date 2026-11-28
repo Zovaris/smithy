@@ -6,12 +6,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/remote"
 )
 
@@ -26,7 +28,7 @@ func TestSessionShellRunsInTheSessionFolder(t *testing.T) {
 	waitStatus(t, sv, id, StatusDone)
 	os.WriteFile(filepath.Join(dir, "marker.txt"), []byte("x"), 0o600)
 	code, m = post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"ls; exit 3"}`)
-	if code != 200 || !strings.Contains(m["output"].(string), "marker.txt") || m["code"].(float64) != 3 {
+	if code != 200 || !strings.Contains(fmt.Sprint(m["lines"]), "marker.txt") || m["code"].(float64) != 3 {
 		t.Fatalf("shell: %d %v", code, m)
 	}
 	code, m = post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"echo out; echo bad >&2"}`)
@@ -48,6 +50,36 @@ func TestSessionShellRunsInTheSessionFolder(t *testing.T) {
 	}
 	if res := do(t, "POST", url+"/v1/sessions/"+id+"/shell", `{"cmd":"ls"}`, map[string]string{LoginHeader: "me@example.com"}); res.StatusCode != 403 {
 		t.Fatalf("a tailnet login cannot run a shell: %d", res.StatusCode)
+	}
+}
+
+func TestSessionShellLandsInTheTranscriptCapped(t *testing.T) {
+	dir := t.TempDir()
+	sv, url, _ := sessionTest(t, func(ctx context.Context, msg string, h []Exchange, e Emit) (string, error) { return "ok", nil })
+	_, m := post(t, url+"/v1/sessions", `{"agent":"claude","dir":"`+dir+`","message":"hi"}`)
+	id := m["id"].(string)
+	waitStatus(t, sv, id, StatusDone)
+	code, m := post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"seq 2000; printf '\\033[31mred\\033[0m' >&2"}`)
+	if code != 200 || m["id"] == "" || m["cut"] != true || len(m["lines"].([]any)) != api.ShellMaxLines {
+		t.Fatalf("shell: %d cut=%v lines=%d", code, m["cut"], len(m["lines"].([]any)))
+	}
+	evs, _ := sv.st.Since(0)
+	var got []ShellRun
+	for _, e := range evs {
+		if e.Kind == KindSessionShell && e.Session == id {
+			var r ShellRun
+			if json.Unmarshal(e.Data, &r) != nil {
+				t.Fatalf("bad event %s", e.Data)
+			}
+			got = append(got, r)
+		}
+	}
+	if len(got) != 1 || got[0].ID != m["id"] || got[0].Cmd == "" || !strings.HasSuffix(got[0].Dir, filepath.Base(dir)) || !got[0].Cut || got[0].Lines[0].Text != "1" || len(got[0].Lines) != api.ShellMaxLines {
+		t.Fatalf("%d events, first cut=%v", len(got), len(got) > 0 && got[0].Cut)
+	}
+	_, m = post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"printf '\\033[31mred\\033[0m\\r\\n' >&2"}`)
+	if l := m["lines"].([]any)[0].(map[string]any); l["text"] != "red" || l["err"] != true {
+		t.Fatalf("escapes kept: %v", m)
 	}
 }
 

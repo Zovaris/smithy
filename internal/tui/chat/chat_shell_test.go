@@ -4,16 +4,99 @@ package chat
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 )
+
+type shellSessions struct {
+	fakeSessions
+	ran [][2]string
+	run api.ShellRun
+}
+
+func (f *shellSessions) Shell(_ context.Context, id, cmd string) (api.ShellRun, error) {
+	f.ran = append(f.ran, [2]string{id, cmd})
+	r := f.run
+	r.Cmd = cmd
+	return r, nil
+}
+
+func shellEv(t *testing.T, m chatView, session string, r api.ShellRun) chatView {
+	t.Helper()
+	b, _ := json.Marshal(r)
+	m.sessionEvent(daemon.KindSessionShell, session, b)
+	m.ver++
+	return m
+}
+
+func TestBangInASessionRunsThroughTheDaemonOnce(t *testing.T) {
+	f := &shellSessions{run: api.ShellRun{ID: "sh-1", Lines: []api.ShellLine{{Text: "a.go"}}, TookMS: 5}}
+	m := newChatTest(0)
+	m.height = 30
+	m.sess = f
+	m.current = "s1"
+	m.sessions = []chatSession{{id: "s1", dir: "/work/proj"}}
+	m.shell = func(context.Context, string, string) daemon.ShellRun {
+		t.Fatal("ran locally")
+		return daemon.ShellRun{}
+	}
+	m = typeIn(m, "!ls")
+	m = cpress(m, ckey("enter"))
+	if len(f.ran) != 1 || f.ran[0] != [2]string{"s1", "ls"} {
+		t.Fatalf("daemon runs %v", f.ran)
+	}
+	r := f.run
+	r.Cmd = "ls"
+	m = shellEv(t, m, "s1", r)
+	if out := screen(m); strings.Count(out, "$ ls") != 1 || !strings.Contains(out, "a.go") {
+		t.Fatalf("want one block:\n%s", out)
+	}
+}
+
+func TestShellEventFromAnotherClientShows(t *testing.T) {
+	m := newChatTest(0)
+	m.height = 30
+	m.current = "s1"
+	m.sessions = []chatSession{{id: "s1"}}
+	m = shellEv(t, m, "s1", api.ShellRun{ID: "sh-9", Cmd: "git status", Lines: []api.ShellLine{{Text: "clean"}}, Code: 1})
+	m = shellEv(t, m, "s2", api.ShellRun{ID: "sh-8", Cmd: "pwd"})
+	out := screen(m)
+	if !strings.Contains(out, "$ git status") || !strings.Contains(out, "clean") || !strings.Contains(out, "exit 1") || strings.Contains(out, "pwd") {
+		t.Fatalf("event not drawn:\n%s", out)
+	}
+	if len(m.convs["s2"]) != 1 || m.convs["s2"][0].sh.run == nil {
+		t.Fatalf("other session's run not kept: %v", m.convs["s2"])
+	}
+}
+
+func TestCutShellRunEndsWithOneNoteWhenOpen(t *testing.T) {
+	m := newChatTest(0)
+	m.height = 80
+	m.current = "s1"
+	m.sessions = []chatSession{{id: "s1"}}
+	var ls []api.ShellLine
+	for i := range 30 {
+		ls = append(ls, api.ShellLine{Text: fmt.Sprintf("line-%02d", i)})
+	}
+	m = shellEv(t, m, "s1", api.ShellRun{ID: "x", Cmd: "seq", Lines: ls, Cut: true})
+	out := screen(m)
+	if !strings.Contains(out, "10 more lines") || strings.Contains(out, "cut") || strings.Contains(out, "line-20") {
+		t.Fatalf("folded:\n%s", out)
+	}
+	m = chatStep(m, tea.MouseClickMsg{X: 5, Y: rowOf(t, m, "$ seq"), Button: tea.MouseLeft})
+	out = screen(m)
+	if !strings.Contains(out, "line-29") || strings.Count(out, "cut") != 1 || !strings.Contains(out, api.ShellCutNote) || strings.Contains(out, "more line") {
+		t.Fatalf("open:\n%s", out)
+	}
+}
 
 func TestBangRunsShellInSessionFolderAndShowsOutput(t *testing.T) {
 	f := &fakeSessions{}
@@ -23,7 +106,7 @@ func TestBangRunsShellInSessionFolderAndShowsOutput(t *testing.T) {
 	var gotDir, gotLine string
 	m.shell = func(_ context.Context, dir, line string) daemon.ShellRun {
 		gotDir, gotLine = dir, line
-		return daemon.ShellRun{Lines: []daemon.ShellLine{{Text: "a.go"}, {Text: "b.go"}}, Took: 40 * time.Millisecond}
+		return daemon.ShellRun{Lines: []daemon.ShellLine{{Text: "a.go"}, {Text: "b.go"}}, TookMS: 40}
 	}
 	m = typeIn(m, "!ls -1")
 	m = cpress(m, ckey("enter"))
@@ -114,7 +197,7 @@ func TestRunShellUsesFolder(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := daemon.RunShell(context.Background(), d, "ls")
-	if r.Code != 0 || !strings.Contains(r.Output(), "here.txt") {
+	if r.Code != 0 || len(r.Lines) != 1 || r.Lines[0].Text != "here.txt" {
 		t.Fatalf("run %+v", r)
 	}
 }
@@ -189,8 +272,12 @@ func TestShellOutputStripsTerminalEscapes(t *testing.T) {
 
 func TestRunShellCapsOutput(t *testing.T) {
 	r := daemon.RunShell(context.Background(), t.TempDir(), "head -c 5000000 /dev/zero | tr '\\0' a")
-	if out := r.Output(); len(out) > 256<<10+100 || !r.Cut {
-		t.Fatalf("output %d bytes", len(out))
+	n := 0
+	for _, l := range r.Lines {
+		n += len(l.Text)
+	}
+	if n > api.ShellMaxBytes || !r.Cut {
+		t.Fatalf("output %d bytes, cut %v", n, r.Cut)
 	}
 }
 

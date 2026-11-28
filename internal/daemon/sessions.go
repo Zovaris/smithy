@@ -39,6 +39,7 @@ const (
 	KindSessionStatus  = "session_status"
 	KindSessionModel   = "session_model"
 	KindSessionMail    = "session_mail"
+	KindSessionShell   = "session_shell"
 )
 
 const (

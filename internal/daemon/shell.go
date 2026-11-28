@@ -12,42 +12,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/text"
 )
 
-// ShellLine is one line a `!cmd` printed; Err marks a stderr line.
-type ShellLine struct {
-	Text string `json:"text"`
-	Err  bool   `json:"err,omitempty"`
-}
-
-// ShellRun is a finished `!cmd`: its lines in the order printed, the exit code (-1 when it never
-// ran or was killed, with Err set), how long it took and whether the output was cut.
-type ShellRun struct {
-	Lines []ShellLine
-	Code  int
-	Err   string
-	Took  time.Duration
-	Cut   bool
-}
-
-// Output is the run's lines joined, the cut note last.
-func (r ShellRun) Output() string {
-	var b strings.Builder
-	for i, l := range r.Lines {
-		if i > 0 {
-			b.WriteByte('\n')
-		}
-		b.WriteString(l.Text)
-	}
-	if r.Cut {
-		b.WriteString("\n… output cut at 256 KiB")
-	}
-	return b.String()
-}
+// ShellLine and ShellRun are the wire types of a `!cmd` run.
+type (
+	ShellLine = api.ShellLine
+	ShellRun  = api.ShellRun
+)
 
 // RunShell runs line with the user's shell in dir, stdout and stderr kept apart line by line,
-// at most shellMaxBytes of output and shellTimeout of time.
+// escapes stripped, at most api.ShellMaxLines lines, api.ShellMaxBytes of output and shellTimeout.
 func RunShell(ctx context.Context, dir, line string) ShellRun {
 	ctx, cancel := context.WithTimeout(ctx, shellTimeout)
 	defer cancel()
@@ -61,7 +37,8 @@ func RunShell(ctx context.Context, dir, line string) ShellRun {
 	cmd.Stdout, cmd.Stderr = o.stream(false), o.stream(true)
 	start := time.Now()
 	err := cmd.Run()
-	run := ShellRun{Took: time.Since(start), Lines: o.done(), Cut: o.cut}
+	run := ShellRun{Cmd: line, Dir: dir, TookMS: time.Since(start).Milliseconds(), Lines: o.done()}
+	run.Cut = o.cut
 	var ee *exec.ExitError
 	switch {
 	case ctx.Err() != nil:
@@ -95,7 +72,7 @@ func (s *shellStream) Write(p []byte) (int, error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	n := len(p)
-	if left := shellMaxBytes - o.n; left < len(p) {
+	if left := api.ShellMaxBytes - o.n; left < len(p) {
 		p, o.cut = p[:max(left, 0)], true
 	}
 	o.n += len(p)
@@ -109,16 +86,26 @@ func (s *shellStream) Write(p []byte) (int, error) {
 			o.part[i] = append(o.part[i], p...)
 			break
 		}
-		o.lines = append(o.lines, ShellLine{Text: string(append(o.part[i], p[:j]...)), Err: s.err})
+		o.add(string(append(o.part[i], p[:j]...)), s.err)
 		o.part[i], p = nil, p[j+1:]
 	}
 	return n, nil
 }
 
+// add keeps one line, cleaned of terminal escapes, while under api.ShellMaxLines.
+func (o *shellOut) add(s string, err bool) {
+	if len(o.lines) >= api.ShellMaxLines {
+		o.cut = true
+		return
+	}
+	s = strings.TrimRight(text.StripEscapes(strings.TrimRight(s, "\r"), true), " ")
+	o.lines = append(o.lines, ShellLine{Text: s, Err: err})
+}
+
 func (o *shellOut) done() []ShellLine {
 	for i, p := range o.part {
 		if len(p) > 0 {
-			o.lines = append(o.lines, ShellLine{Text: string(p), Err: i == 1})
+			o.add(string(p), i == 1)
 		}
 	}
 	return o.lines

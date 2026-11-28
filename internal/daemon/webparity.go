@@ -18,7 +18,6 @@ import (
 
 const (
 	shellTimeout  = 2 * time.Minute
-	shellMaxBytes = 256 << 10
 	imageMaxBytes = 32 << 20
 )
 
@@ -34,8 +33,9 @@ func writeGuard(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-// sessionShell is POST /v1/sessions/{id}/shell {cmd}: the TUI's `!cmd`, run with the user's
-// shell in the session folder; the output comes back here and never reaches the agent.
+// sessionShell is POST /v1/sessions/{id}/shell {cmd}: a `!cmd`, run with the user's shell in the
+// session folder. The run comes back here and lands in the transcript as a session_shell event,
+// so every client and a reopened chat show it; it never reaches the agent.
 func (sv *Server) sessionShell(w http.ResponseWriter, r *http.Request) {
 	if !writeGuard(w, r) {
 		return
@@ -62,11 +62,12 @@ func (sv *Server) sessionShell(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	run := RunShell(r.Context(), dir, req.Cmd)
-	res := map[string]any{"output": run.Output(), "code": run.Code, "lines": run.Lines, "took_ms": run.Took.Milliseconds()}
-	if run.Err != "" {
-		res["error"] = run.Err
+	run.ID = fmt.Sprintf("sh-%d", time.Now().UnixNano())
+	if _, err := sv.Append(KindSessionShell, r.PathValue("id"), run); err != nil {
+		writeJSON(w, 500, map[string]string{"error": text.Clean(err.Error())})
+		return
 	}
-	writeJSON(w, 200, res)
+	writeJSON(w, 200, run)
 }
 
 var (

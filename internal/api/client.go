@@ -262,6 +262,14 @@ func (c *Client) SendSession(ctx context.Context, id, text string) error {
 	return c.call(ctx, "POST", "/v1/sessions/"+url.PathEscape(id)+"/messages", map[string]string{"text": text}, nil)
 }
 
+// Shell is POST /v1/sessions/{id}/shell: cmd runs in the session folder and lands in its
+// transcript as a session_shell event.
+func (c *Client) Shell(ctx context.Context, id, cmd string) (ShellRun, error) {
+	var r ShellRun
+	err := c.call(ctx, "POST", "/v1/sessions/"+url.PathEscape(id)+"/shell", map[string]string{"cmd": cmd}, &r)
+	return r, err
+}
+
 // StopSession is POST /v1/sessions/{id}/stop.
 func (c *Client) StopSession(ctx context.Context, id string) error {
 	return c.call(ctx, "POST", "/v1/sessions/"+url.PathEscape(id)+"/stop", map[string]string{}, nil)
