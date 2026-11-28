@@ -139,6 +139,7 @@ func TestFirstMessageStartsSessionThenSends(t *testing.T) {
 	if len(f.started) != 1 || f.started[0] != "hello" || m.current != "s-1" {
 		t.Fatalf("started %v current %q", f.started, m.current)
 	}
+	m.track("s-1", "done")
 	m = typeIn(m, "again")
 	m = cpress(m, ckey("enter"))
 	if len(f.sent) != 1 || f.sent[0] != [2]string{"s-1", "again"} {
@@ -179,7 +180,7 @@ func TestHelpKeyOpensHelp(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 120, 40
 	m = chatStep(chatStep(m, ckey("?")), ckey("enter"))
-	if m.overlay != overlayHelp || !strings.Contains(screen(m), "/connect") {
+	if m.overlay != overlayHelp || !strings.Contains(screen(m), "/sessions") {
 		t.Fatalf("? help:\n%s", screen(m))
 	}
 	m = chatStep(m, ckey("esc"))

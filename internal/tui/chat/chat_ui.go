@@ -307,6 +307,15 @@ func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	case "tab":
 		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
 		return true, nil
+	case "ctrl+n", "ctrl+p":
+		m.switchTab(map[string]int{"ctrl+n": 1, "ctrl+p": -1}[msg.String()])
+		return true, nil
+	case "ctrl+s":
+		m.selecting = !m.selecting
+		if m.selecting {
+			m.status("select mode: drag to select, your terminal copies; ctrl+s gives the mouse back")
+		}
+		return true, nil
 	case "ctrl+k":
 		return true, m.openPalette("")
 	case "ctrl+l":
@@ -455,8 +464,24 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	case msg.Y >= inputY && msg.Y < m.height-1:
 		m.setFocus(-1)
 	case msg.Y == 1:
-		if _, x := m.tabStrip(max(m.width, 20)); msg.X >= x {
+		_, hits, x := m.tabStrip(max(m.width, 20))
+		if msg.X >= x {
 			m.newSession()
+			m.status("new session: your next message starts it with " + m.agentLabel())
+			return m, nil
+		}
+		for _, h := range hits {
+			if msg.X >= h.x0 && msg.X < h.x1 && h.x0 >= 0 {
+				m.open(h.id)
+			}
+		}
+	case m.sideOn() && msg.X >= m.tw() && msg.Y >= head && msg.Y < head+m.rows():
+		_, urls := m.sideRows()
+		if r := msg.Y - head - 1; r >= 0 && r < len(urls) && urls[r] != "" {
+			if msg.X >= m.tw()+sideW-3 {
+				return m.removeLink(urls[r])
+			}
+			return m, m.openLink(urls[r])
 		}
 	case msg.Y >= head && msg.Y < head+m.rows():
 		vis, idx := m.visible()
@@ -497,6 +522,11 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case overlayWorkflows:
 		return m.workflowsKey(k)
 	case overlayHelp, overlayInfo:
+		if m.overlay == overlayInfo && m.info.urls != nil {
+			if n, cmd, ok := m.linksKey(k); ok {
+				return n, cmd
+			}
+		}
 		if p := m.info.set; p != nil && m.overlay == overlayInfo {
 			switch k {
 			case "left", "h":

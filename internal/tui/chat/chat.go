@@ -110,15 +110,19 @@ type chatView struct {
 	// ask posts a question to /v1/asks (the /ask demo); nil without a daemon.
 	ask func(id, question string, options []string) tea.Cmd
 
-	setup     setupAPI           // the daemon's setup endpoints; nil: none
-	cfg       settingsAPI        // the daemon's settings endpoints; nil: none
-	board     boardAPI           // the daemon's task endpoints; nil: none
-	boardSt   boardView          // the open /board
-	flows     workflowAPI        // the daemon's workflow endpoints; nil: none
-	flowSt    workflowsView      // the open /workflows
-	opener    func(string) error // opens a URL; nil: the default browser
-	infoBack  chatOverlay        // where esc on the info panel goes back to
-	setupSt   *api.Setup         // last GET /v1/setup
+	setup     setupAPI            // the daemon's setup endpoints; nil: none
+	cfg       settingsAPI         // the daemon's settings endpoints; nil: none
+	board     boardAPI            // the daemon's task endpoints; nil: none
+	boardSt   boardView           // the open /board
+	flows     workflowAPI         // the daemon's workflow endpoints; nil: none
+	flowSt    workflowsView       // the open /workflows
+	opener    func(string) error  // opens a URL; nil: the default browser
+	queues    map[string][]string // messages typed during a session's turn, sent in order when it ends
+	qEdit     bool                // the input holds a queued message taken back with up
+	stopAsked bool                // ctrl+c interrupted this turn; a second one quits
+	selecting bool                // ctrl+s: the mouse goes to the terminal so text can be selected
+	infoBack  chatOverlay         // where esc on the info panel goes back to
+	setupSt   *api.Setup          // last GET /v1/setup
 	setupSel  int
 	setupStep setupStep
 	setupNote string // a fix, an error or install output shown in the open overlay
@@ -188,6 +192,7 @@ type infoPanel struct {
 	lines  []string
 	scroll bool
 	set    *panelSetting // a setting row on top, cycled with left/right; nil: none
+	urls   []string      // per line: the link it opens, copies or removes; /links only
 }
 
 func newChatView(stream <-chan api.ClientMsg, url string, th kit.Theme) chatView {
@@ -638,7 +643,7 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.release()
 			}
 		}
-		return m, m.wait()
+		return m, tea.Batch(m.wait(), m.drain())
 	case connectLoadedMsg:
 		m.connectLoaded(msg)
 		return m, nil
@@ -692,7 +697,17 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		page := max(m.rows()-1, 1)
 		switch msg.String() {
 		case "ctrl+c":
+			if m.input.Value() == "" && m.busy(m.current) && !m.stopAsked {
+				m.stopAsked = true
+				m.status("interrupting the turn; ctrl+c again quits")
+				return m.stopSession()
+			}
 			return m.quit()
+		case "up":
+			if m.input.Value() == "" && len(m.queues[m.current]) > 0 {
+				m.takeQueued()
+				return m, nil
+			}
 		case "ctrl+v":
 			return m, m.pasteImage()
 		case "esc":
@@ -707,6 +722,10 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focus >= 0 {
 				m.setFocus(-1)
 				return m, nil
+			}
+			if m.busy(m.current) {
+				m.status("interrupting the turn")
+				return m.stopSession()
 			}
 			return m, nil
 		case "pgup", "ctrl+u":
@@ -824,6 +843,7 @@ func (m chatView) rows() int {
 	if m.refined() != "" {
 		n -= 2
 	}
+	n -= len(m.queueRows(max(m.width, 20)))
 	return max(n, 1)
 }
 
@@ -1038,6 +1058,9 @@ func (m chatView) View() tea.View {
 	v := tea.NewView(strings.Join(out, "\n"))
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
+	if m.selecting {
+		v.MouseMode = tea.MouseModeNone
+	}
 	if t.Surface != nil {
 		v.BackgroundColor = t.Surface
 	}
@@ -1105,6 +1128,9 @@ func (m chatView) composer(w int) []string {
 		out = append(out, p+fill(raised, bw, edge+" "+l)+p)
 	}
 	out = append(out, p+fill(raised, bw, edge+"   "+t.Fg(t.Dim).Inherit(raised).Render(m.agentModel()))+p)
+	for _, r := range m.queueRows(bw) {
+		out = append(out, p+r)
+	}
 	return out
 }
 
