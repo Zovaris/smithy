@@ -82,3 +82,18 @@ func TestSystemPromptEmptyUserFileKeepsDefault(t *testing.T) {
 		t.Fatal("a blank user file should not replace the default")
 	}
 }
+
+func TestSystemPromptNeverNamesTheUnderlyingCLI(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	p := SystemPrompt("claude", false)
+	for _, bad := range []string{"Claude Code", "claude code"} {
+		if strings.Contains(p, bad) {
+			t.Errorf("system prompt names %q, which primes the agent to talk about it", bad)
+		}
+	}
+	for _, want := range []string{"Do not mention", "short"} {
+		if !strings.Contains(p, want) {
+			t.Errorf("system prompt lacks the style rule %q", want)
+		}
+	}
+}
