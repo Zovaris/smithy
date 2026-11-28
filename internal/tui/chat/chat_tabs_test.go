@@ -25,6 +25,7 @@ func click(m chatView, x, y int) chatView {
 func TestTabsSwitchByKeyAndClick(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 120, 30
+	m.tabsOn = true
 	started(&m, "s-1", "fix the login form")
 	started(&m, "s-2", "write release notes")
 	m.open("s-1")
@@ -37,11 +38,11 @@ func TestTabsSwitchByKeyAndClick(t *testing.T) {
 		t.Fatalf("ctrl+p goes back, at %q", m.current)
 	}
 	out := screen(m)
-	if !strings.Contains(out, "ctrl+n") || !strings.Contains(out, "fix the login form") {
+	if !strings.Contains(out, "ctrl+n") || !strings.Contains(out, "Fix the login form") {
 		t.Fatalf("tab key hint and full titles:\n%s", out)
 	}
-	y := rowOf(t, m, "write release notes")
-	x := strings.Index(strings.Split(out, "\n")[y], "write release")
+	y := rowOf(t, m, "Write release notes")
+	x := strings.Index(strings.Split(out, "\n")[y], "Write release")
 	m = click(m, x+2, y)
 	if m.current != "s-2" {
 		t.Fatalf("a click opens the tab, at %q", m.current)

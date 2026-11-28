@@ -14,7 +14,6 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/layout"
@@ -49,6 +48,8 @@ const (
 	overlayAsk       // the question card for the first decision waiting on you
 	overlayBoard     // /board: the task files by status
 	overlayWorkflows // /workflows and /schedules
+	overlayConfig    // /config: every setting, grouped and searchable
+	overlayUsage     // /usage: tokens and spend
 )
 
 // chatTool is the data of a "tool" event: one tool call of a session's turn.
@@ -97,6 +98,7 @@ type palItem struct {
 // question card, a turn's tools and thinking to the transcript, everything else to the status line.
 func (m *chatView) event(kind, session string, at time.Time, data json.RawMessage) {
 	if strings.HasPrefix(kind, "session_") && session != "" {
+		m.evAt = at
 		if m.sessionEvent(kind, session, data) {
 			return
 		}
@@ -165,6 +167,16 @@ func (m *chatView) track(id, kind string) {
 					agent, model = m.setupSt.Default.Agent, m.setupSt.Default.Model
 				}
 				foot := turnFooter(agent, model, time.Since(s.turn).Round(100*time.Millisecond), m.tokRate(id), " "+m.th.G.Dot+" ")
+				prev := m.convs[id]
+				if id == m.current {
+					prev = m.msgs
+				}
+				for j := len(prev) - 1; j >= 0; j-- {
+					if prev[j].who == "you" {
+						prev[j].lines = nil
+						break
+					}
+				}
 				m.into(id, chatMsg{who: "daemon", kind: "foot", text: foot})
 			}
 			s.kind, s.state = kind, state
@@ -212,6 +224,9 @@ func (m *chatView) decided(d chatDecidedMsg) {
 
 func (m *chatView) system(text string) {
 	m.offset = 0
+	if n := len(m.msgs); n > 0 && m.msgs[n-1].kind == "system" && m.msgs[n-1].text == text {
+		return
+	}
 	m.push(chatMsg{who: "daemon", kind: "system", text: text})
 }
 
@@ -306,6 +321,11 @@ func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	case "tab":
 		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
 		return true, nil
+	case "1", "2", "3", "4", "5":
+		if r := m.recent(); m.fresh() && m.input.Value() == "" && m.overlay == overlayNone && int(msg.String()[0]-'1') < len(r) {
+			m.open(r[msg.String()[0]-'1'].id)
+			return true, nil
+		}
 	case "ctrl+n", "ctrl+p":
 		m.switchTab(map[string]int{"ctrl+n": 1, "ctrl+p": -1}[msg.String()])
 		return true, nil
@@ -401,6 +421,8 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.settingsCommand(name, arg)
 	case "usage":
 		return m.openUsage()
+	case "config", "settings":
+		return m.openConfig(arg)
 	case "quit":
 		return m.quit()
 	case "help":
@@ -462,6 +484,11 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 		}
 	case msg.Y >= inputY && msg.Y < m.height-1:
 		m.setFocus(-1)
+	case msg.Y == 0 && m.agentsChipAt(msg.X):
+		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
+		return m, nil
+	case msg.Y == 1 && !m.tabsOn:
+		return m, nil
 	case msg.Y == 1:
 		_, hits, x := m.tabStrip(max(m.width, 20))
 		if msg.X >= x {
@@ -474,17 +501,17 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 				m.open(h.id)
 			}
 		}
-	case m.sideOn() && msg.X >= m.tw() && msg.Y >= head && msg.Y < head+m.rows():
+	case m.sideOn() && msg.X >= m.sideX() && msg.Y >= head && msg.Y < head+m.rows():
 		_, urls := m.sideRows()
 		if r := msg.Y - head - 1; r >= 0 && r < len(urls) && urls[r] != "" {
-			if msg.X >= m.tw()+sideW-3 {
+			if msg.X >= m.sideX()+m.sideW()-4 {
 				return m.removeLink(urls[r])
 			}
 			return m, m.openLink(urls[r])
 		}
 	case msg.Y >= head && msg.Y < head+m.rows():
 		vis, idx := m.visible()
-		j := msg.Y - head - (m.rows() - len(vis))
+		j := msg.Y - head - m.lead(len(vis))
 		if j < 0 || j >= len(idx) {
 			return m, nil
 		}
@@ -512,6 +539,10 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.setupKey(msg)
 	case overlayAsk:
 		return m.askKey(msg)
+	case overlayConfig:
+		return m.configKey(msg)
+	case overlayUsage:
+		return m.usageKey(msg)
 	case overlayAgents:
 		return m.agentsKey(k)
 	case overlayProject:
@@ -732,7 +763,12 @@ func (m chatView) render(i, w int) []string {
 	case "qa":
 		return m.qaRows(c, w)
 	case "foot":
-		return m.footRows(c)
+		for j := i - 1; j >= 0; j-- {
+			if m.msgs[j].who == "you" {
+				return []string{}
+			}
+		}
+		return []string{m.lane(w, "", m.railMark(false), m.th.Border, m.th.Fg(m.th.Dim).Render(c.text), nil), m.gap(w)}
 	case "shell":
 		return m.shellRows(i, w)
 	}
@@ -802,9 +838,11 @@ func (m chatView) summary(a, b, w int) []string {
 	if took > 0 {
 		right = dim.Render(fmt.Sprintf("%.1fs", took))
 	}
-	p := strings.Repeat(" ", m.pad())
-	line := spread(p+"  "+t.Fg(col).Render(g)+"  "+dim.Render(activityLabel(tools, thoughts)), right+p+"  ", w)
-	return []string{m.blockRow(a, w, ansi.Truncate(line, w, "…")), ""}
+	var bg color.Color
+	if a == m.focus {
+		bg = t.Focus
+	}
+	return []string{m.spreadLane(w, t.Fg(col).Render(g), m.railMark(false), t.Border, m.activityChips(tools, thoughts), right, bg), m.gap(w)}
 }
 
 // toolLine colors one line of a tool's output: added lines ok, removed lines failed, hunk
@@ -827,15 +865,14 @@ func (m chatView) toolLine(l string) string {
 func (m chatView) toolRows(i, w int, open, last bool) []string {
 	t := m.th
 	tl := m.msgs[i].tool
-	p := strings.Repeat(" ", m.pad())
 	dim := t.Fg(t.Dim)
-	g, col := m.toolGlyph(tl.Status)
+	mark, col := t.Fg(t.Ok).Render(t.G.Pass), t.Info
 	arg := t.Fg(t.Text).Render(tl.Arg)
-	if tl.Status == "running" {
-		spin := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-		if t.G.Unicode {
-			g = spin[m.frame%len(spin)]
-		}
+	switch tl.Status {
+	case "failed":
+		mark, col = t.Fg(t.Err).Render(t.G.Fail), t.Err
+	case "running":
+		mark, col = t.Fg(t.Warn).Render(t.Spinner(m.frame)), t.Warn
 		n := ansi.StringWidth(tl.Arg)
 		arg = t.Shimmer(tl.Arg, math.Mod(float64(m.frame)*0.6, float64(n+12))-6)
 	}
@@ -843,7 +880,7 @@ func (m chatView) toolRows(i, w int, open, last bool) []string {
 	if ansi.StringWidth(name) < 5 {
 		name += strings.Repeat(" ", 5-ansi.StringWidth(name))
 	}
-	left := p + "  " + t.Fg(col).Render(g) + "  " + t.Fg(t.Strong).Bold(true).Render(name) + " " + arg
+	left := t.Fg(col).Bold(true).Render(name) + " " + arg
 	var right string
 	if m.mode == modeVerbose {
 		var meta []string
@@ -854,67 +891,28 @@ func (m chatView) toolRows(i, w int, open, last bool) []string {
 		}
 		right = dim.Render(strings.Join(meta, " "+t.G.Dot+" "))
 	} else {
-		took := tl.Took
-		if n := ansi.StringWidth(took); n < 5 {
-			took = strings.Repeat(" ", 5-n) + took
-		}
-		right = dim.Render(tl.Stat + "  " + took)
+		right = t.Fg(t.Muted).Render(tl.Stat) + dim.Render("  "+tl.Took)
 	}
-	head := spread(ansi.Truncate(left, w-ansi.StringWidth(right)-m.pad()-4, "…"), right+p+"  ", w)
-	tier := t.Focus
-	if m.mode == modeVerbose {
-		tier = t.Raised
-	}
-	if !open {
-		tier = nil
-	}
-	rows := []string{m.tierRow(i, w, tier, head)}
+	var bg color.Color
 	if open {
-		ind := p + strings.Repeat(" ", 11)
+		bg = t.Raised
+	}
+	if i == m.focus {
+		bg = t.Focus
+	}
+	rail := m.railMark(false)
+	rows := []string{m.spreadLane(w, mark, rail, t.Border, left, right, bg)}
+	if open {
 		for _, l := range tl.Lines {
-			for _, wl := range strings.Split(ansi.Wrap(kit.Clean(l), max(w-2*m.pad()-14, 10), ""), "\n") {
-				rows = append(rows, m.tierRow(i, w, tier, ind+m.toolLine(wl)))
+			for _, wl := range strings.Split(ansi.Wrap(kit.Clean(l), m.textWidth(w)-2, ""), "\n") {
+				rows = append(rows, m.lane(w, "", rail, t.Border, m.toolLine(wl), bg))
 			}
 		}
-		rows = append(rows, m.tierRow(i, w, tier, ""))
 	}
 	if last || (open && m.mode == modeVerbose) {
-		rows = append(rows, "")
+		rows = append(rows, m.gap(w))
 	}
 	return rows
-}
-
-// tierRow lays a block row on background c between the gutters; the focused block also gets
-// the border mark at its left edge.
-func (m chatView) tierRow(i, w int, c color.Color, s string) string {
-	t := m.th
-	if i == m.focus && c == nil {
-		c = t.Focus
-	}
-	if c == nil {
-		return s
-	}
-	p := m.pad()
-	bw := w - 2*p
-	inner := ansi.Cut(s, p, w-p)
-	if i == m.focus {
-		inner = t.Fg(t.Accent).Render("▎") + ansi.Cut(inner, 1, bw)
-	}
-	return strings.Repeat(" ", p) + fill(lipgloss.NewStyle().Background(c), bw, inner) + strings.Repeat(" ", p)
-}
-
-// blockRow lays one row of message i: the focused block sits on the focus tier.
-func (m chatView) blockRow(i, w int, s string) string { return m.tierRow(i, w, nil, s) }
-
-func spread(left, right string, w int) string {
-	gap := w - ansi.StringWidth(left) - ansi.StringWidth(right)
-	if gap < 1 {
-		if rw := ansi.StringWidth(right); rw+10 < w {
-			return ansi.Truncate(left, w-rw-1, "…") + " " + right
-		}
-		return left
-	}
-	return left + strings.Repeat(" ", gap) + right
 }
 
 // askDemo asks a sample question (or the one typed) on the question card through the daemon,
@@ -932,4 +930,49 @@ func (m *chatView) askDemo(q string) tea.Cmd {
 	_, _ = rand.Read(b)
 	m.status("asked: answer it on the question card (a number, arrows and enter, or your own words)")
 	return m.ask("ask:demo"+hexenc.EncodeToString(b), q, opts)
+}
+
+func spread(left, right string, w int) string {
+	gap := w - ansi.StringWidth(left) - ansi.StringWidth(right)
+	if gap < 1 {
+		if rw := ansi.StringWidth(right); rw+10 < w {
+			return ansi.Truncate(left, w-rw-1, "…") + " " + right
+		}
+		return left
+	}
+	return left + strings.Repeat(" ", gap) + right
+}
+
+// turnResult is the heading's right side for the prompt c: how its turn went, once it ended
+// (✓ and the agent's footer), or the spinner while it runs.
+func (m chatView) turnResult(c *chatMsg) string {
+	t := m.th
+	at := -1
+	for i, x := range m.msgs {
+		if x == c {
+			at = i
+		}
+	}
+	if at < 0 {
+		return ""
+	}
+	for _, x := range m.msgs[at+1:] {
+		switch {
+		case x.who == "you":
+			return ""
+		case x.kind == "foot":
+			return t.Fg(t.Ok).Render(t.G.Pass+" ") + t.Fg(t.Dim).Render(x.text)
+		}
+	}
+	return ""
+}
+
+// activityChips is a folded run of tools as one small tally per kind, "▪ 2 reads  ▪ 1 edit".
+func (m chatView) activityChips(tools []chatTool, thoughts int) string {
+	t := m.th
+	var out []string
+	for _, p := range strings.Split(strings.TrimPrefix(activityLabel(tools, thoughts), "+ "), ", ") {
+		out = append(out, t.Fg(t.Info).Render(t.G.On)+" "+t.Fg(t.Muted).Render(p))
+	}
+	return strings.Join(out, "  ")
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/remote"
 	"github.com/Zovaris/smithy/internal/tui/kit"
@@ -172,6 +173,14 @@ type chatView struct {
 	tendPRs   int              // the PRs it tends
 	frame     int              // motion frame, advanced only while something runs
 	ticking   bool             // a frame tick is scheduled
+	mo        motion           // the spring that lifts an overlay in as it opens
+	vb        valueBump        // the setting value that just changed, settling
+	usage     *events.Report   // /usage's report, nil while it loads
+	cfgAdv    bool             // /config shows its Advanced settings
+	evAt      time.Time        // when the event being applied happened
+	dirty     int              // files changed in the folder's repo, -1 outside one
+	homeIn    valueBump        // the empty screen's entrance
+	tabsOn    bool             // ui.agent_tabs: the sessions as tabs under the header
 
 	server      string                    // the saved server name, local or URL this chat talks to
 	picker      *connectPicker            // /connect's state while its box is open
@@ -203,31 +212,30 @@ func newChatView(stream <-chan api.ClientMsg, url string, th kit.Theme) chatView
 // ember ›, three rows tall, growing to ten then scrolling; enter sends, shift+enter, alt+enter
 // or ctrl+j breaks the line.
 // composerPrompt draws the accent › on the first row; a theme change sets it again.
-func composerPrompt(th kit.Theme) func(textarea.PromptInfo) string {
-	return func(i textarea.PromptInfo) string {
-		st := lipgloss.NewStyle()
-		if th.Raised != nil {
-			st = st.Background(th.Raised)
-		}
-		if i.LineNumber == 0 {
-			return th.Fg(th.Accent).Inherit(st).Render(th.G.Prompt) + st.Render(" ")
-		}
-		return st.Render("  ")
-	}
+func composerPrompt(kit.Theme) func(textarea.PromptInfo) string {
+	return func(textarea.PromptInfo) string { return "" }
 }
 
 func newComposer(th kit.Theme) textarea.Model {
 	in := textarea.New()
 	in.ShowLineNumbers = false
 	in.Placeholder = "Ask, or / for commands"
-	in.DynamicHeight, in.MinHeight, in.MaxHeight, in.MaxContentHeight = true, 3, 10, 1<<20
+	in.DynamicHeight, in.MinHeight, in.MaxHeight, in.MaxContentHeight = true, 1, 10, 1<<20
 	in.KeyMap.InsertNewline.SetKeys("shift+enter", "alt+enter", "ctrl+j")
-	in.SetPromptFunc(2, composerPrompt(th))
+	in.SetPromptFunc(0, composerPrompt(th))
+	in.SetStyles(composerStyles(th))
+	in.SetHeight(1)
+	in.Focus()
+	return in
+}
+
+// composerStyles puts the textarea on the focus tier in theme th; a theme change sets them again.
+func composerStyles(th kit.Theme) textarea.Styles {
 	st := textarea.DefaultStyles(true)
 	for _, s := range []*textarea.StyleState{&st.Focused, &st.Blurred} {
 		base := lipgloss.NewStyle()
-		if th.Raised != nil {
-			base = base.Background(th.Raised)
+		if th.Focus != nil {
+			base = base.Background(th.Focus)
 		}
 		s.Base, s.CursorLine, s.EndOfBuffer, s.Prompt = base, base, base, base
 		s.Text = base.Foreground(th.Strong)
@@ -236,10 +244,7 @@ func newComposer(th kit.Theme) textarea.Model {
 			s.Text, s.Placeholder = base, base
 		}
 	}
-	in.SetStyles(st)
-	in.SetHeight(3)
-	in.Focus()
-	return in
+	return st
 }
 
 // chatArgs is what `smithy chat` was given.
@@ -442,6 +447,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	m := newChatView(ch, url, kit.NewTheme(true, p, kit.Utf8Locale()))
 	m.splashOn = splashWanted(isTTY(os.Stdout), os.Getenv("NO_COLOR"), os.Getenv("SMITHY_REDUCE_MOTION"), config.Get("ui.splash", "true"), config.Get("ui.reduce_motion", "false"))
 	m.still = os.Getenv("SMITHY_REDUCE_MOTION") != "" || config.Get("ui.reduce_motion", "false") == "true"
+	m.tabsOn = config.Get("ui.agent_tabs", "false") == "true"
 	m.where = where
 	m.server = serverName
 	m.connectLoad = defaultConnectLoad(func() (string, string) {
@@ -471,6 +477,8 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	m.dir, _ = os.Getwd()
 	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
+	m.dirty = gitDirty(m.dir)
+	m.homeIn = valueBump{key: "home", still: m.still}.start()
 	m.effort = config.Get("agent.effort", "medium")
 	if tok != "" {
 		m.webURL = url + "/#token=" + neturl.QueryEscape(tok)
@@ -553,6 +561,7 @@ func (m *chatView) push(c chatMsg) {
 func (m chatView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	n, cmd := m.update(msg)
 	m = n.(chatView)
+	m.mo = m.mo.follow(m.overlay, m.still)
 	if k, ok := msg.(tea.KeyPressMsg); ok && (k.String() == "ctrl+k" || k.String() == "ctrl+l") {
 		cmd = tea.Batch(cmd, tea.ClearScreen)
 	}
@@ -575,6 +584,7 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case chatFrameMsg:
 		m.frame++
+		m.mo, m.vb, m.homeIn = m.mo.step(), m.vb.step(), m.homeIn.step()
 		m.shimmer = max(m.shimmer-1, 0)
 		for i := max(len(m.msgs)-8, 0); i < len(m.msgs); i++ {
 			if c := m.msgs[i]; c.tool != nil && c.tool.Status == "running" {
@@ -614,6 +624,13 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case paletteSettingsMsg:
 		m.palSet = msg.rows
+		return m, nil
+	case usageMsg:
+		m.usage = &msg.r
+		m.mo.pos, m.mo.vel = min(m.mo.pos, 0.3), 0
+		if m.still {
+			m.mo.pos = 1
+		}
 		return m, nil
 	case settingsDoneMsg:
 		if msg.tend != nil {
@@ -836,7 +853,10 @@ func eventText(kind, session string, data json.RawMessage) string {
 // line and the gap under it, the composer, the footer and the spinner row while the open
 // session works.
 func (m chatView) rows() int {
-	n := m.height - headRows - 2 - m.input.Height() - 2
+	n := m.height - headRows - 1 - m.input.Height() - 5
+	if strings.TrimSpace(ansi.Strip(m.statusLine(m.tw()))) != "" {
+		n--
+	}
 	if m.working() {
 		n -= 2
 	}
@@ -876,23 +896,29 @@ func (m chatView) wrap(i int) []string {
 // blank row after each.
 func (m chatView) textRows(c *chatMsg, w int) []string {
 	t := m.th
-	p := m.pad()
-	gut := strings.Repeat(" ", p)
-	bw := w - 2*p
+	bw := m.textWidth(w)
 	if c.who == "you" {
-		row := lipgloss.NewStyle()
-		if t.Raised != nil {
-			row = row.Background(t.Raised)
-		}
 		var lines []string
-		for n, l := range strings.Split(ansi.Wrap(c.text, max(bw-6, 10), ""), "\n") {
-			lead := "    "
-			if n == 0 {
-				lead = "  " + t.Fg(t.Dim).Render(t.G.Prompt) + " "
-			}
-			lines = append(lines, gut+fill(row, bw, lead+t.Fg(t.Strong).Render(l))+gut)
+		res := m.turnResult(c)
+		if c.at != "" {
+			res = strings.TrimSpace(res + "  " + t.Fg(t.Dim).Render(c.at))
 		}
-		return append(lines, "")
+		below := bw-ansi.StringWidth(res)-2 < max(bw/2, 30)
+		room := bw - ansi.StringWidth(res) - 2
+		if below {
+			room = bw
+		}
+		for n, l := range strings.Split(ansi.Wrap(c.text, room, ""), "\n") {
+			right := ""
+			if n == 0 && !below {
+				right = res
+			}
+			lines = append(lines, m.spreadLane(w, "", m.railMark(true), t.Accent, t.Fg(t.Strong).Bold(true).Render(l), right, nil))
+		}
+		if below && res != "" {
+			lines = append(lines, m.lane(w, "", m.railMark(true), t.Accent, ansi.Truncate(res, bw, "…"), nil))
+		}
+		return append(lines, m.gap(w))
 	}
 	body := t.Fg(t.Text)
 	text := c.text
@@ -906,14 +932,14 @@ func (m chatView) textRows(c *chatMsg, w int) []string {
 	case c.kind != "":
 		body = t.Fg(t.Dim)
 	}
-	if c.at != "" {
+	if c.at != "" && c.who != "agent" {
 		text = c.at + " " + text
 	}
 	var lines []string
-	for _, l := range strings.Split(ansi.Wrap(text, max(bw-4, 10), ""), "\n") {
-		lines = append(lines, gut+"  "+m.linkify(l, body))
+	for _, l := range strings.Split(ansi.Wrap(text, bw, ""), "\n") {
+		lines = append(lines, m.lane(w, "", m.railMark(false), t.Border, m.linkify(l, body), nil))
 	}
-	return append(lines, "")
+	return append(lines, m.gap(w))
 }
 
 // linkify draws l in st: file paths in the link color, `code` spans on the raised tier
@@ -1003,15 +1029,25 @@ func (m chatView) View() tea.View {
 	out = append(out, m.header(w)...)
 	vis, _ := m.visible()
 	body := make([]string, 0, m.rows()+2)
-	for range m.rows() - len(vis) {
-		body = append(body, "")
+	if m.fresh() && !m.working() && m.offset == 0 {
+		body = append(body, m.home(m.tw(), m.rows())...)
+	} else if intro := m.intro(m.tw()); m.lead(len(vis)) == len(intro) {
+		body = append(body, intro...)
+		body = append(body, vis...)
+		for len(body) < m.rows() {
+			body = append(body, "")
+		}
+	} else {
+		for range m.rows() - len(vis) {
+			body = append(body, "")
+		}
+		body = append(body, vis...)
 	}
-	body = append(body, vis...)
 	if m.working() {
-		body = append(body, m.spinRow(w), "")
+		body = append(body, m.spinRow(m.tw()), "")
 	}
 	if m.refined() != "" {
-		r, _ := m.refineRow(w)
+		r, _ := m.refineRow(m.tw())
 		body = append(body, r, "")
 	}
 	if items := m.popup(); len(items) > 0 {
@@ -1023,9 +1059,14 @@ func (m chatView) View() tea.View {
 			body[j] = splice(body[j], r, m.pad(), m.tw())
 		}
 	}
+	if st := m.statusLine(m.tw()); strings.TrimSpace(ansi.Strip(st)) != "" {
+		body = append(body, st, "")
+	} else {
+		body = append(body, "")
+	}
+	body = append(body, m.composer(m.tw())...)
+	body = append(body, "")
 	out = append(out, m.besideSide(body)...)
-	out = append(out, m.statusLine(w), "")
-	out = append(out, m.composer(w)...)
 	out = append(out, m.footer(w))
 	if m.welcome != welcomeOff {
 		out = m.welcomeView(w, m.height)
@@ -1047,6 +1088,10 @@ func (m chatView) View() tea.View {
 		out = m.infoBox(out, w, m.height)
 	case overlayAsk:
 		out = m.askBox(out, w, m.height)
+	case overlayConfig:
+		out = m.configBox(out, w, m.height)
+	case overlayUsage:
+		out = m.usageBox(out, w, m.height)
 	case overlayBoard:
 		out = m.boardBox(out, w, m.height)
 	case overlayWorkflows:
@@ -1104,34 +1149,53 @@ func cwd() string {
 	return d
 }
 
-// composer is the input block: the raised tier from gutter to gutter, the ember › inside it.
+// composer is the input block: the focus tier from gutter to gutter behind an accent rail, the
+// accent › inside it, and a row of chips under the text: agent, model and effort.
 func (m chatView) composer(w int) []string {
 	t := m.th
-	raised := lipgloss.NewStyle()
-	if t.Raised != nil {
-		raised = raised.Background(t.Raised)
+	_, tx, right := m.grid(w)
+	bw := right - tx
+	row := func(mark, s string) string {
+		return m.lane(w, mark, m.railMark(true), t.Accent, ansi.Truncate(s, bw, ""), t.Focus)
 	}
-	p := strings.Repeat(" ", m.pad())
-	bw := w - 2*m.pad()
 	var out []string
 	if c := m.chips(); c != "" {
-		out = append(out, p+fill(raised, bw, "  "+c+"  esc drops")+p)
+		out = append(out, row("", c+"  esc drops"))
 	}
-	edge := t.Fg(t.Accent).Inherit(raised).Render("▎")
-	if !t.G.Unicode {
-		edge = t.Fg(t.Accent).Inherit(raised).Render("|")
-	}
-	for _, l := range strings.Split(m.input.View(), "\n") {
+	out = append(out, row("", ""))
+	for n, l := range strings.Split(m.input.View(), "\n") {
 		if m.shimmer > 0 {
 			l = t.Shimmer(ansi.Strip(l), float64(bw)*float64(shimmerFrames-m.shimmer)/shimmerFrames)
 		}
-		out = append(out, p+fill(raised, bw, edge+" "+l)+p)
+		_ = n
+		out = append(out, row("", l))
 	}
-	out = append(out, p+fill(raised, bw, edge+"   "+t.Fg(t.Dim).Inherit(raised).Render(m.agentModel()))+p)
-	for _, r := range m.queueRows(bw) {
+	out = append(out, row("", ""), row("", m.metaChips()))
+	p := strings.Repeat(" ", tx-1)
+	for _, r := range m.queueRows(bw + 1) {
 		out = append(out, p+r)
 	}
 	return out
+}
+
+func (m chatView) metaChips() string {
+	t := m.th
+	parts := strings.Split(m.agentModel(), " "+t.G.Dot+" ")
+	var out []string
+	for i, s := range parts {
+		if s == "" {
+			continue
+		}
+		fg := t.Text
+		if i == 0 {
+			fg = t.Strong
+		}
+		out = append(out, m.chip(" "+s+" ", fg, t.Overlay, false))
+	}
+	if s, ok := m.session(); ok && s.effort != "" {
+		out = append(out, m.chip(" effort ", t.Muted, t.Overlay, false)+m.chip(s.effort+" ", t.Accent, t.Overlay, true))
+	}
+	return strings.Join(out, on(t.Focus).Render(" "))
 }
 
 // gitBranch is dir's current branch, "" outside a repo.
@@ -1150,4 +1214,16 @@ const daemonCallTimeout = 2 * time.Minute
 // daemonCtx is the context for one daemon call made from a command.
 func daemonCtx() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), daemonCallTimeout)
+}
+
+// gitDirty is how many files git reports changed in dir, -1 outside a repo.
+func gitDirty(dir string) int {
+	out, err := exec.Command("git", "-C", dir, "status", "--porcelain").Output()
+	if err != nil {
+		return -1
+	}
+	if s := strings.TrimSpace(string(out)); s != "" {
+		return len(strings.Split(s, "\n"))
+	}
+	return 0
 }

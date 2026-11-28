@@ -24,8 +24,11 @@ func boxRows(t *testing.T, m chatView) []string {
 	t.Helper()
 	var rows []string
 	for _, l := range strings.Split(screen(m), "\n") {
-		if strings.Contains(l, "┌") || strings.Contains(l, "│") || strings.Contains(l, "├") || strings.Contains(l, "└") {
+		if strings.Contains(l, "▄▄▄") || len(rows) > 0 && len(rows) < 40 && !strings.Contains(l, "▀▀▀") {
 			rows = append(rows, l)
+		}
+		if strings.Contains(l, "▀▀▀") {
+			break
 		}
 	}
 	if len(rows) < 6 {
@@ -39,25 +42,18 @@ func TestModalHasAFrameTitleBarAndFooter(t *testing.T) {
 		m := framedChat(name, 100)
 		m = sendKey(typeIn(m, "/theme"), ckey("enter"))
 		rows := boxRows(t, m)
-		if !strings.Contains(rows[0], "┌") || !strings.Contains(rows[len(rows)-1], "└") {
-			t.Fatalf("%s: square corners top and bottom:\n%s", name, strings.Join(rows, "\n"))
+		if !strings.Contains(rows[0], "▄") {
+			t.Fatalf("%s: a flat accent edge on top:\n%s", name, strings.Join(rows, "\n"))
 		}
-		title := rows[1]
-		if !strings.Contains(title, "Theme") || !strings.HasSuffix(strings.TrimRight(strings.TrimSuffix(strings.TrimSpace(title), "│"), " "), "esc") {
+		title := strings.TrimSpace(rows[1])
+		if !strings.Contains(title, "Theme") || !strings.Contains(title, "esc") {
 			t.Fatalf("%s: title bar has the title left and esc right: %q", name, title)
 		}
-		if !strings.Contains(rows[len(rows)-2], "enter") {
-			t.Fatalf("%s: key footer above the bottom edge: %q", name, rows[len(rows)-2])
+		if !strings.Contains(rows[len(rows)-1], "enter") {
+			t.Fatalf("%s: key footer on the last row: %q", name, rows[len(rows)-1])
 		}
-		w := ansi.StringWidth(strings.TrimSpace(rows[0]))
-		for _, r := range rows {
-			s := strings.TrimSpace(r)
-			if i := strings.IndexAny(s, "┌│├└"); i >= 0 {
-				s = s[i:]
-			}
-			if got := ansi.StringWidth(strings.TrimRight(s, " ")); got > w+40 {
-				t.Fatalf("%s: rows keep the frame width", name)
-			}
+		if strings.ContainsAny(strings.Join(rows, ""), "┌┐└┘│") {
+			t.Fatalf("%s: no box-drawing frame:\n%s", name, strings.Join(rows, "\n"))
 		}
 	}
 }

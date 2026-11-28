@@ -124,7 +124,7 @@ func TestPromptCommandShowsTheFileAndOverride(t *testing.T) {
 	m.width, m.height = 160, 48
 	m.cfg = &fakeSettings{}
 	m = cpress(typeIn(m, "/prompt"), ckey("enter"))
-	if out := screen(m); !strings.Contains(out, "/home/dev/.smithy/prompt.md") || !strings.Contains(out, "override active") {
+	if out := screen(m) + notes(m); !strings.Contains(out, "/home/dev/.smithy/prompt.md") || !strings.Contains(out, "override active") {
 		t.Fatalf("/prompt missing path or state:\n%s", out)
 	}
 }

@@ -35,7 +35,7 @@ func TestUsageOpensAModalWithPeriodsAgentsAndModels(t *testing.T) {
 		t.Fatalf("asked for session %q", f.session)
 	}
 	out := screen(m)
-	for _, s := range []string{"Usage", "THIS SESSION", "TODAY", "LAST 7 DAYS", "ALL TIME", "claude", "haiku", "12.0k", "3.4k", "56.0k", "$1.25"} {
+	for _, s := range []string{"Usage", "this session", "today", "7 days", "all time", "claude", "haiku", "3.4k", "56.0k", "$1.25"} {
 		if !strings.Contains(out, s) {
 			t.Fatalf("%q missing:\n%s", s, out)
 		}

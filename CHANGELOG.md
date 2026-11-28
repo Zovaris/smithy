@@ -3,7 +3,15 @@
 One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skill lands under
 **Unreleased** first and moves into a version when it is tagged. Each version opens with short,
 plain notes for people (`### Highlights`, `### New`, `### Fixed`): what changed for them, in a
-sentence each. The technical bullets go under `### Details`. The GitHub release shows only the
+sentence each. The technical bullets go under `### Details`
+- The daemon runs opencode with `--format json` (`AGENT_ARGS`) and reads it like claude's stream (`opencode_stream.go`): text parts, finished tool calls as `session_tool` events, step tokens and cost as usage; the reply is the text parts. The TUI adopts streamed parts as the agent's answer when the final message matches them.
+- Links: a GitHub rate-limit error pauses GitHub calls for 15 minutes (`Linker.limited`), keeps the last PRs and GitHub issues, and reports `links paused: GitHub rate limit, retry HH:MM`.
+
+- TUI "Slab" design (docs/design/tui.md, docs/design/web.md): flat surfaces, square corners, no box frames; header as an accent block, tabs as chips with a braille spinner on running sessions, user messages on the raised tier behind a `▌` rail, tool rows `▪ Name arg … ✓ stat`, shell blocks on the raised tier with a `$` chip, the composer on the focus tier with agent/model/effort chips, key chips in the footer, a raised sidebar with a flat context meter and `ci ✓/✗/⠹` badges. Status glyphs are squares (`▪ ▫`) everywhere; circles are gone (kit glyphs `On/Half/Off`, `Theme.Spinner`).
+- Modals (`floatBox`, `/config`, `/usage`) lose the border: accent edge or title bar, rows on the raised tier, the selection on the focus tier behind an accent rail, the footer on the overlay tier, a one-cell offset shade (`Theme.Shade`) and a dimmer backdrop. Group headings render in sentence case.
+- Motion uses one harmonica spring: a modal rises into place as it opens, a changed `/config` value settles, `/usage` bars grow in; `ui.reduce_motion` turns it off.
+- `events.Report` adds `month` and `days` (the last 30 local days: runs, tokens, cost) for the `/usage` chart.
+. The GitHub release shows only the
 part above `### Details`.
 
 ## Unreleased
@@ -17,8 +25,17 @@ part above `### Details`.
 - Chat apps get a notifications channel and a chat channel where a message starts a session.
 - `/usage` shows tokens and cost per session, day, week and agent; `~/.smithy/prompt.md` replaces the agents' system prompt.
 - Four more themes, each a whole palette: moss, dune, dusk and rose.
+- The TUI has a new flat look: your messages and the input sit on colored bands with an accent rail, panels open with a shade and a short spring, and every theme's palette drives the accents.
 
 ### New
+
+- `/config` opens every setting in one modal: grouped, filtered as you type, ←→ changes a value, with what the focused setting does and its default.
+- `/usage` is a dashboard: headline numbers, spend (or tokens) per day for 30 days, the split by agent and model with bars, and the token mix. Runs from before agents were recorded read "earlier runs, agent not recorded" instead of "unknown", in the web too.
+- opencode sessions show one answer with their tool calls as tool rows, instead of the reply twice with its raw banner lines.
+- The sidebar no longer shows GitHub's raw rate-limit error: links pause for 15 minutes and say when they retry.
+- The empty chat opens on a home with the repo's state and your recent sessions (1-5 opens one), two panels when wide and one when narrow. Session tabs are now a setting ("Show agent tabs", off): without them an agents chip in the header opens the agents panel.
+- `/config` shows about 20 settings by name (Theme, Sidebar, Effort, Tend, Serve…), booleans as on/off, and the rest under Advanced; tab titles are short and scroll with « » when they overflow.
+- A question waiting on you opens as a Questions panel above the input, each option with its description; the transcript keeps "Asked 1 question" and your answer.
 
 - Workflows: steps run a command, ask an agent (yes/no, a choice or JSON), branch, set variables, pick JSON fields, loop, ask you, notify you, call another workflow, make HTTP calls with stored keys, run in parallel, wait, work with GitHub and files in allowed folders, start a chat session, smelt or warden, fan out an agent per item, judge work against criteria and repeat until a check passes. Every step can retry, time out, skip or recover. Steps that change things need the workflow's `allow_write`; opening or merging a PR and starting warden need your yes first.
 - Schedules start a workflow on a cron line, a webhook, a GitHub event (a Dependabot alert, a red PR, a labeled issue) or a file change. `smithy workflow`, `smithy schedule`, `/workflows`, `/schedules`, `/run` and the web's Workflows and Schedules pages run them, show a run live, edit them with validation and show each step of past runs. `smithy workflow example` adds a daily Dependabot check, a repo health report, a webhook reply and `ship-a-fix` (an agent fixes, tests loop until green, a judge reviews, you approve, the PR opens).

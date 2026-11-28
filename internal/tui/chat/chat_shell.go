@@ -154,16 +154,14 @@ func (m chatView) shellRows(i, w int) []string {
 	t := m.th
 	c := m.msgs[i]
 	sh := c.sh
-	p := strings.Repeat(" ", m.pad())
 	dim := t.Fg(t.Dim)
-	left := p + "  " + t.Fg(t.Accent).Render("$") + " " + t.Fg(t.Strong).Bold(true).Render(sh.cmd)
 	var meta []string
 	if s, ok := m.session(); ok && s.dir != "" && sh.dir != "" && s.dir != sh.dir {
 		meta = append(meta, dim.Render(sh.dir))
 	}
 	switch r := sh.run; {
 	case r == nil:
-		meta = append(meta, t.Fg(t.Warn).Render("running"))
+		meta = append(meta, t.Fg(t.Warn).Render(t.Spinner(m.frame)+" running"))
 	default:
 		meta = append(meta, dim.Render(shellTook(time.Duration(r.TookMS)*time.Millisecond)))
 		switch {
@@ -172,14 +170,17 @@ func (m chatView) shellRows(i, w int) []string {
 		case r.Code != 0:
 			meta = append(meta, t.Fg(t.Err).Render(fmt.Sprintf("exit %d", r.Code)))
 		default:
-			meta = append(meta, t.Fg(t.Ok).Render("ok"))
+			meta = append(meta, t.Fg(t.Ok).Render(t.G.Pass+" exit 0"))
 		}
 	}
-	right := strings.Join(meta, dim.Render(" "+t.G.Dot+" "))
-	head := spread(ansi.Truncate(left, max(w-ansi.StringWidth(right)-m.pad()-4, 10), "…"), right+p+"  ", w)
-	rows := []string{m.blockRow(i, w, head)}
+	bg := t.Raised
+	if i == m.focus {
+		bg = t.Focus
+	}
+	rail := m.railMark(false)
+	rows := []string{m.spreadLane(w, t.Fg(t.Warn).Bold(true).Render("$"), rail, t.Border, t.Fg(t.Strong).Bold(true).Render(sh.cmd), strings.Join(meta, dim.Render(" "+t.G.Dot+" "))+" ", bg)}
 	if sh.run == nil {
-		return append(rows, "")
+		return append(rows, m.gap(w))
 	}
 	lines := sh.run.Lines
 	if len(lines) == 0 {
@@ -189,20 +190,19 @@ func (m chatView) shellRows(i, w int) []string {
 	if !c.open && len(lines) > shellFold {
 		more, lines = len(lines)-shellFold, lines[:shellFold]
 	}
-	rule := p + "  " + dim.Render(t.G.Pipe) + " "
 	for _, l := range lines {
 		st := t.Fg(t.Muted)
 		if l.Err {
 			st = t.Fg(t.Err)
 		}
-		for _, wl := range strings.Split(ansi.Wrap(strings.ReplaceAll(l.Text, "\t", "    "), max(w-2*m.pad()-6, 10), ""), "\n") {
-			rows = append(rows, m.blockRow(i, w, rule+st.Render(wl)))
+		for _, wl := range strings.Split(ansi.Wrap(strings.ReplaceAll(l.Text, "\t", "    "), m.textWidth(w)-2, ""), "\n") {
+			rows = append(rows, m.lane(w, "", rail, t.Border, st.Render(wl), bg))
 		}
 	}
 	if more > 0 {
-		rows = append(rows, m.blockRow(i, w, rule+dim.Render(fmt.Sprintf("… %d more %s · click or enter to open", more, "line"+plural(more)))))
+		rows = append(rows, m.lane(w, "", rail, t.Border, dim.Render(fmt.Sprintf("… %d more %s · click or enter to open", more, "line"+plural(more))), bg))
 	}
-	return append(rows, "")
+	return append(rows, m.gap(w))
 }
 
 // shellTook is a run's time: 40ms, 1.2s, 2m3s.

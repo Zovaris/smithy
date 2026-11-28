@@ -5,7 +5,6 @@ package chat
 import (
 	"fmt"
 	"image/color"
-	"math"
 	"path/filepath"
 	"strings"
 	"time"
@@ -26,7 +25,7 @@ func frameTick() tea.Cmd {
 
 // animating reports whether anything on screen moves: a session working or a tool running.
 func (m chatView) animating() bool {
-	if m.welcome != welcomeOff || m.shimmer > 0 {
+	if m.welcome != welcomeOff || m.shimmer > 0 || m.mo.moving() || m.vb.moving() || m.homeIn.moving() && m.fresh() {
 		return true
 	}
 	for _, s := range m.sessions {
@@ -78,13 +77,22 @@ func (m chatView) header(w int) []string {
 		project = filepath.Base(m.dir)
 	}
 	pill := m.pill
+	if !m.tabsOn {
+		pill = func(bar lipgloss.Style) string { return m.agentsChip() + bar.Render(" ") + m.pill(bar) }
+	}
 	if tag := strings.TrimPrefix(strings.Join([]string{m.goalTag(), m.tendTag()}, "  "), "  "); strings.TrimSpace(tag) != "" {
 		tag = strings.TrimSpace(tag)
 		pill = func(bar lipgloss.Style) string {
-			return bar.Foreground(m.th.Dim).Render(tag) + bar.Render("  ") + m.pill(bar)
+			if !m.tabsOn {
+				return m.agentsChip() + bar.Render(" ") + m.chip(" "+tag+" ", m.th.Muted, m.th.Overlay, false) + bar.Render(" ") + m.pill(bar)
+			}
+			return m.chip(" "+tag+" ", m.th.Muted, m.th.Overlay, false) + bar.Render(" ") + m.pill(bar)
 		}
 	}
 	tabs, _, _ := m.tabStrip(w)
+	if !m.tabsOn {
+		tabs = ""
+	}
 	return []string{m.th.HeadBar(w, m.pad(), project, pill, m.clockNow().Format("15:04")), tabs}
 }
 
@@ -119,21 +127,16 @@ func (m chatView) pill(bar lipgloss.Style) string {
 		}
 	}
 	if len(m.pending) > 0 {
-		w := bar.Foreground(t.Warn).Render(t.G.On) + bar.Foreground(t.Text).Render(" waiting on you")
+		w := m.chip(" ? waiting on you ", t.Surface, t.Warn, true)
 		if n > 0 {
-			w += bar.Foreground(t.Dim).Render(fmt.Sprintf(" · %d running", n))
+			w += bar.Render(" ") + m.chip(fmt.Sprintf(" %s %d running ", t.Spinner(m.frame), n), t.Warn, t.Overlay, false)
 		}
 		return w
 	}
 	if n == 0 {
-		return bar.Foreground(t.Dim).Render("idle")
+		return m.chip(" idle ", t.Muted, t.Overlay, false)
 	}
-	dot := t.Accent
-	if !t.Plain && t.Ramp != nil {
-		ph := float64(m.frame) / (kit.BreathSecs * kit.Fps) * 2 * math.Pi
-		dot = lipgloss.Blend1D(8, t.Dim, t.Accent)[int((1-math.Cos(ph))/2*7+0.5)]
-	}
-	return bar.Foreground(dot).Render(t.G.On) + bar.Foreground(t.Text).Render(fmt.Sprintf(" %d running", n))
+	return m.chip(" "+t.Spinner(m.frame)+fmt.Sprintf(" %d running ", n), t.Warn, t.Overlay, false)
 }
 
 // kTok is a token count with a k or M suffix past a thousand.
@@ -190,10 +193,12 @@ func (m chatView) statusLine(w int) string {
 	case whereRemote:
 		where = dim.Render(m.url)
 	}
-	if right != "" {
+	if right != "" && where != "" && !m.sideOn() {
 		right += dim.Render("  ")
 	}
-	right += where
+	if !m.sideOn() {
+		right += where
+	}
 	left := ""
 	for i := len(m.noise) - 1; i >= 0; i-- {
 		if n := m.noise[i]; !n.quiet {
@@ -201,6 +206,14 @@ func (m chatView) statusLine(w int) string {
 				left = dim.Render(n.text)
 			}
 			break
+		}
+	}
+	if m.fresh() {
+		for i := len(m.msgs) - 1; i >= 0; i-- {
+			if m.msgs[i].kind == "system" {
+				left = dim.Render(m.msgs[i].text)
+				break
+			}
 		}
 	}
 	if m.offset > 0 {
@@ -214,6 +227,19 @@ func (m chatView) statusLine(w int) string {
 	return p + left + strings.Repeat(" ", max(w-2*m.pad()-ansi.StringWidth(left)-ansi.StringWidth(right), 1)) + right + p
 }
 
+// whereNote is where the daemon runs and how it ends, as short lines for the sidebar's foot.
+func (m chatView) whereNote() []string {
+	switch m.where {
+	case whereBackground:
+		return []string{"background daemon", "smithy stop ends it"}
+	case whereStandalone:
+		return []string{"standalone daemon", "stops with this chat"}
+	case whereRemote:
+		return []string{kit.Short(m.url, m.sideW()-4)}
+	}
+	return nil
+}
+
 // noiseShown is how long a daemon line stays in the status area; /log keeps them all.
 const noiseShown = 20 * time.Second
 
@@ -221,9 +247,11 @@ const noiseShown = 20 * time.Second
 func (m chatView) footer(w int) string {
 	t := m.th
 	dim, key := t.Fg(t.Dim), t.Fg(t.Text)
-	hint := func(k, what string) string { return key.Render(k) + dim.Render(" "+what) }
+	hint := func(k, what string) string {
+		return t.Fg(t.Text).Render(k) + t.Fg(t.Dim).Render(" "+what)
+	}
 	p := strings.Repeat(" ", m.pad())
-	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode: "+m.mode.String()), hint("tab", "agents"), hint("?", "help"), hint("ctrl+n/p", "tabs"), hint("ctrl+s", "select")}
+	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode"), hint("tab", "agents"), hint("ctrl+n/p", map[bool]string{true: "tabs", false: "sessions"}[m.tabsOn]), hint("?", "help"), hint("ctrl+s", "select")}
 	if m.busy(m.current) {
 		hints = append([]string{hint("esc", "interrupt")}, hints...)
 	}
@@ -240,12 +268,11 @@ func (m chatView) footer(w int) string {
 	if c, ok := m.cost[m.current]; ok && !m.sideOn() {
 		info = append(info, dim.Render(fmt.Sprintf("$%.2f", c)))
 	}
-	info = append(info, hint("ctrl+k", "palette"))
-	right := strings.Join(info, dim.Render(" "+t.G.Dot+" ")) + p
-	left := p + strings.Join(hints, "  ")
+	right := strings.Join(info, dim.Render(" "+t.G.Dot+" ")) + " " + m.chip(" "+m.mode.String()+" ", t.Surface, t.Muted, true) + " " + m.chip(" ctrl+k palette ", t.Surface, t.Accent, true) + p
+	left := p + strings.Join(hints, "   ")
 	for len(hints) > 1 && w-ansi.StringWidth(left)-ansi.StringWidth(right) < 1 {
 		hints = hints[:len(hints)-1]
-		left = p + strings.Join(hints, "  ")
+		left = p + strings.Join(hints, "   ")
 	}
 	if gap := w - ansi.StringWidth(left) - ansi.StringWidth(right); gap >= 1 {
 		return left + strings.Repeat(" ", gap) + right
@@ -265,7 +292,7 @@ func (m chatView) dimmed(s string) string {
 	if t.Plain || t.Ramp == nil {
 		return plain
 	}
-	return t.Fg(t.Ramp[len(t.Ramp)-1]).Render(plain)
+	return t.Fg(t.Ramp[min(3, len(t.Ramp)-1)]).Render(plain)
 }
 
 // splice lays box over row at column x, keeping the row's cells on both sides.
@@ -290,59 +317,52 @@ type boxItem struct {
 	static           bool // shown, never selected
 }
 
-// floatBox is the one panel every picker uses: a rounded frame in the border color around a
-// title bar (prompt, query or title on the left, esc on the right), grouped rows with the
-// selected one marked by an accent bar, and a key footer.
+// floatBox is the one panel every picker uses, flat and square: a thin accent edge on top, the
+// query on the focus tier (prompt, query or title on the left, esc on the right), grouped rows on
+// the raised tier with the selected one on the focus tier behind an accent rail, and a key footer
+// on the overlay tier.
 func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem, sel int, foot string) []string {
 	t := m.th
-	bg := lipgloss.NewStyle()
-	if t.Overlay != nil {
-		bg = bg.Background(t.Overlay)
-	}
-	edge := t.Fg(t.Dim)
-	if t.Border != nil && t.Ramp != nil {
-		edge = t.Fg(t.Ramp[len(t.Ramp)-1])
-	}
-	if t.Overlay != nil {
-		edge = edge.Background(t.Overlay)
-	}
-	in := max(w-2, 1)
-	g := frameGlyphs(t.Uni)
-	line := func(l, r string) string { return edge.Render(l + strings.Repeat(g.h, in) + r) }
-	row := func(s string) string { return edge.Render(g.v) + fill(bg, in, s) + edge.Render(g.v) }
+	bg, focus, foot0 := on(t.Raised), on(t.Focus), on(t.Overlay)
+	row := func(s string) string { return fill(bg, w, s) }
 	dim := t.Fg(t.Dim)
 	q := t.Fg(t.Strong).Render(query)
 	if query == "" {
-		q = t.Fg(t.Text).Render(placeholder)
+		q = t.Fg(t.Muted).Render(placeholder)
 	}
-	out := []string{line(g.tl, g.tr), row(spread(" "+t.Fg(t.Accent).Render(t.G.Prompt)+" "+q, dim.Render("esc")+" ", in)), line(g.lt, g.rt)}
-	body := max(h-8, 1)
+	top := t.Fg(t.Accent).Inherit(bg).Render(strings.Repeat("▄", w))
+	if t.Plain || !t.G.Unicode {
+		top = row("")
+	}
+	out := []string{top, fill(focus, w, spread("  "+t.Fg(t.Accent).Bold(true).Render(t.G.Prompt)+" "+q, dim.Render("esc")+"  ", w))}
+	body := max(h-6, 1)
 	rows := make([]string, 0, len(items))
 	selRow := 0
 	n := 0
+	rail := t.Fg(t.Accent).Render(railGlyph(t.G.Unicode))
 	for _, it := range items {
 		if it.label == "" {
 			if len(rows) > 0 {
 				rows = append(rows, row(""))
 			}
-			for _, l := range strings.Split(ansi.Wordwrap(it.group, max(in-4, 1), ""), "\n") {
-				rows = append(rows, row("   "+t.Fg(t.Muted).Bold(true).Render(ansi.Truncate(l, max(in-4, 1), "…"))))
+			for _, l := range strings.Split(ansi.Wordwrap(groupName(it.group), max(w-6, 1), ""), "\n") {
+				rows = append(rows, row("   "+t.Fg(t.Accent).Bold(true).Render(ansi.Truncate(l, max(w-6, 1), "…"))))
 			}
 			continue
 		}
-		mark, label := "  ", t.Fg(t.Text)
+		mark, label, st := " ", t.Fg(t.Text), bg
 		if it.static {
 			label = t.Fg(t.Muted)
 		} else if n == sel {
-			mark, label, selRow = t.Fg(t.Accent).Render(g.sel)+" ", t.Fg(t.Strong).Bold(true), len(rows)
+			mark, label, st, selRow = rail, t.Fg(t.Strong).Bold(true), focus, len(rows)
 		}
-		left := " " + mark + t.Fg(it.color).Render(it.glyph) + "  " + label.Render(it.label)
+		left := mark + "  " + t.Fg(it.color).Render(it.glyph) + "  " + label.Render(it.label)
 		if it.hint != "" {
 			left += "  " + dim.Render(it.hint)
 		}
 		key := t.Fg(t.Muted).Render(it.key) + "  "
-		left = ansi.Truncate(left, max(in-ansi.StringWidth(key)-1, 1), "…")
-		rows = append(rows, row(spread(left, key, in)))
+		left = ansi.Truncate(left, max(w-ansi.StringWidth(key)-1, 1), "…")
+		rows = append(rows, fill(st, w, spread(left, key, w)))
 		if !it.static {
 			n++
 		}
@@ -355,8 +375,23 @@ func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem,
 	for i := start; i < len(rows) && i < start+body; i++ {
 		out = append(out, rows[i])
 	}
-	out = append(out, row(""), line(g.lt, g.rt), row(ansi.Truncate(foot, in, "…")), line(g.bl, g.br))
+	out = append(out, row(""), fill(foot0, w, ansi.Truncate(foot, w, "…")))
 	return out
+}
+
+// groupName is a group heading in sentence case: "KEYS" reads "Keys".
+func groupName(g string) string {
+	ws := strings.Split(g, " ")
+	for i, w := range ws {
+		if w != "" && w == strings.ToUpper(w) && w != strings.ToLower(w) {
+			ws[i] = strings.ToLower(w)
+		}
+	}
+	s := strings.Join(ws, " ")
+	if s != "" {
+		s = strings.ToUpper(s[:1]) + s[1:]
+	}
+	return s
 }
 
 type boxFrame struct{ tl, tr, bl, br, lt, rt, h, v, sel string }
@@ -368,9 +403,11 @@ func frameGlyphs(uni bool) boxFrame {
 	return boxFrame{"+", "+", "+", "+", "+", "+", "-", "|", ">"}
 }
 
-// overBox centers box over the dimmed screen rows, 15% from the top as in the mockup, or higher
-// when a tall box would otherwise run past the last row.
+// overBox lays box over the dimmed screen, 15% from the top as in the mockup (higher when a tall
+// box would run past the last row), with a shade one cell right and half a row down for depth.
+// While it opens it rises into place on the spring.
 func (m chatView) overBox(screen []string, box []string, w int) []string {
+	t := m.th
 	out := make([]string, len(screen))
 	for i, r := range screen {
 		out[i] = r
@@ -382,11 +419,22 @@ func (m chatView) overBox(screen []string, box []string, w int) []string {
 	if len(box) > 0 {
 		bw = ansi.StringWidth(box[0])
 	}
-	x, y := (w-bw)/2, max(min(len(screen)*120/800, len(screen)-len(box)), 1)
+	x, y := (w-bw)/2, max(min(len(screen)*120/800, len(screen)-len(box)-1), 1)
+	if m.mo.shown == m.overlay {
+		y = max(min(y+m.mo.lift(), len(screen)-len(box)), y)
+	}
+	sh := t.Shade()
 	for i, b := range box {
-		if y+i < len(out) {
-			out[y+i] = splice(out[y+i], b, x, w)
+		if y+i >= len(out) {
+			break
 		}
+		if sh != nil && i > 0 {
+			b += on(sh).Render(" ")
+		}
+		out[y+i] = splice(out[y+i], b, x, w)
+	}
+	if sh != nil && y+len(box) < len(out) && t.G.Unicode {
+		out[y+len(box)] = splice(out[y+len(box)], t.Fg(sh).Render(strings.Repeat("▀", bw)), x+1, w)
 	}
 	return out
 }
@@ -522,7 +570,6 @@ func (m chatView) totalCost() float64 {
 // pulse, what the session does now, and on the right the live tok/s and the turn's time.
 func (m chatView) spinRow(w int) string {
 	t := m.th
-	g := m.pulse()
 	what, since := "working", time.Time{}
 	for _, s := range m.sessions {
 		if s.id == m.current {
@@ -539,27 +586,7 @@ func (m chatView) spinRow(w int) string {
 	if !since.IsZero() {
 		right = append(right, fmt.Sprintf("%.1fs", time.Since(since).Seconds()))
 	}
-	p := strings.Repeat(" ", m.pad())
-	return spread(p+"  "+g+" "+t.Fg(t.Muted).Render(what), t.Fg(t.Dim).Render(strings.Join(right, "  "))+p+"  ", w)
-}
-
-// pulse is the loader: four small cells with one lit cell drifting across, dim elsewhere.
-func (m chatView) pulse() string {
-	t := m.th
-	on, off := "▪", "·"
-	if !t.G.Unicode {
-		on, off = "*", "."
-	}
-	lit := (m.frame / 3) % 4
-	var b strings.Builder
-	for i := range 4 {
-		if i == lit {
-			b.WriteString(t.Fg(t.Accent).Render(on))
-		} else {
-			b.WriteString(t.Fg(t.Dim).Render(off))
-		}
-	}
-	return b.String()
+	return m.spreadLane(w, t.Fg(t.Warn).Render(t.Spinner(m.frame)), m.railMark(false), t.Warn, t.Fg(t.Muted).Render(what), t.Fg(t.Dim).Render(strings.Join(right, "  ")), nil)
 }
 
 // fill lays s on st's background w cells wide, cut to fit. Unlike Style.Width it keeps the

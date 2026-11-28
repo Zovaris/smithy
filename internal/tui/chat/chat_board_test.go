@@ -65,7 +65,7 @@ func TestBoardShowsColumnsDepsAndPRs(t *testing.T) {
 		t.Fatal("/board must open the board modal")
 	}
 	out := screen(m)
-	for _, s := range []string{"TODO  1", "DOING  1", "DONE  1", "DROPPED  0", "03 · UI", "after 02", "blocked", "PR #12", "v1", "v2"} {
+	for _, s := range []string{"Todo  1", "Doing  1", "Done  1", "Dropped  0", "03 · UI", "after 02", "blocked", "PR #12", "v1", "v2"} {
 		if !strings.Contains(out, s) {
 			t.Errorf("board lacks %q:\n%s", s, out)
 		}
@@ -91,10 +91,10 @@ func TestBoardMovesFiltersAndOpens(t *testing.T) {
 	if len(f.moves) != 1 || f.moves[0][1] != "doing" || !strings.HasSuffix(f.moves[0][0], "03-ui.md") {
 		t.Fatalf("right moves the selected task one column on: %v", f.moves)
 	}
-	if out := screen(m); !strings.Contains(out, "DOING  2") || !strings.Contains(out, "TODO  0") {
+	if out := screen(m); !strings.Contains(out, "Doing  2") || !strings.Contains(out, "Todo  0") {
 		t.Fatalf("the move shows at once:\n%s", out)
 	}
-	if l := strings.Split(screen(m), "\n")[rowOf(t, m, "03 · UI")]; !strings.Contains(l, m.th.G.Sel) {
+	if l := strings.Split(screen(m), "\n")[rowOf(t, m, "03 · UI")]; !strings.Contains(l, railGlyph(m.th.G.Unicode)) {
 		t.Fatalf("the cursor stays on the moved task: %q", l)
 	}
 	m = cpress(m, pressCode(tea.KeyLeft))

@@ -59,6 +59,29 @@ type Linker struct {
 	next    map[string]time.Time
 	backoff map[string]time.Duration
 	missing map[string]bool
+	limited time.Time // GitHub said rate limit: no GitHub calls until then
+}
+
+// ghPause is how long links stop calling GitHub after it reports a rate limit.
+const ghPause = 15 * time.Minute
+
+// ghLimited reports whether GitHub calls are paused, and until when.
+func (k *Linker) ghLimited() (time.Time, bool) {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	return k.limited, k.now().Before(k.limited)
+}
+
+func (k *Linker) pauseGH() {
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	k.limited = k.now().Add(ghPause)
+}
+
+// rateLimited reports whether err is GitHub's rate limit.
+func rateLimited(err error) bool {
+	m := strings.ToLower(err.Error())
+	return strings.Contains(m, "rate limit") || strings.Contains(m, "secondary rate")
 }
 
 // NewLinker is the daemon's linker over gh (or the token API) and the stored Linear key.
@@ -239,6 +262,14 @@ func (sv *Server) refreshLinks(id string) (SessionLinks, bool) {
 	sv.mu.Unlock()
 
 	out := hide(k.collect(id, dir, prs, refs, texts), hidden)
+	if _, p := k.ghLimited(); p {
+		out.PRs = prev.PRs
+		for _, is := range prev.Issues {
+			if is.Kind == "github" {
+				out.Issues = append(out.Issues, is)
+			}
+		}
+	}
 	changed := !sameLinks(out, prev)
 	k.schedule(id, changed)
 	sv.mu.Lock()
@@ -267,6 +298,10 @@ func (k *Linker) collectIn(id, repo, branch string, prs, refs, texts []string) S
 	out := SessionLinks{Session: id, PRs: []ghx.PRLink{}, Issues: []LinkIssue{}, Checked: k.now().UTC()}
 	var errs []string
 	note := func(err error) {
+		if err != nil && rateLimited(err) {
+			k.pauseGH()
+			return
+		}
 		if err != nil && !errors.Is(err, ghx.ErrNotFound) && !errors.Is(err, linear.ErrNotFound) && !errors.Is(err, auto.ErrNoAccess) {
 			if m := text.Clean(err.Error()); !slices.Contains(errs, m) {
 				errs = append(errs, m)
@@ -289,7 +324,11 @@ func (k *Linker) collectIn(id, repo, branch string, prs, refs, texts []string) S
 			}
 		}
 	}
-	if repo != "" && branch != "" && k.BranchPR != nil {
+	_, paused := k.ghLimited()
+	if paused {
+		urls, issueURLs = nil, nil
+	}
+	if repo != "" && branch != "" && k.BranchPR != nil && !paused {
 		u, err := k.BranchPR(repo, branch)
 		note(err)
 		if tendPRURL(u) {
@@ -357,7 +396,7 @@ func (k *Linker) collectIn(id, repo, branch string, prs, refs, texts []string) S
 	}
 	for _, n := range gh {
 		key := "gh:" + repo + "#" + strconv.Itoa(n)
-		if repo == "" || len(out.Issues) >= linksMax || k.isMissing(key) || slices.ContainsFunc(out.Issues, func(i LinkIssue) bool { return i.ID == "#"+strconv.Itoa(n) }) {
+		if _, p := k.ghLimited(); p || repo == "" || len(out.Issues) >= linksMax || k.isMissing(key) || slices.ContainsFunc(out.Issues, func(i LinkIssue) bool { return i.ID == "#"+strconv.Itoa(n) }) {
 			continue
 		}
 		is, err := k.GHIssue(repo, n)
@@ -371,6 +410,9 @@ func (k *Linker) collectIn(id, repo, branch string, prs, refs, texts []string) S
 		out.Issues = append(out.Issues, LinkIssue{Kind: "github", ID: "#" + strconv.Itoa(is.Number), Title: is.Title, URL: is.URL, Status: is.State, Assignee: is.Assignee, Milestone: is.Milestone})
 	}
 	out.Error = strings.Join(errs, "; ")
+	if until, p := k.ghLimited(); p {
+		out.Error = "links paused: GitHub rate limit, retry " + until.Local().Format("15:04")
+	}
 	return out
 }
 

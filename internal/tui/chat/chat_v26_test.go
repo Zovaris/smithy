@@ -31,7 +31,7 @@ func TestDoctorOpensGroupedModalNotTranscript(t *testing.T) {
 		}
 	}
 	out := screen(m)
-	for _, want := range []string{"NEEDS A FIX", "gh missing", "brew install gh", "WORTH A LOOK", "sandbox off", "smithy config set auto.sandbox native", "OK", "git found"} {
+	for _, want := range []string{"Needs a fix", "gh missing", "brew install gh", "Worth a look", "sandbox off", "smithy config set auto.sandbox native", "Ok", "git found"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("doctor modal lacks %q:\n%s", want, out)
 		}
@@ -47,7 +47,7 @@ func TestUsageNamesOnlyTheCommandAndPrintsOnce(t *testing.T) {
 	m.cfg = &fakeSettings{}
 	m = cpress(typeIn(m, "/set x"), ckey("enter"))
 	m = cpress(typeIn(m, "/unset"), ckey("enter"))
-	out := screen(m)
+	out := notes(m)
 	if strings.Count(out, "usage: /set [<key> <value>]") != 1 || strings.Count(out, "usage: /unset <key>") != 1 || strings.Contains(out, "/doctor") {
 		t.Fatalf("each usage once, naming only its command:\n%s", out)
 	}

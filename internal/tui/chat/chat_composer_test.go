@@ -9,10 +9,10 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func TestComposerDefaultsToThreeRows(t *testing.T) {
+func TestComposerDefaultsToOneRow(t *testing.T) {
 	m := newChatTest(0)
-	if h := m.input.Height(); h != 3 {
-		t.Fatalf("empty composer height %d, want 3", h)
+	if h := m.input.Height(); h != 1 {
+		t.Fatalf("empty composer height %d, want 1", h)
 	}
 }
 
@@ -56,7 +56,7 @@ func TestComposerGrowsToTenThenScrollsAndShrinksAfterSend(t *testing.T) {
 		t.Fatalf("content clipped: %d newlines", n)
 	}
 	m = cpress(m, ckey("enter"))
-	if m.input.Value() != "" || m.input.Height() != 3 {
+	if m.input.Value() != "" || m.input.Height() != 1 {
 		t.Fatalf("after send: %q height %d", m.input.Value(), m.input.Height())
 	}
 	if len(f.started) != 1 || !strings.Contains(f.started[0], "line\nline") {

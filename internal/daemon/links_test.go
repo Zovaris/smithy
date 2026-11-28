@@ -253,3 +253,25 @@ func TestClientLinks(t *testing.T) {
 		t.Fatalf("add %+v %v", l, err)
 	}
 }
+
+func TestLinksPauseGitHubOnRateLimit(t *testing.T) {
+	calls := 0
+	now := time.Date(2026, 11, 27, 13, 50, 0, 0, time.Local)
+	k := &Linker{PR: func(string) (ghx.PRLink, error) {
+		calls++
+		return ghx.PRLink{}, errors.New("gh: API rate limit exceeded for user ID 42")
+	}, Now: func() time.Time { return now }}
+	out := k.collectIn("s1", "acme/app", "", []string{"https://github.com/acme/app/pull/7"}, nil, nil)
+	if out.Error != "links paused: GitHub rate limit, retry 14:05" {
+		t.Fatalf("error: %q", out.Error)
+	}
+	k.collectIn("s1", "acme/app", "", []string{"https://github.com/acme/app/pull/7"}, nil, nil)
+	if calls != 1 {
+		t.Fatalf("GitHub called %d times while paused", calls)
+	}
+	now = now.Add(ghPause)
+	k.collectIn("s1", "acme/app", "", []string{"https://github.com/acme/app/pull/7"}, nil, nil)
+	if calls != 2 {
+		t.Fatalf("not resumed after the pause: %d", calls)
+	}
+}

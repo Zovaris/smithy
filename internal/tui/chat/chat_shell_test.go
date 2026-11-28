@@ -118,7 +118,7 @@ func TestBangRunsShellInSessionFolderAndShowsOutput(t *testing.T) {
 		t.Fatalf("shell line went to the agent: %v %v", f.started, f.sent)
 	}
 	out := screen(m)
-	for _, s := range []string{"$ ls -1", "ok", "40ms", "a.go", "b.go"} {
+	for _, s := range []string{"$ ls -1", "exit 0", "40ms", "a.go", "b.go"} {
 		if !strings.Contains(out, s) {
 			t.Fatalf("%q missing:\n%s", s, out)
 		}

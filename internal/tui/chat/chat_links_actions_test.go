@@ -67,7 +67,7 @@ func TestLinkStatusChangePostsOneLine(t *testing.T) {
 	l.PRs[0].State = "MERGED"
 	b, _ = json.Marshal(l)
 	m.event(daemon.KindSessionLinks, "s-1", time.Now(), b)
-	out := screen(m)
+	out := notes(m)
 	if strings.Count(out, "- PR #7 checks red") != 1 || strings.Count(out, "- PR #7 merged") != 1 {
 		t.Fatalf("one line per change:\n%s", out)
 	}

@@ -148,17 +148,24 @@ func (t Theme) HeadBar(w, gutter int, project string, pill func(bar lipgloss.Sty
 	if t.G.Unicode {
 		diamond = "◆"
 	}
-	name := bar.Foreground(t.Strong).Bold(true).Render("smithy")
-	if Version != "" {
-		name += bar.Foreground(t.Dim).Render(" " + Version)
+	block := bar.Foreground(t.Accent).Render(diamond+" ") + bar.Foreground(t.Strong).Bold(true).Render("smithy")
+	if !t.Plain && t.Accent != nil {
+		block = lipgloss.NewStyle().Background(t.Accent).Foreground(t.Surface).Bold(true).Render(" " + diamond + " smithy ")
 	}
-	left := bar.Render(p) + bar.Foreground(t.Accent).Render(diamond+" ") + name
+	name := block
+	if Version != "" {
+		name += bar.Foreground(t.Muted).Render(" " + Version)
+	}
+	left := bar.Render(p) + name
 	if project != "" {
 		left += bar.Foreground(t.Dim).Render(" "+t.G.Dot+" ") + bar.Foreground(t.Muted).Render(project)
 	}
 	right := bar.Foreground(t.Text).Render(clock) + bar.Render(p)
+	if !t.Plain && t.Overlay != nil {
+		right = lipgloss.NewStyle().Background(t.Overlay).Foreground(t.Strong).Render(" "+clock+" ") + bar.Render(p)
+	}
 	if s := pill(bar); s != "" {
-		if full := s + bar.Render("  ") + right; w-ansi.StringWidth(left)-ansi.StringWidth(full) >= 1 {
+		if full := s + bar.Render(" ") + right; w-ansi.StringWidth(left)-ansi.StringWidth(full) >= 1 {
 			right = full
 		}
 	}
