@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/guard"
@@ -134,15 +136,18 @@ func (r *runner) session(ctx context.Context, s Step, sc *scope, res *StepResult
 	var prompt string
 	switch s.Kind {
 	case KindSession:
-		prompt = sc.render(s.Prompt, false, 0)
+		prompt = sc.render(s.Prompt, true, 0)
 	case KindSmelt:
 		speed := s.Speed
 		if speed == "" {
 			speed = "fast"
 		}
-		prompt = "smelt " + speed + " " + sc.render(s.Task, false, 0)
+		prompt = "smelt " + speed + " " + sc.render(s.Task, true, 0)
 	default:
-		prompt = "warden " + sc.render(s.Task, false, 0)
+		prompt = "warden " + sc.render(s.Task, true, 0)
+	}
+	if strings.Contains(prompt, "<data") {
+		prompt += dataNote
 	}
 	res.Input = prompt
 	id, err := r.env.Session(ctx, r.w.Dir, s.Agent, prompt)
@@ -202,7 +207,15 @@ func Fetch(ctx context.Context, method, raw string, headers map[string]string, b
 		req.Header.Set(k, v)
 	}
 	req.Header.Set("User-Agent", "smithy-workflow")
-	c := &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	d := &net.Dialer{Timeout: 10 * time.Second, Control: func(_, address string, _ syscall.RawConn) error {
+		host, _, _ := net.SplitHostPort(address)
+		if ip := net.ParseIP(host); ip == nil || ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+			return fmt.Errorf("%s is a local or private address", host)
+		}
+		return nil
+	}}
+	c := &http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{DialContext: d.DialContext, TLSHandshakeTimeout: 10 * time.Second},
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	resp, err := c.Do(req)
 	if err != nil {
 		return 0, "", err
@@ -321,6 +334,14 @@ func (r *runner) github(ctx context.Context, s Step, sc *scope, res *StepResult)
 	case "issue":
 		runs = [][]string{{"gh", "issue", "create", "--title", title, "--body", body}}
 	case "pr":
+		exe0 := r.env.Exec
+		if exe0 == nil {
+			exe0 = Exec
+		}
+		br, _, err := exe0(ctx, r.w.Dir, []string{"git", "rev-parse", "--abbrev-ref", "HEAD"})
+		if br = strings.TrimSpace(br); err != nil || br == "" || br == "HEAD" || br == "main" || br == "master" {
+			return fmt.Errorf("github pr runs on a work branch, not %q", br)
+		}
 		runs = [][]string{{"git", "push", "-u", "origin", "HEAD"}, {"gh", "pr", "create", "--title", title, "--body", body}}
 	case "merge":
 		runs = [][]string{{"gh", "pr", "merge", pr, "--squash"}}
@@ -364,64 +385,66 @@ func Exec(ctx context.Context, dir string, argv []string) (string, int, error) {
 	return out.String(), 0, err
 }
 
-// allowedPath resolves p inside one of the workflow's files folders (symlinks resolved), or fails.
-func (r *runner) allowedPath(p string) (string, error) {
+// allowedPath finds the files folder p is in and p's path inside it ("" root: outside them all).
+func (r *runner) allowedPath(p string) (string, string, error) {
 	var roots []string
 	for _, f := range r.w.Files {
 		if abs, err := filepath.Abs(dirOr(f)); err == nil {
-			if real, err := filepath.EvalSymlinks(abs); err == nil {
+			roots = append(roots, filepath.Clean(abs))
+			if real, err := filepath.EvalSymlinks(abs); err == nil && real != abs {
 				roots = append(roots, real)
 			}
 		}
 	}
 	if len(roots) == 0 {
-		return "", fmt.Errorf("none of the workflow's files folders exist")
+		return "", "", fmt.Errorf("none of the workflow's files folders exist")
 	}
 	if !filepath.IsAbs(dirOr(p)) {
 		p = filepath.Join(roots[0], p)
 	}
 	p = filepath.Clean(dirOr(p))
-	dir, err := filepath.EvalSymlinks(filepath.Dir(p))
-	if err != nil {
-		return "", fmt.Errorf("folder of %s: %v", p, err)
-	}
-	full := filepath.Join(dir, filepath.Base(p))
-	if real, err := filepath.EvalSymlinks(full); err == nil {
-		full = real
-	}
 	for _, root := range roots {
-		if full == root || strings.HasPrefix(full, root+string(filepath.Separator)) {
-			return full, nil
+		if rel, err := filepath.Rel(root, p); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+			return root, rel, nil
 		}
 	}
-	return "", fmt.Errorf("%s is outside the workflow's files folders", p)
+	return "", "", fmt.Errorf("%s is outside the workflow's files folders", p)
 }
 
+// file reads or writes through os.Root, so no path or symlink inside a files folder reaches
+// outside it.
 func (r *runner) file(s Step, sc *scope, res *StepResult) error {
-	p, err := r.allowedPath(sc.render(s.Path, false, 0))
-	res.Input = s.Op + " " + p
+	root, rel, err := r.allowedPath(sc.render(s.Path, false, 0))
+	res.Input = s.Op + " " + filepath.Join(root, rel)
 	if err != nil {
 		return err
 	}
-	switch s.Op {
-	case "read":
-		f, err := os.Open(p)
+	rt, err := os.OpenRoot(root)
+	if err != nil {
+		return err
+	}
+	defer rt.Close()
+	if s.Op == "read" {
+		f, err := rt.Open(rel)
 		if err != nil {
-			return err
+			return outside(err)
 		}
 		defer f.Close()
 		b, _ := io.ReadAll(io.LimitReader(f, MaxOutput))
 		res.Output = string(b)
 		return nil
 	}
+	if fi, err := rt.Lstat(rel); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("%s is a symlink: file steps write only regular files", rel)
+	}
 	content := sc.render(s.Content, false, 0)
 	flag := os.O_CREATE | os.O_WRONLY | os.O_TRUNC
 	if s.Op == "append" {
 		flag = os.O_CREATE | os.O_WRONLY | os.O_APPEND
 	}
-	f, err := os.OpenFile(p, flag, 0o600)
+	f, err := rt.OpenFile(rel, flag, 0o600)
 	if err != nil {
-		return err
+		return outside(err)
 	}
 	if _, err := io.Copy(f, bytes.NewBufferString(content)); err != nil {
 		f.Close()
@@ -429,4 +452,11 @@ func (r *runner) file(s Step, sc *scope, res *StepResult) error {
 	}
 	res.Output = strconv.Itoa(len(content)) + " bytes"
 	return f.Close()
+}
+
+func outside(err error) error {
+	if strings.Contains(err.Error(), "escapes") {
+		return fmt.Errorf("path is outside the workflow's files folders: %v", err)
+	}
+	return err
 }

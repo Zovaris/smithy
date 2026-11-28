@@ -137,8 +137,15 @@ text (PR bodies, web pages) can be steered, so keep it read-only and its answer 
 - Steps that change things need `allow_write: true` on the workflow (pinned with it). `github
   pr` and `merge`, and `warden` (it starts paid sessions), also need an earlier `ask` step and
   `when: {step: <ask>, equals: yes}`: validation refuses them otherwise.
-- `http` reaches only hosts listed in your `guard.fetch_allow` (`*` doesn't count), with no
-  redirects, 30 s and 1 MiB at most. `{{secret.name}}` values are redacted like `{{env.X}}`.
+- `http` reaches only hosts listed in your `guard.fetch_allow` (`*` doesn't count) and never a
+  loopback, private or link-local address, with no redirects, 30 s and 1 MiB at most. A secret goes
+  only over https. `{{secret.name}}` values are redacted like `{{env.X}}`, and they can't be put in
+  `vars`.
+- A `session` or `smelt` prompt built from inputs or step outputs needs an ask gate too, since a
+  webhook caller or a fetched page could steer the agent; those values reach it inside `<data>` tags.
+- `file` steps go through Go's `os.Root`: no path or symlink inside a files folder reaches outside
+  it, and a write never follows a symlink. `github pr` refuses to push main, master or a detached HEAD.
+- One yes covers one ask: inside a loop, put the ask inside the loop to approve each try.
 - Shell steps go through the guard (`guard.block`, `guard.allow`). Nobody is there to answer, so a
   blocked command fails the step.
 - Agent steps run read-only through `smithy agent` with the auto profile (a `"write": true`

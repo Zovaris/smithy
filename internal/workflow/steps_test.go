@@ -29,6 +29,9 @@ func TestShipAFix(t *testing.T) {
 	var argvs []string
 	env.Exec = func(_ context.Context, _ string, argv []string) (string, int, error) {
 		argvs = append(argvs, strings.Join(argv, " "))
+		if argv[0] == "git" && argv[1] == "rev-parse" {
+			return "fix/workflow-1\n", 0, nil
+		}
 		return "https://github.com/o/r/pull/9", 0, nil
 	}
 	r := RunWith(context.Background(), w, env, Invocation{Trigger: "web", Inputs: map[string]string{"bug": "login loops"}})
@@ -45,7 +48,7 @@ func TestShipAFix(t *testing.T) {
 	if got["green"].Answer != "met" || len(got["green"].Steps) != 2 || got["review"].Answer != "pass" {
 		t.Fatalf("green %+v review %+v", got["green"], got["review"])
 	}
-	if len(argvs) != 2 || !strings.HasPrefix(argvs[1], "gh pr create --title fix: login loops") {
+	if len(argvs) != 3 || !strings.HasPrefix(argvs[2], "gh pr create --title fix: login loops") {
 		t.Fatalf("argv %q", argvs)
 	}
 	f2 := &fake{answers: []string{"a", `{"score":0.2,"why":"no test"}`}, reply: "no"}
@@ -98,7 +101,7 @@ func TestParallelJoinAndWait(t *testing.T) {
 func TestSessionSmeltWarden(t *testing.T) {
 	w := parse(t, `{"name":"s","allow_write":true,"steps":[
 	 {"id":"q","kind":"ask","question":"go?","options":["yes","no"]},
-	 {"id":"chat","kind":"session","prompt":"look at {{steps.q.answer}}"},
+	 {"id":"chat","kind":"session","prompt":"look at {{steps.q.answer}}","when":{"step":"q","equals":"yes"}},
 	 {"id":"build","kind":"smelt","task":"add a health endpoint","speed":"normal"},
 	 {"id":"batch","kind":"warden","task":"docs/specs/v2","when":{"step":"q","equals":"yes"}}]}`)
 	f := &fake{reply: "yes"}
@@ -108,7 +111,7 @@ func TestSessionSmeltWarden(t *testing.T) {
 		got = append(got, prompt)
 		return "s-1", nil
 	}
-	if r := Run(context.Background(), w, env); r.Status != StatusOK || strings.Join(got, "|") != "look at yes|smelt normal add a health endpoint|warden docs/specs/v2" {
+	if r := Run(context.Background(), w, env); r.Status != StatusOK || !strings.Contains(got[0], `<data name="steps.q.answer">yes</data>`) || strings.Join(got[1:], "|") != "smelt normal add a health endpoint|warden docs/specs/v2" {
 		t.Fatalf("%s %s %q", r.Status, r.Error, got)
 	}
 }
@@ -146,11 +149,15 @@ func TestFileStep(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(root, "out.txt")); string(b) != "hello world" {
 		t.Fatalf("%q", b)
 	}
-	for _, p := range []string{"../x.txt", "/etc/passwd", "escape/x.txt"} {
+	os.Symlink(filepath.Join(out, "planted.txt"), filepath.Join(root, "dangling.txt"))
+	for _, p := range []string{"../x.txt", "/etc/passwd", "escape/x.txt", "dangling.txt"} {
 		bad := parse(t, `{"name":"f","allow_write":true,"files":["`+root+`"],"steps":[{"id":"w","kind":"file","op":"write","path":"`+p+`","content":"x"}]}`)
-		if r := Run(context.Background(), bad, (&fake{}).env()); r.Status != StatusFailed || !strings.Contains(r.Error, "outside") {
+		if r := Run(context.Background(), bad, (&fake{}).env()); r.Status != StatusFailed || !(strings.Contains(r.Error, "outside") || strings.Contains(r.Error, "symlink")) {
 			t.Errorf("%s: %s %s", p, r.Status, r.Error)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(out, "planted.txt")); err == nil {
+		t.Fatal("a dangling symlink let a write out of the folder")
 	}
 }
 
@@ -190,6 +197,9 @@ func TestValidateAISteps(t *testing.T) {
 		`{"name":"x","steps":[{"id":"a","kind":"parallel","branches":[[{"id":"b","kind":"run","run":"x"}]]}]}`,
 		`{"name":"x","steps":[{"id":"a","kind":"wait","for":"1s","check":"x"}]}`,
 		`{"name":"x","steps":[{"id":"a","kind":"judge","subject":"s"}]}`,
+		`{"name":"x","vars":{"k":"{{secret.gh}}"},"steps":[{"id":"a","kind":"set","vars":{"v":"1"}}]}`,
+		`{"name":"x","allow_write":true,"inputs":{"m":""},"steps":[{"id":"a","kind":"session","prompt":"do {{inputs.m}}"}]}`,
+		`{"name":"x","steps":[{"id":"a","kind":"http","url":"http://x.y","headers":{"A":"{{secret.k}}"}}]}`,
 	}
 	for _, b := range bad {
 		if _, err := Parse([]byte(b)); err == nil {

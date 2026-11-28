@@ -244,6 +244,11 @@ func (w Workflow) Validate() error {
 			return fmt.Errorf("workflow %s: outputs: %w", w.Name, err)
 		}
 	}
+	for _, t := range w.Vars {
+		if err := v.tmpl(t); err != nil {
+			return fmt.Errorf("workflow %s: vars: %w", w.Name, err)
+		}
+	}
 	if err := v.block(w.Steps); err != nil {
 		return fmt.Errorf("workflow %s: %w", w.Name, err)
 	}
@@ -534,6 +539,9 @@ func (v validator) step(s Step, target func(string, string, ...string) error) er
 		if !v.write {
 			return fmt.Errorf("%s changes code: the workflow needs \"allow_write\": true", s.Kind)
 		}
+		if s.Kind != KindWarden && !v.askedBefore(s) && (strings.Contains(text, "{{inputs.") || strings.Contains(text, "{{steps.")) {
+			return fmt.Errorf("a %s prompt built from inputs or step outputs can be steered: put an ask step before it and gate it with when: {step: <ask>, equals: yes}", s.Kind)
+		}
 		if s.Kind == KindWarden && !v.askedBefore(s) {
 			return fmt.Errorf("warden starts sessions that cost money: put an ask step before it and gate it with when: {step: <ask>, equals: yes}")
 		}
@@ -554,6 +562,9 @@ func (v validator) step(s Step, target func(string, string, ...string) error) er
 		}
 		if !strings.HasPrefix(s.URL, "https://") && !strings.HasPrefix(s.URL, "http://") {
 			return fmt.Errorf("url must start with https:// or http://")
+		}
+		if strings.HasPrefix(s.URL, "http://") && strings.Contains(fmt.Sprint(s.Headers)+s.Body, "{{secret.") {
+			return fmt.Errorf("a secret goes only over https")
 		}
 		if err := v.tmpl(s.URL); err != nil {
 			return err
