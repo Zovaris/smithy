@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/remote"
@@ -145,5 +146,38 @@ func TestServersAddPairsAndRemoves(t *testing.T) {
 	}
 	if res := do(t, "POST", local.URL+"/v1/servers", `{"name":"x","url":"http://a","code":"c"}`, map[string]string{LoginHeader: "me@example.com"}); res.StatusCode != 403 {
 		t.Fatalf("a tailnet login cannot add servers: %d", res.StatusCode)
+	}
+}
+
+func TestPastedImagesLiveUnderHomeAndAreRemoved(t *testing.T) {
+	sv, hs := newTest(t, filepath.Join(t.TempDir(), "s.db"))
+	code, m := post(t, hs.URL+"/v1/images", `{"data":"`+base64.StdEncoding.EncodeToString(onePNG)+`"}`)
+	if code != 200 {
+		t.Fatalf("image: %d %v", code, m)
+	}
+	p := m["path"].(string)
+	if !strings.HasPrefix(p, PasteRoot()+string(filepath.Separator)) {
+		t.Fatalf("paste %q is not under %q", p, PasteRoot())
+	}
+	sv.ClosePastes()
+	if _, err := os.Stat(filepath.Dir(p)); !os.IsNotExist(err) {
+		t.Fatalf("paste dir kept after the daemon ends: %v", err)
+	}
+}
+
+func TestSweepPastesRemovesStaleDirs(t *testing.T) {
+	root := t.TempDir()
+	old, fresh := filepath.Join(root, "old"), filepath.Join(root, "fresh")
+	os.MkdirAll(old, 0o700)
+	os.MkdirAll(fresh, 0o700)
+	os.WriteFile(filepath.Join(old, "paste-1.png"), onePNG, 0o600)
+	past := time.Now().Add(-48 * time.Hour)
+	os.Chtimes(old, past, past)
+	SweepPastes(root, 24*time.Hour)
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Fatalf("stale paste dir kept: %v", err)
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Fatalf("fresh paste dir removed: %v", err)
 	}
 }

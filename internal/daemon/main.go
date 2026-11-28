@@ -245,6 +245,8 @@ func foreground(o runOpts) int {
 		return 1
 	}
 	api.Version = Version
+	SweepPastes(PasteRoot(), 24*time.Hour)
+	defer api.ClosePastes()
 	if o.demo {
 		api.Runners = DemoRunner
 		api.Ready = DemoReady
