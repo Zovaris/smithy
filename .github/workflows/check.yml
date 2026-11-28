@@ -11,7 +11,7 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2604
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
@@ -23,7 +23,7 @@ jobs:
       - name: Launcher syntax
         run: sh -n shared/smithy
       - name: golangci-lint (both builds, config in .golangci.yml)
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
   test:
@@ -34,11 +34,11 @@ jobs:
         build: [skills, harness-ui, harness-core]
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: matrix.build == 'harness-ui'
         with:
           node-version: 24
@@ -76,7 +76,7 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2604
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
@@ -93,11 +93,11 @@ jobs:
         target: ${{ fromJSON((github.event_name != 'pull_request' || startsWith(github.head_ref, 'release/')) && '["darwin/arm64","darwin/amd64","linux/arm64","linux/amd64","windows/amd64"]' || '["linux/amd64"]') }}
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -114,7 +114,7 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2604
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -122,7 +122,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.5
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-1.4.5-${{ hashFiles('web/package-lock.json') }}
@@ -142,11 +142,11 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2604
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -162,7 +162,7 @@ jobs:
           sudo install -m 755 /tmp/ttyd /usr/local/bin/ttyd
       - name: Record the demo
         run: PATH="$(go env GOPATH)/bin:$PATH" demo/run.sh "$RUNNER_TEMP/demo"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: demo
@@ -182,7 +182,7 @@ jobs:
     if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release/')
     runs-on: blacksmith-2vcpu-windows-2025
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: install.sh installs the latest release under Git Bash
         shell: bash
         env:
