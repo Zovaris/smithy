@@ -150,8 +150,8 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
 
 ### Chat, intake, report and web UI
 
-- Connectors: with Telegram (`notify.telegram.chat`), Slack (`connect.slack.channel`) or Discord
-  (`connect.discord.channel`) set up, the daemon gives each session its own topic or thread,
+- Connectors: with Telegram, Slack or Discord set up (`connect.<name>.notify`; the old
+  `notify.telegram.chat`, `connect.slack.channel` and `connect.discord.channel` still work), the daemon gives each session its own topic or thread,
   posts decisions with one button per option, and records a reply in that thread as the
   session's input. It only listens to the users in `connect.<name>.users`; unset, it only sends.
   Setup per chat app: [settings](settings.md).

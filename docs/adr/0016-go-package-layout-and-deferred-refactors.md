@@ -1,6 +1,7 @@
 # 0016 · Go package layout and deferred refactors
 
-- Status: accepted
+- Status: accepted; done in v0.26 for `internal/api`, the `internal/tui` and `internal/agents` splits
+  and the `smithy tui` removal (the `httpx` client and the large-type splits stay open)
 - Date: 2026-11-26
 
 ## Context and Problem Statement
