@@ -186,26 +186,12 @@ const prelude = `(() => {
 func (w *wrapped) exec(ctx context.Context, code string) (out string, err error) {
 	ctx, cancel := context.WithTimeoutCause(ctx, w.lim.Time, errTime)
 	defer cancel()
-	jail, err := os.MkdirTemp("", "smithy-codemode-")
-	if err != nil {
-		return "", err
-	}
-	defer os.RemoveAll(jail)
-	if err := os.Chmod(jail, 0o500); err != nil {
-		return "", err
-	}
 	var logs bytes.Buffer
-	rt, err := qjs.New(qjs.Option{
-		CWD:                jail,
-		Context:            experimental.WithMemoryAllocator(ctx, capAlloc(w.lim.Memory)),
-		CloseOnContextDone: true,
-		MemoryLimit:        w.lim.Memory,
-		Stdout:             &capped{b: &logs},
-		Stderr:             &capped{b: &logs},
-	})
+	rt, done, err := sandbox(ctx, w.lim, &logs)
 	if err != nil {
-		return "", fmt.Errorf("code mode: %w", err)
+		return "", err
 	}
+	defer done()
 	defer func() {
 		if r := recover(); r != nil {
 			out, err = logs.String(), limitErr(ctx, fmt.Errorf("%v", r))
@@ -285,6 +271,33 @@ func (w *wrapped) exec(ctx context.Context, code string) (out string, err error)
 }
 
 var errTime = errors.New("time limit reached")
+
+// sandbox starts a QuickJS runtime under l's memory cap whose "/" is an empty read-only temp dir
+// and whose console writes to logs; done removes that dir.
+func sandbox(ctx context.Context, l Limits, logs *bytes.Buffer) (*qjs.Runtime, func(), error) {
+	jail, err := os.MkdirTemp("", "smithy-codemode-")
+	if err != nil {
+		return nil, nil, err
+	}
+	done := func() { os.RemoveAll(jail) }
+	if err := os.Chmod(jail, 0o500); err != nil {
+		done()
+		return nil, nil, err
+	}
+	rt, err := qjs.New(qjs.Option{
+		CWD:                jail,
+		Context:            experimental.WithMemoryAllocator(ctx, capAlloc(l.Memory)),
+		CloseOnContextDone: true,
+		MemoryLimit:        l.Memory,
+		Stdout:             &capped{b: logs},
+		Stderr:             &capped{b: logs},
+	})
+	if err != nil {
+		done()
+		return nil, nil, fmt.Errorf("code mode: %w", err)
+	}
+	return rt, done, nil
+}
 
 // capAlloc backs the WebAssembly memory and refuses to grow it past max bytes: QuickJS's own
 // limit misses ArrayBuffer storage, so this is the cap that holds. A refused grow is an

@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/agents/sandbox"
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/auto"
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
@@ -26,38 +28,6 @@ import (
 	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/text"
 )
-
-// TendRef is one PR to tend: a warden batch's (its card names the PR, its plan item the
-// worktree) or a chat session's (a pr create it ran printed the PR; Dir is the session's folder).
-type TendRef struct {
-	URL     string `json:"url"`
-	Batch   string `json:"batch"`
-	Item    string `json:"item"`
-	Session string `json:"session,omitempty"`
-	Dir     string `json:"dir"`
-}
-
-// TendPR is what the daemon knows of one watched PR. Status: green, waiting, fixing (a tend
-// session is working on it), needs-fix (watch mode: a fix is due), needs-you (tend's needs-you,
-// or two tend sessions ended with the same action left), closed, error.
-type TendPR struct {
-	TendRef
-	Action  string    `json:"action"`
-	Checks  string    `json:"checks"`
-	Status  string    `json:"status"`
-	PID     int       `json:"pid,omitempty"`
-	Log     string    `json:"log,omitempty"`
-	Tries   int       `json:"tries,omitempty"`
-	Total   int       `json:"total,omitempty"`
-	Error   string    `json:"error,omitempty"`
-	Checked time.Time `json:"checked"`
-}
-
-// TendList is GET /v1/tend.
-type TendList struct {
-	Mode string   `json:"mode"`
-	PRs  []TendPR `json:"prs"`
-}
 
 // tendTries is how many tend sessions one PR gets for the same action before it is the user's;
 // tendMaxPerPR caps them across actions, so a PR flapping between two fixes stops too.
@@ -360,7 +330,7 @@ func fetchPRState(r TendRef) (gitx.PRState, error) {
 // TendPrompt is the one tend session's task for action on r.
 func TendPrompt(r TendRef, action string) string {
 	skill := "the tend skill's SKILL.md"
-	if p, ok := agents.FindSkill("tend"); ok {
+	if p, ok := skills.FindSkill("tend"); ok {
 		skill = p
 	}
 	return fmt.Sprintf("Read %s and follow it for `tend %s`, once: its next step is %s. Work in this worktree on the PR's branch, push the fix and end when the step is done. Never merge, never force-push someone else's branch and never close the PR; anything that needs the user ends in one line starting with `needs-you:`.\n", skill, r.URL, action)
@@ -373,9 +343,9 @@ func launchTend(r TendRef, action string) (int, string, error) {
 		return 0, "", err
 	}
 	agent := auto.DefaultAgent()
-	mode, err := agents.SandboxMode()
+	mode, err := sandbox.SandboxMode()
 	if err == nil {
-		err = agents.SandboxCheckAgent(mode, agent, agents.HostProbe())
+		err = sandbox.SandboxCheckAgent(mode, agent, sandbox.HostProbe())
 	}
 	if err != nil {
 		return 0, "", fmt.Errorf("auto.sandbox: %v; no tend session starts until it is fixed (smithy doctor)", err)
@@ -424,11 +394,4 @@ func (sv *Server) tendView(w http.ResponseWriter, r *http.Request) {
 		out.Mode, out.PRs = sv.Tend.Mode(), sv.Tend.List()
 	}
 	writeJSON(w, 200, out)
-}
-
-// Tend is GET /v1/tend: the PRs the daemon tends and what it is doing on each.
-func (c *Client) Tend(ctx context.Context) (TendList, error) {
-	var out TendList
-	err := c.call(ctx, "GET", "/v1/tend", nil, &out)
-	return out, err
 }

@@ -2,6 +2,7 @@ package connect
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -35,9 +36,11 @@ var (
 
 // Discord is the bot connector: one public thread per session in Channel, button components for
 // decisions, the Gateway for what comes back. Only messages and presses from a user id in Users
-// count, in threads of Channel's guild: with Users empty it only sends.
+// count, in threads of Channel's guild: with Users empty it only sends. ChatChan ("" for none) is
+// the chat channel, in the same server: a new message there starts a session in a thread on it.
 type Discord struct {
 	Token, Channel string
+	ChatChan       string
 	// API and Gateway override DiscordAPI and DiscordGateway (tests only).
 	API, Gateway string
 	Users        map[string]bool
@@ -97,6 +100,9 @@ type dgw struct {
 }
 
 func (d *Discord) Name() string { return "discord" }
+
+// MultiSelect: a multi-select decision is one string select menu (max_values > 1).
+func (d *Discord) MultiSelect() bool { return true }
 
 func (d *Discord) scrub(s string) string {
 	if d.Token != "" {
@@ -183,8 +189,28 @@ func routeOf(p string) string {
 	return strings.Join(parts, "/")
 }
 
-// Thread starts a public thread named after the session in Channel.
-func (d *Discord) Thread(ctx context.Context, session, title string) (string, error) {
+// HasChat reports whether a chat channel is set.
+func (d *Discord) HasChat() bool { return d.ChatChan != "" }
+
+// StartChat starts a public thread on the chat-channel message that began the conversation.
+func (d *Discord) StartChat(ctx context.Context, in Inbound, title string) (string, error) {
+	if d.ChatChan == "" || !snowflakeRe.MatchString(in.Ref) {
+		return "", errors.New("discord: no chat message to start a thread on")
+	}
+	var r struct {
+		ID string `json:"id"`
+	}
+	body := map[string]any{"name": threadName(title), "auto_archive_duration": 10080}
+	if err := d.call(ctx, "POST", "/channels/"+d.ChatChan+"/messages/"+in.Ref+"/threads", body, &r); err != nil {
+		return "", err
+	}
+	if !snowflakeRe.MatchString(r.ID) {
+		return "", errors.New("discord: thread without an id")
+	}
+	return r.ID, nil
+}
+
+func threadName(title string) string {
 	name := []rune(text.Clean(title))
 	if len(name) > 100 {
 		name = name[:100]
@@ -192,10 +218,15 @@ func (d *Discord) Thread(ctx context.Context, session, title string) (string, er
 	if len(name) == 0 {
 		name = []rune("smithy")
 	}
+	return string(name)
+}
+
+// Thread starts a public thread named after the session in Channel.
+func (d *Discord) Thread(ctx context.Context, session, title string) (string, error) {
 	var r struct {
 		ID string `json:"id"`
 	}
-	body := map[string]any{"name": string(name), "type": 11, "auto_archive_duration": 10080}
+	body := map[string]any{"name": threadName(title), "type": 11, "auto_archive_duration": 10080}
 	if err := d.call(ctx, "POST", "/channels/"+d.Channel+"/threads", body, &r); err != nil {
 		return "", err
 	}
@@ -213,10 +244,13 @@ func renderDiscord(n Note) string {
 	if tag := tgTag[n.Kind]; tag != "" {
 		head = "`" + tag + "`  " + head
 	}
-	lines := []string{head}
+	var lines []string
+	if n.Title != "" {
+		lines = append(lines, head)
+	}
 	for _, l := range strings.Split(n.Text, "\n") {
-		if l = strings.TrimSpace(text.Clean(l)); l != "" {
-			lines = append(lines, mdEsc.Replace(clip(l, 500)))
+		if l = strings.TrimRight(text.Clean(l), " \t"); strings.TrimSpace(l) != "" || n.Kind == KindChat {
+			lines = append(lines, mdEsc.Replace(clip(l, lineCap(n))))
 		}
 	}
 	if u, err := url.Parse(n.URL); err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" {
@@ -231,6 +265,24 @@ func renderDiscord(n Note) string {
 func (d *Discord) message(n Note, buttons []Button) map[string]any {
 	var rows []map[string]any
 	var row []map[string]any
+	if n.Multi && len(buttons) > 1 {
+		var opts []map[string]any
+		for i, b := range buttons {
+			if i == 25 {
+				break
+			}
+			label := clip(text.Clean(b.Label), 100)
+			if label == "" {
+				label = "-"
+			}
+			opts = append(opts, map[string]any{"label": label, "value": b.Data})
+		}
+		hd, _, _ := strings.Cut(buttons[0].Data, ":")
+		sel := map[string]any{"type": 3, "custom_id": hd + ":multi", "options": opts, "min_values": 1,
+			"max_values": len(opts), "placeholder": "Pick any"}
+		row = []map[string]any{sel}
+		buttons = nil
+	}
 	for i, b := range buttons {
 		if i == 25 {
 			break
@@ -254,6 +306,9 @@ func (d *Discord) message(n Note, buttons []Button) map[string]any {
 // Send posts n in thread ("" is Channel) with one button per option. The ref is channel/message.
 func (d *Discord) Send(ctx context.Context, thread string, n Note, buttons []Button) (string, error) {
 	ch := d.Channel
+	if rest, ok := strings.CutPrefix(thread, ChatRoot); ok && d.ChatChan != "" {
+		thread = cmp.Or(rest, d.ChatChan)
+	}
 	if thread != "" {
 		ch = thread
 	}
@@ -403,7 +458,7 @@ func (d *Discord) connect(ctx context.Context) (*dgw, error) {
 					seq.n = ev.S
 					seq.Unlock()
 				}
-				if in, ok := d.event(ev); ok {
+				if in, ok := d.event(ev, g.done); ok {
 					d.deliver(g, in)
 				}
 			case 1:
@@ -424,11 +479,16 @@ func (d *Discord) connect(ctx context.Context) (*dgw, error) {
 
 // event turns a dispatch into an Inbound: a thread reply or a button press. A press is
 // acknowledged (deferred update) whether it counts or not, so the client stops its spinner.
-func (d *Discord) event(ev dEvent) (Inbound, bool) {
+func (d *Discord) event(ev dEvent, done <-chan struct{}) (Inbound, bool) {
 	switch ev.T {
 	case "MESSAGE_CREATE":
 		var m struct {
+			ID      string `json:"id"`
 			Channel string `json:"channel_id"`
+			Ref     *struct {
+				Message string `json:"message_id"`
+				Channel string `json:"channel_id"`
+			} `json:"message_reference"`
 			Guild   string `json:"guild_id"`
 			Author  dUser  `json:"author"`
 			Content string `json:"content"`
@@ -437,7 +497,14 @@ func (d *Discord) event(ev dEvent) (Inbound, bool) {
 		if json.Unmarshal(ev.D, &m) != nil || m.Hook != "" || m.Content == "" || !snowflakeRe.MatchString(m.Channel) || !d.allowed(m.Guild, m.Author) {
 			return Inbound{}, false
 		}
-		return Inbound{Thread: m.Channel, Text: clip(m.Content, 4000), By: m.Author.ID}, true
+		in := Inbound{Thread: m.Channel, Text: clip(m.Content, 4000), By: m.Author.ID}
+		if d.ChatChan != "" && m.Channel == d.ChatChan {
+			in.Thread, in.Ref, in.Chat = "", m.ID, true
+		}
+		if m.Ref != nil && snowflakeRe.MatchString(m.Ref.Message) && snowflakeRe.MatchString(m.Ref.Channel) {
+			in.ReplyTo = m.Ref.Channel + "/" + m.Ref.Message
+		}
+		return in, true
 	case "INTERACTION_CREATE":
 		var it struct {
 			ID     string `json:"id"`
@@ -448,7 +515,9 @@ func (d *Discord) event(ev dEvent) (Inbound, bool) {
 				User dUser `json:"user"`
 			} `json:"member"`
 			Data struct {
-				Custom string `json:"custom_id"`
+				Custom string   `json:"custom_id"`
+				Kind   int      `json:"component_type"`
+				Values []string `json:"values"`
 			} `json:"data"`
 			Message *struct {
 				ID      string `json:"id"`
@@ -461,12 +530,35 @@ func (d *Discord) event(ev dEvent) (Inbound, bool) {
 		if snowflakeRe.MatchString(it.ID) && itokenRe.MatchString(it.Token) {
 			go func(path string) {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				select {
+				case <-done:
+					return
+				default:
+				}
+				go func() {
+					select {
+					case <-done:
+						cancel()
+					case <-ctx.Done():
+					}
+				}()
 				_ = d.call(ctx, "POST", path, map[string]int{"type": 6}, nil)
-				cancel()
 			}("/interactions/" + it.ID + "/" + it.Token + "/callback")
 		}
 		if it.Member == nil || it.Message == nil || len(it.Data.Custom) > 100 || !d.allowed(it.Guild, it.Member.User) {
 			return Inbound{}, false
+		}
+		if it.Data.Kind == 3 {
+			if len(it.Data.Values) == 0 || len(it.Data.Values) > 25 {
+				return Inbound{}, false
+			}
+			for _, v := range it.Data.Values {
+				if len(v) > 100 || strings.Contains(v, ",") {
+					return Inbound{}, false
+				}
+			}
+			return Inbound{Picks: strings.Join(it.Data.Values, ","), Ref: it.Message.Channel + "/" + it.Message.ID, By: it.Member.User.ID}, true
 		}
 		return Inbound{Button: it.Data.Custom, Ref: it.Message.Channel + "/" + it.Message.ID, By: it.Member.User.ID}, true
 	}

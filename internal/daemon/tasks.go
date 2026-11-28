@@ -11,30 +11,6 @@ import (
 	"github.com/Zovaris/smithy/internal/tasks"
 )
 
-// TaskBoard is GET /v1/tasks: a project's task lists, the files `smithy tasks` reads.
-type TaskBoard struct {
-	Project  string     `json:"project"`
-	Statuses []string   `json:"statuses"`
-	Lists    []TaskList `json:"lists"`
-}
-
-// TaskList is one task dir and its tasks in NN order.
-type TaskList struct {
-	Dir   string     `json:"dir"`
-	Name  string     `json:"name"`
-	Tasks []TaskCard `json:"tasks"`
-}
-
-// TaskCard is one task file.
-type TaskCard struct {
-	File     string   `json:"file"`
-	NN       string   `json:"nn"`
-	Title    string   `json:"title"`
-	Status   string   `json:"status"`
-	PR       string   `json:"pr,omitempty"`
-	Blockers []string `json:"blockers"`
-}
-
 func card(t tasks.Task) TaskCard {
 	c := TaskCard{File: t.File, NN: t.NN, Title: t.Title, Status: t.Status, Blockers: t.Blockers}
 	if t.PR != "-" {

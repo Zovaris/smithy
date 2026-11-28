@@ -14,7 +14,11 @@ async function call(method: string, path: string, body?: unknown): Promise<any> 
 const sid = (id: string) => "/v1/sessions/" + encodeURIComponent(id);
 
 export const setSessionModel = (id: string, model: string, effort: string): Promise<Sess> => call("PUT", sid(id) + "/model", { model, effort });
-export const runShell = (id: string, cmd: string): Promise<{ output: string; code: number; error?: string }> => call("POST", sid(id) + "/shell", { cmd });
+export const addLink = (id: string, ref: string) => call("POST", sid(id) + "/links", { ref });
+export const setSessionGoal = (id: string, goal: string): Promise<Sess> => call("PUT", sid(id) + "/goal", { goal });
+// runShell runs `!cmd` in the session folder; the run comes back and reaches every client as a
+// session_shell event.
+export const runShell = (id: string, cmd: string): Promise<import("./store").Shell> => call("POST", sid(id) + "/shell", { cmd });
 
 export async function uploadImage(f: Blob): Promise<string> {
   if (f.size > 32 << 20) throw new Error("image over 32 MiB");
@@ -28,7 +32,7 @@ export async function uploadImage(f: Blob): Promise<string> {
 export const sampleAsk = (q: string) =>
   call("POST", "/v1/asks", { id: "ask:web-" + Date.now().toString(36), question: q || "Ship the sample change?", options: ["yes", "no"] });
 
-export type Settings = { settings: SettingRow[]; keys: { service: string; masked: string }[]; serve: boolean };
+export type Settings = { settings: SettingRow[]; keys: { service: string; masked: string }[]; serve: boolean; prompt?: { path: string; active: boolean } };
 export const loadSettings = (): Promise<Settings> => call("GET", "/v1/settings");
 export const setSetting = (k: string, v: string) => call("PUT", "/v1/settings/" + encodeURIComponent(k), { value: v });
 export const unsetSetting = (k: string) => call("DELETE", "/v1/settings/" + encodeURIComponent(k));
@@ -36,5 +40,7 @@ export const setKey = (svc: string, key: string) => call("PUT", "/v1/keys/" + en
 export const removeKey = (svc: string) => call("DELETE", "/v1/keys/" + encodeURIComponent(svc));
 export const setServe = (on: boolean) => call("PUT", "/v1/serve", { on });
 export const runDoctor = (): Promise<{ lines: string[] }> => call("GET", "/v1/doctor");
+export const tokenUsage = <R,>(session: string): Promise<R> => call("GET", "/v1/usage?session=" + encodeURIComponent(session));
+export const connectTest = (): Promise<{ results: string[]; error?: string }> => call("POST", "/v1/connect/test", {});
 export const addServer = (name: string, url: string, code: string) => call("POST", "/v1/servers", { name, url, code });
 export const removeServer = (name: string) => call("DELETE", "/v1/servers/" + encodeURIComponent(name));

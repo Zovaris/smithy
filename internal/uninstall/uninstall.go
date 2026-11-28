@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/auto"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/layout"
@@ -205,7 +205,7 @@ func Gather(purge bool, engine string) Plan {
 }
 
 func isKnown(name string) bool {
-	for _, k := range agents.Known {
+	for _, k := range skills.Known {
 		if k == name {
 			return true
 		}

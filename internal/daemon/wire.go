@@ -198,7 +198,9 @@ func (sv *Server) Ingest(e events.Event, source string) {
 	switch e.Kind {
 	case "secret_ask":
 		if source == ProxySource {
-			_ = sv.Ask(events.DecisionID(e, ""), "Allow "+line1(e.Detail, 300)+"?", []string{"approve", "deny"})
+			if err := sv.Ask(events.DecisionID(e, ""), "Allow "+line1(e.Detail, 300)+"?", []string{"approve", "deny"}); err != nil {
+				_ = events.AppendProxy(events.Event{Kind: "secret_denied", ID: e.ID, Detail: "daemon could not record the ask: " + text.Clean(err.Error())})
+			}
 		}
 	case "secret_approved", "secret_denied":
 		if source != ProxySource {

@@ -84,11 +84,17 @@ var Known = []Setting{
 	{"notify.telegram.chat", "", "smithy auto serve", "Telegram chat id serve notifies (bot token: smithy auth set telegram); empty = no notifications"},
 	{"notify.style", "plain", "smithy auto serve", "Telegram message look: emoji (an icon per line) or plain (status tag, one monospace detail line, no emoji)"},
 	{"notify.kinds", "pr_ready,blocked,stuck,decision,orchestrator_failed,serve_down,cap_reached,limited", "smithy auto serve", "comma list of notification kinds sent to Telegram"},
+	{"connect.telegram.notify", "", "smithy daemon", "Telegram notifications channel: numeric id of a supergroup with topics, alerts only, a topic per session; empty = notify.telegram.chat"},
+	{"connect.telegram.chat", "", "smithy daemon", "Telegram chat channel: numeric id of a supergroup with topics; a new message starts a session in its own topic, replies continue it; empty = off"},
 	{"connect.telegram.kinds", "", "smithy daemon", "comma list of kinds the daemon's Telegram connector sends; empty = notify.kinds; notify.telegram.chat must be a supergroup with topics, the bot an admin that can manage topics"},
 	{"connect.telegram.users", "", "smithy daemon", "comma list of Telegram user ids whose buttons, topic replies and idea: messages count; empty = send only"},
+	{"connect.slack.notify", "", "smithy daemon", "Slack notifications channel id (C…), alerts only, a thread per session; empty = connect.slack.channel"},
+	{"connect.slack.chat", "", "smithy daemon", "Slack chat channel id (C…); a new message starts a session in its thread, replies continue it; empty = off"},
 	{"connect.slack.channel", "", "smithy daemon", "Slack channel id (C…) the daemon's Slack connector posts in, a thread per session (tokens: smithy auth set slack and slack_app); empty = off"},
 	{"connect.slack.kinds", "", "smithy daemon", "comma list of kinds the daemon's Slack connector sends; empty = notify.kinds"},
 	{"connect.slack.users", "", "smithy daemon", "comma list of Slack user ids whose buttons and thread replies count; empty = send only"},
+	{"connect.discord.notify", "", "smithy daemon", "Discord notifications channel id, alerts only, a thread per session; empty = connect.discord.channel"},
+	{"connect.discord.chat", "", "smithy daemon", "Discord chat channel id in the same server; a new message starts a session in a thread on it, replies continue it; empty = off"},
 	{"connect.discord.channel", "", "smithy daemon", "numeric Discord text channel id the daemon's Discord connector posts in, a public thread per session (token: smithy auth set discord); empty = off"},
 	{"connect.discord.users", "", "smithy daemon", "comma list of Discord user ids whose buttons and thread replies count; empty = send only"},
 	{"connect.discord.kinds", "", "smithy daemon", "comma list of kinds the daemon's Discord connector sends; empty = notify.kinds"},
@@ -102,11 +108,14 @@ var Known = []Setting{
 	{"linear.states", "unstarted,backlog", "smithy auto", "Linear workflow state types that count as new work"},
 	{"session.agent", "", "smithy daemon", "agent a new session starts with when none is named (a CLI name, acp:<cli> or api:<provider>/<model>); the agent picker (ctrl+l, /agent) sets it; empty = the last used, else the first installed CLI"},
 	{"session.model", "", "smithy daemon", "model a new CLI session passes to its agent (--model); the picker (/model) sets it; empty = the agent's own default"},
+	{"session.goal_max_turns", "10", "smithy daemon", "turns the daemon sends on its own toward a session's /goal before it stops and leaves it to you"},
+	{"session.goal_max_cost", "5", "smithy daemon", "USD of reported agent cost a /goal loop may spend before it stops (unknown cost counts as 0); 0 = no cost cap"},
 	{"kit.mcp", "true", "smithy agent", "false: driven CLIs don't get smithy's own MCP server (smithy mcp); /skills in the TUI and the web Setup screen toggle it"},
 	{"kit.skills", "", "smithy agent", "comma list of installed skills linked into every driven CLI that takes skills (claude, codex, opencode, pi); /skills toggles them"},
-	{"ui.theme", "steel", "smithy, smithy stats, web", "color theme the TUI and web share: steel (ember accent), frost or plum; /theme and the web palette pick it"},
+	{"ui.theme", "steel", "smithy, smithy stats, web", "color theme the TUI and web share: steel (graphite, ember accent), frost, plum, moss, dune, dusk or rose, each a full palette; /theme and the web palette pick it"},
+	{"ui.agent_tabs", "false", "smithy", "true shows the open sessions as tabs under the chat header; false puts an agents chip in the header that opens the agents panel (tab, /agents)"},
 	{"ui.splash", "true", "smithy", "false skips the short dither-and-anvil animation when smithy opens; it never plays without a terminal, color or motion, or under 80×24"},
-	{"tui.reduce_motion", "false", "smithy, smithy stats", "true draws every frame still: no sparks, shimmer or sliding bars (like --no-anim or SMITHY_REDUCE_MOTION)"},
+	{"ui.reduce_motion", "false", "smithy, smithy stats", "true draws every frame still: no sparks, shimmer or sliding bars (like --no-anim or SMITHY_REDUCE_MOTION)"},
 }
 
 // ErrUnset means the key has no value and no default: ask the user once, then save it.
@@ -343,6 +352,9 @@ func defaultOf(key string) string {
 	return ""
 }
 
+// renamed maps a setting to its old name, still read when only the old one is saved.
+var renamed = map[string]string{"ui.reduce_motion": "tui.reduce_motion"}
+
 // Effective returns a key's value and where it came from (repo, user or default); a settings
 // file that isn't a JSON object is an error, not ErrUnset.
 func Effective(key string) (string, string, error) { return Snapshot()(key) }
@@ -367,6 +379,11 @@ func Snapshot() func(key string) (string, string, error) {
 			}
 			if v, ok := lookup(l.m, key); ok {
 				return str(v), l.src, nil
+			}
+			if old, ok := renamed[key]; ok {
+				if v, ok := lookup(l.m, old); ok {
+					return str(v), l.src, nil
+				}
 			}
 		}
 		if d := defaultOf(key); d != "" && d != "ask" {

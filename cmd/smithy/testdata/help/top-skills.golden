@@ -29,6 +29,8 @@ Daily
   report        weekly report: shipped, failed, time and cost per harness, open
                 decisions
   scan          check a change's added lines and files for secrets
+  schedule      start workflows on a cron, webhook, GitHub event or file change
+                (harness build)
   search        search ADRs, glossary and docs, best sources first (--code: the
                 whole repo)
   servers       the daemons this machine talks to: list, add, use, discover
@@ -39,6 +41,8 @@ Daily
   tasks         the shared task list (smithy tasks board --all)
   wait          wait without tokens for PRs, runs, branches, issues or a batch
   web           print or open the daemon's web UI link (harness build)
+  workflow      workflows: flows of steps you run: list, show, add, example,
+                run, history, validate (harness build)
 
 Accounts and secrets
   auth          source API keys in ~/.smithy/auth.json: set (stdin only), list,

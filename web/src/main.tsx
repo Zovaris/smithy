@@ -10,7 +10,6 @@ import { parse, totals, withComments, type Comment } from "./lib/diff";
 import { Anvil, I } from "./components/icons";
 import { sendMessage, start, stopSession, useLive } from "./lib/live";
 import { clock, headerLine } from "./lib/parity";
-import { Changes, Decisions } from "./components/rail";
 import { go, href, PAGES, type Page, useView } from "./lib/router";
 import { agentName, ago, open, sessions as list, type Sess } from "./lib/store";
 import { initTheme, toggleTheme, current, loadAccent, type ThemeName } from "./lib/theme";
@@ -18,24 +17,30 @@ import { St } from "./components/ui";
 import type { Info } from "./components/info";
 import type { Detail } from "./lib/detail";
 
+// The rail (diff viewer, decisions) loads after the first paint: it sits beside the chat.
+const Changes = lazy(() => import("./components/rail").then((m) => ({ default: m.Changes })));
+const Decisions = lazy(() => import("./components/rail").then((m) => ({ default: m.Decisions })));
+
 
 const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
   decisions: lazy(() => import("./screens/decisions")),
   agents: lazy(() => import("./screens/agents")),
   board: lazy(() => import("./screens/board")),
   bench: lazy(() => import("./screens/bench")),
+  workflows: lazy(() => import("./screens/workflows")),
+  schedules: lazy(() => import("./screens/schedules")),
   setup: lazy(() => import("./screens/setup")),
 };
 const Palette = lazy(() => import("./components/palette"));
 const AgentsPanel = lazy(() => import("./components/panel"));
 const Splash = lazy(() => import("./components/splash"));
 const SideServers = lazy(() => import("./components/servers").then((m) => ({ default: () => <m.Servers rows={m.useServers()} /> })));
+const Refined = lazy(() => import("./features/chat/refined"));
 const SessionPick = lazy(() => import("./features/chat/sessionpick"));
 const InfoPanel = lazy(() => import("./components/info"));
 const NewSession = lazy(() => import("./features/chat/newsession").then((m) => ({ default: m.NewSession })));
-type Shell = { cmd: string; output: string; code: number };
 
-const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", setup: "gear" };
+const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", workflows: "layers", schedules: "clock", setup: "gear" };
 
 type Auth = { state: "checking" } | { state: "ok" } | { state: "denied" } | { state: "down"; error: string };
 
@@ -123,7 +128,7 @@ function App() {
   const [version, setVersion] = useState("");
   const [pick, setPick] = useState(false);
   const [note, setNote] = useState("");
-  const [shells, setShells] = useState<Record<string, Shell[]>>({});
+  const [shim, setShim] = useState(0);
   const v = useView();
   const auth = useAuth();
   const l = useLive();
@@ -161,7 +166,7 @@ function App() {
 
   const onAction = (a: string, arg = "") => {
     if (a === "new") go({ name: "new" });
-    else import("./features/chat/slash").then((m) => m.run(a, arg, { s, pend, log: l.store.log, detail, setPick, setNote, setAccent, setDetail, setInfo, showTend: () => setSheet("rail") }));
+    else import("./features/chat/slash").then((m) => m.run(a, arg, { s, pend, log: l.store.log, detail, setPick, setNote, setAccent, setDetail, setInfo, showTend: () => setSheet("rail"), shimmer: () => setShim((n) => n + 1) }));
   };
 
   useEffect(() => {
@@ -198,11 +203,11 @@ function App() {
   const title = v.name === "session" ? s?.title ?? "Session" : v.name === "new" ? "New session" : PAGES.find((p) => p.id === v.name)!.label;
   const rail = v.name !== "new" || !!ss.length;
   const railBody = s ? (
-    <>
+    <Suspense fallback={null}>
       <Changes diff={diff} comments={mine} onComment={(c) => setNotes({ ...notes, [sid]: [...mine, c] })} onDrop={(c) => setNotes({ ...notes, [sid]: mine.filter((x) => x !== c) })} />
       <Decisions list={l.store.decisions.filter((d) => d.session === s.id || (!d.session && d.answer == null))} sessions={l.store.sessions} />
-      <Suspense fallback={null}><AgentsPanel store={l.store} project={s.dir} cur={s.id} host={host()} /></Suspense>
-    </>
+      <AgentsPanel store={l.store} project={s.dir} cur={s.id} host={host()} />
+    </Suspense>
   ) : (
     <Suspense fallback={null}><AgentsPanel store={l.store} project={project} cur="" host={host()} /></Suspense>
   );
@@ -218,26 +223,23 @@ function App() {
     );
 
   let center;
-  if (v.name === "new") center = <Suspense fallback={null}><NewSession setup={l.setup} recent={ss} host={host()} onAction={onAction} /></Suspense>;
+  if (v.name === "new") center = <Suspense fallback={null}><NewSession setup={l.setup} recent={ss} host={host()} shimmer={shim} onAction={onAction} /></Suspense>;
   else if (v.name === "session")
     center = s ? (
       <>
         <Conversation s={s} detail={detail} items={l.store.convo[s.id] ?? []} decisions={decs} loose={s.status === "working" || s.status === "needs_you" ? pend.filter((d) => !d.session) : []}
-          extra={(shells[s.id] ?? []).map((x) => (
-            <div class="shell" role="group" aria-label={"Shell: " + x.cmd}>
-              <div class="mono"><span class="t3">$</span> {x.cmd}{x.code !== 0 && <span class="st fail">exit {x.code}</span>}</div>
-              <pre>{x.output.trimEnd() || "(no output)"}</pre>
-            </div>
-          ))} />
+          extra={[<Suspense fallback={null}><Refined s={s} items={l.store.convo[s.id]} /></Suspense>]} />
         <Composer
           placeholder={`Reply to ${agentName(s.agent)}`}
           skills={skills}
+          paths={l.setup?.paths}
+          agent={s.agent}
+          shimmer={shim}
           working={s.status === "working" || s.status === "needs_you"}
           onStop={() => stopSession(s.id).catch(() => {})}
           onAction={onAction}
           onShell={currentServer() ? undefined : async (cmd) => {
-            const x = await (await import("./features/chat/slash")).shell(s.id, cmd);
-            setShells((m) => ({ ...m, [s.id]: [...(m[s.id] ?? []), x] }));
+            await (await import("./lib/actions")).runShell(s.id, cmd);
           }}
           onImage={currentServer() ? undefined : async (f) => (await import("./lib/actions")).uploadImage(f)}
           above={!!mine.length && <div class="cmts"><span class="tag"><I n="pen" />{mine.length} diff comment{mine.length > 1 ? "s" : ""} go with this message</span></div>}
@@ -247,9 +249,12 @@ function App() {
             return "";
           }}
           pills={
-            <button class="pill" aria-haspopup="dialog" title="Model and effort (/model, /effort)" onClick={() => setPick(true)}>
-              <I n="term" />{agentName(s.agent)}<span class="hide-s t3">{(s.model || "default") + (s.effort ? " · " + s.effort : "")}</span>
-            </button>
+            <>
+              <button class="pill" aria-haspopup="dialog" title="Model and effort (/model, /effort)" onClick={() => setPick(true)}>
+                <I n="term" />{agentName(s.agent)}<span class="hide-s t3">{(s.model || "default") + (s.effort ? " · " + s.effort : "")}</span>
+              </button>
+              {s.goal && <span class="pill" title={s.goal}>goal {s.goal_state || "on"}</span>}
+            </>
           }
         />
       </>
@@ -301,7 +306,7 @@ function App() {
       )}
       {pick && s && (
         <Suspense fallback={null}>
-          <SessionPick s={s} open={pick} onClose={() => setPick(false)} />
+          <SessionPick s={s} open={pick} onClose={() => setPick(false)} onTop={() => setShim((n) => n + 1)} />
         </Suspense>
       )}
       {info && (

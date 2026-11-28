@@ -2,18 +2,26 @@
 // session with its status and usage, its conversation as turns, its latest diff, and every
 // decision with the session it belongs to.
 import type { Ev } from "./model";
+import type { Links } from "./links";
 
 export type Status = "working" | "needs_you" | "done" | "failed";
 export type Usage = { input_tokens?: number; output_tokens?: number; cost_usd?: number };
 export type Sess = {
   id: string; agent: string; model?: string; effort?: string; dir: string; title: string;
-  status: Status; detail?: string; created: string; updated: string; usage?: Usage;
+  status: Status; detail?: string; created: string; updated: string; usage?: Usage; parent?: string;
+  goal?: string; goal_state?: string;
 };
 export type Tool = { id?: string; name: string; args?: unknown; output?: string; is_error?: boolean };
 export type Part = { kind: "text"; text: string } | { kind: "tools"; tools: Tool[] } | { kind: "decision"; id: string };
-export type Item = { kind: "you"; text: string; at: string } | { kind: "agent"; parts: Part[]; at: string };
+// Shell is a `!cmd` run (session_shell): the first and last 250 lines, cut set when a "… N lines
+// cut …" line sits between them.
+export type ShellLine = { text: string; err?: boolean };
+export type Shell = { id?: string; cmd: string; dir?: string; lines: ShellLine[]; code: number; error?: string; took_ms?: number; cut?: boolean };
+export type Item = { kind: "you"; text: string; at: string } | { kind: "agent"; parts: Part[]; at: string } | { kind: "shell"; x: Shell; at: string };
+
 export type Diff = { stat: string; patch: string; truncated: boolean; at: string };
-export type Dec = { id: string; session: string; question: string; options: string[]; asked: string; answer?: string; by?: string };
+// multi: several options may be picked (the answer joins them with ", "); other: free text is taken.
+export type Dec = { id: string; session: string; question: string; options: string[]; asked: string; multi?: boolean; other?: boolean; answer?: string; by?: string };
 export type Store = {
   last: number;
   order: string[];
@@ -22,19 +30,25 @@ export type Store = {
   diffs: Record<string, Diff>;
   decisions: Dec[];
   log: string[];
+  links?: Record<string, Links>;
+  notes: Note[];
 };
 
-export const blank = (): Store => ({ last: 0, order: [], sessions: {}, convo: {}, diffs: {}, decisions: [], log: [] });
+export type Note = { at: string; workflow: string; title: string; text: string };
+
+export const blank = (): Store => ({ last: 0, order: [], sessions: {}, convo: {}, diffs: {}, decisions: [], log: [], notes: [] });
 
 const obj = (d: unknown): Record<string, any> => (d && typeof d === "object" ? (d as Record<string, any>) : {});
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 // prose drops the machine lines a CLI agent's log can leak into its text (one JSON object per
-// line, stream-json); people never write those, so the conversation keeps only what reads.
+// line, stream-json); people never write those, so the conversation keeps only what reads. It
+// drops a goal turn's GOAL MET: line too: the "goal met" line says it.
 export function prose(t: string): string {
   return t
     .split("\n")
     .filter((l) => {
       const x = l.trim();
+      if (x.startsWith("GOAL MET:")) return false;
       if (!x.startsWith("{") || !x.endsWith("}")) return true;
       try {
         return typeof JSON.parse(x) !== "object";
@@ -89,9 +103,22 @@ export function fold(s: Store, e: Ev): Store {
       next.order = touch(s, id);
       return next;
     }
+    case "session_links": {
+      next.links = { ...s.links, [id]: d as Links };
+      return next;
+    }
     case "session_model": {
       if (!sess) return next;
       next.sessions = { ...s.sessions, [id]: { ...sess, model: str(d.model), effort: str(d.effort) } };
+      return next;
+    }
+    case "session_goal": {
+      if (!sess) return next;
+      const goal = str(d.goal), state = str(d.state);
+      next.sessions = { ...s.sessions, [id]: { ...sess, goal, goal_state: state } };
+      const { items, turn } = agentTurn(convo, at);
+      turn.parts.push({ kind: "text", text: "\n\ngoal " + (!goal ? "cleared" : state || "set: " + goal) });
+      next.convo = { ...s.convo, [id]: items };
       return next;
     }
     case "session_usage": {
@@ -139,6 +166,12 @@ export function fold(s: Store, e: Ev): Store {
       next.convo = { ...s.convo, [id]: items };
       return next;
     }
+    case "session_shell": {
+      if (!sess || !str(d.cmd) || (d.id && convo.some((i) => i.kind === "shell" && i.x.id === d.id))) return next;
+      const x: Shell = { id: str(d.id), cmd: str(d.cmd), dir: str(d.dir), lines: Array.isArray(d.lines) ? d.lines : [], code: Number(d.code) || 0, error: str(d.error) || undefined, took_ms: Number(d.took_ms) || 0, cut: d.cut === true };
+      next.convo = { ...s.convo, [id]: [...convo, { kind: "shell", x, at }] };
+      return next;
+    }
     case "session_diff": {
       if (!sess) return next;
       next.diffs = { ...s.diffs, [id]: { stat: str(d.stat), patch: str(d.patch), truncated: !!d.truncated, at } };
@@ -148,12 +181,16 @@ export function fold(s: Store, e: Ev): Store {
       const did = str(d.id);
       if (!did || s.decisions.some((x) => x.id === did)) return next;
       const sid = sessionOf(did, id);
-      next.decisions = [...s.decisions, { id: did, session: sid, question: str(d.question), options: Array.isArray(d.options) && d.options.length ? d.options : ["yes", "no"], asked: str(d.asked) || at }];
+      next.decisions = [...s.decisions, { id: did, session: sid, question: str(d.question), options: Array.isArray(d.options) && d.options.length ? d.options : ["yes", "no"], asked: str(d.asked) || at, multi: d.multi === true, other: d.other === true }];
       if (sid && s.sessions[sid]) {
         const { items, turn } = agentTurn(s.convo[sid] ?? [], at);
         turn.parts.push({ kind: "decision", id: did });
         next.convo = { ...s.convo, [sid]: items };
       }
+      return next;
+    }
+    case "workflow_note": {
+      next.notes = [...s.notes, { at, workflow: str(d.workflow), title: str(d.title), text: str(d.text) }].slice(-20);
       return next;
     }
     case "log": {
@@ -170,13 +207,16 @@ export function fold(s: Store, e: Ev): Store {
 }
 
 // seed adds the pending decisions /v1/state lists that the stream has not shown yet.
-export function seed(s: Store, pending: { id: string; question: string; options?: string[]; asked?: string }[]): Store {
+export function seed(s: Store, pending: { id: string; question: string; options?: string[]; asked?: string; multi?: boolean; other?: boolean }[]): Store {
   const add = pending.filter((p) => !s.decisions.some((d) => d.id === p.id));
   if (!add.length) return s;
-  return { ...s, decisions: [...s.decisions, ...add.map((p) => ({ id: p.id, session: sessionOf(p.id), question: p.question, options: p.options?.length ? p.options : ["yes", "no"], asked: p.asked ?? "" }))] };
+  return { ...s, decisions: [...s.decisions, ...add.map((p) => ({ id: p.id, session: sessionOf(p.id), question: p.question, options: p.options?.length ? p.options : ["yes", "no"], asked: p.asked ?? "", multi: p.multi === true, other: p.other === true }))] };
 }
 
 export const open = (s: Store) => s.decisions.filter((d) => d.answer == null);
+export const tree = (l: Sess[], up?: string): Sess[] =>
+  l.filter((s) => s.parent == up || (!up && !l.some((p) => p.id == s.parent))).flatMap((s) => [s, ...tree(l, s.id)]);
+
 export const sessions = (s: Store) => s.order.map((id) => s.sessions[id]).filter(Boolean);
 
 export const STATUS_WORD: Record<Status, string> = { working: "working", needs_you: "needs you", done: "done", failed: "failed" };
@@ -190,6 +230,9 @@ export function kindOf(d: Dec): string {
 }
 
 // primary is the option the ↵ key answers: deny for the guard (the safe one), else the first.
+// picks is a multi-select answer: the picked options in their listed order, joined as the daemon checks them.
+export const picks = (options: string[], picked: Set<number>) => options.filter((_, i) => picked.has(i)).join(", ");
+
 export const primary = (d: Dec) => (d.options.includes("deny") ? "deny" : d.options[0]);
 
 let names: Record<string, string> = {};

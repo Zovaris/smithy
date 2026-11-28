@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/Zovaris/smithy/internal/agents/skills"
 )
 
 func env(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
@@ -263,28 +265,28 @@ func TestSkills(t *testing.T) {
 	os.MkdirAll(filepath.Join(home, ".claude", "skills"), 0o755)
 	os.Symlink(dir, filepath.Join(home, ".claude", "skills", "scout"))
 	real, _ := filepath.EvalSymlinks(dir)
-	if p, ok := FindSkill("scout"); !ok || p != filepath.Join(real, "SKILL.md") {
-		t.Errorf("FindSkill(scout) = %q %v", p, ok)
+	if p, ok := skills.FindSkill("scout"); !ok || p != filepath.Join(real, "SKILL.md") {
+		t.Errorf("skills.FindSkill(scout) = %q %v", p, ok)
 	}
-	if _, ok := FindSkill("tend"); ok {
+	if _, ok := skills.FindSkill("tend"); ok {
 		t.Error("tend found")
 	}
-	if m, d := MissingInHarness("claude-cli"); len(m) != 0 || d != filepath.Join(home, ".claude", "skills") {
+	if m, d := skills.MissingInHarness("claude-cli"); len(m) != 0 || d != filepath.Join(home, ".claude", "skills") {
 		t.Errorf("claude-cli has scout linked: %q %s", m, d)
 	}
-	if m, _ := MissingInHarness("codex"); len(m) != 1 || m[0] != "scout" {
+	if m, _ := skills.MissingInHarness("codex"); len(m) != 1 || m[0] != "scout" {
 		t.Errorf("codex can't load scout: %q", m)
 	}
-	if d := HarnessSkillDirs("claude-cli", "/r", "/h", env(nil)); len(d) != 2 || d[0] != "/h/.claude/skills" || d[1] != "/r/.claude/skills" {
+	if d := skills.HarnessSkillDirs("claude-cli", "/r", "/h", env(nil)); len(d) != 2 || d[0] != "/h/.claude/skills" || d[1] != "/r/.claude/skills" {
 		t.Errorf("claude-cli reads ~/.claude and <repo>/.claude only: %q", d)
 	}
-	if d := HarnessSkillDirs("codex", "/r", "/h", env(nil)); d[len(d)-1] != "/r/.agents/skills" || strings.Contains(strings.Join(d, " "), ".claude") {
+	if d := skills.HarnessSkillDirs("codex", "/r", "/h", env(nil)); d[len(d)-1] != "/r/.agents/skills" || strings.Contains(strings.Join(d, " "), ".claude") {
 		t.Errorf("codex: %q", d)
 	}
-	if m, d := MissingInHarness("unknown"); m != nil || d != "" {
+	if m, d := skills.MissingInHarness("unknown"); m != nil || d != "" {
 		t.Errorf("unknown harness: %q %s", m, d)
 	}
-	c := SkillCandidates("x", "/s/use-smithy/scripts", "/top", "/h", env(nil))
+	c := skills.SkillCandidates("x", "/s/use-smithy/scripts", "/top", "/h", env(nil))
 	if c[0] != "/s/x/SKILL.md" || c[1] != "/top/.agents/skills/x/SKILL.md" || c[len(c)-1] != "/h/.dsh/skills/x/SKILL.md" {
 		t.Errorf("candidates = %q", c)
 	}
@@ -721,5 +723,29 @@ func TestResolveTier(t *testing.T) {
 	}
 	if got := ResolveTier("claude", "cheap"); got != "" {
 		t.Fatalf("unset tier must fall back to the default, got %q", got)
+	}
+}
+
+func TestAgentWithoutEffortFlagIgnoresEffortSilently(t *testing.T) {
+	d := t.TempDir()
+	bin := filepath.Join(d, "opencode")
+	os.WriteFile(bin, []byte("#!/bin/sh\necho done\n"), 0o755)
+	t.Setenv("AGENT_CLI", bin)
+	t.Setenv("SMITHY_HOME", d)
+	t.Setenv("AGENT_EFFORT", "medium")
+	p := filepath.Join(d, "p.md")
+	os.WriteFile(p, []byte("x"), 0o644)
+	r, w, _ := os.Pipe()
+	old := os.Stderr
+	os.Stderr = w
+	rc := AgentMain([]string{"--timeout", "0", "--log", filepath.Join(d, "w.log"), p})
+	w.Close()
+	os.Stderr = old
+	errOut, _ := io.ReadAll(r)
+	if rc != 0 {
+		t.Fatalf("rc = %d: %s", rc, errOut)
+	}
+	if strings.Contains(string(errOut), "effort") {
+		t.Fatalf("an agent without an effort flag must ignore the effort quietly, stderr: %s", errOut)
 	}
 }

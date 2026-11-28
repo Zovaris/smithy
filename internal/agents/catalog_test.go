@@ -9,9 +9,6 @@ func TestTablesDeriveFromKnownCLIs(t *testing.T) {
 	if want := []string{"claude", "codex", "opencode", "agy", "copilot", "grok", "cursor", "pi", "dsh"}; !reflect.DeepEqual(CLIs, want) {
 		t.Errorf("CLIs = %v", CLIs)
 	}
-	if !reflect.DeepEqual(installHarnesses, CLIs) {
-		t.Errorf("installHarnesses = %v", installHarnesses)
-	}
 	if want := map[string]bool{"claude": true, "codex": true}; !reflect.DeepEqual(EffortFlags, want) {
 		t.Errorf("EffortFlags = %v", EffortFlags)
 	}
@@ -20,9 +17,6 @@ func TestTablesDeriveFromKnownCLIs(t *testing.T) {
 	}
 	if Bin("cursor") != "agent" || Bin("codex") != "codex" || Bin("/x/custom") != "/x/custom" {
 		t.Error("Bin")
-	}
-	if harnessName("claude") != "claude-cli" || harnessName("pi") != "pi" {
-		t.Error("harnessName")
 	}
 	if len(InstallHint) != len(CLIs) {
 		t.Errorf("InstallHint has %d entries", len(InstallHint))

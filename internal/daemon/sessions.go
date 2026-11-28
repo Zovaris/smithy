@@ -21,6 +21,7 @@ import (
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/store"
@@ -37,6 +38,8 @@ const (
 	KindSessionUsage   = "session_usage"
 	KindSessionStatus  = "session_status"
 	KindSessionModel   = "session_model"
+	KindSessionMail    = "session_mail"
+	KindSessionShell   = "session_shell"
 )
 
 const (
@@ -56,22 +59,6 @@ const (
 	permitWait      = 24 * time.Hour
 	sessionIDPrefix = "s-"
 )
-
-// Session is one conversation with an agent in a folder.
-type Session struct {
-	ID      string       `json:"id"`
-	Agent   string       `json:"agent"`
-	Model   string       `json:"model,omitempty"`
-	Effort  string       `json:"effort,omitempty"`
-	Dir     string       `json:"dir"`
-	Title   string       `json:"title"`
-	Status  string       `json:"status"`
-	Detail  string       `json:"detail,omitempty"`
-	Created time.Time    `json:"created"`
-	Updated time.Time    `json:"updated"`
-	Usage   *usage.Usage `json:"usage,omitempty"`
-	PRs     []string     `json:"prs,omitempty"`
-}
 
 // ToolEvent is one finished tool call of a session.
 type ToolEvent struct {
@@ -113,6 +100,11 @@ type live struct {
 	asks     int
 	stopped  bool
 	lastDiff string
+	links    *SessionLinks
+	hidden   []string // links removed by hand (session_unlink)
+	mail     []Mail
+	sent     []time.Time
+	goalBase float64
 }
 
 var (
@@ -180,6 +172,10 @@ func (sv *Server) applySession(e store.Event) {
 		if l := sv.sessions[e.Session]; l != nil && json.Unmarshal(e.Data, &c) == nil {
 			l.s.Model, l.s.Effort, l.s.Updated = c.Model, c.Effort, e.Time
 		}
+	case KindSessionGoal:
+		if l := sv.sessions[e.Session]; l != nil {
+			sv.applyGoal(l, e.Data)
+		}
 	case KindSessionStatus:
 		var st struct{ Status, Detail string }
 		if l := sv.sessions[e.Session]; l != nil && json.Unmarshal(e.Data, &st) == nil {
@@ -196,6 +192,10 @@ func (sv *Server) applySession(e store.Event) {
 		if json.Unmarshal(e.Data, &t) == nil {
 			sv.notePRsLocked(e.Session, t)
 		}
+	case KindSessionLink, KindSessionLinks, KindSessionUnlink:
+		sv.applyLinks(e)
+	case KindSessionMail:
+		sv.applyMailLocked(e)
 	case KindSessionUsage:
 		var u usage.Usage
 		if l := sv.sessions[e.Session]; l != nil && json.Unmarshal(e.Data, &u) == nil {
@@ -270,6 +270,10 @@ func (sv *Server) StartSessionWith(agent, model, dir, msg, by string) (Session, 
 
 // StartSessionEffort is StartSessionWith with an effort for a CLI that takes one ("": agent.effort).
 func (sv *Server) StartSessionEffort(agent, model, effort, dir, msg, by string) (Session, error) {
+	return sv.newSession("", agent, model, effort, dir, msg, by)
+}
+
+func (sv *Server) newSession(parent, agent, model, effort, dir, msg, by string) (Session, error) {
 	if len(msg) > MaxMessage {
 		return Session{}, fmt.Errorf("%w: message over %d bytes", errBadRequest, MaxMessage)
 	}
@@ -327,8 +331,9 @@ func (sv *Server) StartSessionEffort(agent, model, effort, dir, msg, by string) 
 	if es, ok := r.(effortSetter); ok && effort != "" {
 		es.SetEffort(effort)
 	}
+	sv.setBus(r, id)
 	now := time.Now().UTC()
-	s := Session{ID: id, Agent: agent, Model: model, Effort: effort, Dir: d, Title: titleOf(msg), Status: StatusDone, Created: now, Updated: now}
+	s := Session{ID: id, Agent: agent, Model: model, Effort: effort, Dir: d, Title: titleOf(msg), Status: StatusDone, Created: now, Updated: now, Parent: parent}
 	ctx, cancel := context.WithCancel(sv.ctx())
 	l := &live{s: s, runner: r, inbox: make(chan string, MaxQueued), cancel: cancel, done: make(chan struct{})}
 	sv.mu.Lock()
@@ -396,6 +401,7 @@ func (sv *Server) SendSession(id, msg, by string) error {
 		if es, ok := r.(effortSetter); ok && effort != "" {
 			es.SetEffort(effort)
 		}
+		sv.setBus(r, id)
 		sv.mu.Lock()
 		if l.runner == nil || l.stopped {
 			ctx, cancel := context.WithCancel(sv.ctx())
@@ -411,6 +417,7 @@ func (sv *Server) SendSession(id, msg, by string) error {
 }
 
 func (sv *Server) queueLocked(l *live, msg, by string) error {
+	sv.goalResumeLocked(l, by)
 	select {
 	case l.inbox <- msg:
 	default:
@@ -561,6 +568,9 @@ func (sv *Server) runTurn(ctx context.Context, l *live, r Runner, msg string) {
 	if n := len(hist); n > 0 && hist[n-1].Role == "user" && hist[n-1].Text == msg {
 		hist = hist[:n-1]
 	}
+	if l.s.Goal != "" && l.s.GoalState == "" {
+		msg = goalPrompt(l.s.Goal, msg)
+	}
 	sv.mu.Unlock()
 	sv.setStatus(id, StatusWorking, "")
 	e := &emitter{sv: sv, id: id}
@@ -580,7 +590,7 @@ func (sv *Server) runTurn(ctx context.Context, l *live, r Runner, msg string) {
 		sv.setStatus(id, StatusFailed, line1(text.Clean(err.Error()), 300))
 	default:
 		sv.mu.Lock()
-		if len(l.inbox) == 0 {
+		if len(l.inbox) == 0 && !sv.goalNextLocked(l, reply) {
 			sv.setStatusLocked(id, StatusDone, "")
 		}
 		sv.mu.Unlock()
@@ -616,17 +626,24 @@ func (e *emitter) Tool(t ToolEvent) {
 func (e *emitter) Usage(u usage.Usage) {
 	sv := e.sv
 	sv.mu.Lock()
-	defer sv.mu.Unlock()
 	if _, err := sv.appendLocked(KindSessionUsage, e.id, u); err != nil {
+		sv.mu.Unlock()
 		return
 	}
+	ev := events.Event{Kind: "usage", Usage: &u, Session: e.id}
 	if l := sv.sessions[e.id]; l != nil {
 		t := u
 		if l.s.Usage != nil {
 			t = l.s.Usage.Add(u)
 		}
 		l.s.Usage = &t
+		ev.Agent, ev.Model = l.s.Agent, l.s.Model
 	}
+	sv.mu.Unlock()
+	if ev.Agent == "" {
+		ev.Agent = "default"
+	}
+	_ = events.Append(ev)
 }
 
 // Ask records a decision perm:<session>/<n> and waits for its answer; the session shows
@@ -641,7 +658,7 @@ func (e *emitter) Ask(ctx context.Context, question string, options []string) (s
 	}
 	l.asks++
 	id := "perm:" + e.id + "/" + strconv.Itoa(l.asks)
-	d := Decision{ID: id, Question: line1(question, MaxQuestion), Options: options, Asked: time.Now().UTC()}
+	d := Decision{ID: id, Question: line1(question, MaxQuestion), Options: options, Asked: time.Now().UTC(), Session: e.id}
 	if _, err := sv.appendLocked(KindAsked, e.id, d); err != nil {
 		sv.mu.Unlock()
 		return "", err
@@ -756,13 +773,6 @@ func (sv *Server) stopSession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]string{"id": r.PathValue("id"), "status": StatusDone})
 }
 
-// SessionList is GET /v1/sessions.
-type SessionList struct {
-	Sessions  []Session `json:"sessions"`
-	LastAgent string    `json:"last_agent"`
-	LastModel string    `json:"last_model,omitempty"`
-}
-
 func (sv *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 	l := SessionList{Sessions: sv.Sessions()}
 	if d := r.URL.Query().Get("dir"); d != "" {
@@ -779,6 +789,17 @@ func (sv *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 	}
 	l.LastAgent, l.LastModel = sv.Defaults()
 	writeJSON(w, 200, l)
+}
+
+func (sv *Server) sessionMail(w http.ResponseWriter, r *http.Request) {
+	sv.mu.Lock()
+	ok := sv.sessions[r.PathValue("id")] != nil
+	sv.mu.Unlock()
+	if !ok {
+		sessionErr(w, errNoSession)
+		return
+	}
+	writeJSON(w, 200, sv.Mail(r.PathValue("id")))
 }
 
 func (sv *Server) getSession(w http.ResponseWriter, r *http.Request) {

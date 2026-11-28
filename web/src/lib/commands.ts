@@ -1,6 +1,7 @@
 // The composer's `/` commands: smithy's own (they act here) and the installed skills (they go to
 // the agent as the start of the message, the way you would type them in the CLI).
-export type Cmd = { name: string; hint: string; kind: "action" | "skill" };
+// fill, when set, is the text picking the row puts in the composer.
+export type Cmd = { name: string; hint: string; kind: "action" | "skill"; fill?: string };
 
 // Each command and its hint, in the order the `/` menu lists them.
 const HINTS: Record<string, string> = {
@@ -10,8 +11,9 @@ const HINTS: Record<string, string> = {
   stop: "stop the turn",
   model: "session model",
   effort: "session effort",
+  goal: "session goal",
   skills: "skills and MCP",
-  theme: "steel, frost, plum, light or dark",
+  theme: "steel, frost, plum, moss, dune, dusk, rose, light or dark",
   mode: "transcript detail",
   connect: "servers",
   remote: "from another machine",
@@ -19,6 +21,9 @@ const HINTS: Record<string, string> = {
   board: "board",
   decisions: "decisions",
   bench: "bench",
+  workflows: "workflows",
+  schedules: "schedules",
+  run: "<workflow> run it",
   log: "daemon log",
   welcome: "first-run steps",
   setup: "agents ready or missing",
@@ -31,19 +36,36 @@ const HINTS: Record<string, string> = {
   keys: "API keys",
   key: "rm <service>",
   doctor: "smithy doctor",
+  usage: "tokens and cost",
+  prompt: "system prompt file",
+  sidebar: "side panel: changes and links",
+  links: "PRs and issues",
   tend: "PRs kept green",
+  channels: "chat channels, test-send",
   settings: "settings",
+  config: "every setting",
 };
 
 export const ACTIONS: Cmd[] = Object.entries(HINTS).map(([name, hint]) => ({ name, hint, kind: "action" }));
 
-// suggest lists the commands matching a message that is only `/word` so far.
-export function suggest(input: string, skills: string[]): Cmd[] {
+// skillDir is where a skill lives, from its SKILL.md path, the home folder shown as ~ like the TUI.
+const skillDir = (p: string) => p.replace(/\/[^/]+\/[^/]+$/, "").replace(/^\/(?:Users|home)\/[^/]+(?=\/)/, "~");
+
+// match keeps the rows whose name holds q (or, from three letters on, whose hint does), name-prefix
+// matches first.
+function match(l: Cmd[], q: string): Cmd[] {
+  const hit = (c: Cmd) => c.name.includes(q) || (q.length >= 3 && c.hint.toLowerCase().includes(q));
+  return l.filter((c) => c.name.startsWith(q)).concat(l.filter((c) => !c.name.startsWith(q) && hit(c)));
+}
+
+// suggest lists what a message that is only `/word` so far can be, as the TUI's / menu does: the
+// commands, then the skills (marked as skills, with where each lives).
+export function suggest(input: string, skills: string[], paths: Record<string, string> = {}): Cmd[] {
   const m = /^\/([\w-]*)$/.exec(input);
   if (!m) return [];
   const q = m[1].toLowerCase();
-  const all = [...ACTIONS, ...skills.map((s) => ({ name: s, hint: "skill", kind: "skill" as const }))];
-  return all.filter((c) => c.name.startsWith(q)).concat(all.filter((c) => !c.name.startsWith(q) && c.name.includes(q)));
+  const own = skills.filter((s) => !HINTS[s]).map((s): Cmd => ({ name: s, hint: paths[s] ? skillDir(paths[s]) : "skill", kind: "skill" }));
+  return [...match(ACTIONS, q), ...match(own, q)];
 }
 
 // action is the smithy command a sent message names, if it is one and nothing else.

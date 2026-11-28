@@ -1,4 +1,4 @@
-// The Settings sections the TUI reaches with /set, /keys, /serve, /doctor, /theme and /connect:
+// The Settings sections the TUI reaches with /set, /keys, /serve, /doctor, /prompt, /theme and /connect:
 // every config key with a typed control, stored API keys, serve, doctor, the color theme and the
 // saved servers this daemon reaches.
 import { SegmentedControl } from "@zovaris/sephiro/segmented-control";
@@ -11,7 +11,7 @@ import "@zovaris/sephiro/css/settings-list.css";
 import "@zovaris/sephiro/css/toggle.css";
 import "./settings.css";
 import { useEffect, useState } from "preact/hooks";
-import { addServer, loadSettings, removeKey, removeServer, runDoctor, setKey, setServe, setSetting, type Settings, unsetSetting } from "../lib/actions";
+import { addServer, connectTest, loadSettings, removeKey, removeServer, runDoctor, setKey, setServe, setSetting, type Settings, unsetSetting } from "../lib/actions";
 import { api, currentServer, pickServer } from "../lib/auth";
 import { controlOf, groupSettings, type SettingRow } from "../lib/parity";
 import { statusLine, useServers } from "../components/servers";
@@ -41,7 +41,11 @@ function Control({ r, onSaved }: { r: SettingRow; onSaved: (msg: string) => void
         <span class="mono t3">{r.value || "unset"} · set it under API keys</span>
       ) : (
         <form onSubmit={(e) => (e.preventDefault(), save(v))} style="display:flex;gap:6px">
-          <input id={id} type={c === "number" ? "number" : "text"} value={v} placeholder={r.default} onInput={(e) => setV(e.currentTarget.value)} spellcheck={false} />
+          {c === "number" ? (
+            <input id={id} type="number" value={v} placeholder={r.default} onInput={(e) => setV(e.currentTarget.value)} spellcheck={false} />
+          ) : (
+            <input id={id} type="text" value={v} placeholder={r.default} onInput={(e) => setV(e.currentTarget.value)} spellcheck={false} />
+          )}
           {v !== r.value && <button class="btn sm" type="submit">Save</button>}
         </form>
       )}
@@ -143,6 +147,13 @@ export function More() {
   const [msg, setMsg] = useState("");
   const [doc, setDoc] = useState<string[] | null>(null);
   const [docBusy, setDocBusy] = useState(false);
+  const [sent, setSent] = useState<string[] | null>(null);
+  const [sendBusy, setSendBusy] = useState(false);
+  const testSend = async () => {
+    setSendBusy(true);
+    setSent(await connectTest().then((r) => [...r.results, ...(r.error ? [r.error] : [])], (x) => ["test: " + err(x)]));
+    setSendBusy(false);
+  };
   const [theme, setTheme] = useState<ThemeName>("steel");
   const load = () => loadSettings().then((x) => (setSt(x), setTheme(themeOf(x))), (x) => setE(err(x)));
   useEffect(() => void load(), []);
@@ -175,6 +186,16 @@ export function More() {
               <span>{st.serve ? "Serve may launch new work" : "Serve launches nothing new (auto.paused)"}</span>
             </div></div>
           </div>
+          {st.prompt && (
+            <div id="set-prompt">
+              <div class="lbl">System prompt</div>
+              <div class="card"><div class="kv">
+                <span class="mono">{st.prompt.path}</span>
+                <span class="sp" />
+                <span class="t3">{st.prompt.active ? "override active: replaces the default" : "no override: the default is in use"}</span>
+              </div></div>
+            </div>
+          )}
           <div id="set-keys"><div class="lbl">API keys</div><Keys st={st} onSaved={saved} /></div>
           <SettingsList
             id="set-settings"
@@ -189,6 +210,13 @@ export function More() {
               })),
             }))}
           />
+          <div id="set-channels">
+            <div class="lbl">Chat channels</div>
+            <div class="card">
+              <div class="kv"><span>A test message to each connector's notifications and chat channel (connect.*.notify, connect.*.chat)</span><span class="sp" /><button class="btn sm" disabled={sendBusy} onClick={testSend}>{sendBusy ? "Sending…" : "Send test"}</button></div>
+              {sent && <pre class="out" style="margin:0 12px 12px">{sent.join("\n")}</pre>}
+            </div>
+          </div>
           <div id="set-doctor">
             <div class="lbl">Doctor</div>
             <div class="card">

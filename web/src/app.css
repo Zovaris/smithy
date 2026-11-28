@@ -90,6 +90,9 @@ code { font-family: var(--sph-font-mono); font-size: 12.5px; background: var(--t
 .btn.primary { background: var(--t-primary); border-color: var(--t-primary); color: var(--t-on-primary); }
 .btn.primary:hover { opacity: .9; }
 .btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+.btn.on { border-color: var(--t-primary); background: var(--t-raised); }
+.decide .other { display: flex; gap: 8px; }
+.decide .other input { flex: 1; min-width: 0; height: 28px; padding: 0 10px; border: 1px solid var(--t-line-strong); border-radius: 0; background: var(--t-card); font-size: 16px; }
 .btn kbd { background: transparent; border-color: currentColor; opacity: .6; color: inherit; }
 .err { color: var(--t-fail); font-size: 13px; }
 
@@ -304,8 +307,10 @@ a.row1:hover, button.row1:hover, .pick .row1:hover { background: var(--t-raised)
 .meta-bar .tag { flex: none; }
 .meta-bar .clock { font-size: 12px; }
 .meta-bar .note { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; cursor: default; }
-.shell { border: 1px solid var(--t-line); background: var(--t-card); margin: 8px 0; }
-.shell > div { display: flex; gap: 8px; align-items: center; padding: 6px 10px; font-size: 12px; border-bottom: 1px solid var(--t-line); }
-.shell pre { margin: 0; padding: 8px 10px; font-size: 12px; max-height: 320px; overflow: auto; white-space: pre-wrap; }
 .composer.bang { border-color: var(--t-wait); }
+.menu .skill .sk { color: var(--t-ember); }
+.menu .skill .t3 { font-style: italic; }
+.composer.shimmer::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 35%, color-mix(in srgb, var(--t-ember) 30%, transparent) 50%, transparent 65%) no-repeat; background-size: 250% 100%; animation: shimmer 1.1s ease-out both; }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+@media (prefers-reduced-motion: reduce) { .composer.shimmer::before { display: none; } }
 

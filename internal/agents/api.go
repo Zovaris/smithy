@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Zovaris/smithy/internal/agents/sandbox"
 	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/Zovaris/smithy/internal/apiloop/tools"
 	"github.com/Zovaris/smithy/internal/auth"
@@ -91,7 +92,7 @@ func runAPI(o Options, cli string) int {
 	if APIProvider == nil {
 		return needsHarness("agent --backend api")
 	}
-	mode, err := SandboxMode()
+	mode, err := sandbox.SandboxMode()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
 		return 1
@@ -144,7 +145,7 @@ func runAPI(o Options, cli string) int {
 	}
 	defer cancel()
 	item := wardenItem(o.Log)
-	set, err := apiTools(o, model, mode, HostProbe())
+	set, err := apiTools(o, model, mode, sandbox.HostProbe())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
 		out.Close()
@@ -172,7 +173,7 @@ func runAPI(o Options, cli string) int {
 			_ = usage.Write(out.Name(), u)
 		}
 		e := item
-		e.Kind, e.Usage = "usage", &u
+		e.Kind, e.Usage, e.Agent, e.Model = "usage", &u, "api", o.Model
 		if o.Log != "" {
 			e.Detail = filepath.Base(o.Log)
 		}
@@ -191,9 +192,9 @@ func runAPI(o Options, cli string) int {
 // apiTools is the core tool set under the --profile auto rules: AutoTools allowed, AutoDenied
 // (with SecretDenied) winning, and fetch limited to the sandbox domain allow-list. A read-only run
 // gets only the read tools; auto.sandbox native runs its shell commands under the OS sandbox.
-func apiTools(o Options, model, mode string, p Probe) (*tools.Set, error) {
-	extra, _ := SandboxSetting("auto.sandbox_domains", "")
-	s := &tools.Set{Cwd: o.Cwd, Model: model, Allow: AutoTools(o.SmithyBins), Deny: AutoDenied(o.SmithyBins), Hosts: SandboxDomains(extra), ReadOnly: o.ReadOnly}
+func apiTools(o Options, model, mode string, p sandbox.Probe) (*tools.Set, error) {
+	extra, _ := sandbox.SandboxSetting("auto.sandbox_domains", "")
+	s := &tools.Set{Cwd: o.Cwd, Model: model, Allow: AutoTools(o.SmithyBins), Deny: AutoDenied(o.SmithyBins), Hosts: sandbox.SandboxDomains(extra), ReadOnly: o.ReadOnly}
 	s.Guard = func(cmd string) (bool, string) { return guard.HookGuard().Check(context.Background(), cmd) }
 	s.FetchGuard = func(host string) (bool, string) { return guard.HookGuard().CheckFetch(context.Background(), host) }
 	if v := os.Getenv("HTTPS_PROXY"); v != "" {
@@ -202,11 +203,11 @@ func apiTools(o Options, model, mode string, p Probe) (*tools.Set, error) {
 		}
 	}
 	if mode == "native" {
-		paths, err := apiSandboxPaths(o.Cwd)
+		paths, err := sandbox.APIPaths(o.Cwd)
 		if err != nil {
 			return nil, err
 		}
-		if s.Wrap, err = apiShellSandbox(mode, p, paths); err != nil {
+		if s.Wrap, err = sandbox.APIShell(mode, p, paths); err != nil {
 			return nil, err
 		}
 	}

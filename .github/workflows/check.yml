@@ -1,55 +1,59 @@
 name: check
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 concurrency:
   group: check-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+# Every job runs on 2 vCPU Linux (Blacksmith's free tier) except the Windows launcher check.
+# Draft pull requests run nothing; marking one ready runs the checks.
+# build, demo and windows-launcher run only on pull requests into main and on push to main.
 jobs:
-  lint:
+  go:
+    if: github.event.pull_request.draft != true
     runs-on: blacksmith-2vcpu-ubuntu-2604
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
-      - name: Go format and vet (both builds)
+      - name: What changed
+        id: changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
-          go vet ./...
-          go vet -tags harness ./...
-      - name: Launcher syntax
-        run: sh -n shared/smithy
-      - name: golangci-lint (both builds, config in .golangci.yml)
-        uses: golangci/golangci-lint-action@v8
-        with:
-          version: v2.15.0
-  test:
-    runs-on: blacksmith-4vcpu-ubuntu-2604
-    strategy:
-      fail-fast: false
-      matrix:
-        build: [skills, harness-ui, harness-core]
-    steps:
-      - uses: useblacksmith/checkout@v1
-      - uses: actions/setup-go@v5
+          # code=false when a pull request changes only Markdown or docs/ (skill text included)
+          code=true
+          if [ -n "$BASE" ]; then
+            git fetch -q --depth=1 origin "$BASE"
+            files="$(git diff --name-only "$BASE" HEAD)"
+            echo "$files"
+            echo "$files" | grep -qvE '(\.md$|^docs/)' || code=false
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
-      - uses: actions/setup-node@v4
-        if: matrix.build == 'harness-ui'
+      - uses: actions/setup-node@v7
+        if: steps.changes.outputs.code == 'true'
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
-      - name: Build the web UI (embedded by the harness build)
-        if: matrix.build == 'harness-ui'
-        working-directory: web
-        run: npm ci && npm run build
+      - name: Go format and vet (both builds), launcher syntax
+        if: steps.changes.outputs.code == 'true'
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go vet ./...
+          go vet -tags harness ./...
+          sh -n shared/smithy
+      - name: golangci-lint (both builds, config in .golangci.yml)
+        if: steps.changes.outputs.code == 'true'
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
       - name: Go tests, skills build (race detector, coverage)
-        if: matrix.build == 'skills'
+        if: steps.changes.outputs.code == 'true'
         env:
           COVERAGE_MIN: "60"
         run: |
@@ -63,71 +67,54 @@ jobs:
             go tool cover -func=cover.out | awk '$1 != "total:" {split($1,f,":"); pkg=f[1]; sub("/[^/]*$","",pkg); sub("github.com/Zovaris/smithy/","",pkg); n[pkg]++; s[pkg]+=$3} END {for (p in n) printf "| %s | %.1f%% |\n", p, s[p]/n[p]}' | sort
           } >> "$GITHUB_STEP_SUMMARY"
           awk -v t="${total%\%}" -v min="$COVERAGE_MIN" 'BEGIN { if (t+0 < min+0) { print "coverage " t "% is below " min "%"; exit 1 } }'
-      # the harness build is split in two jobs: the TUI and web packages (slowest, need the web build) and the rest
-      - name: Go tests, harness build, TUI and web (race detector)
-        if: matrix.build == 'harness-ui'
+      - name: Build the web UI (embedded by the harness build)
+        if: steps.changes.outputs.code == 'true'
+        working-directory: web
+        run: npm ci && npm run build
+      - name: Go tests, harness build (race detector)
+        if: steps.changes.outputs.code == 'true'
         env:
           SMITHY_REQUIRE_WEB_BUILD: "1" # the web e2e test runs on the real build, never skips
-        run: go test -race -tags harness ./internal/tui/... ./internal/web/...
-      - name: Go tests, harness build, every other package (race detector)
-        if: matrix.build == 'harness-core'
-        run: go test -race -tags harness $(go list -tags harness ./... | grep -v -e '/internal/tui' -e '/internal/web')
-  integration:
-    runs-on: blacksmith-2vcpu-ubuntu-2604
-    steps:
-      - uses: useblacksmith/checkout@v1
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
+        run: go test -race -tags harness ./...
       - name: Integration tests (skill lint, CLI tests through the binary)
         env:
           SKIP_GO_TEST: "1"
         run: tests/run.sh
-  build:
-    runs-on: blacksmith-4vcpu-ubuntu-2604
-    strategy:
-      fail-fast: false
-      matrix:
-        # pull requests build the native target; release/* pull requests and main build every release target
-        target: ${{ fromJSON((github.event_name != 'pull_request' || startsWith(github.head_ref, 'release/')) && '["darwin/arm64","darwin/amd64","linux/arm64","linux/amd64","windows/amd64"]' || '["linux/amd64"]') }}
-    steps:
-      - uses: useblacksmith/checkout@v1
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - name: Build the web UI (embedded by the harness build)
-        working-directory: web
-        run: npm ci && npm run build
-      - name: Build both builds for ${{ matrix.target }}
-        run: |
-          t='${{ matrix.target }}'
-          GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /dev/null ./cmd/smithy
-          GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build -tags harness -trimpath -ldflags "-s -w" -o /dev/null ./cmd/smithy
   web:
+    if: github.event.pull_request.draft != true
     runs-on: blacksmith-2vcpu-ubuntu-2604
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: actions/setup-node@v4
+      - name: What changed
+        id: changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # web=false when a pull request leaves web/ and this workflow alone
+          web=true
+          if [ -n "$BASE" ]; then
+            git fetch -q --depth=1 origin "$BASE"
+            git diff --name-only "$BASE" HEAD | grep -qE '^(web/|\.github/workflows/check\.yml$)' || web=false
+          fi
+          echo "web=$web" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v7
+        if: steps.changes.outputs.web == 'true'
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: web/package-lock.json
       - uses: oven-sh/setup-bun@v2
+        if: steps.changes.outputs.web == 'true'
         with:
           bun-version: 1.4.5
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
+        if: steps.changes.outputs.web == 'true'
         with:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-1.4.5-${{ hashFiles('web/package-lock.json') }}
           restore-keys: bun-${{ runner.os }}-1.4.5-
       - name: Web UI tests, typecheck, lint, build within budget (ADR 0010, 0011)
+        if: steps.changes.outputs.web == 'true'
         working-directory: web
         run: |
           npm ci
@@ -136,17 +123,43 @@ jobs:
           bun check
           npm run lint
           npm run build
-  demo:
-    # Records the v0.23 demo (demo/run.sh): the TUI tape and the web screenshots, kept as an artifact.
-    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release/')
-    runs-on: blacksmith-4vcpu-ubuntu-2604
+  build:
+    # every release target in one job; the Go build cache is shared across targets
+    if: github.event_name == 'push' || (github.base_ref == 'main' && github.event.pull_request.draft != true)
+    runs-on: blacksmith-2vcpu-ubuntu-2604
     steps:
       - uses: useblacksmith/checkout@v1
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build the web UI (embedded by the harness build)
+        working-directory: web
+        run: npm ci && npm run build
+      - name: Build both builds for every release target
+        run: |
+          for t in darwin/arm64 darwin/amd64 linux/arm64 linux/amd64 windows/amd64; do
+            echo "::group::$t"
+            GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o /dev/null ./cmd/smithy
+            GOOS=${t%/*} GOARCH=${t#*/} CGO_ENABLED=0 go build -tags harness -trimpath -ldflags "-s -w" -o /dev/null ./cmd/smithy
+            echo "::endgroup::"
+          done
+  demo:
+    # Records the demo (demo/run.sh): the TUI tape and the web screenshots, kept as an artifact.
+    if: github.event_name == 'push' || (github.base_ref == 'main' && github.event.pull_request.draft != true)
+    runs-on: blacksmith-2vcpu-ubuntu-2604
+    steps:
+      - uses: useblacksmith/checkout@v1
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum # Go module and build cache, keyed on go.sum
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -162,27 +175,17 @@ jobs:
           sudo install -m 755 /tmp/ttyd /usr/local/bin/ttyd
       - name: Record the demo
         run: PATH="$(go env GOPATH)/bin:$PATH" demo/run.sh "$RUNNER_TEMP/demo"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: demo
           path: ${{ runner.temp }}/demo
           if-no-files-found: error
-  check:
-    if: always()
-    needs: [lint, test, integration, build, web, demo]
-    runs-on: blacksmith-2vcpu-ubuntu-2604
-    steps:
-      - name: Every check job passed
-        run: |
-          r='${{ join(needs.*.result, ' ') }}'
-          echo "results: $r"
-          for x in $r; do case "$x" in success|skipped) ;; *) exit 1 ;; esac; done
   windows-launcher:
-    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release/')
+    if: github.event_name == 'push' || (github.base_ref == 'main' && github.event.pull_request.draft != true)
     runs-on: blacksmith-2vcpu-windows-2025
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: install.sh installs the latest release under Git Bash
         shell: bash
         env:
@@ -204,3 +207,14 @@ jobs:
           call "%RUNNER_TEMP%\l\smithy.cmd" version 2> "%RUNNER_TEMP%\err.txt"
           if not errorlevel 3 ( type "%RUNNER_TEMP%\err.txt" & exit /b 1 )
           findstr /c:"is not installed" "%RUNNER_TEMP%\err.txt" || exit /b 1
+  check:
+    # the single gate: success when every job passed or was skipped on purpose
+    if: always()
+    needs: [go, web, build, demo, windows-launcher]
+    runs-on: blacksmith-2vcpu-ubuntu-2604
+    steps:
+      - name: Every check job passed
+        run: |
+          r='${{ join(needs.*.result, ' ') }}'
+          echo "results: $r"
+          for x in $r; do case "$x" in success|skipped) ;; *) exit 1 ;; esac; done

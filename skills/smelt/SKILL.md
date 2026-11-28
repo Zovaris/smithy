@@ -28,7 +28,7 @@ Plain words work in any harness ("smelt plan <idea>").
 |---|---|
 | `smelt <task>` | no agreed plan → `plan` (at `fast`: `build`, criteria from the task); a plan, spec or task → `build`; a bug → `debug` |
 | `smelt brainstorm <idea>` | `references/BRAINSTORM.md` |
-| `smelt plan <idea>` | at normal: spec; at full or for a vague idea: brainstorm → grill → spec. Then builder check (> 8 criteria or open questions) → tasks → ask how to run them. An agreed spec skips to its builder check, then tasks |
+| `smelt plan <idea>` | at normal: spec; at full or for a vague idea (a vague product idea: no file, stack or behaviour named): brainstorm → grill → spec. Then builder check (> 8 criteria or open questions) → tasks → ask how to run them. An agreed spec skips to its builder check, then tasks |
 | `smelt build next [dir]` · `build all [dir]` | `smithy tasks next`, build it to ship · every task in order (`references/EXECUTE.md`) |
 | `smelt <phase>` · `smelt from <phase>` | that phase only, or from it to the end (`spec`, `build`, `check`, `ship`, `retro`) |
 | `smelt debug <bug>` | `references/DEBUG.md` → build → check (regression agent) → ship |

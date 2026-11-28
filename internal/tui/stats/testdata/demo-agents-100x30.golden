@@ -1,0 +1,30 @@
+  ◆ smithy  dev · smithy                                                   DEMO  ▪ watching  14:30  
+  1   2 Agents   3   4 ? 8   5   6   7   8   9   10                                                 
+                                                                                                    
+┌─ Agents · 15 · sort stage ───────────────────────────────────────────────────────────────────────┐
+│                                                                                                  │
+│   issue       title                     model   stage     CI         PR      beat      cost      │
+│ ▸ serve       orchestrator · claude ·…  -       orchestr  -          -       -         -         │
+│   TES-212     Show CI time per PR       cheap   blocked   -          -       2m ago    $2.06     │
+│   TES-211     Typed config loader       strong  blocked   ✗ red      #2011   38m ago   $0.59     │
+│   TES-209     Add SSO for admins        cheap   ready     ✓ green    #2009   1m ago    -         │
+│   TES-210     Speed up cold start       mid     ready     ✓ green    #2010   2m ago    $1.14     │
+│   TES-207     Upgrade to Go 1.27        mid     pr_open   ▪ running  #2007   1m ago    -         │
+│   TES-208     Drop the legacy CSV imp…  strong  pr_open   ✓ green    #2008   1m ago    $2.62     │
+│   TES-206     Split the billing servi…  cheap   checking  -          -       1m ago    $1.32     │
+│   TES-205     Retry webhooks with bac…  strong  checking  -          -       1m ago    -         │
+│   TES-203     Cache board queries       cheap   building  -          -       53s ago   $0.95     │
+│   TES-204     Paginate the audit log    mid     building  -          -       1m ago    $0.40     │
+│   TES-202     Rate-limit the export A…  strong  building  -          -       42s ago   $1.88     │
+│   TES-200     Add dark mode to the re…  cheap   queued    -          -       -         -         │
+│   TES-201     Fix flaky login test      mid     queued    -          -       -         -         │
+│   TES-213     Archive stale branches    mid     merged    ✓ green    #2013   2m ago    $1.51     │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+│                                                                                                  │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+ ↑↓ move  ←→ pane  enter details  l log  o open  c copy  s sort  / filter                    ? help 

@@ -111,12 +111,13 @@ func parseFeed(b []byte) (map[string]price, error) {
 func key(id string) string { return strings.ToLower(strings.ReplaceAll(id, ".", "-")) }
 
 // loadPrices reads the cached feed (once per cache path, so a new SMITHY_HOME is read anew); once it is a day old it fetches a new one and keeps the old
-// cache when the fetch or the answer fails (offline). nil when neither exists.
+// cache when the fetch or the answer fails (offline). nil when neither exists. The fetch runs
+// outside the lock: other callers meanwhile get the old cache (or nil) instead of waiting.
 func loadPrices() map[string]price {
 	pricesMu.Lock()
-	defer pricesMu.Unlock()
 	path := feedPath()
 	if loaded == path {
+		defer pricesMu.Unlock()
 		return prices
 	}
 	loaded, prices = path, nil
@@ -124,21 +125,32 @@ func loadPrices() map[string]price {
 	if err == nil {
 		prices, _ = parseFeed(cached)
 		if st, err := os.Stat(path); err == nil && time.Since(st.ModTime()) < feedMaxAge && prices != nil {
+			defer pricesMu.Unlock()
 			return prices
 		}
 	}
-	if b, err := fetchFeed(); err == nil {
-		if m, err := parseFeed(b); err == nil {
-			prices = m
-			if os.MkdirAll(filepath.Dir(path), 0o700) == nil {
-				tmp := path + ".tmp"
-				if os.WriteFile(tmp, b, 0o600) == nil {
-					_ = os.Rename(tmp, path)
-				}
-			}
+	old := prices
+	pricesMu.Unlock()
+	b, err := fetchFeed()
+	if err != nil {
+		return old
+	}
+	m, err := parseFeed(b)
+	if err != nil {
+		return old
+	}
+	if os.MkdirAll(filepath.Dir(path), 0o700) == nil {
+		tmp := path + ".tmp"
+		if os.WriteFile(tmp, b, 0o600) == nil {
+			_ = os.Rename(tmp, path)
 		}
 	}
-	return prices
+	pricesMu.Lock()
+	defer pricesMu.Unlock()
+	if loaded == path {
+		prices = m
+	}
+	return m
 }
 
 // snapshot is what may follow a listed model id: a date (-20250929, -2025-08-07) or -latest.

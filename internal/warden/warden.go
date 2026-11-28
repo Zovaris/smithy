@@ -17,6 +17,8 @@ import (
 
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/agents/catalog"
+	"github.com/Zovaris/smithy/internal/agents/sandbox"
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
@@ -259,9 +261,9 @@ func readSettings(f string) (claudeSettings, bool) {
 	return s, json.Unmarshal(b, &s) == nil
 }
 
-var findSkill = agents.FindSkill
+var findSkill = skills.FindSkill
 
-var missingInHarness = agents.MissingInHarness
+var missingInHarness = skills.MissingInHarness
 
 func githubMode(r *report) {
 	if ok, origin := ghx.OriginIsGitHub(); !ok && origin != "" {
@@ -388,7 +390,7 @@ func Doctor(args []string) int {
 			}
 		}
 	}
-	sandboxDoctor(r, agents.HostProbe())
+	sandboxDoctor(r, sandbox.HostProbe())
 	daemonDoctor(r)
 	for _, s := range []string{"smelt", "hush", "scout", "tend", "use-smithy"} {
 		if p, ok := findSkill(s); ok {
@@ -462,7 +464,7 @@ func Doctor(args []string) int {
 		r.warn("no AGENTS.md / CLAUDE.md here or in a parent folder", "optional: workers follow smelt and the brief")
 	}
 	if fixing {
-		applyFixes(r.fixes, yes)
+		applyFixes(r.fixes, yes, os.Stdin)
 	}
 	if r.failed {
 		fmt.Println("not ready")
@@ -511,8 +513,8 @@ func firstLine(s string) string {
 
 // sandboxDoctor reports auto.sandbox: off says so, native checks what it needs here
 // (sandbox-exec on macOS, bwrap and socat on Linux) for the auto.agent CLI.
-func sandboxDoctor(r *report, p agents.Probe) {
-	mode, err := agents.SandboxMode()
+func sandboxDoctor(r *report, p sandbox.Probe) {
+	mode, err := sandbox.SandboxMode()
 	if err != nil {
 		r.bad(err.Error(), "smithy config set auto.sandbox <off|native>")
 		return
@@ -521,7 +523,7 @@ func sandboxDoctor(r *report, p agents.Probe) {
 	if cli == "" {
 		cli = agents.ResolveCLI(os.Getenv, func(b string) bool { _, err := p.Look(b); return err == nil })
 	}
-	switch err := agents.SandboxCheckAgent(mode, cli, p); {
+	switch err := sandbox.SandboxCheckAgent(mode, cli, p); {
 	case mode == "off":
 		r.ok("sandbox: off (unattended workers rely on the allow-list; smithy config set auto.sandbox native)")
 	case err != nil:
@@ -530,15 +532,15 @@ func sandboxDoctor(r *report, p agents.Probe) {
 		r.ok("sandbox: native (codex workspace-write, network off)")
 		r.warn("sandbox native with codex: workers have no network, so git push and gh fail inside them", "push and open PRs through smithy outside the worker")
 	default:
-		r.ok("sandbox: native (claude, hosts " + strings.Join(agents.SandboxDomains(userSetting("auto.sandbox_domains", "")), ",") + ")")
+		r.ok("sandbox: native (claude, hosts " + strings.Join(sandbox.SandboxDomains(userSetting("auto.sandbox_domains", "")), ",") + ")")
 	}
-	if cli != "" && !agents.SecretGuarded(cli) {
-		r.ok("guard: " + agents.Kind(cli) + " " + agents.UnguardedNote)
+	if cli != "" && !sandbox.SecretGuarded(cli) {
+		r.ok("guard: " + agents.Kind(cli) + " " + sandbox.UnguardedNote)
 	}
 }
 
-// userSetting is an auto.sandbox* key from the user settings only (agents.SandboxSetting).
+// userSetting is an auto.sandbox* key from the user settings only (sandbox.SandboxSetting).
 func userSetting(key, def string) string {
-	v, _ := agents.SandboxSetting(key, def)
+	v, _ := sandbox.SandboxSetting(key, def)
 	return v
 }

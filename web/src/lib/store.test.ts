@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Ev } from "./model";
-import { agentName, ago, argLine, blank, fold, initials, kindOf, open, primary, seed, sessionOf, sessions, setNames, type Store } from "./store";
+import { agentName, ago, argLine, blank, fold, initials, kindOf, open, picks, primary, seed, sessionOf, sessions, setNames, tree, type Store } from "./store";
 import { parse, totals, withComments } from "./diff";
 
 let seq = 0;
@@ -9,11 +9,34 @@ const run = (...es: Ev[]): Store => es.reduce(fold, blank());
 const started = (id = "s-1", title = "Add retry") => ev("session_started", { id, agent: "claude", model: "sonnet", dir: "/r", title, status: "done" }, id);
 
 describe("fold", () => {
+  it("records a child's parent and orders children under their parent", () => {
+    const s = run(started("s-a", "parent"), started("s-z", "other"), ev("session_started", { id: "s-b", agent: "claude", dir: "/r", title: "child", parent: "s-a" }, "s-b"));
+    expect(s.sessions["s-b"].parent).toBe("s-a");
+    expect(tree(sessions(s)).map((x) => x.id)).toEqual(["s-z", "s-a", "s-b"]);
+  });
+  it("shows a bus message where the receiver got it", () => {
+    const s = run(started("s-a"), ev("session_message", { role: "user", by: "session:s-b", text: "Message from session s-b: done" }, "s-a"));
+    expect(s.convo["s-a"]).toMatchObject([{ kind: "you", text: "Message from session s-b: done" }]);
+  });
   it("keeps the daemon's log lines for /log, newest last and at most 200", () => {
     const lines = Array.from({ length: 205 }, (_, i) => ev("log", { line: "daemon: " + i }, ""));
     const s = run(...lines);
     expect(s.log.length).toBe(200);
     expect(s.log[199]).toBe("daemon: 204");
+  });
+  it("keeps workflow notifications, newest last and at most 20", () => {
+    const s = run(...Array.from({ length: 22 }, (_, i) => ev("workflow_note", { workflow: "d", title: "t" + i, text: "why" }, "")));
+    expect(s.notes.length).toBe(20);
+    expect(s.notes[19]).toEqual({ at: "2026-11-25T10:00:00Z", workflow: "d", title: "t21", text: "why" });
+  });
+  it("pins a session's goal and notes each change in the conversation", () => {
+    const s = run(started(), ev("session_goal", { goal: "ship it" }), ev("session_goal", { goal: "ship it", state: "met", turns: 2 }));
+    expect([s.sessions["s-1"].goal, s.sessions["s-1"].goal_state]).toEqual(["ship it", "met"]);
+    const said = (st: Store) => st.convo["s-1"].flatMap((i) => (i.kind === "agent" ? i.parts : [])).map((p) => (p.kind === "text" ? p.text.trim() : ""));
+    expect(said(s)).toEqual(["goal set: ship it", "goal met"]);
+    const c = run(started(), ev("session_goal", { goal: "x" }), ev("session_goal", { goal: "" }));
+    expect(c.sessions["s-1"].goal).toBe("");
+    expect(said(c)).toEqual(["goal set: x", "goal cleared"]);
   });
   it("keeps a session's model and effort when /model or /effort changes them", () => {
     const s = run(started(), ev("session_model", { model: "opus", effort: "low" }));
@@ -70,6 +93,14 @@ describe("fold", () => {
     const s = run(started(), ev("session_usage", { input_tokens: 1, output_tokens: 1 }));
     expect(s.sessions["s-1"].usage?.cost_usd).toBeUndefined();
   });
+  it("keeps multi-select and free-text flags of a question", () => {
+    const s = run(started(), ev("decision_asked", { id: "ask:q1", question: "Which checks?", options: ["lint", "test"], multi: true, other: true }));
+    expect(s.decisions[0]).toMatchObject({ multi: true, other: true });
+    const t = seed(blank(), [{ id: "ask:q2", question: "Db?", options: ["a"], other: true }]);
+    expect(t.decisions[0]).toMatchObject({ multi: false, other: true });
+    expect(picks(["lint", "test", "e2e"], new Set([2, 0]))).toBe("lint, e2e");
+  });
+
   it("seeds pending decisions once", () => {
     const s = seed(seed(blank(), [{ id: "guard:ab", question: "Run x?" }]), [{ id: "guard:ab", question: "Run x?" }]);
     expect(s.decisions).toHaveLength(1);
@@ -160,6 +191,7 @@ describe("guard questions", () => {
 import { prose } from "./store";
 describe("prose", () => {
   it("drops stream-json lines a CLI log leaks and keeps the words", () => {
+    expect(prose("all green\nGOAL MET: go test ok")).toBe("all green");
     expect(prose('{"type":"system"}\nDone: retry added.\n{"result":"x","n":1}\n{not json}')).toBe("Done: retry added.\n{not json}");
   });
 });
@@ -168,5 +200,12 @@ import { blocks } from "../components/md";
 describe("md blocks", () => {
   it("splits paragraphs, lists and fences", () => {
     expect(blocks("Done.\n\n- one\n- two\n1. a\n```\nx := 1\n```\nend").map((b) => [b.t, b.lines.length])).toEqual([["p", 1], ["ul", 2], ["ol", 1], ["pre", 1], ["p", 1]]);
+  });
+  it("keeps a !cmd run from session_shell once, in transcript order", () => {
+    const sh = { id: "sh-1", cmd: "ls", dir: "/p", lines: [{ text: "a" }, { text: "b", err: true }], code: 2, took_ms: 40, cut: true };
+    const s = run(started(), ev("session_message", { role: "user", text: "hi" }), ev("session_shell", sh), ev("session_shell", sh));
+    const c = s.convo[Object.keys(s.convo)[0]];
+    expect(c.map((i) => i.kind)).toEqual(["you", "shell"]);
+    expect(c[1]).toMatchObject({ kind: "shell", x: { id: "sh-1", cmd: "ls", code: 2, cut: true, lines: sh.lines } });
   });
 });

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/board"
 	"github.com/Zovaris/smithy/internal/daemon"
@@ -25,6 +26,9 @@ An MCP server on stdin/stdout (harness build) that smithy agent gives every driv
   board_*      list, show, claim and set tasks of the built-in tracker
   secret_call  call an API with secret:<name> through the egress proxy; the key never returns
   ask          ask the user a decision through smithy daemon (on the run's card in warden) and wait
+  send, inbox, start_session
+               in a daemon session (SMITHY_SESSION_KEY): message its parent, children or siblings,
+               read what they sent, start a child session in the same project
 --readonly keeps search, board_list and board_show. Inputs are validated and output is capped.`
 
 func init() {
@@ -79,6 +83,15 @@ func init() {
 				return a, nil
 			}))
 		}
+		if key := os.Getenv("SMITHY_SESSION_KEY"); key != "" && !ro {
+			tools = append(tools, mcp.BusTools(os.Getenv("SMITHY_SESSION"), func() (mcp.Bus, error) {
+				a, err := daemon.LocalAsker()
+				if err != nil {
+					return nil, err
+				}
+				return busAdapter{&api.BusClient{C: a.C, Key: key}}, nil
+			})...)
+		}
 		s := &mcp.Server{Name: "smithy", Version: version, Tools: tools}
 		if err := s.Serve(context.Background(), os.Stdin, os.Stdout); err != nil {
 			fmt.Fprintln(os.Stderr, "smithy mcp:", err)
@@ -86,4 +99,18 @@ func init() {
 		}
 		return 0
 	})
+}
+
+type busAdapter struct{ b *api.BusClient }
+
+func (a busAdapter) Send(ctx context.Context, to, text string) (any, error) {
+	return a.b.Send(ctx, to, text)
+}
+
+func (a busAdapter) Inbox(ctx context.Context, since int64) (any, error) {
+	return a.b.Inbox(ctx, since)
+}
+
+func (a busAdapter) Start(ctx context.Context, agent, dir, msg string) (any, error) {
+	return a.b.Start(ctx, api.BusStartReq{Agent: agent, Dir: dir, Message: msg})
 }

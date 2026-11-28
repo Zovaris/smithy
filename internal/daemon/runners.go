@@ -108,8 +108,13 @@ func (s *apiSink) Usage(u usage.Usage) { s.e.Usage(u) }
 type cliRunner struct {
 	exe, agent, model, dir, sdir string
 	effort                       string
+	busID, busKey                string
 	n                            int
 }
+
+// SetBus gives the turns the session's id and bus key (SMITHY_SESSION, SMITHY_SESSION_KEY) for
+// the smithy MCP server's send, inbox and start tools.
+func (r *cliRunner) SetBus(id, key string) { r.busID, r.busKey = id, key }
 
 func (r *cliRunner) Close() {}
 
@@ -162,6 +167,12 @@ func (r *cliRunner) env() []string {
 	if r.effort != "" {
 		env = append(env, "AGENT_EFFORT="+r.effort)
 	}
+	if r.busKey != "" {
+		env = append(env, "SMITHY_SESSION="+r.busID, "SMITHY_SESSION_KEY="+r.busKey)
+	}
+	if r.agent == "opencode" {
+		env = append(env, "AGENT_ARGS=--format json")
+	}
 	if r.agent == "claude" {
 		env = append(env, "AGENT_ARGS=--output-format stream-json --verbose --append-system-prompt "+quoteArg(SystemPrompt(r.agent, false)))
 	}
@@ -178,8 +189,12 @@ func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e 
 	cmd := exec.Command(r.exe, "agent", "--cwd", r.dir, "--log", log, prompt)
 	cmd.Dir = r.dir
 	var cs *claudeStream
-	if r.agent == "claude" {
+	var oc *opencodeStream
+	switch r.agent {
+	case "claude":
 		cs = newClaudeStream()
+	case "opencode":
+		oc = &opencodeStream{}
 	}
 	cmd.Env = r.env()
 	var errOut capped
@@ -210,7 +225,7 @@ func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e 
 		off += int64(len(b))
 		var keep []byte
 		for _, l := range bytes.SplitAfter(b, []byte("\n")) {
-			if cs != nil && cs.line(l, e) {
+			if cs != nil && cs.line(l, e) || oc != nil && oc.line(l, e) {
 				continue
 			}
 			if !bytes.HasPrefix(l, []byte(`{"type":`)) {
@@ -245,6 +260,8 @@ loop:
 	follow(true)
 	if cs != nil && cs.usage != nil {
 		e.Usage(*cs.usage)
+	} else if oc != nil && oc.usage != nil {
+		e.Usage(*oc.usage)
 	} else if u, ok := usage.Read(log); ok {
 		e.Usage(u)
 	}
@@ -258,17 +275,34 @@ loop:
 	if cs != nil {
 		reply = cs.result
 	}
+	if oc != nil {
+		reply = oc.reply()
+	}
 	if ctx.Err() != nil {
 		return reply, ctx.Err()
 	}
 	if werr != nil {
-		msg := strings.TrimSpace(text.Clean(errOut.b.String()))
-		if msg == "" {
-			msg = werr.Error()
+		streamErr := ""
+		if oc != nil {
+			streamErr = oc.err
 		}
-		return reply, errors.New("smithy agent: " + line1(msg, 300))
+		return reply, turnError(errOut.b.String(), streamErr, werr)
 	}
 	return reply, nil
+}
+
+// turnError is a failed turn's one-line cause: the agent's own error event, else the last line
+// smithy agent wrote to stderr, else the exit status.
+func turnError(stderr, streamErr string, werr error) error {
+	msg := strings.TrimSpace(streamErr)
+	if msg == "" {
+		lines := strings.Split(strings.TrimSpace(text.Clean(stderr)), "\n")
+		msg = strings.TrimSpace(lines[len(lines)-1])
+	}
+	if msg == "" {
+		msg = werr.Error()
+	}
+	return errors.New("smithy agent: " + line1(strings.TrimPrefix(msg, "smithy agent: "), 300))
 }
 
 var diffMu sync.Mutex

@@ -112,6 +112,7 @@ More options: [docs/install.md](docs/install.md).
 | [scout](skills/scout/README.md) | Read-only answers with sources |
 | [hush](skills/hush/README.md) | Does the task with no talk |
 | [simple](skills/simple/README.md) | Short, plain replies |
+| [refine](skills/refine/README.md) | Turns a rough prompt into a structured one (you run it: `/refine`) |
 
 ## Autonomous mode
 
@@ -171,17 +172,19 @@ Run `smithy` to open a chat with any agent CLI above. A local daemon runs the se
 TUI and the web are two views of it, so you can leave and come back, or open the same sessions
 from your phone.
 
-- Sessions per project; `tab` lists them.
+- Optional session tabs (`ui.agent_tabs`, off by default; an `agents N` chip in the header opens the agents panel), a sidebar with context, spend and the session's PRs and issues, live.
 - Modals for agent, model, skills and settings; `ctrl+k` opens the palette.
-- `/name` runs any installed skill; `!cmd` runs a shell command.
-- Three themes (steel, frost, plum) and a first-run welcome.
+- `/name` runs any installed skill; `!cmd` runs a shell command; `/goal` keeps a session going until it is done.
+- Workflows you run with `/run` or a click, and schedules that start them on a cron, a webhook,
+  a GitHub event or a file change ([docs/workflows.md](docs/workflows.md)).
+- Seven themes and a first-run welcome.
 - `/detach` quits and keeps the daemon running.
 
 | First run | Working session |
 |---|---|
-| ![Welcome screen](demo/review/welcome-anvil-steel.png) | ![Chat with a pending decision](demo/review/header-steel-1280-running.png) |
+| ![Welcome screen](docs/demo/welcome-anvil-steel.png) | ![Chat with a pending decision](docs/demo/header-steel-1280-running.png) |
 | **Palette (`ctrl+k`)** | **Same session on the web** |
-| ![Command palette](demo/review/modal-steel-palette.png) | ![Web view](docs/demo/web-session-1440.png) |
+| ![Command palette](docs/demo/modal-steel-palette.png) | ![Web view](docs/demo/web-session-1440.png) |
 
 The web does everything the TUI does: sessions, a board of your task files, agents with cost and
 speed charts, bench, decisions and every setting. `smithy web open` opens it; install it as an
@@ -189,7 +192,7 @@ app from Chrome, or with Add to Home Screen on iOS.
 
 | Board | Agents | New session |
 |---|---|---|
-| ![Web board](demo/review/web-board-1440.png) | ![Web agents with charts](demo/review/web-agents-1440.png) | ![Web new session with folder picker](demo/review/web-picker-1440.png) |
+| ![Web board](docs/demo/web-board-1440.png) | ![Web agents with charts](docs/demo/web-agents-1440.png) | ![Web new session with folder picker](docs/demo/web-picker-1440.png) |
 
 Every key and command: [docs/harness-guide.md](docs/harness-guide.md).
 
@@ -200,6 +203,7 @@ Every key and command: [docs/harness-guide.md](docs/harness-guide.md).
 - [Autonomous mode](docs/autonomous.md)
 - [Harnesses](docs/harnesses.md)
 - [Chat and TUI guide](docs/harness-guide.md)
+- [Workflows and schedules](docs/workflows.md)
 - [For AI agents](docs/agents.md)
 - [API backend and benchmark](docs/api-backend.md)
 - [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)

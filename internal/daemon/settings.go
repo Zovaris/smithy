@@ -15,36 +15,12 @@ import (
 
 	authstore "github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/connect"
 	"github.com/Zovaris/smithy/internal/text"
 )
 
-// SettingRow is one known key with its effective value and where it comes from; secrets are masked.
-type SettingRow struct {
-	Key     string   `json:"key"`
-	Value   string   `json:"value"`
-	Src     string   `json:"src"`
-	Default string   `json:"default"`
-	Meaning string   `json:"meaning"`
-	Secret  bool     `json:"secret,omitempty"`
-	Kind    string   `json:"kind"`
-	Options []string `json:"options,omitempty"`
-}
-
-// KeyRow is one stored API key, masked.
-type KeyRow struct {
-	Service string `json:"service"`
-	Masked  string `json:"masked"`
-}
-
-// Settings is GET /v1/settings: every setting, the stored API keys and whether serve may launch.
-type Settings struct {
-	Settings []SettingRow `json:"settings"`
-	Keys     []KeyRow     `json:"keys"`
-	Serve    bool         `json:"serve"`
-}
-
 func loadSettings() (Settings, error) {
-	out := Settings{Settings: []SettingRow{}, Keys: []KeyRow{}}
+	out := Settings{Settings: []SettingRow{}, Keys: []KeyRow{}, Prompt: PromptStatus()}
 	eff := config.Snapshot()
 	for _, k := range config.Known {
 		v, src, err := eff(k.Key)
@@ -236,4 +212,30 @@ func (sv *Server) doctor(w http.ResponseWriter, r *http.Request) {
 		run = runDoctor
 	}
 	writeJSON(w, 200, map[string][]string{"lines": run(r.Context())})
+}
+
+// connectTest sends a test message through each chat connector built from the current config
+// (so a settings change is tried without a restart), to its notifications and chat channels.
+func (sv *Server) connectTest(w http.ResponseWriter, r *http.Request) {
+	if !settingsGuard(w, r) {
+		return
+	}
+	build := sv.Connectors
+	if build == nil {
+		build = connect.FromConfig
+	}
+	cs, err := build()
+	out := ConnectTestResult{Results: []string{}}
+	if err != nil {
+		out.Error = text.Clean(err.Error())
+	}
+	if len(cs) == 0 && out.Error == "" {
+		out.Error = "no chat connector is set up (connect.<telegram|slack|discord>.notify or .chat, and its token)"
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+	for _, l := range (&connect.Hub{Conns: cs}).Test(ctx) {
+		out.Results = append(out.Results, text.Clean(l))
+	}
+	writeJSON(w, 200, out)
 }

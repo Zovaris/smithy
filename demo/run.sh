@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Records the v0.23 demo: a VHS tape of the TUI and Playwright screenshots of the web, both on a
+# Records the demo: a VHS tape of the TUI and Playwright screenshots of the web, both on a
 # throwaway SMITHY_HOME and `smithy daemon --demo` (a scripted agent: no CLI, key or network).
 # Needs a harness build with the web UI, vhs, and Playwright's chromium (npx playwright install chromium in web/).
 # DEMO_CHROME=<browser path> uses an installed browser instead of Playwright's chromium.

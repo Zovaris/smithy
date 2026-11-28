@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/layout"
 )
@@ -352,24 +353,24 @@ func KitChoice() (mcp bool, skills []string) {
 var KitGuard func(exe string) string
 
 // RunKit is the injection for one run (kit.mcp, kit.skills): KitMCP as the "smithy" MCP server, told the run's warden
-// card (SMITHY_MCP_CARD) and, for a --readonly run, to expose read-only tools. nil when there is
+// card (SMITHY_MCP_CARD), the daemon session's bus key (SMITHY_SESSION_KEY) and, for a --readonly run, to expose read-only tools. nil when there is
 // no kit or for a custom AGENT_CMD.
 func RunKit(cli string, o Options, getenv func(string) string) (*Injection, error) {
 	if len(KitMCP) == 0 || cli == "custom" {
 		return nil, nil
 	}
 	useMCP, skillNames := KitChoice()
-	var skills []string
+	var dirs []string
 	for _, n := range skillNames {
-		if p, ok := FindSkill(n); ok {
-			skills = append(skills, filepath.Dir(p))
+		if p, ok := skills.FindSkill(n); ok {
+			dirs = append(dirs, filepath.Dir(p))
 		}
 	}
 	guard := ""
 	if KitGuard != nil && Kind(cli) == "claude" {
 		guard = KitGuard(KitMCP[0])
 	}
-	if !useMCP && len(skills) == 0 && guard == "" {
+	if !useMCP && len(dirs) == 0 && guard == "" {
 		return nil, nil
 	}
 	args := slices.Clone(KitMCP[1:])
@@ -379,6 +380,9 @@ func RunKit(cli string, o Options, getenv func(string) string) (*Injection, erro
 	env := map[string]string{}
 	if batch, id := cardOf(o.Log, o.Cwd); batch != "" {
 		env["SMITHY_MCP_CARD"] = batch + "/" + id
+	}
+	if k := getenv("SMITHY_SESSION_KEY"); k != "" && !o.ReadOnly {
+		env["SMITHY_SESSION"], env["SMITHY_SESSION_KEY"] = getenv("SMITHY_SESSION"), k
 	}
 	dir := ""
 	if o.Log != "" {
@@ -394,7 +398,7 @@ func RunKit(cli string, o Options, getenv func(string) string) (*Injection, erro
 		}
 		dir = d
 	}
-	k := Kit{Skills: skills}
+	k := Kit{Skills: dirs}
 	if useMCP {
 		k.MCP = map[string]MCPServer{"smithy": {Command: KitMCP[0], Args: args, Env: env}}
 	}

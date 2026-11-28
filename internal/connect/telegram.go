@@ -23,9 +23,11 @@ var TelegramAPI = "https://api.telegram.org"
 
 // Telegram is the Bot API connector: one forum topic per session in Chat (a supergroup with
 // topics on), inline-keyboard buttons for decisions, long polling for what comes back. Only
-// updates from Chat and from a user id in Users count: with Users empty it only sends.
+// updates from Chat (and ChatID) and from a user id in Users count: with Users empty it only sends.
+// ChatID ("" for none) is the chat channel: a new message there starts a session in a topic.
 type Telegram struct {
 	Base, Token, Chat string
+	ChatID            string
 	Users             map[string]bool
 	// Poll is the getUpdates long-poll timeout (default 25 s).
 	Poll   time.Duration
@@ -152,8 +154,44 @@ func (t *Telegram) poll() time.Duration {
 	return 25 * time.Second
 }
 
+// HasChat reports whether a chat channel is set.
+func (t *Telegram) HasChat() bool { return t.ChatID != "" }
+
+// split maps a thread or ref to its chat and id: a ChatRoot prefix means ChatID.
+func (t *Telegram) split(v string) (string, string) {
+	if rest, ok := strings.CutPrefix(v, ChatRoot); ok && t.ChatID != "" {
+		return t.ChatID, rest
+	}
+	return t.Chat, v
+}
+
+// tag is the thread or ref Receive reports for id in chat: prefixed when chat is the chat
+// channel and not also the notifications one.
+func (t *Telegram) tag(chat, id string) string {
+	if chat == t.ChatID && chat != t.Chat {
+		return ChatRoot + id
+	}
+	return id
+}
+
+// StartChat makes a topic in the chat channel for a conversation started in its General topic.
+func (t *Telegram) StartChat(ctx context.Context, in Inbound, title string) (string, error) {
+	if t.ChatID == "" {
+		return "", errors.New("telegram: no chat channel")
+	}
+	id, err := t.topic(ctx, t.ChatID, title)
+	if err != nil {
+		return "", err
+	}
+	return ChatRoot + id, nil
+}
+
 // Thread creates a forum topic named after the session.
 func (t *Telegram) Thread(ctx context.Context, session, title string) (string, error) {
+	return t.topic(ctx, t.Chat, title)
+}
+
+func (t *Telegram) topic(ctx context.Context, chat, title string) (string, error) {
 	var r struct {
 		ID int64 `json:"message_thread_id"`
 	}
@@ -164,7 +202,7 @@ func (t *Telegram) Thread(ctx context.Context, session, title string) (string, e
 	if len(name) == 0 {
 		name = []rune("smithy")
 	}
-	if err := t.call(ctx, "createForumTopic", url.Values{"chat_id": {t.Chat}, "name": {string(name)}}, &r); err != nil {
+	if err := t.call(ctx, "createForumTopic", url.Values{"chat_id": {chat}, "name": {string(name)}}, &r); err != nil {
 		return "", err
 	}
 	return strconv.FormatInt(r.ID, 10), nil
@@ -182,15 +220,26 @@ func clip(s string, n int) string {
 var tgTag = map[string]string{"pr_ready": "READY", "blocked": "BLOCKED", "stuck": "STUCK", "decision": "DECIDE",
 	"orchestrator_failed": "FAILED", "serve_down": "STOPPED", "cap_reached": "CAP", "limited": "LIMITED", "pr_merged": "MERGED", "ci_red": "CI RED"}
 
+// lineCap is the most runes kept of one line of n's text: a chat answer keeps whole lines.
+func lineCap(n Note) int {
+	if n.Kind == KindChat {
+		return ChatChunk
+	}
+	return 500
+}
+
 func render(n Note) string {
 	head := "<b>" + tgEsc(clip(text.Clean(n.Title), 200)) + "</b>"
 	if tag := tgTag[n.Kind]; tag != "" {
 		head = "<code>" + tag + "</code>  " + head
 	}
-	lines := []string{head}
+	var lines []string
+	if n.Title != "" {
+		lines = append(lines, head)
+	}
 	for _, l := range strings.Split(n.Text, "\n") {
-		if l = strings.TrimSpace(text.Clean(l)); l != "" {
-			lines = append(lines, tgEsc(clip(l, 500)))
+		if l = strings.TrimRight(text.Clean(l), " \t"); strings.TrimSpace(l) != "" || n.Kind == KindChat {
+			lines = append(lines, tgEsc(clip(l, lineCap(n))))
 		}
 	}
 	if u, err := url.Parse(n.URL); err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" {
@@ -201,21 +250,13 @@ func render(n Note) string {
 
 // Send posts n in thread ("" is the chat's main topic) with one button per option.
 func (t *Telegram) Send(ctx context.Context, thread string, n Note, buttons []Button) (string, error) {
-	form := url.Values{"chat_id": {t.Chat}, "text": {render(n)}, "parse_mode": {"HTML"}, "link_preview_options": {`{"is_disabled":true}`}}
+	chat, thread := t.split(thread)
+	form := url.Values{"chat_id": {chat}, "text": {render(n)}, "parse_mode": {"HTML"}, "link_preview_options": {`{"is_disabled":true}`}}
 	if thread != "" {
 		form.Set("message_thread_id", thread)
 	}
 	if len(buttons) > 0 {
-		type kb struct {
-			Text string `json:"text"`
-			Data string `json:"callback_data"`
-		}
-		var rows [][]kb
-		for _, b := range buttons {
-			rows = append(rows, []kb{{Text: clip(text.Clean(b.Label), 60), Data: b.Data}})
-		}
-		mk, _ := json.Marshal(map[string]any{"inline_keyboard": rows})
-		form.Set("reply_markup", string(mk))
+		form.Set("reply_markup", tgKeyboard(buttons))
 	}
 	var r struct {
 		ID int64 `json:"message_id"`
@@ -223,12 +264,33 @@ func (t *Telegram) Send(ctx context.Context, thread string, n Note, buttons []Bu
 	if err := t.call(ctx, "sendMessage", form, &r); err != nil {
 		return "", err
 	}
-	return strconv.FormatInt(r.ID, 10), nil
+	return t.tag(chat, strconv.FormatInt(r.ID, 10)), nil
+}
+
+// tgKeyboard is an inline keyboard with one button per row.
+func tgKeyboard(buttons []Button) string {
+	type kb struct {
+		Text string `json:"text"`
+		Data string `json:"callback_data"`
+	}
+	var rows [][]kb
+	for _, b := range buttons {
+		rows = append(rows, []kb{{Text: clip(text.Clean(b.Label), 60), Data: b.Data}})
+	}
+	mk, _ := json.Marshal(map[string]any{"inline_keyboard": rows})
+	return string(mk)
+}
+
+// Buttons replaces message ref's buttons (Telegram has no multi-select: the hub toggles ☐/☑).
+func (t *Telegram) Buttons(ctx context.Context, ref string, buttons []Button) error {
+	chat, ref := t.split(ref)
+	return t.call(ctx, "editMessageReplyMarkup", url.Values{"chat_id": {chat}, "message_id": {ref}, "reply_markup": {tgKeyboard(buttons)}}, nil)
 }
 
 // Update replaces the text of message ref and removes its buttons.
 func (t *Telegram) Update(ctx context.Context, ref string, n Note) error {
-	form := url.Values{"chat_id": {t.Chat}, "message_id": {ref}, "text": {render(n)}, "parse_mode": {"HTML"},
+	chat, ref := t.split(ref)
+	form := url.Values{"chat_id": {chat}, "message_id": {ref}, "text": {render(n)}, "parse_mode": {"HTML"},
 		"link_preview_options": {`{"is_disabled":true}`}}
 	return t.call(ctx, "editMessageText", form, nil)
 }
@@ -249,6 +311,9 @@ type tgMessage struct {
 	From    tgUser `json:"from"`
 	Chat    tgChat `json:"chat"`
 	Text    string `json:"text"`
+	Reply   *struct {
+		ID int64 `json:"message_id"`
+	} `json:"reply_to_message"`
 }
 
 type tgUpdate struct {
@@ -263,7 +328,8 @@ type tgUpdate struct {
 }
 
 func (t *Telegram) allowed(chat int64, u tgUser) bool {
-	if u.IsBot || strconv.FormatInt(chat, 10) != t.Chat {
+	c := strconv.FormatInt(chat, 10)
+	if u.IsBot || (c != t.Chat && (t.ChatID == "" || c != t.ChatID)) {
 		return false
 	}
 	return t.Users[strconv.FormatInt(u.ID, 10)]
@@ -295,16 +361,23 @@ func (t *Telegram) Receive(ctx context.Context) ([]Inbound, error) {
 		case u.Callback != nil:
 			_ = t.call(ctx, "answerCallbackQuery", url.Values{"callback_query_id": {u.Callback.ID}}, nil)
 			if m := u.Callback.Message; m != nil && t.allowed(m.Chat.ID, u.Callback.From) && len(u.Callback.Data) <= 64 {
-				out = append(out, Inbound{Button: u.Callback.Data, Ref: strconv.FormatInt(m.ID, 10), By: strconv.FormatInt(u.Callback.From.ID, 10)})
+				out = append(out, Inbound{Button: u.Callback.Data, Ref: t.tag(strconv.FormatInt(m.Chat.ID, 10), strconv.FormatInt(m.ID, 10)), By: strconv.FormatInt(u.Callback.From.ID, 10)})
 			}
 		case u.Message != nil:
 			m := u.Message
 			if m.Text == "" || !t.allowed(m.Chat.ID, m.From) {
 				continue
 			}
-			in := Inbound{Text: clip(m.Text, 4000), By: strconv.FormatInt(m.From.ID, 10)}
+			chat := strconv.FormatInt(m.Chat.ID, 10)
+			in := Inbound{Text: clip(m.Text, 4000), By: strconv.FormatInt(m.From.ID, 10), Chat: chat == t.ChatID}
+			if in.Chat {
+				in.Ref = t.tag(chat, strconv.FormatInt(m.ID, 10))
+			}
 			if m.IsTopic && m.Thread != 0 {
-				in.Thread = strconv.FormatInt(m.Thread, 10)
+				in.Thread = t.tag(chat, strconv.FormatInt(m.Thread, 10))
+			}
+			if m.Reply != nil && m.Reply.ID != 0 && m.Reply.ID != m.Thread {
+				in.ReplyTo = t.tag(chat, strconv.FormatInt(m.Reply.ID, 10))
 			}
 			out = append(out, in)
 		}

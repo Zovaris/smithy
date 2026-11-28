@@ -20,9 +20,11 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/connect"
 	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/web"
+	"github.com/Zovaris/smithy/internal/workflow"
 )
 
 const (
@@ -32,43 +34,23 @@ const (
 	KindRouted = "decision_routed"
 )
 
-// Decision is a question waiting on (or answered by) someone.
-type Decision struct {
-	ID       string    `json:"id"`
-	Question string    `json:"question"`
-	Options  []string  `json:"options,omitempty"`
-	Asked    time.Time `json:"asked"`
-	Outcome  *Outcome  `json:"outcome,omitempty"`
-}
-
-// Outcome is the recorded answer. Won is true only in the response to the answer that won.
-type Outcome struct {
-	ID     string    `json:"id"`
-	Answer string    `json:"answer"`
-	By     string    `json:"by"`
-	At     time.Time `json:"at"`
-	Won    bool      `json:"won"`
-}
-
-// State is GET /v1/state.
-type State struct {
-	PID     int        `json:"pid"`
-	Started time.Time  `json:"started"`
-	LastSeq int64      `json:"last_seq"`
-	Pending []Decision `json:"pending"`
-	Serve   any        `json:"serve,omitempty"`
-	Version string     `json:"version,omitempty"`
-}
-
 // Server serves the API over one store.
 type Server struct {
-	st      *store.Store
-	token   string
-	allow   []string
-	log     func(string)
-	started time.Time
+	// Connectors builds the chat connectors from the current config (nil: connect.FromConfig).
+	Connectors func() ([]connect.Connector, error)
+	pastes     pastes
+	chatBuf    map[string]string // a chat session's answer so far, sent when its turn ends
+	st         *store.Store
+	token      string
+	allow      []string
+	log        func(string)
+	started    time.Time
 	// Tend, when set, is the PR tender GET /v1/tend reports.
 	Tend *Tender
+	// Links, when set, keeps each session's PR and issue links live (GET /v1/sessions/{id}/links).
+	Links *Linker
+	// Workflows, when set, is the scheduler behind /v1/workflows.
+	Workflows *workflow.Scheduler
 	// ServeState, when set, fills State.Serve (the auto loop's heartbeat).
 	ServeState func() any
 	// Route, when set, sends a won answer back to its asker (RouteBack); an error leaves it for Resume.
@@ -79,6 +61,9 @@ type Server struct {
 	BenchDir string
 	// BenchRun, when set, replaces running `smithy <args>` for a web-started bench run (tests).
 	BenchRun func(args []string) error
+	// GoalMaxTurns and GoalMaxCost cap a goal's continued turns and USD; 0: the session.goal_* settings.
+	GoalMaxTurns int
+	GoalMaxCost  float64
 	// Runners makes each session's runner; nil: DefaultRunner.
 	Runners RunnerFor
 	// Version is the daemon binary's version, reported in State so a client can warn on a mismatch.
@@ -111,6 +96,7 @@ type Server struct {
 	lastSeq    int64
 	wake       chan struct{}
 	sessions   map[string]*live
+	busKeys    map[string]string
 	lastAgent  string
 	lastModel  string
 	starting   int
@@ -160,7 +146,7 @@ func (sv *Server) apply(e store.Event) {
 		}
 	case KindIntake:
 		sv.applyIntake(e.Data)
-	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool:
+	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool, KindSessionMail, KindSessionGoal, KindSessionLink, KindSessionLinks, KindSessionUnlink:
 		sv.applySession(e)
 	case KindRouted:
 		var r struct{ ID string }
@@ -194,6 +180,12 @@ func (sv *Server) appendLocked(kind, session string, data any) (int64, error) {
 
 // Ask records a pending decision; asking an existing id again is a no-op.
 func (sv *Server) Ask(id, question string, options []string) error {
+	return sv.askDecision(Decision{ID: id, Question: question, Options: options})
+}
+
+// askDecision records d unless its id is already known.
+func (sv *Server) askDecision(d Decision) error {
+	id := d.ID
 	if id == "" {
 		return errors.New("daemon: decision id is empty")
 	}
@@ -202,8 +194,8 @@ func (sv *Server) Ask(id, question string, options []string) error {
 	if _, ok := sv.decisions[id]; ok {
 		return nil
 	}
-	d := Decision{ID: id, Question: question, Options: options, Asked: time.Now().UTC()}
-	if _, err := sv.appendLocked(KindAsked, "", d); err != nil {
+	d.Asked = time.Now().UTC()
+	if _, err := sv.appendLocked(KindAsked, d.Session, d); err != nil {
 		return err
 	}
 	sv.decisions[id] = &d
@@ -212,6 +204,10 @@ func (sv *Server) Ask(id, question string, options []string) error {
 
 // Answer records the first answer to id. Later answers get the recorded outcome with Won false.
 // A won answer goes back to its asker through Route.
+// FreeAnswer reports whether decision id takes an answer in the user's own words besides its
+// options: only the ask tool's questions (ask:<key>) do.
+func FreeAnswer(id string) bool { return strings.HasPrefix(id, "ask:") }
+
 func (sv *Server) Answer(id, answer, by string) (Outcome, error) {
 	sv.mu.Lock()
 	o, err := sv.answerLocked(id, answer, by)
@@ -236,7 +232,7 @@ func (sv *Server) answerLocked(id, answer, by string) (Outcome, error) {
 		o.Won = false
 		return o, nil
 	}
-	if len(d.Options) > 0 && !slices.Contains(d.Options, answer) {
+	if len(d.Options) > 0 && !d.Other && !FreeAnswer(id) && !picked(d, answer) {
 		return Outcome{}, fmt.Errorf("%w: answer must be one of %s", errBadRequest, strings.Join(d.Options, ", "))
 	}
 	o := Outcome{ID: id, Answer: answer, By: by, At: time.Now().UTC()}
@@ -324,6 +320,15 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("POST /v1/sessions/{id}/messages", sv.sendSession)
 	mux.HandleFunc("POST /v1/sessions/{id}/stop", sv.stopSession)
 	mux.HandleFunc("PUT /v1/sessions/{id}/model", sv.setSessionModel)
+	mux.HandleFunc("GET /v1/sessions/{id}/links", sv.getLinks)
+	mux.HandleFunc("POST /v1/sessions/{id}/links", sv.addLink)
+	mux.HandleFunc("DELETE /v1/sessions/{id}/links", sv.removeLink)
+	mux.HandleFunc("GET /v1/links", sv.projectWork)
+	mux.HandleFunc("GET /v1/sessions/{id}/mail", sv.sessionMail)
+	mux.HandleFunc("POST /v1/bus/send", sv.busSend)
+	mux.HandleFunc("GET /v1/bus/inbox", sv.busInbox)
+	mux.HandleFunc("POST /v1/bus/start", sv.busStart)
+	mux.HandleFunc("PUT /v1/sessions/{id}/goal", sv.setSessionGoal)
 	mux.HandleFunc("GET /v1/projects", sv.listProjects)
 	mux.HandleFunc("POST /v1/projects", sv.addProject)
 	mux.HandleFunc("DELETE /v1/projects", sv.removeProject)
@@ -335,13 +340,25 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("GET /v1/agents/{id}/models", sv.agentModels)
 	mux.HandleFunc("GET /v1/bench", sv.benchRuns)
 	mux.HandleFunc("GET /v1/settings", sv.listSettings)
+	mux.HandleFunc("POST /v1/connect/test", sv.connectTest)
 	mux.HandleFunc("PUT /v1/settings/{key}", sv.putSetting)
 	mux.HandleFunc("DELETE /v1/settings/{key}", sv.deleteSetting)
 	mux.HandleFunc("PUT /v1/keys/{service}", sv.putKey)
 	mux.HandleFunc("DELETE /v1/keys/{service}", sv.deleteKey)
 	mux.HandleFunc("PUT /v1/serve", sv.putServe)
 	mux.HandleFunc("GET /v1/doctor", sv.doctor)
+	mux.HandleFunc("GET /v1/usage", sv.tokenUsage)
 	mux.HandleFunc("GET /v1/tend", sv.tendView)
+	mux.HandleFunc("GET /v1/workflows", sv.listWorkflows)
+	mux.HandleFunc("GET /v1/workflows/{name}", sv.getWorkflow)
+	mux.HandleFunc("PUT /v1/workflows/{name}", sv.saveWorkflow)
+	mux.HandleFunc("POST /v1/workflows/validate", sv.validateWorkflow)
+	mux.HandleFunc("POST /v1/workflows/{name}/run", sv.runWorkflow)
+	mux.HandleFunc("GET /v1/schedules", sv.listSchedules)
+	mux.HandleFunc("POST /v1/schedules", sv.addSchedule)
+	mux.HandleFunc("GET /v1/schedules/{name}", sv.getSchedule)
+	mux.HandleFunc("DELETE /v1/schedules/{name}", sv.removeSchedule)
+	mux.HandleFunc("POST /v1/schedules/{name}/{op}", sv.setSchedule)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
 	mux.HandleFunc("POST /v1/bench/run", sv.benchStart)
 	mux.HandleFunc("GET /v1/bench/status", sv.benchStatus)
@@ -357,6 +374,8 @@ func (sv *Server) public(w http.ResponseWriter, r *http.Request) bool {
 		writeJSON(w, 200, map[string]any{"smithy": true, "version": sv.Version})
 	case r.Method == "POST" && r.URL.Path == "/v1/pair":
 		sv.redeem(w, r)
+	case r.Method == "POST" && strings.HasPrefix(r.URL.Path, "/v1/hooks/schedules/"):
+		sv.scheduleHook(w, r, strings.TrimPrefix(r.URL.Path, "/v1/hooks/schedules/"))
 	default:
 		return false
 	}
@@ -550,6 +569,8 @@ func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
 		ID       string   `json:"id"`
 		Question string   `json:"question"`
 		Options  []string `json:"options"`
+		Multi    bool     `json:"multi"`
+		Session  string   `json:"session"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&req); err != nil || req.Question == "" || len(req.Options) > 6 {
 		writeJSON(w, 400, map[string]string{"error": "body must be {\"id\":…,\"question\":…,\"options\":[…]}"})
@@ -566,7 +587,11 @@ func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
 	for _, o := range req.Options {
 		opts = append(opts, line1(o, 200))
 	}
-	if err := sv.Ask(req.ID, line1(req.Question, 500), opts); err != nil {
+	d := Decision{ID: req.ID, Question: line1(req.Question, 500), Options: opts, Multi: req.Multi && len(opts) > 1, Other: !guardID}
+	if strings.HasPrefix(req.Session, sessionIDPrefix) && cardID(req.Session) {
+		d.Session = req.Session
+	}
+	if err := sv.askDecision(d); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "store failed"})
 		return
 	}
@@ -658,3 +683,20 @@ func (sv *Server) events(w http.ResponseWriter, r *http.Request) {
 }
 
 func sseSafe(s string) string { return strings.NewReplacer("\n", " ", "\r", " ").Replace(s) }
+
+// picked reports whether answer is one of d's options, or for a multi-select decision a ", "
+// list of them.
+func picked(d *Decision, answer string) bool {
+	if slices.Contains(d.Options, answer) {
+		return true
+	}
+	if !d.Multi {
+		return false
+	}
+	for _, a := range strings.Split(answer, ", ") {
+		if !slices.Contains(d.Options, a) {
+			return false
+		}
+	}
+	return true
+}

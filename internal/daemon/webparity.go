@@ -3,25 +3,22 @@
 package daemon
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/remote"
 	"github.com/Zovaris/smithy/internal/text"
 )
 
 const (
 	shellTimeout  = 2 * time.Minute
-	shellMaxBytes = 256 << 10
 	imageMaxBytes = 32 << 20
 )
 
@@ -37,22 +34,9 @@ func writeGuard(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-type cappedBuf struct {
-	b   []byte
-	cut bool
-}
-
-func (c *cappedBuf) Write(p []byte) (int, error) {
-	if n := shellMaxBytes - len(c.b); n < len(p) {
-		c.b, c.cut = append(c.b, p[:max(n, 0)]...), true
-		return len(p), nil
-	}
-	c.b = append(c.b, p...)
-	return len(p), nil
-}
-
-// sessionShell is POST /v1/sessions/{id}/shell {cmd}: the TUI's `!cmd`, run with the user's
-// shell in the session folder; the output comes back here and never reaches the agent.
+// sessionShell is POST /v1/sessions/{id}/shell {cmd}: a `!cmd`, run with the user's shell in the
+// session folder. The run comes back here and lands in the transcript as a session_shell event,
+// so every client and a reopened chat show it; it never reaches the agent.
 func (sv *Server) sessionShell(w http.ResponseWriter, r *http.Request) {
 	if !writeGuard(w, r) {
 		return
@@ -78,39 +62,52 @@ func (sv *Server) sessionShell(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "cmd is empty"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), shellTimeout)
-	defer cancel()
-	sh := os.Getenv("SHELL")
-	if sh == "" {
-		sh = "/bin/sh"
+	run := RunShell(r.Context(), dir, req.Cmd)
+	run.ID = fmt.Sprintf("sh-%d", time.Now().UnixNano())
+	if _, err := sv.Append(KindSessionShell, r.PathValue("id"), run); err != nil {
+		writeJSON(w, 500, map[string]string{"error": text.Clean(err.Error())})
+		return
 	}
-	cmd := exec.CommandContext(ctx, sh, "-c", req.Cmd)
-	cmd.Dir = dir
-	var out cappedBuf
-	cmd.Stdout, cmd.Stderr = &out, &out
-	err := cmd.Run()
-	res := map[string]any{"output": string(out.b), "code": 0}
-	if out.cut {
-		res["output"] = string(out.b) + "\n… output cut at 256 KiB"
-	}
-	var ee *exec.ExitError
-	if errors.As(err, &ee) {
-		res["code"] = ee.ExitCode()
-	} else if err != nil {
-		res["code"], res["error"] = -1, text.Clean(err.Error())
-	}
-	writeJSON(w, 200, res)
+	writeJSON(w, 200, run)
 }
 
-var (
-	pasteMu  sync.Mutex
-	pasteDir string
-)
+type pastes struct {
+	mu  sync.Mutex
+	dir string
+}
+
+// PasteRoot holds one folder of pasted images per daemon run.
+func PasteRoot() string { return filepath.Join(layout.Home(), "pastes") }
+
+// ClosePastes removes this daemon run's pasted images.
+func (sv *Server) ClosePastes() {
+	sv.pastes.mu.Lock()
+	defer sv.pastes.mu.Unlock()
+	if sv.pastes.dir != "" {
+		_ = os.RemoveAll(sv.pastes.dir)
+		sv.pastes.dir = ""
+	}
+}
+
+// SweepPastes removes paste folders under root untouched for maxAge, left by a daemon that did
+// not exit cleanly.
+func SweepPastes(root string, maxAge time.Duration) {
+	ents, err := os.ReadDir(root)
+	if err != nil {
+		return
+	}
+	for _, e := range ents {
+		fi, err := e.Info()
+		if err == nil && e.IsDir() && time.Since(fi.ModTime()) > maxAge {
+			_ = os.RemoveAll(filepath.Join(root, e.Name()))
+		}
+	}
+}
 
 var imageExt = map[string]string{"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}
 
-// saveImage is POST /v1/images {data: base64}: a pasted or dropped image saved 0600 in a temp
-// folder; the path goes into the next message the way the TUI's ctrl+v attaches one.
+// saveImage is POST /v1/images {data: base64}: a pasted or dropped image saved 0600 in this daemon run's
+// folder under PasteRoot; the path goes into the next message the way the TUI's ctrl+v attaches one.
 func (sv *Server) saveImage(w http.ResponseWriter, r *http.Request) {
 	if !writeGuard(w, r) {
 		return
@@ -127,17 +124,19 @@ func (sv *Server) saveImage(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "not a png, jpeg, gif or webp image"})
 		return
 	}
-	pasteMu.Lock()
-	defer pasteMu.Unlock()
-	if pasteDir == "" {
-		d, err := os.MkdirTemp("", "smithy-paste-")
+	sv.pastes.mu.Lock()
+	defer sv.pastes.mu.Unlock()
+	if sv.pastes.dir == "" {
+		err := os.MkdirAll(PasteRoot(), 0o700)
+		if err == nil {
+			sv.pastes.dir, err = os.MkdirTemp(PasteRoot(), "run-")
+		}
 		if err != nil {
 			writeJSON(w, 500, map[string]string{"error": text.Clean(err.Error())})
 			return
 		}
-		pasteDir = d
 	}
-	p := filepath.Join(pasteDir, fmt.Sprintf("paste-%d%s", time.Now().UnixNano(), ext))
+	p := filepath.Join(sv.pastes.dir, fmt.Sprintf("paste-%d%s", time.Now().UnixNano(), ext))
 	f, err := os.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err == nil {
 		_, err = f.Write(req.Data)

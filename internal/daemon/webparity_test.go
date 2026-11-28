@@ -6,12 +6,15 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/remote"
 )
 
@@ -26,8 +29,19 @@ func TestSessionShellRunsInTheSessionFolder(t *testing.T) {
 	waitStatus(t, sv, id, StatusDone)
 	os.WriteFile(filepath.Join(dir, "marker.txt"), []byte("x"), 0o600)
 	code, m = post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"ls; exit 3"}`)
-	if code != 200 || !strings.Contains(m["output"].(string), "marker.txt") || m["code"].(float64) != 3 {
+	if code != 200 || !strings.Contains(fmt.Sprint(m["lines"]), "marker.txt") || m["code"].(float64) != 3 {
 		t.Fatalf("shell: %d %v", code, m)
+	}
+	code, m = post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"echo out; echo bad >&2"}`)
+	ls, _ := m["lines"].([]any)
+	marked := 0
+	for _, l := range ls {
+		if x := l.(map[string]any); (x["err"] == true) == (x["text"] == "bad") {
+			marked++
+		}
+	}
+	if code != 200 || len(ls) != 2 || marked != 2 || m["took_ms"] == nil {
+		t.Fatalf("stderr lines not marked: %d %v", code, m)
 	}
 	if code, _ := post(t, url+"/v1/sessions/nope/shell", `{"cmd":"ls"}`); code != 404 {
 		t.Fatalf("unknown session: %d", code)
@@ -37,6 +51,55 @@ func TestSessionShellRunsInTheSessionFolder(t *testing.T) {
 	}
 	if res := do(t, "POST", url+"/v1/sessions/"+id+"/shell", `{"cmd":"ls"}`, map[string]string{LoginHeader: "me@example.com"}); res.StatusCode != 403 {
 		t.Fatalf("a tailnet login cannot run a shell: %d", res.StatusCode)
+	}
+}
+
+func TestSessionShellLandsInTheTranscriptCapped(t *testing.T) {
+	dir := t.TempDir()
+	sv, url, _ := sessionTest(t, func(ctx context.Context, msg string, h []Exchange, e Emit) (string, error) { return "ok", nil })
+	_, m := post(t, url+"/v1/sessions", `{"agent":"claude","dir":"`+dir+`","message":"hi"}`)
+	id := m["id"].(string)
+	waitStatus(t, sv, id, StatusDone)
+	code, m := post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"seq 800; echo oops >&2"}`)
+	ls := m["lines"].([]any)
+	text := func(i int) any { return ls[i].(map[string]any)["text"] }
+	// stdout and stderr are separate pipes, so where "oops" lands among the last stdout lines
+	// is up to the scheduler: check the tail as stdout in order plus one stderr line.
+	if code != 200 || m["id"] == "" || m["cut"] != true || len(ls) != api.ShellMaxLines+1 || text(0) != "1" || text(249) != "250" || text(250) != "… 301 lines cut …" {
+		t.Fatalf("shell: %d cut=%v lines=%d", code, m["cut"], len(m["lines"].([]any)))
+	}
+	var outs []any
+	errs := 0
+	for _, l := range ls[251:] {
+		if l.(map[string]any)["err"] == true {
+			errs++
+			if l.(map[string]any)["text"] != "oops" {
+				t.Fatalf("stderr line %v", l)
+			}
+			continue
+		}
+		outs = append(outs, l.(map[string]any)["text"])
+	}
+	if errs != 1 || len(outs) != 249 || outs[0] != "552" || outs[248] != "800" {
+		t.Fatalf("tail: %d stderr lines, stdout %v…%v (%d)", errs, outs[0], outs[len(outs)-1], len(outs))
+	}
+	evs, _ := sv.st.Since(0)
+	var got []ShellRun
+	for _, e := range evs {
+		if e.Kind == KindSessionShell && e.Session == id {
+			var r ShellRun
+			if json.Unmarshal(e.Data, &r) != nil {
+				t.Fatalf("bad event %s", e.Data)
+			}
+			got = append(got, r)
+		}
+	}
+	if len(got) != 1 || got[0].ID != m["id"] || got[0].Cmd == "" || !strings.HasSuffix(got[0].Dir, filepath.Base(dir)) || !got[0].Cut || got[0].Lines[0].Text != "1" || len(got[0].Lines) != api.ShellMaxLines+1 {
+		t.Fatalf("%d events, first cut=%v", len(got), len(got) > 0 && got[0].Cut)
+	}
+	_, m = post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"printf '\\033[31mred\\033[0m\\r\\n' >&2"}`)
+	if l := m["lines"].([]any)[0].(map[string]any); l["text"] != "red" || l["err"] != true {
+		t.Fatalf("escapes kept: %v", m)
 	}
 }
 
@@ -100,5 +163,38 @@ func TestServersAddPairsAndRemoves(t *testing.T) {
 	}
 	if res := do(t, "POST", local.URL+"/v1/servers", `{"name":"x","url":"http://a","code":"c"}`, map[string]string{LoginHeader: "me@example.com"}); res.StatusCode != 403 {
 		t.Fatalf("a tailnet login cannot add servers: %d", res.StatusCode)
+	}
+}
+
+func TestPastedImagesLiveUnderHomeAndAreRemoved(t *testing.T) {
+	sv, hs := newTest(t, filepath.Join(t.TempDir(), "s.db"))
+	code, m := post(t, hs.URL+"/v1/images", `{"data":"`+base64.StdEncoding.EncodeToString(onePNG)+`"}`)
+	if code != 200 {
+		t.Fatalf("image: %d %v", code, m)
+	}
+	p := m["path"].(string)
+	if !strings.HasPrefix(p, PasteRoot()+string(filepath.Separator)) {
+		t.Fatalf("paste %q is not under %q", p, PasteRoot())
+	}
+	sv.ClosePastes()
+	if _, err := os.Stat(filepath.Dir(p)); !os.IsNotExist(err) {
+		t.Fatalf("paste dir kept after the daemon ends: %v", err)
+	}
+}
+
+func TestSweepPastesRemovesStaleDirs(t *testing.T) {
+	root := t.TempDir()
+	old, fresh := filepath.Join(root, "old"), filepath.Join(root, "fresh")
+	os.MkdirAll(old, 0o700)
+	os.MkdirAll(fresh, 0o700)
+	os.WriteFile(filepath.Join(old, "paste-1.png"), onePNG, 0o600)
+	past := time.Now().Add(-48 * time.Hour)
+	os.Chtimes(old, past, past)
+	SweepPastes(root, 24*time.Hour)
+	if _, err := os.Stat(old); !os.IsNotExist(err) {
+		t.Fatalf("stale paste dir kept: %v", err)
+	}
+	if _, err := os.Stat(fresh); err != nil {
+		t.Fatalf("fresh paste dir removed: %v", err)
 	}
 }

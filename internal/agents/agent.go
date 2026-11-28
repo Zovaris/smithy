@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents/catalog"
+	"github.com/Zovaris/smithy/internal/agents/sandbox"
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
@@ -205,16 +207,7 @@ func AutoDenied(smithy []string) []string {
 }
 
 // Kind is the CLI kind of an agent name or path: its base name, with agent meaning cursor.
-func Kind(cli string) string {
-	if cli == "" || cli == "custom" {
-		return cli
-	}
-	b := strings.TrimSuffix(filepath.Base(cli), ".exe")
-	if b == "agent" {
-		return "cursor"
-	}
-	return b
-}
+func Kind(cli string) string { return catalog.Kind(cli) }
 
 // DefaultTimeout is the agent.timeout setting when unset, in minutes.
 const DefaultTimeout = "90"
@@ -571,7 +564,7 @@ func jsonResult(argv []string) bool {
 
 // finish rewrites a claude json log to text and records its usage: the sidecar next to a named
 // log and a "usage" event (batch and item from a <warden home>/<batch>/<item>.log path).
-func finish(log string, named bool, account string) {
+func finish(log string, named bool, base events.Event) {
 	u, ok := usage.Finish(log)
 	if !named {
 		os.Remove(usage.Sidecar(log))
@@ -579,22 +572,15 @@ func finish(log string, named bool, account string) {
 	if !ok {
 		return
 	}
-	e := events.Event{Kind: "usage", Usage: &u, Account: account}
+	e := base
+	e.Kind, e.Usage = "usage", &u
 	if named {
 		e.Detail = filepath.Base(log)
-		if dir := filepath.Dir(log); realPath(filepath.Dir(dir)) == realPath(layout.WardenHome()) {
+		if dir := filepath.Dir(log); sandbox.RealPath(filepath.Dir(dir)) == sandbox.RealPath(layout.WardenHome()) {
 			e.Batch, e.Item = filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log")
 		}
 	}
 	_ = events.Append(e)
-}
-
-// realPath resolves symlinks so a linked warden home still matches; p as given when it can't.
-func realPath(p string) string {
-	if r, err := filepath.EvalSymlinks(p); err == nil {
-		return r
-	}
-	return filepath.Clean(p)
 }
 
 // withPath runs an absolute or relative CLI path in place of the bare name.
@@ -608,7 +594,7 @@ func withPath(a []string, path string) []string {
 // Env is the worker's environment: base without the parent harness's variables, with
 // WARDEN_HARNESS and the AGENT_* run variables set.
 func Env(base []string, s Spec, o Options) []string {
-	drop := map[string]bool{ProfileEnv: true, SandboxRoleEnv: true, WorkerEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
+	drop := map[string]bool{ProfileEnv: true, sandbox.SandboxRoleEnv: true, WorkerEnv: true, "WARDEN_HARNESS": true, "AGENT_PROMPT_FILE": true, "AGENT_MODEL": true, "AGENT_READONLY": true, "AGENT_EFFORT": true}
 	if len(o.PoolEnv) > 0 {
 		for _, k := range PoolDropEnv {
 			drop[k] = true
@@ -747,10 +733,10 @@ func Run(o Options) int {
 		}
 	}
 	// after the pool picked the harness, so the check is the CLI that actually runs
-	if o.Profile == "auto" && os.Getenv(SandboxRoleEnv) != "orchestrator" {
-		mode, err := SandboxMode()
+	if o.Profile == "auto" && os.Getenv(sandbox.SandboxRoleEnv) != "orchestrator" {
+		mode, err := sandbox.SandboxMode()
 		if err == nil {
-			err = SandboxCheck(mode, cli, HostProbe())
+			err = sandbox.SandboxCheck(mode, cli, sandbox.HostProbe())
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "smithy agent: auto.sandbox: %v; worker not started (fails closed)\n", err)
@@ -778,9 +764,6 @@ func Run(o Options) int {
 		}
 		prompt = strings.TrimRight(string(b), "\n")
 	}
-	if cli != "custom" && !EffortFlags[Kind(cli)] {
-		fmt.Fprintf(os.Stderr, "smithy agent: %s has no effort flag; it runs at its own default (AGENT_EFFORT=%s is set)\n", cli, o.Effort)
-	}
 	if o.Inject == nil {
 		in, err := RunKit(cli, o, os.Getenv)
 		if err != nil {
@@ -806,7 +789,7 @@ func Run(o Options) int {
 		env = append(env, "GOCACHE="+gocache)
 	}
 	if o.Sandbox == "native" {
-		env = append(env, NativeGitEnv(env)...)
+		env = append(env, sandbox.NativeGitEnv(env)...)
 	}
 	if fi, err := os.Stat(o.Cwd); err != nil || !fi.IsDir() {
 		fmt.Fprintf(os.Stderr, "smithy agent: cd: %s: No such file or directory\n", o.Cwd)
@@ -890,7 +873,7 @@ func Run(o Options) int {
 	out.Close()
 	hit := acct.Name != "" && limited(acct, out.Name(), Kind(cli), rc)
 	if asJSON {
-		finish(out.Name(), o.Log != "", o.Account)
+		finish(out.Name(), o.Log != "", events.Event{Account: o.Account, Agent: Kind(cli), Model: o.Model})
 	}
 	if hit {
 		if len(o.poolSkip) == 0 && (o.ReadOnly || untouched(o.Cwd, o.poolStart)) {
@@ -1070,7 +1053,7 @@ func SmithyPaths() []string {
 		roots = append(roots, filepath.Dir(filepath.Dir(d)))
 	}
 	for _, s := range []string{"use-smithy", "tend", "warden", "smelt", "scout", "ledger", "hush"} {
-		if p, ok := FindSkill(s); ok {
+		if p, ok := skills.FindSkill(s); ok {
 			add(filepath.Join(filepath.Dir(p), "scripts", "smithy"))
 			roots = append(roots, filepath.Dir(filepath.Dir(p)))
 		}

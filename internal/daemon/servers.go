@@ -64,11 +64,11 @@ func probeServer(ctx context.Context, s RemoteServer) serverRow {
 	defer cancel()
 	get := func(path string, v any) error {
 		c := &Client{Base: s.URL, Token: s.Token}
-		req, err := c.req(ctx, "GET", path, nil)
+		req, err := c.NewRequest(ctx, "GET", path, nil)
 		if err != nil {
 			return err
 		}
-		res, err := c.http().Do(req)
+		res, err := c.HTTPClient().Do(req)
 		if err != nil {
 			return err
 		}
@@ -171,7 +171,7 @@ func (sv *Server) proxyServer(w http.ResponseWriter, r *http.Request) {
 			pr.Out.URL.Path = strings.TrimRight(u.Path, "/") + rest
 			pr.Out.URL.RawPath = ""
 			pr.Out.Host = u.Host
-			for _, h := range []string{"Authorization", "Cookie", "Origin", "Referer", "X-Smithy-Who", LoginHeader, "Sec-Fetch-Site"} {
+			for _, h := range []string{"Authorization", "Cookie", "Origin", "Referer", "X-Smithy-Who", "X-Smithy-Hook", LoginHeader, "Sec-Fetch-Site"} {
 				pr.Out.Header.Del(h)
 			}
 			if target.Token != "" {

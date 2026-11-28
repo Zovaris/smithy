@@ -8,7 +8,7 @@ export type Harness = {
   harness: string; present: boolean; skills_dir: string; smithy: string[]; missing: string[]; other: string[];
   mcp: string[]; mcp_file?: string; mcp_error?: string;
 };
-export type Setup = { agents: Ready[]; default: Choice; chosen: boolean; kit: Kit; skills: string[]; harnesses: Harness[]; effort?: EffortRules };
+export type Setup = { agents: Ready[]; default: Choice; chosen: boolean; kit: Kit; skills: string[]; paths?: Record<string, string>; harnesses: Harness[]; effort?: EffortRules };
 
 // choice is what PUT /v1/setup/default gets for row r and a typed model; an API agent needs one.
 export function choice(r: Ready, model: string): { agent: string; model: string } | null {

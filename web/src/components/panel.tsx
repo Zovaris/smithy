@@ -2,10 +2,11 @@ import { GlyphSparkline } from "@zovaris/sephiro/glyph-chart";
 import "@zovaris/sephiro/css/glyph-chart.css";
 import { href } from "../lib/router";
 import { count, stats, usd } from "../lib/stats";
-import { agentName, kindOf, open, sessions, type Sess, type Store } from "../lib/store";
+import { agentName, kindOf, open, sessions, tree, type Sess, type Store } from "../lib/store";
 import { split, St } from "./ui";
 import { useEffect, useState } from "preact/hooks";
 import { loadTend, tendRows, type TendList } from "../lib/tend";
+import { SessionLinks } from "./links";
 
 // Tend is /tend beside every page: tend.daemon's mode and each session's or batch item's PR.
 function Tend({ store }: { store: Store }) {
@@ -49,7 +50,7 @@ function Row({ s, here }: { s: Sess; here: boolean }) {
   return (
     <a class="row2" href={href({ name: "session", id: s.id })} aria-current={here ? "page" : undefined}>
       <div class="top2">
-        <span class="tt1">{s.title}</span>
+        <span class="tt1">{s.parent ? "└ " : ""}{s.title}</span>
         <span class="sp" />
         <St s={s.status} />
       </div>
@@ -61,7 +62,7 @@ function Row({ s, here }: { s: Sess; here: boolean }) {
 }
 
 // AgentsPanel is the TUI's tab panel beside every page: the running agents of this project first,
-// then elsewhere, what waits on you, and the cost so far.
+// then elsewhere, what waits on you, and the cost so far; in a session, its links come first.
 export default function AgentsPanel({ store, project, cur, host }: { store: Store; project: string; cur: string; host: string }) {
   const running = sessions(store).filter(live);
   const mine = running.filter((s) => project && s.dir === project);
@@ -71,14 +72,15 @@ export default function AgentsPanel({ store, project, cur, host }: { store: Stor
   const pname = project.split("/").pop() || "this project";
   return (
     <>
+      {cur && <SessionLinks id={cur} links={store.links?.[cur]} />}
       <section aria-label="Agents">
         <h2>Agents<span class="sp" /><span class="mono t3">{running.length} running · {host}</span></h2>
         <div class="card">
           {!running.length && <p class="hint">No agent is working right now. <a href="#/new">Start one</a>.</p>}
           {!!mine.length && <div class="sub">{pname}</div>}
-          {mine.map((s) => <Row s={s} here={s.id === cur} />)}
+          {tree(mine).map((s) => <Row s={s} here={s.id === cur} />)}
           {!!other.length && !!mine.length && <div class="sub">Elsewhere</div>}
-          {other.map((s) => <Row s={s} here={s.id === cur} />)}
+          {tree(other).map((s) => <Row s={s} here={s.id === cur} />)}
         </div>
       </section>
       {!!waiting.length && (

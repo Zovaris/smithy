@@ -185,7 +185,7 @@ var cardPart = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 // Asker records a decision on smithy daemon and reads its outcome back from the daemon's own record.
 type Asker interface {
-	Ask(ctx context.Context, id, question string, options []string) error
+	AskMulti(ctx context.Context, id, question string, options []string, multi bool) error
 	Outcome(ctx context.Context, id string) (answer string, answered bool, err error)
 }
 
@@ -197,7 +197,8 @@ type Asker interface {
 func AskTool(card string, poll time.Duration, connect func() (Asker, error)) Tool {
 	var one sync.Mutex
 	return Tool{Name: "ask", Description: "Ask the user a decision and wait for the answer (TUI, web or chat). Only for real decisions: give the options and their trade-offs.",
-		Schema: Object(map[string]any{"question": Str("one question"), "options": List("up to 6 short options"),
+		Schema: Object(map[string]any{"question": Str("one question"), "options": List("up to 6 short options; the user may also answer in their own words"),
+			"multi":           Bool("true when several options may be picked together (the answer lists them, comma-separated)"),
 			"timeout_minutes": Int("how long to wait, 1-240 (default 60)")}, "question"),
 		Call: func(ctx context.Context, a Args) (string, error) {
 			batch, item, ok := strings.Cut(card, "/")
@@ -210,6 +211,10 @@ func AskTool(card string, poll time.Duration, connect func() (Asker, error)) Too
 				return "", err
 			}
 			opts, err := a.Strings("options", 6, 200)
+			if err != nil {
+				return "", err
+			}
+			multi, err := a.Bool("multi")
 			if err != nil {
 				return "", err
 			}
@@ -240,7 +245,7 @@ func AskTool(card string, poll time.Duration, connect func() (Asker, error)) Too
 			if onCard {
 				want = "decide:" + batch + "/" + item + "/" + key
 			}
-			if err := asker.Ask(ctx, want, q, opts); err != nil {
+			if err := asker.AskMulti(ctx, want, q, opts, multi); err != nil {
 				return "", errors.New("ask: the daemon refused the question (" + err.Error() + "); decide by the task's rules and say so in your report")
 			}
 			setCard := func(p []string) error {

@@ -174,6 +174,33 @@ func srvRead(r *bufio.Reader) (string, error) {
 	return string(p), nil
 }
 
+func TestDiscordMultiSelect(t *testing.T) {
+	a := &restAPI{}
+	d := dc(t, a)
+	if _, err := d.Send(context.Background(), "", Note{Kind: "decision", Title: "Which?", Multi: true},
+		[]Button{{"a", "h:0"}, {"b", "h:1"}, {"c", "h:2"}}); err != nil {
+		t.Fatal(err)
+	}
+	rows := a.bodies[0]["components"].([]any)
+	sel := rows[0].(map[string]any)["components"].([]any)[0].(map[string]any)
+	if len(rows) != 1 || sel["type"] != float64(3) || sel["max_values"] != float64(3) || sel["min_values"] != float64(1) ||
+		len(sel["options"].([]any)) != 3 || sel["options"].([]any)[2].(map[string]any)["value"] != "h:2" {
+		t.Fatalf("select %v", rows)
+	}
+	pick := func(user string) dEvent {
+		return dEvent{Op: 0, T: "INTERACTION_CREATE", D: json.RawMessage(`{"id":"11","token":"tok_A","type":3,"guild_id":"42","member":{"user":{"id":"` + user +
+			`"}},"data":{"custom_id":"h:multi","component_type":3,"values":["h:2","h:0"]},"message":{"id":"900","channel_id":"700"}}`)}
+	}
+	d.guild = "42"
+	if _, ok := d.event(pick("6"), nil); ok {
+		t.Fatal("a user outside connect.discord.users counted")
+	}
+	in, ok := d.event(pick("5"), nil)
+	if !ok || in != (Inbound{Picks: "h:2,h:0", Ref: "700/900", By: "5"}) {
+		t.Fatalf("%+v %v", in, ok)
+	}
+}
+
 func TestDiscordReceive(t *testing.T) {
 	a := &restAPI{}
 	d := dc(t, a)
@@ -288,5 +315,20 @@ func TestDiscordFromConfig(t *testing.T) {
 	}
 	if d := cs[0].(*Discord); d.Channel != "500" || !d.Users["5"] || d.Token != dTok {
 		t.Fatalf("%+v", d)
+	}
+}
+
+func TestDiscordAckStopsWithTheGateway(t *testing.T) {
+	a := &restAPI{}
+	d := dc(t, a)
+	d.Users = nil
+	done := make(chan struct{})
+	close(done)
+	d.event(dEvent{Op: 0, T: "INTERACTION_CREATE", D: json.RawMessage(`{"id":"11","token":"tok_A","type":3,"data":{"custom_id":"h:0"}}`)}, done)
+	time.Sleep(100 * time.Millisecond)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if len(a.calls) != 0 {
+		t.Fatalf("acked after the gateway closed: %v", a.calls)
 	}
 }
