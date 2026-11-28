@@ -262,3 +262,17 @@ func TestQuestionAndOptionsAreCleaned(t *testing.T) {
 		t.Fatalf("pending = %+v", p)
 	}
 }
+
+func TestSecretAskThatCannotBeRecordedIsDenied(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
+	sv := wired(t, filepath.Join(t.TempDir(), "s.db"))
+	sv.st.Close()
+	sv.Ingest(events.Event{Kind: "secret_ask", ID: "lost1"}, ProxySource)
+	es, _ := events.Read(time.Time{}, 0)
+	for _, e := range es {
+		if e.ID == "lost1" && e.Kind == "secret_denied" && strings.Contains(e.Detail, "could not record") {
+			return
+		}
+	}
+	t.Fatalf("the proxy is left waiting: %+v", es)
+}
