@@ -146,6 +146,21 @@ func TestExitBranchAndJSON(t *testing.T) {
 	}
 }
 
+func TestIfEqualsAnswer(t *testing.T) {
+	w := parse(t, `{"name":"e","schedule":"@daily","steps":[
+	 {"id":"q","kind":"agent","prompt":"merge?","answer":"yesno"},
+	 {"id":"ok","kind":"if","step":"q","equals":"YES","else":"stop"},
+	 {"id":"n","kind":"notify","message":"merge"}]}`)
+	f := &fake{answers: []string{"Yes. fine"}}
+	if r := Run(context.Background(), w, f.env()); r.Status != StatusOK || len(f.notes) != 1 || r.Steps[0].Why != "fine" {
+		t.Fatalf("yes: %+v %q", r, f.notes)
+	}
+	f = &fake{answers: []string{"no\nrisky"}}
+	if r := Run(context.Background(), w, f.env()); r.Status != StatusOK || len(f.notes) != 0 {
+		t.Fatalf("no: %+v %q", r, f.notes)
+	}
+}
+
 func TestCaps(t *testing.T) {
 	w := parse(t, `{"name":"c","schedule":"@daily","max_agents":1,"steps":[
 	 {"id":"a","kind":"agent","prompt":"one"},{"id":"b","kind":"agent","prompt":"two"}]}`)

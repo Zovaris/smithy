@@ -232,12 +232,13 @@ func answer(kind, ans string) (string, string, error) {
 	switch kind {
 	case "yesno":
 		first, rest, _ := strings.Cut(ans, "\n")
-		word := strings.ToLower(strings.Trim(strings.TrimSpace(first), " .!*:,"))
-		if f := strings.Fields(word); len(f) > 0 {
-			word = strings.Trim(f[0], " .!*:,")
-			if len(f) > 1 && rest == "" {
-				rest = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(first), f[0]))
-				rest = strings.TrimLeft(rest, " .!*:,-")
+		const punct = " .!*:,-"
+		f := strings.Fields(first)
+		word := ""
+		if len(f) > 0 {
+			word = strings.ToLower(strings.Trim(f[0], punct))
+			if rest == "" {
+				rest = strings.TrimLeft(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(first), f[0])), punct)
 			}
 		}
 		if word != "yes" && word != "no" {
