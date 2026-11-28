@@ -54,6 +54,7 @@ part above `### Details`.
 
 ### Fixed
 
+- An opencode turn that stops on its free usage limit now says so ("Free usage limit reached... retry in ~9h 41m") instead of "smithy agent: exit status 1", and the account counts as limited.
 - opencode sessions work again with agent.effort set: an agent without an effort flag ignores the setting quietly, a failed turn shows the agent's own error (such as a usage limit) instead of the first stderr line, and the error no longer reads "smithy agent: smithy agent:".
 
 - TUI: the sidebar ends on the input band's last row instead of running to the footer.
@@ -89,6 +90,7 @@ part above `### Details`.
 
 ### Details
 
+- opencode `--format json` error events: the stream parser appends `retryAfterMs` as "retry in ~Xh Ym" to `error.message`; `pool.Detect` reads the JSON event (not only the plain "Error:" line) and uses `retryAfterMs` as the reset.
 - TUI: the / popup loses its accent bar; modals open and close without the entrance spring (the web keeps its motion); headings carry no rules.
 - TUI: the demo commands `/ask`, `/answer` and `/welcome` are gone (`smithy welcome` still walks the first run), and so is `/prompt` (the web settings show the prompt file); `notify.style` is an enum of emoji and plain.
 - The daemon runs opencode with `--format json` (`AGENT_ARGS`) and reads it like claude's stream (`opencode_stream.go`): text parts, finished tool calls as `session_tool` events, step tokens and cost as usage; the reply is the text parts. The TUI adopts streamed parts as the agent's answer when the final message matches them.

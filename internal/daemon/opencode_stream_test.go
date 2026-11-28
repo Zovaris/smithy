@@ -4,8 +4,10 @@ package daemon
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -58,5 +60,40 @@ func TestTurnErrorNamesTheRealCauseOnce(t *testing.T) {
 	}
 	if got := turnError("", "", errors.New("exit status 1")).Error(); got != "smithy agent: exit status 1" {
 		t.Errorf("fallback: %q", got)
+	}
+}
+
+// testdata/opencode-free-limit.jsonl is the line `opencode run --format json` prints on stdout when
+// the free usage limit is hit; the failed turn must name it, with when to retry.
+func TestOpencodeFreeLimitFixtureIsTheTurnError(t *testing.T) {
+	b, err := os.ReadFile("testdata/opencode-free-limit.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	o, r := &opencodeStream{}, &streamEmit{}
+	if !o.line(b, r) {
+		t.Fatal("error event not taken")
+	}
+	want := "Free usage limit reached. Connect a provider or subscribe to OpenCode Go to keep going, or switch models. (retry in ~9h 41m)"
+	if o.err != want {
+		t.Fatalf("err = %q", o.err)
+	}
+	if got := turnError("smithy agent: exit status 1\n", o.err, errors.New("exit status 1")).Error(); got != "smithy agent: "+want {
+		t.Errorf("turn error = %q", got)
+	}
+}
+
+func TestOpencodeTurnWithAnErrorEventFailsWithItsMessage(t *testing.T) {
+	dir := t.TempDir()
+	exe := filepath.Join(dir, "fake")
+	src, _ := filepath.Abs("testdata/opencode-free-limit.jsonl")
+	script := "#!/bin/sh\nwhile [ \"$1\" != --log ]; do shift; done\ncat '" + src + "' > \"$2\"\necho 'smithy agent: exit status 1' >&2\nexit 1\n"
+	if err := os.WriteFile(exe, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	r := &cliRunner{exe: exe, agent: "opencode", dir: dir, sdir: dir}
+	_, err := r.Turn(context.Background(), "hi", nil, &streamEmit{})
+	if err == nil || !strings.Contains(err.Error(), "Free usage limit reached.") || !strings.Contains(err.Error(), "retry in ~9h 41m") {
+		t.Fatalf("err = %v", err)
 	}
 }
