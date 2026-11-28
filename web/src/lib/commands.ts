@@ -43,6 +43,7 @@ const HINTS: Record<string, string> = {
   tend: "PRs kept green",
   channels: "chat channels, test-send",
   settings: "settings",
+  config: "every setting",
 };
 
 export const ACTIONS: Cmd[] = Object.entries(HINTS).map(([name, hint]) => ({ name, hint, kind: "action" }));
