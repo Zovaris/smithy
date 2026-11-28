@@ -24,6 +24,7 @@ import (
 	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/web"
+	"github.com/Zovaris/smithy/internal/workflow"
 )
 
 const (
@@ -77,6 +78,8 @@ type Server struct {
 	Tend *Tender
 	// Links, when set, keeps each session's PR and issue links live (GET /v1/sessions/{id}/links).
 	Links *Linker
+	// Workflows, when set, is the scheduler behind /v1/workflows.
+	Workflows *workflow.Scheduler
 	// ServeState, when set, fills State.Serve (the auto loop's heartbeat).
 	ServeState func() any
 	// Route, when set, sends a won answer back to its asker (RouteBack); an error leaves it for Resume.
@@ -87,6 +90,9 @@ type Server struct {
 	BenchDir string
 	// BenchRun, when set, replaces running `smithy <args>` for a web-started bench run (tests).
 	BenchRun func(args []string) error
+	// GoalMaxTurns and GoalMaxCost cap a goal's continued turns and USD; 0: the session.goal_* settings.
+	GoalMaxTurns int
+	GoalMaxCost  float64
 	// Runners makes each session's runner; nil: DefaultRunner.
 	Runners RunnerFor
 	// Version is the daemon binary's version, reported in State so a client can warn on a mismatch.
@@ -119,6 +125,7 @@ type Server struct {
 	lastSeq    int64
 	wake       chan struct{}
 	sessions   map[string]*live
+	busKeys    map[string]string
 	lastAgent  string
 	lastModel  string
 	starting   int
@@ -168,7 +175,7 @@ func (sv *Server) apply(e store.Event) {
 		}
 	case KindIntake:
 		sv.applyIntake(e.Data)
-	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool, KindSessionLink, KindSessionLinks:
+	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool, KindSessionMail, KindSessionGoal, KindSessionLink, KindSessionLinks:
 		sv.applySession(e)
 	case KindRouted:
 		var r struct{ ID string }
@@ -345,6 +352,11 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("GET /v1/sessions/{id}/links", sv.getLinks)
 	mux.HandleFunc("POST /v1/sessions/{id}/links", sv.addLink)
 	mux.HandleFunc("GET /v1/links", sv.projectWork)
+	mux.HandleFunc("GET /v1/sessions/{id}/mail", sv.sessionMail)
+	mux.HandleFunc("POST /v1/bus/send", sv.busSend)
+	mux.HandleFunc("GET /v1/bus/inbox", sv.busInbox)
+	mux.HandleFunc("POST /v1/bus/start", sv.busStart)
+	mux.HandleFunc("PUT /v1/sessions/{id}/goal", sv.setSessionGoal)
 	mux.HandleFunc("GET /v1/projects", sv.listProjects)
 	mux.HandleFunc("POST /v1/projects", sv.addProject)
 	mux.HandleFunc("DELETE /v1/projects", sv.removeProject)
@@ -364,6 +376,11 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("PUT /v1/serve", sv.putServe)
 	mux.HandleFunc("GET /v1/doctor", sv.doctor)
 	mux.HandleFunc("GET /v1/tend", sv.tendView)
+	mux.HandleFunc("GET /v1/workflows", sv.listWorkflows)
+	mux.HandleFunc("GET /v1/workflows/{name}", sv.getWorkflow)
+	mux.HandleFunc("PUT /v1/workflows/{name}", sv.saveWorkflow)
+	mux.HandleFunc("POST /v1/workflows/{name}/run", sv.runWorkflow)
+	mux.HandleFunc("POST /v1/workflows/{name}/{op}", sv.enableWorkflow)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
 	mux.HandleFunc("POST /v1/bench/run", sv.benchStart)
 	mux.HandleFunc("GET /v1/bench/status", sv.benchStatus)

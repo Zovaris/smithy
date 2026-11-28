@@ -206,3 +206,77 @@ func TestHandleMainChatIdeaGoesToIntake(t *testing.T) {
 		t.Fatalf("intake got %v", got)
 	}
 }
+
+type nativeFake struct{ fake }
+
+func (*nativeFake) MultiSelect() bool { return true }
+
+type toggleFake struct {
+	fake
+	keyboards []string
+}
+
+func (f *toggleFake) Buttons(_ context.Context, ref string, buttons []Button) error {
+	var bs []string
+	for _, b := range buttons {
+		bs = append(bs, b.Label+"="+b.Data)
+	}
+	f.keyboards = append(f.keyboards, ref+"|"+strings.Join(bs, ","))
+	return nil
+}
+
+func TestMultiSelectAnswersWithEveryPickInOptionOrder(t *testing.T) {
+	a := &nativeFake{fake{name: "a"}}
+	h := hub(t, a)
+	var answers []string
+	h.Answer = func(id, ans, by string) error { answers = append(answers, id+"="+ans+"@"+by); return nil }
+	ctx := context.Background()
+	h.Notify(ctx, Note{Key: "d", Kind: "decision", Title: "Pick", Options: []string{"x", "y", "z"}, Decision: "ask:1", Multi: true})
+	if strings.Contains(a.sent[0], "Done") {
+		t.Fatalf("a native select gets no Done button: %q", a.sent[0])
+	}
+	hd := handle("ask:1")
+	h.Handle(ctx, a, Inbound{Picks: hd + ":2," + hd + ":0", Ref: "m9", By: "u1"})
+	h.Handle(ctx, a, Inbound{Picks: hd + ":2,bogus:0", Ref: "m1", By: "u1"})
+	h.Handle(ctx, a, Inbound{Picks: hd + ":2," + hd + ":0", Ref: "m1", By: "u1"})
+	if len(answers) != 1 || answers[0] != "ask:1=x, z@a:u1" {
+		t.Fatalf("answers %q", answers)
+	}
+}
+
+func TestMultiSelectTogglesThenDone(t *testing.T) {
+	a := &toggleFake{fake: fake{name: "a"}}
+	h := hub(t, a)
+	var answers []string
+	h.Answer = func(id, ans, by string) error { answers = append(answers, id+"="+ans+"@"+by); return nil }
+	ctx := context.Background()
+	h.Notify(ctx, Note{Key: "d", Kind: "decision", Title: "Pick", Options: []string{"x", "y", "z"}, Decision: "ask:1", Multi: true})
+	hd := handle("ask:1")
+	if want := "☐ x=" + hd + ":0,☐ y=" + hd + ":1,☐ z=" + hd + ":2,Done=" + hd + ":done"; !strings.HasSuffix(a.sent[0], want) {
+		t.Fatalf("sent %q, want toggles %q", a.sent[0], want)
+	}
+	h.Handle(ctx, a, Inbound{Button: hd + ":done", Ref: "m1", By: "u1"})
+	h.Handle(ctx, a, Inbound{Button: hd + ":2", Ref: "m1", By: "u1"})
+	h.Handle(ctx, a, Inbound{Button: hd + ":0", Ref: "m1", By: "u1"})
+	h.Handle(ctx, a, Inbound{Button: hd + ":1", Ref: "m1", By: "u1"})
+	h.Handle(ctx, a, Inbound{Button: hd + ":1", Ref: "m1", By: "u1"})
+	if len(answers) != 0 {
+		t.Fatalf("a toggle or an empty Done answered: %q", answers)
+	}
+	if k := a.keyboards[len(a.keyboards)-1]; !strings.HasPrefix(k, "m1|☑ x=") || !strings.Contains(k, "☐ y=") || !strings.Contains(k, "☑ z=") {
+		t.Fatalf("keyboard %q", k)
+	}
+	h.Handle(ctx, a, Inbound{Button: hd + ":done", Ref: "m1", By: "u1"})
+	if len(answers) != 1 || answers[0] != "ask:1=x, z@a:u1" {
+		t.Fatalf("answers %q", answers)
+	}
+}
+
+func TestSingleSelectKeepsOneButtonPerOption(t *testing.T) {
+	a := &toggleFake{fake: fake{name: "a"}}
+	h := hub(t, a)
+	h.Notify(context.Background(), Note{Key: "d", Kind: "decision", Title: "Pick", Options: []string{"x", "y"}, Decision: "ask:1"})
+	if strings.Contains(a.sent[0], "Done") || strings.Contains(a.sent[0], "☐") {
+		t.Fatalf("sent %q", a.sent[0])
+	}
+}

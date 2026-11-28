@@ -2,7 +2,7 @@ import { GlyphSparkline } from "@zovaris/sephiro/glyph-chart";
 import "@zovaris/sephiro/css/glyph-chart.css";
 import { href } from "../lib/router";
 import { count, stats, usd } from "../lib/stats";
-import { agentName, kindOf, open, sessions, type Sess, type Store } from "../lib/store";
+import { agentName, kindOf, open, sessions, tree, type Sess, type Store } from "../lib/store";
 import { split, St } from "./ui";
 import { useEffect, useState } from "preact/hooks";
 import { loadTend, tendRows, type TendList } from "../lib/tend";
@@ -50,7 +50,7 @@ function Row({ s, here }: { s: Sess; here: boolean }) {
   return (
     <a class="row2" href={href({ name: "session", id: s.id })} aria-current={here ? "page" : undefined}>
       <div class="top2">
-        <span class="tt1">{s.title}</span>
+        <span class="tt1">{s.parent ? "└ " : ""}{s.title}</span>
         <span class="sp" />
         <St s={s.status} />
       </div>
@@ -78,9 +78,9 @@ export default function AgentsPanel({ store, project, cur, host }: { store: Stor
         <div class="card">
           {!running.length && <p class="hint">No agent is working right now. <a href="#/new">Start one</a>.</p>}
           {!!mine.length && <div class="sub">{pname}</div>}
-          {mine.map((s) => <Row s={s} here={s.id === cur} />)}
+          {tree(mine).map((s) => <Row s={s} here={s.id === cur} />)}
           {!!other.length && !!mine.length && <div class="sub">Elsewhere</div>}
-          {other.map((s) => <Row s={s} here={s.id === cur} />)}
+          {tree(other).map((s) => <Row s={s} here={s.id === cur} />)}
         </div>
       </section>
       {!!waiting.length && (

@@ -352,7 +352,7 @@ func KitChoice() (mcp bool, skills []string) {
 var KitGuard func(exe string) string
 
 // RunKit is the injection for one run (kit.mcp, kit.skills): KitMCP as the "smithy" MCP server, told the run's warden
-// card (SMITHY_MCP_CARD) and, for a --readonly run, to expose read-only tools. nil when there is
+// card (SMITHY_MCP_CARD), the daemon session's bus key (SMITHY_SESSION_KEY) and, for a --readonly run, to expose read-only tools. nil when there is
 // no kit or for a custom AGENT_CMD.
 func RunKit(cli string, o Options, getenv func(string) string) (*Injection, error) {
 	if len(KitMCP) == 0 || cli == "custom" {
@@ -379,6 +379,9 @@ func RunKit(cli string, o Options, getenv func(string) string) (*Injection, erro
 	env := map[string]string{}
 	if batch, id := cardOf(o.Log, o.Cwd); batch != "" {
 		env["SMITHY_MCP_CARD"] = batch + "/" + id
+	}
+	if k := getenv("SMITHY_SESSION_KEY"); k != "" && !o.ReadOnly {
+		env["SMITHY_SESSION"], env["SMITHY_SESSION_KEY"] = getenv("SMITHY_SESSION"), k
 	}
 	dir := ""
 	if o.Log != "" {

@@ -35,6 +35,12 @@ func TestNoteOf(t *testing.T) {
 	if !ok || n.Kind != "decision" || n.Session != "b/v1" || n.Decision != "decide:b/v1/queue" || len(n.Options) != 2 || !strings.Contains(n.Text, "Redis?") {
 		t.Fatalf("decision: %+v", n)
 	}
+	if n.Multi {
+		t.Fatalf("single-select decision sent as multi: %+v", n)
+	}
+	if n, _ = NoteOf(ev(t, KindAsked, "", Decision{ID: "ask:b/v1/1", Question: "Which?", Options: []string{"a", "b"}, Multi: true})); !n.Multi {
+		t.Fatalf("multi-select decision lost Multi: %+v", n)
+	}
 	n, _ = NoteOf(ev(t, KindAsked, "", Decision{ID: "merge:b/v1", Question: "Merge?", Options: []string{"merge", "hold"}}))
 	if n.Kind != "pr_ready" || n.Session != "b/v1" {
 		t.Fatalf("merge: %+v", n)

@@ -182,6 +182,30 @@ func TestSlackReceive(t *testing.T) {
 	}
 }
 
+func TestSlackMultiSelect(t *testing.T) {
+	s, api, sock := slackTest(t)
+	ctx := context.Background()
+	if _, err := s.Send(ctx, "", Note{Kind: "decision", Title: "Which?", Multi: true},
+		[]Button{{Label: "a", Data: "ab:0"}, {Label: "b", Data: "ab:1"}}); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(api.bodies[0])
+	for _, want := range []string{`"type":"multi_static_select"`, `"value":"ab:1"`, `"max_selected_items":2`} {
+		if !strings.Contains(string(b), want) {
+			t.Fatalf("send body lacks %s: %s", want, b)
+		}
+	}
+	if strings.Contains(string(b), `"type":"button"`) {
+		t.Fatalf("multi-select must not also send buttons: %s", b)
+	}
+	sock.send <- `{"envelope_id":"i1","type":"interactive","payload":{"type":"block_actions","user":{"id":"U2"},"channel":{"id":"C123456"},"message":{"ts":"100.1"},"actions":[{"type":"multi_static_select","selected_options":[{"value":"ab:0"}]}]}}`
+	sock.send <- `{"envelope_id":"i2","type":"interactive","payload":{"type":"block_actions","user":{"id":"U1"},"channel":{"id":"C123456"},"message":{"ts":"100.1"},"actions":[{"type":"multi_static_select","selected_options":[{"value":"ab:0"},{"value":"ab:1"}]}]}}`
+	ins, err := s.Receive(ctx)
+	if err != nil || len(ins) != 1 || ins[0] != (Inbound{Picks: "ab:0,ab:1", Ref: "100.1", By: "U1"}) {
+		t.Fatalf("%+v %v", ins, err)
+	}
+}
+
 func TestSlackReplyReachesSession(t *testing.T) {
 	s, _, sock := slackTest(t)
 	ctx := context.Background()

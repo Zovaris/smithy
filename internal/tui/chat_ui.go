@@ -45,8 +45,9 @@ const (
 	overlayInfo    // /connect, /remote, /web, /log
 	overlayProject // which project a new session starts in
 	overlayWelcome
-	overlayAsk   // the question card for the first decision waiting on you
-	overlayBoard // /board: the task files by status
+	overlayAsk       // the question card for the first decision waiting on you
+	overlayBoard     // /board: the task files by status
+	overlayWorkflows // /workflows: the scheduled workflows
 )
 
 // chatTool is the data of a "tool" event: one tool call of a session's turn.
@@ -64,7 +65,9 @@ type chatSession struct {
 	id, kind, state          string
 	title, agent, model, now string
 	effort                   string
+	goal, goalState          string
 	dir                      string // the folder it started in; "" for batch events
+	parent                   string
 	prs                      []string
 	links                    *daemon.SessionLinks
 	since, turn              time.Time
@@ -125,6 +128,12 @@ func (m *chatView) event(kind, session string, at time.Time, data json.RawMessag
 		if json.Unmarshal(data, &o) == nil {
 			m.unpend(o.ID)
 		}
+	case daemon.KindWorkflowNote:
+		var n struct{ Workflow, Title, Text string }
+		if json.Unmarshal(data, &n) == nil && n.Workflow != "" {
+			m.system(clean("workflow " + n.Workflow + " · " + n.Title + ": " + n.Text))
+		}
+		return
 	}
 	if t := eventText(kind, session, data); t != "" {
 		m.logNoise(noise{at: at, text: t, quiet: kind == daemon.KindAsked})
@@ -315,6 +324,8 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.modelCommand(arg)
 	case "effort":
 		return m.effortCommand(arg)
+	case "goal":
+		return m.goalCommand(arg)
 	case "theme":
 		return m.themeCommand(arg)
 	case "skills":
@@ -340,6 +351,8 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.openBoard(arg)
 	case "links":
 		return m.linksCommand(arg)
+	case "workflows", "workflow":
+		return m.openWorkflows()
 	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "prompt", "channels":
 		return m.settingsCommand(name, arg)
 	case "quit":
@@ -432,6 +445,8 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.projectKey(k)
 	case overlayBoard:
 		return m.boardKey(k)
+	case overlayWorkflows:
+		return m.workflowsKey(k)
 	case overlayHelp, overlayInfo:
 		if p := m.info.set; p != nil && m.overlay == overlayInfo {
 			switch k {

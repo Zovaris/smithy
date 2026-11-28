@@ -257,6 +257,9 @@ func (m chatView) agentsBox(screen []string, w, h int) []string {
 		if s.id == m.current && m.current != "" {
 			title = t.g.prompt + " " + title
 		}
+		if d := m.depth(s.id); d > 0 {
+			title = strings.Repeat("  ", d-1) + "└ " + title
+		}
 		items = append(items, boxItem{glyph: g, color: c, label: title, hint: strings.Join(parts, " "+t.g.dot+" "), key: when})
 	}
 	if len(list) == 0 {

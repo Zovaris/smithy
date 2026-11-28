@@ -10,7 +10,6 @@ import { parse, totals, withComments, type Comment } from "./lib/diff";
 import { Anvil, I } from "./components/icons";
 import { sendMessage, start, stopSession, useLive } from "./lib/live";
 import { clock, headerLine } from "./lib/parity";
-import { Changes, Decisions } from "./components/rail";
 import { go, href, PAGES, type Page, useView } from "./lib/router";
 import { agentName, ago, open, sessions as list, type Sess } from "./lib/store";
 import { initTheme, toggleTheme, current, loadAccent, type ThemeName } from "./lib/theme";
@@ -18,12 +17,17 @@ import { St } from "./components/ui";
 import type { Info } from "./components/info";
 import type { Detail } from "./lib/detail";
 
+// The rail (diff viewer, decisions) loads after the first paint: it sits beside the chat.
+const Changes = lazy(() => import("./components/rail").then((m) => ({ default: m.Changes })));
+const Decisions = lazy(() => import("./components/rail").then((m) => ({ default: m.Decisions })));
+
 
 const PAGE: Record<Page, ComponentType<{ onAction: (a: string) => void }>> = {
   decisions: lazy(() => import("./screens/decisions")),
   agents: lazy(() => import("./screens/agents")),
   board: lazy(() => import("./screens/board")),
   bench: lazy(() => import("./screens/bench")),
+  workflows: lazy(() => import("./screens/workflows")),
   setup: lazy(() => import("./screens/setup")),
 };
 const Palette = lazy(() => import("./components/palette"));
@@ -36,7 +40,7 @@ const InfoPanel = lazy(() => import("./components/info"));
 const NewSession = lazy(() => import("./features/chat/newsession").then((m) => ({ default: m.NewSession })));
 type Shell = { cmd: string; output: string; code: number };
 
-const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", setup: "gear" };
+const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", workflows: "layers", setup: "gear" };
 
 type Auth = { state: "checking" } | { state: "ok" } | { state: "denied" } | { state: "down"; error: string };
 
@@ -200,11 +204,11 @@ function App() {
   const title = v.name === "session" ? s?.title ?? "Session" : v.name === "new" ? "New session" : PAGES.find((p) => p.id === v.name)!.label;
   const rail = v.name !== "new" || !!ss.length;
   const railBody = s ? (
-    <>
+    <Suspense fallback={null}>
       <Changes diff={diff} comments={mine} onComment={(c) => setNotes({ ...notes, [sid]: [...mine, c] })} onDrop={(c) => setNotes({ ...notes, [sid]: mine.filter((x) => x !== c) })} />
       <Decisions list={l.store.decisions.filter((d) => d.session === s.id || (!d.session && d.answer == null))} sessions={l.store.sessions} />
-      <Suspense fallback={null}><AgentsPanel store={l.store} project={s.dir} cur={s.id} host={host()} /></Suspense>
-    </>
+      <AgentsPanel store={l.store} project={s.dir} cur={s.id} host={host()} />
+    </Suspense>
   ) : (
     <Suspense fallback={null}><AgentsPanel store={l.store} project={project} cur="" host={host()} /></Suspense>
   );
@@ -252,9 +256,12 @@ function App() {
             return "";
           }}
           pills={
-            <button class="pill" aria-haspopup="dialog" title="Model and effort (/model, /effort)" onClick={() => setPick(true)}>
-              <I n="term" />{agentName(s.agent)}<span class="hide-s t3">{(s.model || "default") + (s.effort ? " · " + s.effort : "")}</span>
-            </button>
+            <>
+              <button class="pill" aria-haspopup="dialog" title="Model and effort (/model, /effort)" onClick={() => setPick(true)}>
+                <I n="term" />{agentName(s.agent)}<span class="hide-s t3">{(s.model || "default") + (s.effort ? " · " + s.effort : "")}</span>
+              </button>
+              {s.goal && <span class="pill" title={s.goal}>goal {s.goal_state || "on"}</span>}
+            </>
           }
         />
       </>

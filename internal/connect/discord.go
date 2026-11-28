@@ -101,6 +101,9 @@ type dgw struct {
 
 func (d *Discord) Name() string { return "discord" }
 
+// MultiSelect: a multi-select decision is one string select menu (max_values > 1).
+func (d *Discord) MultiSelect() bool { return true }
+
 func (d *Discord) scrub(s string) string {
 	if d.Token != "" {
 		s = strings.ReplaceAll(s, d.Token, "<token>")
@@ -262,6 +265,24 @@ func renderDiscord(n Note) string {
 func (d *Discord) message(n Note, buttons []Button) map[string]any {
 	var rows []map[string]any
 	var row []map[string]any
+	if n.Multi && len(buttons) > 1 {
+		var opts []map[string]any
+		for i, b := range buttons {
+			if i == 25 {
+				break
+			}
+			label := clip(text.Clean(b.Label), 100)
+			if label == "" {
+				label = "-"
+			}
+			opts = append(opts, map[string]any{"label": label, "value": b.Data})
+		}
+		hd, _, _ := strings.Cut(buttons[0].Data, ":")
+		sel := map[string]any{"type": 3, "custom_id": hd + ":multi", "options": opts, "min_values": 1,
+			"max_values": len(opts), "placeholder": "Pick any"}
+		row = []map[string]any{sel}
+		buttons = nil
+	}
 	for i, b := range buttons {
 		if i == 25 {
 			break
@@ -494,7 +515,9 @@ func (d *Discord) event(ev dEvent) (Inbound, bool) {
 				User dUser `json:"user"`
 			} `json:"member"`
 			Data struct {
-				Custom string `json:"custom_id"`
+				Custom string   `json:"custom_id"`
+				Kind   int      `json:"component_type"`
+				Values []string `json:"values"`
 			} `json:"data"`
 			Message *struct {
 				ID      string `json:"id"`
@@ -513,6 +536,17 @@ func (d *Discord) event(ev dEvent) (Inbound, bool) {
 		}
 		if it.Member == nil || it.Message == nil || len(it.Data.Custom) > 100 || !d.allowed(it.Guild, it.Member.User) {
 			return Inbound{}, false
+		}
+		if it.Data.Kind == 3 {
+			if len(it.Data.Values) == 0 || len(it.Data.Values) > 25 {
+				return Inbound{}, false
+			}
+			for _, v := range it.Data.Values {
+				if len(v) > 100 || strings.Contains(v, ",") {
+					return Inbound{}, false
+				}
+			}
+			return Inbound{Picks: strings.Join(it.Data.Values, ","), Ref: it.Message.Channel + "/" + it.Message.ID, By: it.Member.User.ID}, true
 		}
 		return Inbound{Button: it.Data.Custom, Ref: it.Message.Channel + "/" + it.Message.ID, By: it.Member.User.ID}, true
 	}

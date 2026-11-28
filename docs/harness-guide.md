@@ -46,6 +46,7 @@ stops with the chat.
 | `/agent [name]` | the agent new sessions start with |
 | `/model [name]` | the model of the open session, else new sessions |
 | `/effort [low\|medium]` | the open session's reasoning effort |
+| `/goal [text\|clear]` | pin a goal on the open session; the daemon continues it until the agent ends a reply with `GOAL MET: <evidence>` or `GOAL BLOCKED: <question>`, or a cap (`session.goal_max_turns`, `session.goal_max_cost`) stops it |
 | `/skills` | skills and MCP injected into every session |
 | `/name` or `$name` | run an installed skill on the rest of the line |
 | `/theme [steel\|frost\|plum]` | color theme, shared with the web (`ui.theme`) |

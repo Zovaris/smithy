@@ -37,6 +37,7 @@ const (
 	KindSessionUsage   = "session_usage"
 	KindSessionStatus  = "session_status"
 	KindSessionModel   = "session_model"
+	KindSessionMail    = "session_mail"
 )
 
 const (
@@ -72,6 +73,11 @@ type Session struct {
 	Usage   *usage.Usage `json:"usage,omitempty"`
 	PRs     []string     `json:"prs,omitempty"`
 	Links   []string     `json:"links,omitempty"`
+	Parent  string       `json:"parent,omitempty"`
+	// Goal is pinned by a person (/goal); the daemon continues the session toward it.
+	Goal      string `json:"goal,omitempty"`
+	GoalState string `json:"goal_state,omitempty"`
+	GoalTurns int    `json:"goal_turns,omitempty"`
 }
 
 // ToolEvent is one finished tool call of a session.
@@ -115,6 +121,9 @@ type live struct {
 	stopped  bool
 	lastDiff string
 	links    *SessionLinks
+	mail     []Mail
+	sent     []time.Time
+	goalBase float64
 }
 
 var (
@@ -182,6 +191,10 @@ func (sv *Server) applySession(e store.Event) {
 		if l := sv.sessions[e.Session]; l != nil && json.Unmarshal(e.Data, &c) == nil {
 			l.s.Model, l.s.Effort, l.s.Updated = c.Model, c.Effort, e.Time
 		}
+	case KindSessionGoal:
+		if l := sv.sessions[e.Session]; l != nil {
+			sv.applyGoal(l, e.Data)
+		}
 	case KindSessionStatus:
 		var st struct{ Status, Detail string }
 		if l := sv.sessions[e.Session]; l != nil && json.Unmarshal(e.Data, &st) == nil {
@@ -200,6 +213,8 @@ func (sv *Server) applySession(e store.Event) {
 		}
 	case KindSessionLink, KindSessionLinks:
 		sv.applyLinks(e)
+	case KindSessionMail:
+		sv.applyMailLocked(e)
 	case KindSessionUsage:
 		var u usage.Usage
 		if l := sv.sessions[e.Session]; l != nil && json.Unmarshal(e.Data, &u) == nil {
@@ -274,6 +289,10 @@ func (sv *Server) StartSessionWith(agent, model, dir, msg, by string) (Session, 
 
 // StartSessionEffort is StartSessionWith with an effort for a CLI that takes one ("": agent.effort).
 func (sv *Server) StartSessionEffort(agent, model, effort, dir, msg, by string) (Session, error) {
+	return sv.newSession("", agent, model, effort, dir, msg, by)
+}
+
+func (sv *Server) newSession(parent, agent, model, effort, dir, msg, by string) (Session, error) {
 	if len(msg) > MaxMessage {
 		return Session{}, fmt.Errorf("%w: message over %d bytes", errBadRequest, MaxMessage)
 	}
@@ -331,8 +350,9 @@ func (sv *Server) StartSessionEffort(agent, model, effort, dir, msg, by string) 
 	if es, ok := r.(effortSetter); ok && effort != "" {
 		es.SetEffort(effort)
 	}
+	sv.setBus(r, id)
 	now := time.Now().UTC()
-	s := Session{ID: id, Agent: agent, Model: model, Effort: effort, Dir: d, Title: titleOf(msg), Status: StatusDone, Created: now, Updated: now}
+	s := Session{ID: id, Agent: agent, Model: model, Effort: effort, Dir: d, Title: titleOf(msg), Status: StatusDone, Created: now, Updated: now, Parent: parent}
 	ctx, cancel := context.WithCancel(sv.ctx())
 	l := &live{s: s, runner: r, inbox: make(chan string, MaxQueued), cancel: cancel, done: make(chan struct{})}
 	sv.mu.Lock()
@@ -400,6 +420,7 @@ func (sv *Server) SendSession(id, msg, by string) error {
 		if es, ok := r.(effortSetter); ok && effort != "" {
 			es.SetEffort(effort)
 		}
+		sv.setBus(r, id)
 		sv.mu.Lock()
 		if l.runner == nil || l.stopped {
 			ctx, cancel := context.WithCancel(sv.ctx())
@@ -415,6 +436,7 @@ func (sv *Server) SendSession(id, msg, by string) error {
 }
 
 func (sv *Server) queueLocked(l *live, msg, by string) error {
+	sv.goalResumeLocked(l, by)
 	select {
 	case l.inbox <- msg:
 	default:
@@ -565,6 +587,9 @@ func (sv *Server) runTurn(ctx context.Context, l *live, r Runner, msg string) {
 	if n := len(hist); n > 0 && hist[n-1].Role == "user" && hist[n-1].Text == msg {
 		hist = hist[:n-1]
 	}
+	if l.s.Goal != "" && l.s.GoalState == "" {
+		msg = goalPrompt(l.s.Goal, msg)
+	}
 	sv.mu.Unlock()
 	sv.setStatus(id, StatusWorking, "")
 	e := &emitter{sv: sv, id: id}
@@ -584,7 +609,7 @@ func (sv *Server) runTurn(ctx context.Context, l *live, r Runner, msg string) {
 		sv.setStatus(id, StatusFailed, line1(text.Clean(err.Error()), 300))
 	default:
 		sv.mu.Lock()
-		if len(l.inbox) == 0 {
+		if len(l.inbox) == 0 && !sv.goalNextLocked(l, reply) {
 			sv.setStatusLocked(id, StatusDone, "")
 		}
 		sv.mu.Unlock()
@@ -783,6 +808,17 @@ func (sv *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 	}
 	l.LastAgent, l.LastModel = sv.Defaults()
 	writeJSON(w, 200, l)
+}
+
+func (sv *Server) sessionMail(w http.ResponseWriter, r *http.Request) {
+	sv.mu.Lock()
+	ok := sv.sessions[r.PathValue("id")] != nil
+	sv.mu.Unlock()
+	if !ok {
+		sessionErr(w, errNoSession)
+		return
+	}
+	writeJSON(w, 200, sv.Mail(r.PathValue("id")))
 }
 
 func (sv *Server) getSession(w http.ResponseWriter, r *http.Request) {

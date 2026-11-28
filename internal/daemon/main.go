@@ -26,6 +26,7 @@ import (
 	"github.com/Zovaris/smithy/internal/remote"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/text"
+	"github.com/Zovaris/smithy/internal/workflow"
 )
 
 // Usage is the text for `smithy daemon --help`.
@@ -54,6 +55,8 @@ serve a Tailscale-User-Login listed in daemon.allow; anything else gets 401):
                                  ?dir= keeps the ones started in that folder or below
   POST /v1/sessions/{id}/messages  {"text"}: the next user message (queued behind a turn); 202
   POST /v1/sessions/{id}/stop    cancel the turn; a later message goes on with the history
+  PUT  /v1/sessions/{id}/goal    {"goal"}: pin a goal ("" clears); each turn carries it and the
+                                 daemon sends the next turn until GOAL MET/BLOCKED or a cap
 Session events (session_* kinds, decision_asked for a permission) carry the session id on
 /v1/events. api: agents run in the daemon, so tool calls stream live and a call the auto rules
 refuse becomes a decision (perm:<id>/<n>) until someone answers; other agents run smithy agent
@@ -262,6 +265,8 @@ func foreground(o runOpts) int {
 		api.Links = NewLinker()
 	}
 	go api.Links.Run(tctx, api, 15*time.Second)
+	api.Workflows = api.NewWorkflows(workflow.Store{Dir: workflow.Home()})
+	go api.Workflows.Loop(tctx)
 	conns, cerr := connect.FromConfig()
 	if cerr != nil {
 		fmt.Fprintf(os.Stderr, "%s: chat connectors: %s\n", name, text.Clean(cerr.Error()))
@@ -320,7 +325,7 @@ func foreground(o runOpts) int {
 			}
 			_, _ = api.Append("daemon_up", "", map[string]any{"pid": info.PID, "addr": info.Addr})
 			if o.idle > 0 {
-				busy := func() bool { hb := sv.Heartbeat(); return hb.SessionRunning() }
+				busy := func() bool { hb := sv.Heartbeat(); return hb.SessionRunning() || api.WorkflowsScheduled() }
 				go api.WatchIdle(life, o.idle, 15*time.Second, busy, func() {
 					_, _ = api.Append("log", "", map[string]string{"line": fmt.Sprintf("daemon: idle for %s with no clients and no running work; exiting", o.idle)})
 					quit()
