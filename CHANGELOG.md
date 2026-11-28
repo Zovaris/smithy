@@ -43,6 +43,16 @@ part above `### Details`.
 
 ### Fixed
 
+- Images pasted in the web chat are kept under `~/.smithy/pastes` and removed when the daemon stops; folders left by a crash are cleared after a day.
+- The daemon waits for its background loops before it closes its store on shutdown.
+- A secret request the daemon cannot record is denied at once instead of leaving the agent waiting until it times out.
+- The TUI no longer crashes when you browse or add a project without a running daemon.
+- A daemon that stops answering no longer freezes the TUI: each call gives up after two minutes, and requests from smithy's API client after five.
+- `smithy serve` waits for its last cycle and notification sends before it stops, and a Discord button ack stops when the gateway closes.
+- A crash while sending notifications is now reported with its stack instead of hidden.
+- `smithy doctor --fix` reads its answers from one reader per run.
+- `smithy wait` stops on ctrl+c, even during a timer, with exit code 130.
+- Pricing a model no longer blocks other callers for up to 10 seconds while the daily price list downloads.
 - The web `/theme` lists and accepts all seven themes, and the guide marks `/agents`, `/decisions`, `/bench` and `/settings` as web only.
 - The agents' system prompt is shorter and direct, and no longer names the CLI underneath.
 - A settings command's usage line names only that command, and enter on a command that needs arguments fills it in instead of running it bare. A bare `/set` opens the settings list in the palette.
