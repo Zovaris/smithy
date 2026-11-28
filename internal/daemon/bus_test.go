@@ -165,6 +165,7 @@ func TestBusSurvivesRestart(t *testing.T) {
 	if _, err := sv.BusSend(sv.BusKey(c.ID), "parent", "hello"); err != nil {
 		t.Fatal(err)
 	}
+	waitStatus(t, sv, p.ID, StatusDone)
 	sv2, err := New(sv.st, testToken, nil, nil)
 	if err != nil {
 		t.Fatal(err)
