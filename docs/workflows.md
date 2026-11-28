@@ -1,39 +1,58 @@
-# Workflows
+# Workflows and schedules
 
-The daemon runs workflows: triggers that start them and steps that compose. Each one is a JSON
-file in `~/.smithy/workflows/` (no YAML), and each run is kept with every step's input, output,
-duration and status.
+Two things, kept apart. A **workflow** is a flow of steps you run: one command or one click.
+A **schedule** starts a workflow on its own: a cron line, a webhook, a GitHub event or a file
+change. The schedule names the workflow; the workflow doesn't know it is scheduled. Both are JSON
+files: workflows in `~/.smithy/workflows/`, schedules in `~/.smithy/workflows/schedules/` (no
+YAML). Each run is kept with every step's input, output, duration and status.
 
 ```bash
-smithy workflow example                  # adds dependabot-daily, repo-health, webhook-reply (disabled)
-smithy workflow validate repo-health
-smithy workflow enable repo-health       # after you set "dir" in the file
+smithy workflow example                  # dependabot-daily, repo-health, webhook-reply + their schedules (off)
 smithy workflow run webhook-reply --input message="lunch at 1?"
 smithy workflow history repo-health
-smithy workflow hook webhook-reply       # its URL and token, once enabled
+smithy schedule add nightly --workflow repo-health --cron "0 9 * * 1-5"
+smithy schedule enable nightly           # pins the schedule and its workflow as they are now
+smithy schedule list
+smithy schedule hook webhook-reply       # a webhook schedule's URL and token, once enabled
 ```
 
-The TUI's `/workflows` and the web's Workflows page show the steps as a tree, run one now, turn it
-on or off, show a running workflow live and its past runs step by step, and edit it (the web
-editor validates as you type; the TUI opens the file in your editor).
+In the TUI, `/workflows` lists workflows (r runs one, with its inputs prefilled in the composer
+when it has any; enter shows the live run, the steps and past runs; e opens the file) and tab
+switches to `/schedules` (left/right turns one on or off, enter shows its runs). `/run <workflow>
+[input=value]…` runs one. On the web, the Workflows page has a Run button (with a form for the
+inputs), the live run, history and an editor that validates as you type; the Schedules page turns
+schedules on or off and shows the runs each started.
 
-## Triggers
+## Schedules
 
-- **Manual**: always: `smithy workflow run`, run now in the TUI and web.
-- **Schedule**: `"schedule"`: five cron fields (minute, hour, day, month, weekday; `*`, lists,
-  ranges, `/steps`, `jan`, `sun`) or `@hourly`, `@daily`, `@weekly`, `@monthly`, `@yearly`, in
-  local time. A run missed by under an hour (daemon asleep) still starts; older misses are skipped.
-- **Webhook**: `"webhook": true`. `POST /v1/hooks/workflows/<name>` on the daemon, from this
-  machine only, with header `X-Smithy-Hook: <token>` (`smithy workflow hook <name>`). The JSON
-  body's fields that the workflow declares under `inputs` become its inputs; the response holds
-  the run's `status`, `outputs` and `error` (202 when it runs past two minutes).
+```json
+{"name": "nightly", "workflow": "repo-health", "cron": "0 9 * * 1-5", "inputs": {"since": "1d"}}
+```
 
-## File
+Exactly one trigger:
+
+- `cron`: five fields (minute, hour, day, month, weekday; `*`, lists, ranges, `/steps`, `jan`,
+  `sun`) or `@hourly`, `@daily`, `@weekly`, `@monthly`, `@yearly`, in local time. A run missed by
+  under an hour (daemon asleep) still starts; older misses are skipped.
+- `webhook: true`: `POST /v1/hooks/schedules/<name>` on the daemon, from this machine only, with
+  header `X-Smithy-Hook: <token>` (`smithy schedule hook <name>`). The JSON body's fields that the
+  workflow declares under `inputs` become its inputs; the response holds the run's `status`,
+  `outputs` and `error` (202 when it runs past two minutes).
+- `github`: `{"event": "dependabot_alert"}`, `{"event": "pr_red"}` (a PR's checks failed) or
+  `{"event": "issue_labeled", "label": "bug"}`, read with `gh` in `dir` (the workflow's when
+  empty) every 5 minutes. The first look only notes what is there; each new item after that
+  starts a run with input `event`, a JSON array of `{id, title, url}`.
+- `watch`: a file or folder (no `.git` or `node_modules`, at most 5000 files), looked at every
+  minute. The first look only notes it; a change starts a run with input `changed`, the paths one
+  per line.
+
+`inputs` are passed to the workflow; the trigger's own inputs win.
+
+## Workflows
 
 ```json
 {
   "name": "webhook-reply",
-  "webhook": true,
   "inputs": {"message": ""},
   "vars": {"tone": "brief"},
   "outputs": {"reply": "{{steps.reply.output}}"},
@@ -88,11 +107,14 @@ text (PR bodies, web pages) can be steered, so keep it read-only and its answer 
 
 ## Safety
 
-- Nothing runs on a schedule or webhook until you enable it. Enabling pins the file's hash: a
-  change made outside smithy (a script, a pulled repo file) stops it until you enable it again,
-  and so does saving an edit from the web page. `smithy workflow add <file>` copies a repo's file
-  in, disabled. Run now works on a disabled workflow: you asked for that one run.
-- An unattended run (schedule, webhook) calls only enabled workflows; calls nest at most 3 deep.
+- Nothing starts on its own until you enable a schedule. Enabling pins the schedule file, its
+  workflow and every workflow that one calls: a change to any of them (a script, a pulled repo
+  file, a save from the web editor) turns the schedule off until you enable it again. `smithy
+  workflow add <file>` copies a repo's workflow or schedule in; a schedule lands off. Running a
+  workflow by hand needs no enable: you asked for that one run. Calls nest at most 3 deep.
+- Files from before schedules (a workflow with `schedule` or `webhook`) are moved on first use:
+  the workflow loses those fields and a schedule of the same name gets them, enabled if the
+  workflow was, keeping its webhook token.
 - Shell steps go through the guard (`guard.block`, `guard.allow`). Nobody is there to answer, so a
   blocked command fails the step.
 - Agent steps run read-only through `smithy agent` with the auto profile: the unattended allow-list
@@ -110,4 +132,4 @@ text (PR bodies, web pages) can be steered, so keep it read-only and its answer 
 - Output is capped at 64 KiB per step while it runs.
 - An enabled workflow keeps the background daemon from its idle exit, so its schedule fires.
 - Running, enabling and editing over the API need this machine's daemon token; paired devices
-  can read the list and history only. The webhook takes only its own token, from this machine.
+  can read the lists and history only. A webhook takes only its own token, from this machine.
