@@ -9,6 +9,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -177,5 +179,16 @@ func TestLocalAnswerStaysAsQAOnce(t *testing.T) {
 	m.event("decision_answered", "", time.Now(), a)
 	if out := screen(m); strings.Count(out, "Ship it?") != 1 || !strings.Contains(out, "→ no") {
 		t.Fatalf("want one Q → A block:\n%s", out)
+	}
+}
+
+func TestSidebarShowsLiveLinks(t *testing.T) {
+	m := layoutView(140)
+	m.sessions[0].links = &daemon.SessionLinks{PRs: []ghx.PRLink{{Number: 42, State: "OPEN", Checks: "green", Title: "add health"}}, Issues: []daemon.LinkIssue{{ID: "TK-9", Status: "doing", Title: "health"}}}
+	out := screen(m)
+	for _, want := range []string{"PR #42", "open", "TK-9", "doing"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("sidebar lacks %q:\n%s", want, out)
+		}
 	}
 }

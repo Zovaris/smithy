@@ -210,12 +210,7 @@ func (m chatView) sidebar(h int) []string {
 		rows = append(rows, txt.Render(fmt.Sprintf("$%.2f spent", c)))
 	}
 	rows = append(rows, "", head.Render("Links"))
-	if len(s.prs) == 0 {
-		rows = append(rows, dim.Render("no PRs or issues yet"))
-	}
-	for _, l := range s.prs {
-		rows = append(rows, t.fg(t.info).Render(short(strings.TrimPrefix(l, "https://github.com/"), iw)))
-	}
+	rows = append(rows, m.sideLinks(s, iw)...)
 	out := make([]string, h)
 	bar := t.fg(t.dim).Render("│")
 	if !t.g.unicode {
@@ -292,4 +287,40 @@ func (m *chatView) keepQA(id, answer string) {
 			m.push(chatMsg{who: "daemon", kind: "qa", text: d.Question, ans: answer})
 		}
 	}
+}
+
+// sideLinks is the sidebar's Links block: the live PRs and issues when the daemon sent them,
+// else the PR URLs the session recorded.
+func (m chatView) sideLinks(s chatSession, iw int) []string {
+	t := m.th
+	dim, link := t.fg(t.dim), t.fg(t.info)
+	var rows []string
+	if l := s.links; l != nil {
+		for _, p := range l.PRs {
+			col := t.text
+			switch p.Checks {
+			case "green":
+				col = t.ok
+			case "red":
+				col = t.err
+			}
+			rows = append(rows, link.Render(fmt.Sprintf("PR #%d ", p.Number))+t.fg(col).Render(short(strings.ToLower(p.State), iw)))
+			rows = append(rows, dim.Render(short(p.Title, iw)))
+		}
+		for _, is := range l.Issues {
+			rows = append(rows, link.Render(is.ID+" ")+t.fg(t.text).Render(short(is.Status, iw)))
+			rows = append(rows, dim.Render(short(is.Title, iw)))
+		}
+		if l.Error != "" {
+			rows = append(rows, t.fg(t.err).Render(short(l.Error, iw)))
+		}
+	} else {
+		for _, u := range s.prs {
+			rows = append(rows, link.Render(short(strings.TrimPrefix(u, "https://github.com/"), iw)))
+		}
+	}
+	if len(rows) == 0 {
+		rows = append(rows, dim.Render("no PRs or issues yet"))
+	}
+	return rows
 }
