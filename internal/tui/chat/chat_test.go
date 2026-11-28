@@ -39,7 +39,7 @@ func TestChatInputPinnedFullscreen(t *testing.T) {
 	if len(lines) != m.height {
 		t.Fatalf("got %d lines, want %d", len(lines), m.height)
 	}
-	if !strings.Contains(strings.Join(lines[len(lines)-4:], "\n"), "for commands") || !strings.Contains(lines[len(lines)-1], "enter send") {
+	if !strings.Contains(strings.Join(lines[len(lines)-6:], "\n"), "for commands") || !strings.Contains(lines[len(lines)-1], "enter send") {
 		t.Fatalf("input and footer not pinned at the bottom:\n%s", v.Content)
 	}
 	if !strings.Contains(v.Content, "message 2") {

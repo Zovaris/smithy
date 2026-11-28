@@ -1,6 +1,5 @@
    ◆ smithy dev                                             ? waiting on you   ⠋ 1 running  09:07   
     TK-6   ⠋ TK-29   TES-9   + 
-   ┃ Add usage-limit detection for Pi (TK-6).                                              ✓ 0.0s
    │ 
    │ thinking · Pi's limit errors are typed classes; match their names, not prose.
    │ 
@@ -29,4 +28,5 @@
    ┃ Ask, or / for commands                  
    ┃ 
    ┃ 
+
    enter send   shift+enter newline   ctrl+o mode   tab agents          verbose   ctrl+k palette    

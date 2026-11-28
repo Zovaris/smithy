@@ -129,7 +129,7 @@ func (m chatView) askBox(screen []string, w, h int) []string {
 	tw := m.tw()
 	bw := tw - 2*p
 	bg, sel := on(t.Raised), on(t.Focus)
-	rail := t.Fg(t.Warn).Render(railGlyph(t.G.Unicode))
+	rail := t.Fg(t.Warn).Render(m.railMark(true))
 	row := func(st lipgloss.Style, s string) string { return gut + fill(st, bw, rail+s) + gut }
 	title := t.Fg(t.Warn).Bold(true).Render("Questions")
 	count := t.Fg(t.Dim).Render(fmt.Sprintf("1 of %d  ", len(m.pending)))

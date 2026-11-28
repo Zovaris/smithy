@@ -3,8 +3,10 @@
 package chat
 
 import (
+	"charm.land/lipgloss/v2"
 	"fmt"
 	"image/color"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -75,49 +77,210 @@ func (m chatView) textWidth(w int) int {
 	return max(right-tx-1, 10)
 }
 
-// home is the empty screen of a session with no turns yet, h rows: a third of the way down, the
-// wordmark and version, one line of context (folder, branch, agent, model), then up to five recent
-// sessions numbered so 1-5 opens one. Nothing else; it sits on the transcript's text column.
+// home is the empty screen of a session with no turns yet, h rows, centred both ways: the
+// wordmark rising in on the spring, the repo's pulse as tone chips, the recent sessions as rich
+// rows (title, what was said last, agent and age) and one tip. SMITHY_TUI_HOME=split picks the
+// two-panel variant.
 func (m chatView) home(w, h int) []string {
-	t := m.th
-	var rows []string
-	add := func(s string) { rows = append(rows, m.lane(w, "", "", nil, s, nil)) }
-	add(t.Fg(t.Accent).Bold(true).Render("smithy") + t.Fg(t.Dim).Render("  "+kitVersion()))
-	ctx := []string{projectName(m.dir)}
-	if m.branch != "" {
-		ctx = append(ctx, m.branch)
-	}
-	ctx = append(ctx, nonEmpty(strings.Split(m.agentModel(), " "+t.G.Dot+" ")...)...)
-	add(t.Fg(t.Muted).Render(strings.Join(ctx, " "+t.G.Dot+" ")))
-	add("")
-	rec := m.recent()
-	for i, s := range rec {
-		age := ""
-		if !s.since.IsZero() {
-			age = ago(time.Since(s.since))
-		}
-		add(t.Fg(t.Accent).Render(fmt.Sprint(i+1)) + "  " + padTo(t.Fg(t.Text).Render(kit.Short(tabTitle(s.title), 32)), 34) + t.Fg(t.Dim).Render(strings.Join(nonEmpty(s.agent, age), " "+t.G.Dot+" ")))
-	}
-	if len(rec) == 0 {
-		add(t.Fg(t.Dim).Render("your first message starts a session"))
+	var block []string
+	if os.Getenv("SMITHY_TUI_HOME") == "split" {
+		block = m.homeSplit(min(w-2*m.pad(), 104))
 	} else {
-		add("")
-		keys := fmt.Sprintf("1-%d opens one", len(rec))
-		if len(rec) == 1 {
-			keys = "1 opens it"
-		}
-		add(t.Fg(t.Dim).Render(keys + " " + t.G.Dot + " or type to start a new session"))
+		block = m.homeStack(min(w-2*m.pad(), 76))
+	}
+	bw := 0
+	for _, l := range block {
+		bw = max(bw, ansi.StringWidth(l))
+	}
+	x := max((w-bw)/2, m.pad())
+	top := max((h-len(block))/2, 1)
+	lift := int((1-m.homeIn.pos)*3 + 0.5)
+	if m.homeIn.key == "" || !m.homeIn.moving() {
+		lift = 0
 	}
 	out := make([]string, 0, h)
-	for range max(h/3-2, 1) {
+	for range top + lift {
 		out = append(out, "")
 	}
-	out = append(out, rows...)
+	for _, l := range block {
+		out = append(out, strings.Repeat(" ", x)+l)
+	}
 	if len(out) > h {
 		out = out[:h]
 	}
 	for len(out) < h {
 		out = append(out, "")
+	}
+	return out
+}
+
+// homePulse is the repo at a glance as tone chips: branch, changes, tend and the session count.
+func (m chatView) homePulse() []string {
+	t := m.th
+	var out []string
+	chip := func(label, val string, c color.Color) string {
+		return m.chip(" "+label+" ", t.Muted, t.Overlay, false) + m.chip(" "+val+" ", t.Surface, c, true)
+	}
+	if m.branch != "" {
+		out = append(out, chip("branch", m.branch, t.Accent))
+	}
+	switch {
+	case m.dirty == 0:
+		out = append(out, chip("tree", "clean", t.Ok))
+	case m.dirty > 0:
+		out = append(out, chip("tree", fmt.Sprintf("%d changed", m.dirty), t.Warn))
+	}
+	if m.tendMode != "" {
+		out = append(out, chip("tend", fmt.Sprintf("%s %s %d PR%s", m.tendMode, t.G.Dot, m.tendPRs, plural(m.tendPRs)), t.Info))
+	}
+	return out
+}
+
+// homeRow is one recent session in two lines: its title (with its age when titles repeat) and the
+// last thing said in it, dim; agent and age right-aligned.
+func (m chatView) homeRow(i int, s chatSession, w int, dup bool) []string {
+	t := m.th
+	title := tabTitle(s.title)
+	if title == "" {
+		title = kit.Short(s.id, 8)
+	}
+	age := ""
+	if !s.since.IsZero() {
+		age = ago(time.Since(s.since))
+	}
+	last := m.lastLine(s.id)
+	if dup && last == "" {
+		last = "started " + age
+	}
+	num := m.chip(fmt.Sprintf(" %d ", i+1), t.Surface, t.Accent, true)
+	right := t.Fg(t.Dim).Render(strings.Join(nonEmpty(s.agent, age), " "+t.G.Dot+" "))
+	head := spread(num+"  "+t.Fg(t.Strong).Bold(true).Render(kit.Short(title, w-30)), right, w)
+	rows := []string{head}
+	if last != "" {
+		rows = append(rows, "     "+t.Fg(t.Muted).Render(kit.Short(last, w-6)))
+	}
+	return rows
+}
+
+// lastLine is the last thing said in session id that this chat holds, one line.
+func (m chatView) lastLine(id string) string {
+	msgs := m.convs[id]
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if c := msgs[i]; (c.who == "agent" || c.who == "you") && strings.TrimSpace(c.text) != "" {
+			return strings.Join(strings.Fields(c.text), " ")
+		}
+	}
+	return ""
+}
+
+// homeTip is one key or habit worth knowing, a different one per session count.
+func (m chatView) homeTip() string {
+	t := m.th
+	tips := [][2]string{{"ctrl+k", "every action, session and setting in one place"}, {"!cmd", "runs a shell command here; it stays in the session"},
+		{"esc", "interrupts a turn; enter while it runs queues the next"}, {"/config", "every setting, grouped, ←→ to change"}}
+	tp := tips[len(m.sessions)%len(tips)]
+	return t.Fg(t.Accent).Render(tp[0]) + t.Fg(t.Dim).Render("  "+tp[1])
+}
+
+// homeStack is the stacked variant: one raised panel, the wordmark and context on its top band,
+// the pulse chips, the recent sessions on the focus tone, the tip under it.
+func (m chatView) homeStack(w int) []string {
+	t := m.th
+	panel, deep := on(t.Raised), on(t.Focus)
+	row := func(st lipgloss.Style, s string) string { return fill(st, w, "  "+s) }
+	word := t.Fg(t.Accent).Bold(true).Render("smithy") + t.Fg(t.Dim).Render("  "+kitVersion())
+	ctx := t.Fg(t.Muted).Render(strings.Join(nonEmpty(projectName(m.dir), m.agentModel()), " "+t.G.Dot+" "))
+	out := []string{row(panel, ""), row(panel, spread(word, ctx+"  ", w-2)), row(panel, "")}
+	if p := m.homePulse(); len(p) > 0 {
+		out = append(out, row(panel, strings.Join(p, panel.Render("  "))), row(panel, ""))
+	}
+	rec := m.recent()
+	dup := dupTitles(rec)
+	if len(rec) == 0 {
+		out = append(out, row(deep, ""), row(deep, t.Fg(t.Text).Render("Your first message starts a session here.")), row(deep, ""))
+	} else {
+		out = append(out, row(deep, ""))
+		for i, s := range rec {
+			for _, l := range m.homeRow(i, s, w-4, dup[s.title]) {
+				out = append(out, row(deep, l))
+			}
+			out = append(out, row(deep, ""))
+		}
+	}
+	out = append(out, row(panel, ""), row(panel, m.homeTip()), row(panel, ""))
+	return out
+}
+
+// homeSplit is the two-panel variant: a narrow overlay-toned column with the wordmark and the
+// repo's pulse stacked as tiles, beside a raised column of recent sessions; the tip below both.
+func (m chatView) homeSplit(w int) []string {
+	t := m.th
+	lw := 30
+	rw := w - lw - 2
+	left, right := on(t.Overlay), on(t.Raised)
+	var l []string
+	addL := func(s string) { l = append(l, fill(left, lw, "  "+s)) }
+	addL("")
+	addL(t.Fg(t.Accent).Bold(true).Render("smithy") + t.Fg(t.Dim).Render("  "+kitVersion()))
+	addL(t.Fg(t.Muted).Render(kit.Short(projectName(m.dir), lw-4)))
+	addL("")
+	tile := func(label, val string, c color.Color) {
+		addL(t.Fg(t.Dim).Render(label))
+		addL(t.Fg(c).Bold(true).Render(kit.Short(val, lw-4)))
+		addL("")
+	}
+	if m.branch != "" {
+		tile("branch", m.branch, t.Accent)
+	}
+	switch {
+	case m.dirty == 0:
+		tile("working tree", "clean", t.Ok)
+	case m.dirty > 0:
+		tile("working tree", fmt.Sprintf("%d changed", m.dirty), t.Warn)
+	}
+	if m.tendMode != "" {
+		tile("tend", fmt.Sprintf("%s %s %d PR%s", m.tendMode, t.G.Dot, m.tendPRs, plural(m.tendPRs)), t.Info)
+	}
+	tile("agent", m.agentModel(), t.Text)
+	var r []string
+	addR := func(s string) { r = append(r, fill(right, rw, "  "+s)) }
+	addR("")
+	addR(t.Fg(t.Strong).Bold(true).Render("Pick up where you left off"))
+	addR("")
+	rec := m.recent()
+	dup := dupTitles(rec)
+	for i, s := range rec {
+		for _, x := range m.homeRow(i, s, rw-4, dup[s.title]) {
+			addR(x)
+		}
+		addR("")
+	}
+	if len(rec) == 0 {
+		addR(t.Fg(t.Text).Render("Nothing here yet: your first message starts a session."))
+		addR("")
+	}
+	for len(l) < len(r) {
+		addL("")
+	}
+	for len(r) < len(l) {
+		addR("")
+	}
+	out := make([]string, len(l))
+	for i := range l {
+		out[i] = l[i] + "  " + r[i]
+	}
+	return append(out, "", "  "+m.homeTip())
+}
+
+// dupTitles marks the titles more than one recent session shares.
+func dupTitles(ss []chatSession) map[string]bool {
+	n := map[string]int{}
+	for _, s := range ss {
+		n[s.title]++
+	}
+	out := map[string]bool{}
+	for k, v := range n {
+		out[k] = v > 1
 	}
 	return out
 }
@@ -147,9 +310,6 @@ func kitVersion() string {
 	}
 	return kit.Version
 }
-
-// padTo pads s with spaces to n cells.
-func padTo(s string, n int) string { return s + strings.Repeat(" ", max(n-ansi.StringWidth(s), 0)) }
 
 // fresh reports whether the open session has nothing but notes yet, so the empty screen shows.
 func (m chatView) fresh() bool {

@@ -22,11 +22,11 @@
                                                                                               
          Sessions                                                                             
          ✓  TK-6  done                                                                        
-         ▪  TK-29  running                                                                    
-         ✗  TES-9  failed                                                                     477   
-                                                                                              
-   ┃     Settings                                                                             
-   ┃ A   ·  chat.mode  ‹ minimal ›  how much of each turn the transcript shows                
-   ┃     ·  daemon  http://127.0.0.1:7477                                                     
+         ▪  TK-29  running                                                                    477   
+         ✗  TES-9  failed                                                                     
    ┃                                                                                          
+   ┃ A   Settings                                                                             
+   ┃     ·  chat.mode  ‹ minimal ›  how much of each turn the transcript shows                
+   ┃     ·  daemon  http://127.0.0.1:7477                                                     
+                                                                                              
    ent  ↑↓ move   enter run   tab next group                                    17 results    te    

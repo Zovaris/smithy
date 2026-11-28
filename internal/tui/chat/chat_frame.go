@@ -25,7 +25,7 @@ func frameTick() tea.Cmd {
 
 // animating reports whether anything on screen moves: a session working or a tool running.
 func (m chatView) animating() bool {
-	if m.welcome != welcomeOff || m.shimmer > 0 || m.mo.moving() || m.vb.moving() {
+	if m.welcome != welcomeOff || m.shimmer > 0 || m.mo.moving() || m.vb.moving() || m.homeIn.moving() && m.fresh() {
 		return true
 	}
 	for _, s := range m.sessions {

@@ -2,7 +2,7 @@
     TK-6   ⠋ TK-29   TES-9   + 
      
      new session
-     started 23:51
+     started 00:02
      
    ┃ Add usage-limit detection for Pi (TK-6).                                              ✓ 0.0s
    │ 
@@ -22,11 +22,11 @@
 
 
 
-
                                                               ▪ connecting  http://127.0.0.1:7477   
 
    ┃ 
    ┃ Ask, or / for commands                  
    ┃ 
    ┃ 
+
    enter send   shift+enter newline   ctrl+o mode   tab agents          minimal   ctrl+k palette    

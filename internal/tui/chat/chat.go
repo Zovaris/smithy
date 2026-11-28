@@ -178,6 +178,8 @@ type chatView struct {
 	usage     *events.Report   // /usage's report, nil while it loads
 	cfgAdv    bool             // /config shows its Advanced settings
 	evAt      time.Time        // when the event being applied happened
+	dirty     int              // files changed in the folder's repo, -1 outside one
+	homeIn    valueBump        // the empty screen's entrance
 
 	server      string                    // the saved server name, local or URL this chat talks to
 	picker      *connectPicker            // /connect's state while its box is open
@@ -473,6 +475,8 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	m.dir, _ = os.Getwd()
 	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
+	m.dirty = gitDirty(m.dir)
+	m.homeIn = valueBump{key: "home", still: m.still}.start()
 	m.effort = config.Get("agent.effort", "medium")
 	if tok != "" {
 		m.webURL = url + "/#token=" + neturl.QueryEscape(tok)
@@ -578,7 +582,7 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case chatFrameMsg:
 		m.frame++
-		m.mo, m.vb = m.mo.step(), m.vb.step()
+		m.mo, m.vb, m.homeIn = m.mo.step(), m.vb.step(), m.homeIn.step()
 		m.shimmer = max(m.shimmer-1, 0)
 		for i := max(len(m.msgs)-8, 0); i < len(m.msgs); i++ {
 			if c := m.msgs[i]; c.tool != nil && c.tool.Status == "running" {
@@ -847,7 +851,7 @@ func eventText(kind, session string, data json.RawMessage) string {
 // line and the gap under it, the composer, the footer and the spinner row while the open
 // session works.
 func (m chatView) rows() int {
-	n := m.height - headRows - 1 - m.input.Height() - 4
+	n := m.height - headRows - 1 - m.input.Height() - 5
 	if strings.TrimSpace(ansi.Strip(m.statusLine(m.tw()))) != "" {
 		n--
 	}
@@ -1059,6 +1063,7 @@ func (m chatView) View() tea.View {
 		body = append(body, "")
 	}
 	body = append(body, m.composer(m.tw())...)
+	body = append(body, "")
 	out = append(out, m.besideSide(body)...)
 	out = append(out, m.footer(w))
 	if m.welcome != welcomeOff {
@@ -1207,4 +1212,16 @@ const daemonCallTimeout = 2 * time.Minute
 // daemonCtx is the context for one daemon call made from a command.
 func daemonCtx() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), daemonCallTimeout)
+}
+
+// gitDirty is how many files git reports changed in dir, -1 outside a repo.
+func gitDirty(dir string) int {
+	out, err := exec.Command("git", "-C", dir, "status", "--porcelain").Output()
+	if err != nil {
+		return -1
+	}
+	if s := strings.TrimSpace(string(out)); s != "" {
+		return len(strings.Split(s, "\n"))
+	}
+	return 0
 }
