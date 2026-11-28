@@ -41,7 +41,11 @@ function Control({ r, onSaved }: { r: SettingRow; onSaved: (msg: string) => void
         <span class="mono t3">{r.value || "unset"} · set it under API keys</span>
       ) : (
         <form onSubmit={(e) => (e.preventDefault(), save(v))} style="display:flex;gap:6px">
-          <input id={id} type={c === "number" ? "number" : "text"} value={v} placeholder={r.default} onInput={(e) => setV(e.currentTarget.value)} spellcheck={false} />
+          {c === "number" ? (
+            <input id={id} type="number" value={v} placeholder={r.default} onInput={(e) => setV(e.currentTarget.value)} spellcheck={false} />
+          ) : (
+            <input id={id} type="text" value={v} placeholder={r.default} onInput={(e) => setV(e.currentTarget.value)} spellcheck={false} />
+          )}
           {v !== r.value && <button class="btn sm" type="submit">Save</button>}
         </form>
       )}
