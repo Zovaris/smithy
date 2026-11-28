@@ -155,6 +155,17 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   posts decisions with one button per option, and records a reply in that thread as the
   session's input. It only listens to the users in `connect.<name>.users`; unset, it only sends.
   Setup per chat app: [settings](settings.md).
+- Two places per chat app: `connect.<name>.notify` is the notifications channel (alerts and
+  decisions only; the old single key still works) and `connect.<name>.chat` the chat channel. A
+  new message in the chat channel starts a session (default agent, default project) in a thread
+  of its own: a Slack thread on that message, a Discord thread on it, a Telegram forum topic
+  (or the topic you wrote in). Replies there continue the session, and when its turn ends the
+  answer comes back in the thread, split into chunks for long answers. Only users in
+  `connect.<name>.users` start or steer anything; a message from anyone else is ignored.
+  `/channels` in the TUI shows both places, and `/channels test` (or Settings → Chat channels →
+  Send test on the web) sends a test message to each.
+- The ask tool's questions arrive with one button per option; reply to the message (in Slack, in
+  its thread) to answer in your own words instead.
 - `idea:` intake: write `idea: <what you want>` in the main Telegram chat and smithy plans it and
   posts the plan back. Nothing runs without your yes; on yes the tasks land on the board with the
   `intake` label and wait there for your review.

@@ -699,6 +699,9 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.openAsk()
 				return m, nil
 			}
+			if o, ok := m.refineOption(t); ok && len(m.images) == 0 {
+				return m.refineAct(o)
+			}
 			if t == "?" && len(m.images) == 0 {
 				m.overlay, m.pal = overlayHelp, palette{}
 				return m, nil
@@ -766,6 +769,9 @@ func eventText(kind, session string, data json.RawMessage) string {
 func (m chatView) rows() int {
 	n := m.height - headRows - 2 - m.input.Height() - 1
 	if m.working() {
+		n -= 2
+	}
+	if m.refined() != "" {
 		n -= 2
 	}
 	return max(n, 1)
@@ -932,6 +938,10 @@ func (m chatView) View() tea.View {
 	body = append(body, vis...)
 	if m.working() {
 		body = append(body, m.spinRow(w), "")
+	}
+	if m.refined() != "" {
+		r, _ := m.refineRow(w)
+		body = append(body, r, "")
 	}
 	if items := m.popup(); len(items) > 0 {
 		pw := min(w-2*m.pad(), 72)

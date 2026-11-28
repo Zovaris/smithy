@@ -45,6 +45,7 @@ var slashCommands = []slashCommand{
 	{"key", "rm <service>", "remove a stored API key"},
 	{"prompt", "", "the system prompt file (~/.smithy/prompt.md) and whether it replaces the default"},
 	{"doctor", "", "run smithy doctor on the daemon's machine"},
+	{"channels", "[test]", "chat connectors' notifications and chat channels; test sends a test message to each"},
 	{"board", "[task dir]", "the task files by status: move, filter by task dir, open a file or its PR"},
 	{"tend", "", "the batch PRs the daemon keeps green, and what it is doing on each"},
 	{"detach", "", "quit and leave the daemon running"},

@@ -112,6 +112,7 @@ More options: [docs/install.md](docs/install.md).
 | [scout](skills/scout/README.md) | Read-only answers with sources |
 | [hush](skills/hush/README.md) | Does the task with no talk |
 | [simple](skills/simple/README.md) | Short, plain replies |
+| [refine](skills/refine/README.md) | Turns a rough prompt into a structured one (you run it: `/refine`) |
 
 ## Autonomous mode
 

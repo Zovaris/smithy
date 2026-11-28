@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { removeKey, unsetSetting } from "./actions";
+import { connectTest, removeKey, unsetSetting } from "./actions";
 
 // daemonLike answers as the daemon's sameOrigin does: a body must be JSON, a body-less DELETE needs no type.
 function daemonLike(calls: { method: string; url: string }[]) {
@@ -24,5 +24,14 @@ describe("removing a key and resetting a setting", () => {
       { method: "DELETE", url: "/v1/keys/linear" },
       { method: "DELETE", url: "/v1/settings/linear.team" },
     ]);
+  });
+});
+
+describe("the chat channels test-send", () => {
+  it("posts a JSON body to /v1/connect/test", async () => {
+    const calls: { method: string; url: string }[] = [];
+    vi.stubGlobal("fetch", daemonLike(calls));
+    await connectTest();
+    expect(calls).toEqual([{ method: "POST", url: "/v1/connect/test" }]);
   });
 });

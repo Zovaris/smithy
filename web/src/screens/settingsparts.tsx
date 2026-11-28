@@ -11,7 +11,7 @@ import "@zovaris/sephiro/css/settings-list.css";
 import "@zovaris/sephiro/css/toggle.css";
 import "./settings.css";
 import { useEffect, useState } from "preact/hooks";
-import { addServer, loadSettings, removeKey, removeServer, runDoctor, setKey, setServe, setSetting, type Settings, unsetSetting } from "../lib/actions";
+import { addServer, connectTest, loadSettings, removeKey, removeServer, runDoctor, setKey, setServe, setSetting, type Settings, unsetSetting } from "../lib/actions";
 import { api, currentServer, pickServer } from "../lib/auth";
 import { controlOf, groupSettings, type SettingRow } from "../lib/parity";
 import { statusLine, useServers } from "../components/servers";
@@ -143,6 +143,13 @@ export function More() {
   const [msg, setMsg] = useState("");
   const [doc, setDoc] = useState<string[] | null>(null);
   const [docBusy, setDocBusy] = useState(false);
+  const [sent, setSent] = useState<string[] | null>(null);
+  const [sendBusy, setSendBusy] = useState(false);
+  const testSend = async () => {
+    setSendBusy(true);
+    setSent(await connectTest().then((r) => [...r.results, ...(r.error ? [r.error] : [])], (x) => ["test: " + err(x)]));
+    setSendBusy(false);
+  };
   const [theme, setTheme] = useState<ThemeName>("steel");
   const load = () => loadSettings().then((x) => (setSt(x), setTheme(themeOf(x))), (x) => setE(err(x)));
   useEffect(() => void load(), []);
@@ -199,6 +206,13 @@ export function More() {
               })),
             }))}
           />
+          <div id="set-channels">
+            <div class="lbl">Chat channels</div>
+            <div class="card">
+              <div class="kv"><span>A test message to each connector's notifications and chat channel (connect.*.notify, connect.*.chat)</span><span class="sp" /><button class="btn sm" disabled={sendBusy} onClick={testSend}>{sendBusy ? "Sending…" : "Send test"}</button></div>
+              {sent && <pre class="out" style="margin:0 12px 12px">{sent.join("\n")}</pre>}
+            </div>
+          </div>
           <div id="set-doctor">
             <div class="lbl">Doctor</div>
             <div class="card">

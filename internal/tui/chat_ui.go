@@ -338,7 +338,7 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.detach()
 	case "board", "tasks":
 		return m.openBoard(arg)
-	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "prompt":
+	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "prompt", "channels":
 		return m.settingsCommand(name, arg)
 	case "quit":
 		return m, tea.Quit
@@ -392,6 +392,13 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	switch {
 	case m.overlay != overlayNone:
 		return m, nil
+	case msg.Y == head+m.rows() && m.refined() != "" && !m.working():
+		_, hits := m.refineRow(max(m.width, 20))
+		for _, h := range hits {
+			if msg.X >= h.x0 && msg.X < h.x1 {
+				return m.refineAct(h.option)
+			}
+		}
 	case msg.Y >= inputY && msg.Y < m.height-1:
 		m.setFocus(-1)
 	case msg.Y >= head && msg.Y < head+m.rows():
