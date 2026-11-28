@@ -13,10 +13,13 @@
   placeholder page. The CI `web` job runs tests, typecheck, `bun check` (type check), Oxlint
   (`npm run lint`, warnings fail) and the size budget; run `bun check` and `npm run lint` in `web/`
   to check locally.
-- Pull requests run `check` (gofmt, vet, golangci-lint, `bun check` and Oxlint on `web/`, `go test`, every offline test through the binary; a
-  Markdown- or `docs/`-only change skips the Go tests, and the build per release target, the demo and the
-  Windows launcher run only for pull requests into `main`). A `v*` tag runs `release`: it checks the tag matches
-  `shared/VERSION`, builds darwin, linux (arm64, amd64) and windows binaries, skills and harness builds each, gzips them,
+- Pull requests run `check`, the one gate, as two jobs on 2 vCPU runners: `go` (gofmt, vet,
+  golangci-lint, `go test` in both builds, every offline test through the binary) and `web`
+  (`bun check`, Oxlint, tests and the size budget). A Markdown- or `docs/`-only change skips the
+  Go tests, `web` runs only when `web/` changes, drafts run nothing, and the build per release
+  target, the demo and the Windows launcher run only for pull requests into `main` and pushes to
+  `main`. A `v*` tag runs `release`: it checks the tag matches
+  `shared/VERSION`, builds one binary per platform (darwin, linux arm64 and amd64, windows), gzips them,
   writes `checksums.txt`, attests the build and publishes the GitHub release with the
   CHANGELOG section's plain notes (everything above `### Details`) as notes.
 - `shared/` holds the launcher (`smithy`, `smithy.cmd`) and `VERSION`; edit them there and run
@@ -38,6 +41,9 @@
   `windows-launcher`; no direct pushes, force-pushes or deletion. A release is a PR that bumps
   `shared/VERSION` and the CHANGELOG, then a `v*` tag on the merged commit.
 - Pull requests follow `.github/pull_request_template.md`.
+- Dependabot (`.github/dependabot.yml`) opens one weekly PR per ecosystem (Go modules, `web/`
+  packages, GitHub Actions) for minor and patch updates, and a separate PR for each major. They
+  pass the same `check`; keep `charm.land` on its latest release.
 
 Commits are atomic and conventional (`smithy commit style` shows the rules); every change lands under
 **Unreleased** in [CHANGELOG.md](CHANGELOG.md) first: a plain line for people under `### Highlights`,
