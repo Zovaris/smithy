@@ -61,6 +61,17 @@ func Detect(log, kind string, rc int, now time.Time) (until time.Time, ok bool) 
 		re := map[string]*regexp.Regexp{"opencode": opencodeLimitRe, "pi": piLimitRe}[kind]
 		for i := len(lines) - 1; i >= 0 && i >= len(lines)-5; i-- {
 			l := strings.TrimSpace(ansiRe.ReplaceAllString(lines[i], ""))
+			if kind == "opencode" {
+				if msg, retry, isErr := opencodeEvent(l); isErr {
+					if !opencodeLimitRe.MatchString("error: " + msg) {
+						continue
+					}
+					if retry > 0 {
+						return now.Add(retry), true
+					}
+					return Reset(msg, now), true
+				}
+			}
 			if !re.MatchString(l) {
 				continue
 			}
@@ -78,6 +89,21 @@ func Detect(log, kind string, rc int, now time.Time) (until time.Time, ok bool) 
 		}
 	}
 	return
+}
+
+// opencodeEvent reads a `--format json` error event: its message and retryAfterMs.
+func opencodeEvent(line string) (msg string, retry time.Duration, ok bool) {
+	var ev struct {
+		Type  string `json:"type"`
+		Error struct {
+			Message      string `json:"message"`
+			RetryAfterMs int64  `json:"retryAfterMs"`
+		} `json:"error"`
+	}
+	if !strings.HasPrefix(line, "{") || json.Unmarshal([]byte(line), &ev) != nil || ev.Type != "error" {
+		return "", 0, false
+	}
+	return ev.Error.Message, time.Duration(ev.Error.RetryAfterMs) * time.Millisecond, true
 }
 
 func claudeError(line string) (string, bool) {

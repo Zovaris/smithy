@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/Zovaris/smithy/internal/usage"
 )
@@ -67,7 +68,8 @@ func (o *opencodeStream) line(l []byte, e Emit) bool {
 		Type  string       `json:"type"`
 		Part  opencodePart `json:"part"`
 		Error struct {
-			Message string `json:"message"`
+			Message      string `json:"message"`
+			RetryAfterMs int64  `json:"retryAfterMs"`
 		} `json:"error"`
 	}
 	if json.Unmarshal(l, &ev) != nil || ev.Type == "" {
@@ -77,6 +79,9 @@ func (o *opencodeStream) line(l []byte, e Emit) bool {
 	switch ev.Type {
 	case "error":
 		o.err = strings.TrimSpace(ev.Error.Message)
+		if d := time.Duration(ev.Error.RetryAfterMs) * time.Millisecond; d >= time.Minute && o.err != "" {
+			o.err += fmt.Sprintf(" (retry in ~%dh %dm)", int(d.Hours()), int(d.Minutes())%60)
+		}
 	case "text":
 		if strings.TrimSpace(p.Text) != "" {
 			o.texts = append(o.texts, p.Text)

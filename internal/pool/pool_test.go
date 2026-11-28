@@ -274,6 +274,11 @@ func TestDetectOpenCodePi(t *testing.T) {
 		// sst/opencode@63f2ac53 packages/core/src/plugin/provider/claude-agent/language-model/claude-agent-error.ts:40-42.
 		{"opencode", "Error: Claude Code subscription limit reached (five hour). Resets at 2026-11-24T17:00:00.000Z.\n", 1, true, time.Date(2026, 11, 24, 17, 0, 0, 0, time.UTC)},
 		{"opencode", "Error: OpenCode Go usage limit reached.\n", 0, false, time.Time{}},
+		// `opencode run --format json` prints the error as a stdout event, with retryAfterMs.
+		{"opencode", `{"type":"error","timestamp":1,"sessionID":"s","error":{"type":"provider.free-limit","message":"Free usage limit reached. Connect a provider or subscribe to OpenCode Go to keep going, or switch models.","status":429,"retryAfterMs":3600000}}` + "\n", 1, true, now.Add(time.Hour)},
+		{"opencode", `{"type":"error","error":{"type":"provider.free-limit","message":"Free usage limit reached."}}` + "\n", 1, true, now.Add(DefaultLimit)},
+		{"opencode", `{"type":"error","error":{"message":"Free usage limit reached."}}` + "\n", 0, false, time.Time{}},
+		{"opencode", `{"type":"error","error":{"message":"Session failed"}}` + "\n", 1, false, time.Time{}},
 		{"opencode", "I explained the usage limit reached message\nError: Session failed\n", 1, false, time.Time{}},
 		// badlogic/pi-mono@642a705e packages/coding-agent/src/modes/print-mode.ts:151-153 prints the
 		// provider's errorMessage on stderr and exits 1; packages/ai/src/utils/retry.ts:7-34 lists the
