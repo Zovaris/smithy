@@ -5,6 +5,7 @@ vi.mock("../../lib/actions", () => ({
   setSetting: async (k: string, v: string) => void calls.push("set " + k + " " + v),
   unsetSetting: async (k: string) => void calls.push("unset " + k),
   setSessionModel: async (id: string, m: string, e: string) => void calls.push("session " + id + " " + m + " " + e),
+  setSessionGoal: async (id: string, g: string) => void calls.push("goal " + id + " " + g),
 }));
 vi.mock("../../lib/router", () => ({ go: (r: { name: string }) => void calls.push("go " + r.name) }));
 
@@ -60,5 +61,29 @@ describe("/effort", () => {
     const { c, out } = ctx({ id: "s-2", agent: "opencode" });
     run("effort", "low", c);
     expect(out.note).toBe("opencode keeps its own effort; /effort works for claude and codex");
+  });
+});
+
+describe("/goal", () => {
+  beforeEach(() => void (calls.length = 0));
+  it("pins a goal on the open session, shows it, and clears it", async () => {
+    const { c, out } = ctx({ id: "s-1", agent: "claude" });
+    run("goal", "make the tests pass", c);
+    await tick();
+    expect(calls).toEqual(["goal s-1 make the tests pass"]);
+    expect(out.note).toBe("goal set: make the tests pass");
+    const shown = ctx({ id: "s-1", agent: "claude", goal: "ship it", goal_state: "met" } as never);
+    run("goal", "", shown.c);
+    expect(shown.out.note).toBe("goal met: ship it");
+    run("goal", "clear", c);
+    await tick();
+    expect(calls[1]).toBe("goal s-1 ");
+    expect(out.note).toBe("goal cleared");
+  });
+  it("needs an open session", () => {
+    const { c, out } = ctx();
+    run("goal", "x", c);
+    expect(calls).toEqual([]);
+    expect(out.note).toContain("open a session");
   });
 });

@@ -145,6 +145,9 @@ func (m chatView) setupUpdate(msg tea.Msg) (chatView, tea.Cmd, bool) {
 			return n, tea.Batch(cmd, n.loadSetup(false)), true
 		}
 		return m, m.loadSetup(false), true
+	case sessionGoalSetMsg:
+		m.sessionGoalSet(msg)
+		return m, nil, true
 	case sessionModelSetMsg:
 		m.sessionModelSet(msg)
 		return m, nil, true

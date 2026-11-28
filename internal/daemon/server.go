@@ -85,6 +85,9 @@ type Server struct {
 	BenchDir string
 	// BenchRun, when set, replaces running `smithy <args>` for a web-started bench run (tests).
 	BenchRun func(args []string) error
+	// GoalMaxTurns and GoalMaxCost cap a goal's continued turns and USD; 0: the session.goal_* settings.
+	GoalMaxTurns int
+	GoalMaxCost  float64
 	// Runners makes each session's runner; nil: DefaultRunner.
 	Runners RunnerFor
 	// Version is the daemon binary's version, reported in State so a client can warn on a mismatch.
@@ -167,7 +170,7 @@ func (sv *Server) apply(e store.Event) {
 		}
 	case KindIntake:
 		sv.applyIntake(e.Data)
-	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool, KindSessionMail:
+	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool, KindSessionMail, KindSessionGoal:
 		sv.applySession(e)
 	case KindRouted:
 		var r struct{ ID string }
@@ -345,6 +348,7 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("POST /v1/bus/send", sv.busSend)
 	mux.HandleFunc("GET /v1/bus/inbox", sv.busInbox)
 	mux.HandleFunc("POST /v1/bus/start", sv.busStart)
+	mux.HandleFunc("PUT /v1/sessions/{id}/goal", sv.setSessionGoal)
 	mux.HandleFunc("GET /v1/projects", sv.listProjects)
 	mux.HandleFunc("POST /v1/projects", sv.addProject)
 	mux.HandleFunc("DELETE /v1/projects", sv.removeProject)

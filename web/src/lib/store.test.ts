@@ -24,6 +24,15 @@ describe("fold", () => {
     expect(s.log.length).toBe(200);
     expect(s.log[199]).toBe("daemon: 204");
   });
+  it("pins a session's goal and notes each change in the conversation", () => {
+    const s = run(started(), ev("session_goal", { goal: "ship it" }), ev("session_goal", { goal: "ship it", state: "met", turns: 2 }));
+    expect([s.sessions["s-1"].goal, s.sessions["s-1"].goal_state]).toEqual(["ship it", "met"]);
+    const said = (st: Store) => st.convo["s-1"].flatMap((i) => (i.kind === "agent" ? i.parts : [])).map((p) => (p.kind === "text" ? p.text.trim() : ""));
+    expect(said(s)).toEqual(["goal set: ship it", "goal met"]);
+    const c = run(started(), ev("session_goal", { goal: "x" }), ev("session_goal", { goal: "" }));
+    expect(c.sessions["s-1"].goal).toBe("");
+    expect(said(c)).toEqual(["goal set: x", "goal cleared"]);
+  });
   it("keeps a session's model and effort when /model or /effort changes them", () => {
     const s = run(started(), ev("session_model", { model: "opus", effort: "low" }));
     expect([s.sessions["s-1"].model, s.sessions["s-1"].effort]).toEqual(["opus", "low"]);

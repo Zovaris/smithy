@@ -73,6 +73,10 @@ type Session struct {
 	Usage   *usage.Usage `json:"usage,omitempty"`
 	PRs     []string     `json:"prs,omitempty"`
 	Parent  string       `json:"parent,omitempty"`
+	// Goal is pinned by a person (/goal); the daemon continues the session toward it.
+	Goal      string `json:"goal,omitempty"`
+	GoalState string `json:"goal_state,omitempty"`
+	GoalTurns int    `json:"goal_turns,omitempty"`
 }
 
 // ToolEvent is one finished tool call of a session.
@@ -117,6 +121,7 @@ type live struct {
 	lastDiff string
 	mail     []Mail
 	sent     []time.Time
+	goalBase float64
 }
 
 var (
@@ -183,6 +188,10 @@ func (sv *Server) applySession(e store.Event) {
 		var c struct{ Model, Effort string }
 		if l := sv.sessions[e.Session]; l != nil && json.Unmarshal(e.Data, &c) == nil {
 			l.s.Model, l.s.Effort, l.s.Updated = c.Model, c.Effort, e.Time
+		}
+	case KindSessionGoal:
+		if l := sv.sessions[e.Session]; l != nil {
+			sv.applyGoal(l, e.Data)
 		}
 	case KindSessionStatus:
 		var st struct{ Status, Detail string }
@@ -423,6 +432,7 @@ func (sv *Server) SendSession(id, msg, by string) error {
 }
 
 func (sv *Server) queueLocked(l *live, msg, by string) error {
+	sv.goalResumeLocked(l, by)
 	select {
 	case l.inbox <- msg:
 	default:
@@ -573,6 +583,9 @@ func (sv *Server) runTurn(ctx context.Context, l *live, r Runner, msg string) {
 	if n := len(hist); n > 0 && hist[n-1].Role == "user" && hist[n-1].Text == msg {
 		hist = hist[:n-1]
 	}
+	if l.s.Goal != "" && l.s.GoalState == "" {
+		msg = goalPrompt(l.s.Goal, msg)
+	}
 	sv.mu.Unlock()
 	sv.setStatus(id, StatusWorking, "")
 	e := &emitter{sv: sv, id: id}
@@ -592,7 +605,7 @@ func (sv *Server) runTurn(ctx context.Context, l *live, r Runner, msg string) {
 		sv.setStatus(id, StatusFailed, line1(text.Clean(err.Error()), 300))
 	default:
 		sv.mu.Lock()
-		if len(l.inbox) == 0 {
+		if len(l.inbox) == 0 && !sv.goalNextLocked(l, reply) {
 			sv.setStatusLocked(id, StatusDone, "")
 		}
 		sv.mu.Unlock()

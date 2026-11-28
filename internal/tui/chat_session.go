@@ -135,6 +135,11 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 		if json.Unmarshal(data, &s) == nil {
 			m.meta(id, s)
 		}
+	case daemon.KindSessionGoal:
+		var g struct{ Goal, State string }
+		if json.Unmarshal(data, &g) == nil {
+			m.goalSeen(id, g.Goal, g.State)
+		}
 	case daemon.KindSessionStatus:
 		var d struct{ Status, Detail string }
 		if json.Unmarshal(data, &d) == nil {
@@ -241,6 +246,7 @@ func (m *chatView) meta(id string, s daemon.Session) {
 			if s.Parent != "" {
 				m.sessions[i].parent = s.Parent
 			}
+			m.sessions[i].goal, m.sessions[i].goalState = s.Goal, s.GoalState
 			if !s.Created.IsZero() {
 				m.sessions[i].since = s.Created
 			}
