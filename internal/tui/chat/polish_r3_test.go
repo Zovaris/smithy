@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 
@@ -119,5 +120,53 @@ func TestSidebarEndsWithTheInputBand(t *testing.T) {
 	}
 	if !strings.Contains(lines[foot-2], "smithy stop ends it") {
 		t.Fatalf("the sidebar's last row sits beside the input band's last row:\n%s", strings.Join(lines[foot-4:], "\n"))
+	}
+}
+
+// chipAt is the middle of the last s on screen.
+func chipAt(t *testing.T, m chatView, s string) (int, int) {
+	t.Helper()
+	lines := strings.Split(screen(m), "\n")
+	for y := len(lines) - 1; y >= 0; y-- {
+		if i := strings.LastIndex(lines[y], s); i >= 0 {
+			return ansi.StringWidth(lines[y][:i]) + ansi.StringWidth(s)/2, y
+		}
+	}
+	t.Fatalf("%q not on screen:\n%s", s, screen(m))
+	return 0, 0
+}
+
+func clickOn(t *testing.T, m chatView, s string) (chatView, tea.Cmd) {
+	t.Helper()
+	x, y := chipAt(t, m, s)
+	n, cmd := m.click(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	return n.(chatView), cmd
+}
+
+func TestChipsThatLookLikeButtonsAct(t *testing.T) {
+	m := newChatScene()
+	m.width, m.height = 140, 40
+	if n, _ := clickOn(t, m, "ctrl+k palette"); n.overlay != overlayPalette {
+		t.Fatalf("the palette chip opens the palette: %v", n.overlay)
+	}
+	if n, _ := clickOn(t, m, " "+m.mode.String()+" "); n.mode == m.mode {
+		t.Fatal("the mode chip moves the transcript mode on")
+	}
+	idle := m
+	idle.sessions, idle.pending = nil, nil
+	if n, _ := clickOn(t, idle, " idle "); n.overlay != overlayAgents {
+		t.Fatalf("the idle chip opens the agents panel: %v", n.overlay)
+	}
+	tend := m
+	tend.tendMode, tend.cfg = "fix", &fakeSettings{}
+	if _, cmd := clickOn(t, tend, "tend fix"); cmd == nil {
+		t.Fatal("the tend chip runs /tend")
+	}
+	m.setupSt = &api.Setup{Default: api.AgentChoice{Agent: "claude", Model: "sonnet"}}
+	if n, _ := clickOn(t, m, " claude "); n.overlay != overlayPicker {
+		t.Fatalf("the composer's agent chip opens the agent picker: %v", n.overlay)
+	}
+	if n, _ := clickOn(t, m, " sonnet "); n.overlay != overlayPicker || n.setupStep != stepModel {
+		t.Fatalf("the composer's model chip opens the model list: %v", n.overlay)
 	}
 }

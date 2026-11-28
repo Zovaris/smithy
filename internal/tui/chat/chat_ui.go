@@ -459,6 +459,11 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	}
 	const head = headRows
 	inputY := m.height - 2 - m.input.Height()
+	if m.overlay == overlayNone {
+		if n, cmd, ok := m.chipClick(msg.X, msg.Y); ok {
+			return n, cmd
+		}
+	}
 	switch {
 	case m.overlay != overlayNone:
 		return m, nil
@@ -945,4 +950,55 @@ func (m chatView) activityChips(tools []chatTool, thoughts int) string {
 		out = append(out, t.Fg(t.Info).Render(t.G.On)+" "+t.Fg(t.Muted).Render(p))
 	}
 	return strings.Join(out, "  ")
+}
+
+// chipClick acts on a chip that looks like a button: the header's tend and state chips, the
+// footer's mode and palette chips, and the composer's agent, model and effort chips.
+func (m chatView) chipClick(x, y int) (tea.Model, tea.Cmd, bool) {
+	lines := strings.Split(ansi.Strip(m.View().Content), "\n")
+	if y < 0 || y >= len(lines) {
+		return m, nil, false
+	}
+	l := lines[y]
+	hit := func(label string) bool {
+		i := strings.LastIndex(l, label)
+		if label == "" || i < 0 {
+			return false
+		}
+		x0 := ansi.StringWidth(l[:i])
+		return x >= x0 && x < x0+ansi.StringWidth(label)
+	}
+	run := func(line string) (tea.Model, tea.Cmd, bool) {
+		n, cmd := m.command(line)
+		return n, cmd, true
+	}
+	switch {
+	case y == len(lines)-1 && hit(" ctrl+k palette "):
+		return m, m.openPalette(""), true
+	case y == len(lines)-1 && hit(" "+m.mode.String()+" "):
+		m.setMode((m.mode + 1) % 3)
+		return m, nil, true
+	case y == 0 && hit(m.tendTag()):
+		return run("/tend")
+	case y == 0 && len(m.pending) > 0 && hit("waiting on you"):
+		m.openAsk()
+		return m, nil, true
+	case y == 0 && (hit(" idle ") || hit(" running ")):
+		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
+		return m, nil, true
+	}
+	meta := ansi.Strip(m.metaChips())
+	if meta == "" || !strings.Contains(l, meta) {
+		return m, nil, false
+	}
+	parts := strings.Split(m.agentModel(), " "+m.th.G.Dot+" ")
+	switch {
+	case hit(" effort "):
+		return run("/effort")
+	case len(parts) > 1 && hit(" "+parts[1]+" "):
+		return run("/model")
+	case parts[0] != "" && hit(" "+parts[0]+" "):
+		return run("/agent")
+	}
+	return m, nil, false
 }
