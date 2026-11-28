@@ -31,8 +31,9 @@ v0.25 lands the mechanical part, with no behaviour change:
 
 Target layout for later releases, each in its own PR:
 
-- `internal/api`: the daemon's wire types and client (`daemon/wire.go`, `daemon/client.go`), so
-  the TUI and other clients stop importing the whole daemon.
+- `internal/api`: the daemon's wire types and client, so the TUI and other clients stop importing
+  the whole daemon. Done in v0.26: the request and response types and `Client` moved there and the
+  daemon aliases them; the TUI still imports the daemon for event kinds, the shell and token files.
 - `internal/tui` split into `kit` (widgets, theme), `stats` (dashboard panels) and `chat`.
 - `internal/agents` split into `sandbox` (native and API sandboxes, guard) and `skills` (find,
   install, inventory).
