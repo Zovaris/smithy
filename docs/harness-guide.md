@@ -40,6 +40,10 @@ command, ok or exit N, how long it took and the output, folded after 20 lines.
 | `ctrl+k` | palette; `ctrl+k` and `ctrl+l` also redraw the screen |
 | `ctrl+l` | agent and model |
 | `ctrl+o` | transcript mode: minimal, expandable, verbose |
+| `ctrl+n` `ctrl+p`, click a tab | next and previous session tab; click `+` for a new session |
+| `enter` during a turn | queue the message (shown under the input, sent when the turn ends); `↑` on an empty input takes the next one back to edit or drop |
+| `esc` during a turn | interrupt the turn (`ctrl+c` too; a second `ctrl+c` quits) |
+| `ctrl+s` | select mode: the mouse goes to the terminal so you can select and copy text; `ctrl+s` again takes it back. Shift+drag (option+drag in iTerm2 and Terminal.app) selects without it |
 | `pgup` `pgdn`, `ctrl+u` `ctrl+d`, wheel | scroll; `home` and `end` jump |
 | click | open a tool block or a folded line |
 | `1`-`9`, arrows, `enter` | answer the question card; `space` picks several, `esc` later |
@@ -81,7 +85,7 @@ command, ok or exit N, how long it took and the output, folded after 20 lines.
 | `/channels [test]` | chat connectors' notifications and chat channels; `test` sends to each |
 | `/board [task dir]` | task files by status: move with left/right, open a file or its PR |
 | `/sidebar` | show or hide the right sidebar |
-| `/links [TK-123\|#12\|PR url]` | this session's PRs and issues, live; with a ref, link it |
+| `/links`, `/links add <url\|TK-123\|#12>`, `/links rm <n\|url>` | this session's links, live: PRs (state, CI, review), issues (status, assignee) and any URL. A PR or issue URL the agent or you mention, the branch's PR and a Linear id in the branch link themselves. In the modal `enter` opens, `c` copies, `x` removes; in the sidebar a click opens and `×` removes. A PR going red, green, merged or closed posts one line |
 | `/workflows`, `/schedules` | run workflows and watch them live; turn schedules on or off ([workflows.md](workflows.md)) |
 | `/run <workflow> [input=value]…` | run a workflow now |
 | `/welcome` | walk the first-run steps again |

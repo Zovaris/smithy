@@ -84,7 +84,7 @@ func (m chatView) header(w int) []string {
 			return bar.Foreground(m.th.Dim).Render(tag) + bar.Render("  ") + m.pill(bar)
 		}
 	}
-	tabs, _ := m.tabStrip(w)
+	tabs, _, _ := m.tabStrip(w)
 	return []string{m.th.HeadBar(w, m.pad(), project, pill, m.clockNow().Format("15:04")), tabs}
 }
 
@@ -223,7 +223,13 @@ func (m chatView) footer(w int) string {
 	dim, key := t.Fg(t.Dim), t.Fg(t.Text)
 	hint := func(k, what string) string { return key.Render(k) + dim.Render(" "+what) }
 	p := strings.Repeat(" ", m.pad())
-	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode: "+m.mode.String()), hint("tab", "agents"), hint("?", "help")}
+	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode: "+m.mode.String()), hint("tab", "agents"), hint("?", "help"), hint("ctrl+n/p", "tabs"), hint("ctrl+s", "select")}
+	if m.busy(m.current) {
+		hints = append([]string{hint("esc", "interrupt")}, hints...)
+	}
+	if m.selecting {
+		hints = []string{t.Fg(t.Warn).Render("select mode") + dim.Render(": drag to select, the terminal copies"), hint("ctrl+s", "back")}
+	}
 	var info []string
 	if m.branch != "" {
 		info = append(info, dim.Render(m.branch))
@@ -430,7 +436,9 @@ func (m chatView) helpBox(screen []string, w, h int) []string {
 		{"tab", "agents and sessions"}, {"ctrl+k", "palette"}, {"ctrl+l", "agent and model"},
 		{"ctrl+o", "minimal · expandable · verbose"}, {"? enter", "this help (or /help)"}, {"pgup pgdn", "scroll; wheel too, home and end"}, {"click", "open a tool block or answer a decision"},
 		{"enter", "on an empty composer opens the question waiting on you"},
-		{"/name or $name", "run an installed skill on the rest of the line"}, {"ctrl+c", "quit"},
+		{"/name or $name", "run an installed skill on the rest of the line"},
+		{"ctrl+n ctrl+p", "session tabs (click a tab, + for new)"}, {"esc in a turn", "interrupt; enter queues, ↑ edits the next"},
+		{"ctrl+s", "select mode to copy text (or shift+drag)"}, {"ctrl+c", "quit"},
 	} {
 		items = append(items, boxItem{glyph: t.G.Dot, color: t.Muted, label: k[0], hint: k[1]})
 	}
@@ -494,6 +502,8 @@ func (m chatView) infoBox(screen []string, w, h int) []string {
 	switch {
 	case m.info.set != nil:
 		foot = "  " + keyHints(t, "←→", "change", "enter", "save", "esc", "close")
+	case m.info.urls != nil:
+		foot = "  " + keyHints(t, "↑↓", "move", "enter", "open", "c", "copy", "x", "remove", "esc", "close")
 	case m.info.scroll:
 		foot = "  " + keyHints(t, "↑↓", "scroll", "esc", "close")
 	}

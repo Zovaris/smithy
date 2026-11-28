@@ -24,6 +24,7 @@ func TestSkillInvokedFromChat(t *testing.T) {
 	if len(f.started) != 1 || !strings.Contains(f.started[0], "/h/.agents/skills/pdf/SKILL.md") || !strings.HasSuffix(f.started[0], "merge a.pdf and b.pdf") {
 		t.Fatalf("/pdf sends the skill and the task: %q", f.started)
 	}
+	m.track(m.current, "done")
 	m = cpress(typeIn(m, "$smelt"), ckey("enter"))
 	if len(f.sent) != 1 || !strings.Contains(f.sent[0][1], "/h/.claude/skills/smelt/SKILL.md") {
 		t.Fatalf("$smelt sends the skill: %q", f.sent)

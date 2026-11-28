@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	neturl "net/url"
 	"os/exec"
 	"path/filepath"
 	"regexp"
@@ -27,13 +28,15 @@ import (
 const (
 	KindSessionLink  = "session_link"
 	KindSessionLinks = "session_links"
-	linksMax         = 20
-	linkTextMax      = 8 << 10
+	// KindSessionUnlink removes a link by hand; a found one (branch, mention) stays hidden.
+	KindSessionUnlink = "session_unlink"
+	linksMax          = 20
+	linkTextMax       = 8 << 10
 )
 
 func sameLinks(a, b SessionLinks) bool {
-	x, _ := json.Marshal([]any{a.PRs, a.Issues, a.Error})
-	y, _ := json.Marshal([]any{b.PRs, b.Issues, b.Error})
+	x, _ := json.Marshal([]any{a.PRs, a.Issues, a.URLs, a.Error})
+	y, _ := json.Marshal([]any{b.PRs, b.Issues, b.URLs, b.Error})
 	return string(x) == string(y)
 }
 
@@ -222,14 +225,20 @@ func (sv *Server) refreshLinks(id string) (SessionLinks, bool) {
 		if h.Role == "user" && len(texts) < 8 {
 			texts = append(texts, clip(h.Text, linkTextMax))
 		}
+		for _, u := range mentionRe.FindAllString(clip(h.Text, linkTextMax), -1) {
+			if !slices.Contains(refs, u) && len(refs) < 2*linksMax {
+				refs = append(refs, u)
+			}
+		}
 	}
+	hidden := slices.Clone(l.hidden)
 	var prev SessionLinks
 	if l.links != nil {
 		prev = *l.links
 	}
 	sv.mu.Unlock()
 
-	out := k.collect(id, dir, prs, refs, texts)
+	out := hide(k.collect(id, dir, prs, refs, texts), hidden)
 	changed := !sameLinks(out, prev)
 	k.schedule(id, changed)
 	sv.mu.Lock()
@@ -265,9 +274,19 @@ func (k *Linker) collectIn(id, repo, branch string, prs, refs, texts []string) S
 		}
 	}
 	urls := slices.Clone(prs)
+	var issueURLs []string
 	for _, r := range refs {
-		if tendPRURL(r) {
+		switch {
+		case tendPRURL(r):
 			urls = append(urls, r)
+		case ghIssueURLRe.MatchString(r):
+			issueURLs = append(issueURLs, r)
+		case linearURLRe.MatchString(r):
+			refs = append(refs, strings.ToUpper(linearURLRe.FindStringSubmatch(r)[1]))
+		case strings.HasPrefix(r, "http") && len(out.URLs) < linksMax:
+			if u, err := neturl.Parse(r); err == nil {
+				out.URLs = append(out.URLs, LinkURL{URL: r, Host: u.Host, Title: strings.TrimSuffix(u.Host+u.Path, "/")})
+			}
 		}
 	}
 	if repo != "" && branch != "" && k.BranchPR != nil {
@@ -291,7 +310,13 @@ func (k *Linker) collectIn(id, repo, branch string, prs, refs, texts []string) S
 		out.PRs = append(out.PRs, p)
 		texts = append(texts, p.Title, clip(p.Body, linkTextMax))
 	}
-	lin, gh := linkRefs(branch, texts, refs, linearTeams())
+	var lrefs []string
+	for _, r := range refs {
+		if !strings.HasPrefix(r, "http") {
+			lrefs = append(lrefs, r)
+		}
+	}
+	lin, gh := linkRefs(branch, texts, lrefs, linearTeams())
 	for _, idv := range lin {
 		if len(out.Issues) >= linksMax || k.isMissing("linear:"+idv) {
 			continue
@@ -309,9 +334,30 @@ func (k *Linker) collectIn(id, repo, branch string, prs, refs, texts []string) S
 		}
 		out.Issues = append(out.Issues, LinkIssue{Kind: "linear", ID: is.ID, Title: is.Title, URL: is.URL, Status: is.Status, Assignee: is.Assignee, Milestone: is.Milestone})
 	}
+	for _, u := range issueURLs {
+		m := ghIssueURLRe.FindStringSubmatch(u)
+		n, _ := strconv.Atoi(m[2])
+		key := "gh:" + m[1] + "#" + m[2]
+		if len(out.Issues) >= linksMax || k.isMissing(key) || slices.ContainsFunc(out.Issues, func(i LinkIssue) bool { return i.URL == u }) {
+			continue
+		}
+		is, err := k.GHIssue(m[1], n)
+		if errors.Is(err, ghx.ErrNotFound) {
+			k.setMissing(key)
+		}
+		if err != nil {
+			note(err)
+			continue
+		}
+		id := "#" + m[2]
+		if m[1] != repo {
+			id = m[1] + "#" + m[2]
+		}
+		out.Issues = append(out.Issues, LinkIssue{Kind: "github", ID: id, Title: is.Title, URL: is.URL, Status: is.State, Assignee: is.Assignee, Milestone: is.Milestone})
+	}
 	for _, n := range gh {
 		key := "gh:" + repo + "#" + strconv.Itoa(n)
-		if repo == "" || len(out.Issues) >= linksMax || k.isMissing(key) {
+		if repo == "" || len(out.Issues) >= linksMax || k.isMissing(key) || slices.ContainsFunc(out.Issues, func(i LinkIssue) bool { return i.ID == "#"+strconv.Itoa(n) }) {
 			continue
 		}
 		is, err := k.GHIssue(repo, n)
@@ -359,9 +405,44 @@ func (sv *Server) getLinks(w http.ResponseWriter, r *http.Request) {
 
 var ghIssueRefRe = regexp.MustCompile(`^#[0-9]{1,7}$`)
 
-// validLinkRef is a ref /link accepts: a Linear id, #<n> or a GitHub PR URL.
+var (
+	ghIssueURLRe = regexp.MustCompile(`^https://github\.com/([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)/issues/([0-9]{1,7})$`)
+	linearURLRe  = regexp.MustCompile(`^https://linear\.app/[A-Za-z0-9_-]+/issue/([A-Za-z][A-Za-z0-9]{0,9}-[0-9]{1,7})(?:/[A-Za-z0-9_-]*)?$`)
+	// mentionRe is a PR, GitHub issue or Linear issue URL in a session's messages.
+	mentionRe = regexp.MustCompile(`https://(?:github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:pull|issues)/[0-9]{1,7}|linear\.app/[A-Za-z0-9_-]+/issue/[A-Za-z][A-Za-z0-9]{0,9}-[0-9]{1,7})\b`)
+)
+
+// validLinkRef is a ref /links accepts: a Linear id, #<n> or any http(s) URL.
 func validLinkRef(s string) bool {
-	return linear.IDRe.MatchString(s) || ghIssueRefRe.MatchString(s) || tendPRURL(s)
+	return linear.IDRe.MatchString(s) || ghIssueRefRe.MatchString(s) || webURL(s)
+}
+
+func webURL(s string) bool {
+	if len(s) > 2048 || strings.ContainsFunc(s, func(r rune) bool { return r <= ' ' || r == 0x7f }) {
+		return false
+	}
+	u, err := neturl.Parse(s)
+	return err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host != "" && u.User == nil
+}
+
+// hide drops the links removed by hand: a PR or URL by its URL, an issue by its id or URL.
+func hide(l SessionLinks, hidden []string) SessionLinks {
+	if len(hidden) == 0 {
+		return l
+	}
+	l.PRs = slices.DeleteFunc(l.PRs, func(p ghx.PRLink) bool { return slices.Contains(hidden, p.URL) })
+	l.Issues = slices.DeleteFunc(l.Issues, func(i LinkIssue) bool { return slices.Contains(hidden, i.ID) || slices.Contains(hidden, i.URL) })
+	l.URLs = slices.DeleteFunc(l.URLs, func(u LinkURL) bool { return slices.Contains(hidden, u.URL) })
+	return l
+}
+
+// linkRef normalizes a typed ref: a URL as given, an id upper-cased.
+func linkRef(s string) string {
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "http") {
+		s = strings.ToUpper(s)
+	}
+	return s
 }
 
 func (sv *Server) addLink(w http.ResponseWriter, r *http.Request) {
@@ -371,12 +452,9 @@ func (sv *Server) addLink(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "body: {\"ref\": \"TK-123\" | \"#12\" | PR URL}", 400)
 		return
 	}
-	ref := strings.TrimSpace(in.Ref)
-	if !strings.HasPrefix(ref, "http") {
-		ref = strings.ToUpper(ref)
-	}
+	ref := linkRef(in.Ref)
 	if !validLinkRef(ref) {
-		http.Error(w, "ref must be a Linear id (TK-123), a GitHub issue (#12) or a GitHub PR URL", 400)
+		http.Error(w, "ref must be a Linear id (TK-123), a GitHub issue (#12) or an http(s) URL", 400)
 		return
 	}
 	sv.mu.Lock()
@@ -399,6 +477,7 @@ func (sv *Server) addLink(w http.ResponseWriter, r *http.Request) {
 		}
 		l.s.Links = append(l.s.Links, ref)
 	}
+	l.hidden = slices.DeleteFunc(l.hidden, func(h string) bool { return h == ref })
 	sv.mu.Unlock()
 	if sv.Links == nil {
 		writeJSON(w, 200, SessionLinks{Session: id, PRs: []ghx.PRLink{}, Issues: []LinkIssue{}})
@@ -406,6 +485,54 @@ func (sv *Server) addLink(w http.ResponseWriter, r *http.Request) {
 	}
 	out, _ := sv.refreshLinks(id)
 	writeJSON(w, 200, out)
+}
+
+// removeLink is DELETE /v1/sessions/{id}/links?ref=…: the ref leaves the session's links and a
+// link found on its own (the branch PR, a mention) stays hidden.
+func (sv *Server) removeLink(w http.ResponseWriter, r *http.Request) {
+	if code, msg := sameOrigin(r); code != 0 {
+		writeJSON(w, code, map[string]string{"error": msg})
+		return
+	}
+	id, ref := r.PathValue("id"), linkRef(r.URL.Query().Get("ref"))
+	if !validLinkRef(ref) {
+		http.Error(w, "ref must be a Linear id, #<n> or an http(s) URL", 400)
+		return
+	}
+	sv.mu.Lock()
+	l := sv.sessions[id]
+	if l == nil {
+		sv.mu.Unlock()
+		sessionErr(w, errNoSession)
+		return
+	}
+	if _, err := sv.appendLocked(KindSessionUnlink, id, map[string]string{"ref": ref}); err != nil {
+		sv.mu.Unlock()
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	unlink(l, ref)
+	if l.links != nil {
+		v := hide(*l.links, l.hidden)
+		l.links = &v
+	}
+	out := SessionLinks{Session: id, PRs: []ghx.PRLink{}, Issues: []LinkIssue{}}
+	if l.links != nil {
+		out = *l.links
+	}
+	sv.mu.Unlock()
+	if sv.Links != nil {
+		out, _ = sv.refreshLinks(id)
+	}
+	writeJSON(w, 200, out)
+}
+
+func unlink(l *live, ref string) {
+	l.s.Links = slices.DeleteFunc(l.s.Links, func(s string) bool { return s == ref })
+	l.s.PRs = slices.DeleteFunc(l.s.PRs, func(s string) bool { return s == ref })
+	if !slices.Contains(l.hidden, ref) && len(l.hidden) < 4*linksMax {
+		l.hidden = append(l.hidden, ref)
+	}
 }
 
 func (sv *Server) hasSession(id string) bool {
@@ -422,8 +549,16 @@ func (sv *Server) applyLinks(e store.Event) {
 	switch e.Kind {
 	case KindSessionLink:
 		var v struct{ Ref string }
-		if json.Unmarshal(e.Data, &v) == nil && validLinkRef(v.Ref) && !slices.Contains(l.s.Links, v.Ref) {
-			l.s.Links = append(l.s.Links, v.Ref)
+		if json.Unmarshal(e.Data, &v) == nil && validLinkRef(v.Ref) {
+			if !slices.Contains(l.s.Links, v.Ref) {
+				l.s.Links = append(l.s.Links, v.Ref)
+			}
+			l.hidden = slices.DeleteFunc(l.hidden, func(h string) bool { return h == v.Ref })
+		}
+	case KindSessionUnlink:
+		var v struct{ Ref string }
+		if json.Unmarshal(e.Data, &v) == nil && validLinkRef(v.Ref) {
+			unlink(l, v.Ref)
 		}
 	case KindSessionLinks:
 		var v SessionLinks

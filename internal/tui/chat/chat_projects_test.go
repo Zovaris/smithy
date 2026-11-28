@@ -79,6 +79,7 @@ func TestNewSessionAsksWhichProject(t *testing.T) {
 	if len(f.dirs) != 1 || f.dirs[0] != "/w/beta" || f.started[0] != "hello" || m.overlay != overlayNone || m.current != "s-1" {
 		t.Fatalf("enter starts in the picked project: dirs %v started %v overlay %v", f.dirs, f.started, m.overlay)
 	}
+	m.track("s-1", "done")
 	m = typeIn(m, "again")
 	m = cpress(m, ckey("enter"))
 	if len(f.dirs) != 1 || len(f.sent) != 1 || m.overlay != overlayNone {

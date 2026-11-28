@@ -122,7 +122,12 @@ func (c *Client) Ask(ctx context.Context, id, question string, options []string)
 
 // AskMulti is Ask for a question whose options may be picked together when multi is true.
 func (c *Client) AskMulti(ctx context.Context, id, question string, options []string, multi bool) error {
-	b, _ := json.Marshal(map[string]any{"id": id, "question": question, "options": options, "multi": multi})
+	return c.AskIn(ctx, "", id, question, options, multi)
+}
+
+// AskIn is AskMulti for a question a daemon session asks: the question shows in that session.
+func (c *Client) AskIn(ctx context.Context, session, id, question string, options []string, multi bool) error {
+	b, _ := json.Marshal(map[string]any{"id": id, "question": question, "options": options, "multi": multi, "session": session})
 	r, err := c.NewRequest(ctx, "POST", "/v1/asks", b)
 	if err != nil {
 		return err
@@ -442,10 +447,17 @@ func (c *Client) SessionLinks(ctx context.Context, id string) (SessionLinks, err
 	return l, err
 }
 
-// AddLink is POST /v1/sessions/{id}/links: ref is a Linear id, #<n> or a GitHub PR URL.
+// AddLink is POST /v1/sessions/{id}/links: ref is a Linear id, #<n> or an http(s) URL.
 func (c *Client) AddLink(ctx context.Context, id, ref string) (SessionLinks, error) {
 	var l SessionLinks
 	err := c.call(ctx, "POST", "/v1/sessions/"+url.PathEscape(id)+"/links", map[string]string{"ref": ref}, &l)
+	return l, err
+}
+
+// RemoveLink is DELETE /v1/sessions/{id}/links?ref=…: ref is a linked URL or issue id.
+func (c *Client) RemoveLink(ctx context.Context, id, ref string) (SessionLinks, error) {
+	var l SessionLinks
+	err := c.call(ctx, "DELETE", "/v1/sessions/"+url.PathEscape(id)+"/links?ref="+url.QueryEscape(ref), nil, &l)
 	return l, err
 }
 

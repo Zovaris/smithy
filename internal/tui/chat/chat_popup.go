@@ -335,7 +335,7 @@ func (m chatView) popupRows(items []popupItem, w int) []string {
 	for _, it := range items {
 		lw = max(lw, ansi.StringWidth(it.label))
 	}
-	room := max(min(len(items), m.rows()), 1)
+	room := max(min(len(items), popupMax, m.rows()), 1)
 	start := max(0, min(m.popSel-room+1, len(items)-room))
 	var out []string
 	for i := start; i < len(items) && i < start+room; i++ {

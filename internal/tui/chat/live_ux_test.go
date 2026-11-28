@@ -154,14 +154,3 @@ func TestStatusLineNamesEventsInWords(t *testing.T) {
 		t.Errorf("an unknown kind reads as words, got %q", got)
 	}
 }
-
-func TestPopupDoesNotCoverTheLatestMessage(t *testing.T) {
-	_, m := noSessionScene()
-	m.width, m.height = 120, 30
-	m.system("daemon started on 127.0.0.1:7777")
-	m.input.SetValue("/effort ")
-	out := screen(m)
-	if !strings.Contains(out, "daemon started on") || !strings.Contains(out, "/effort low") {
-		t.Fatalf("the popup sits under the latest message, not over it:\n%s", out)
-	}
-}

@@ -53,6 +53,12 @@ part above `### Details`.
 - `smithy doctor --fix` reads its answers from one reader per run.
 - `smithy wait` stops on ctrl+c, even during a timer, with exit code 130.
 - Pricing a model no longer blocks other callers for up to 10 seconds while the daily price list downloads.
+- Session tabs work: `ctrl+n` and `ctrl+p` or a click switch tabs, `+` starts a new session, and the open tab is bold and underlined.
+- An answered question stays in the session that asked it; a new session or another one no longer shows it, and a batch's questions stay out of every transcript.
+- The `/` menu floats over the transcript, at most eight rows, instead of pushing it up.
+- Messages sent during a turn wait in a queue under the input and go out in order when it ends; `↑` edits or drops the next one, and `esc` interrupts the turn.
+- Text can be selected and copied: `ctrl+s` hands the mouse to the terminal, or shift+drag.
+- Links take any URL (`/links add <url>`) and can be removed (`/links rm <n|url>`, `x` in `/links`, `×` in the sidebar); a PR or issue URL mentioned in a session links itself, a click opens a link, `c` copies it, and a PR going red, green, merged or closed posts one line.
 - The web `/theme` lists and accepts all seven themes, and the guide marks `/agents`, `/decisions`, `/bench` and `/settings` as web only.
 - The agents' system prompt is shorter and direct, and no longer names the CLI underneath.
 - A settings command's usage line names only that command, and enter on a command that needs arguments fills it in instead of running it bare. A bare `/set` opens the settings list in the palette.
@@ -63,13 +69,13 @@ part above `### Details`.
 - The status line names workflow runs and events in words ("workflow repo-health running") instead of raw event names.
 - The agents reply in the language of your latest message.
 - `smithy workflow --help` and other help tables keep their description column when a line wraps.
-- The `/` popup lifts the transcript instead of drawing over its latest lines.
 - ctrl+k and ctrl+l redraw the whole TUI, so clearing the terminal no longer leaves a dimmed screen.
 - A `!cmd` run is part of the session: the TUI, the web and a reopened `smithy chat --session` all show it. A run keeps its first and last 250 lines (64 KiB in all) with one `… N lines cut …` line between them, so errors printed last still show, and folds to 20 lines with "N more lines".
 - `smithy tui` is gone: run `smithy stats`. The `tui.reduce_motion` setting is now `ui.reduce_motion`; a saved `tui.reduce_motion` still works.
 
 ### Details
 
+- daemon: a decision carries the `session` that asked (`POST /v1/asks` takes `session`; smithy mcp's ask tool sends `SMITHY_SESSION`) and its `decision_asked` event is that session's. Links: `POST /v1/sessions/{id}/links` takes any http(s) URL (generic ones land in `urls` with host and title), `DELETE /v1/sessions/{id}/links?ref=` removes one (a `session_unlink` event; a found link stays hidden), and PR, GitHub issue and Linear issue URLs in a session's messages link themselves.
 - workflow: `internal/workflow` with its own cron parser; steps run, agent, if, switch, set, json, foreach, ask, notify, call, judge, loop, session, smelt, warden, http, parallel, wait, github, file and agent `items` fan-out; per-step when, timeout, retry, on_error; templates `{{steps.x.output}}`, `{{vars.y}}`, `{{inputs.z}}`, `{{env.Z}}` and `{{secret.name}}` (redacted, none in run commands); http only to `guard.fetch_allow` hosts; github runs gh by argv; pr, merge and warden validated to need a `when` on an earlier ask's yes. Workflows in `~/.smithy/workflows`, schedules in `schedules/` with the enable pinned (sha256) to the schedule file plus its workflow's call tree, runs in `runs/<name>/`, 50 kept; older files with `schedule`/`webhook` are migrated to a schedule.
 - daemon: ticks schedules every minute (cron, `gh`-polled GitHub events every 5 min, file watches); `/v1/workflows` (list, detail with the live run, PUT, validate, run with inputs), `/v1/schedules` (list, add, detail, enable, disable, delete; writes local-only) and the token-checked, loopback-only `POST /v1/hooks/schedules/{name}`; notify steps are `workflow_note` events sent to connectors as kind `workflow`. Docs in `docs/workflows.md`.
 - Session links: `GET/POST /v1/sessions/{id}/links` and `GET /v1/links?dir=`, polled per session with backoff (1m doubling to 10m) and pushed as `session_links` events; GitHub through gh or the token API, Linear through the stored key, never an MCP connector. `smithy daemon --demo` links canned work offline.

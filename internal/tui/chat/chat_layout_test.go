@@ -126,8 +126,8 @@ func TestTurnFooterAfterAnswer(t *testing.T) {
 
 func TestAnsweredAskStaysAsQA(t *testing.T) {
 	m := layoutView(140)
-	d, _ := json.Marshal(map[string]any{"id": "q1", "question": "Merge now?", "options": []string{"yes", "no"}})
-	m.event("decision_asked", "", time.Now(), d)
+	d, _ := json.Marshal(map[string]any{"id": "q1", "question": "Merge now?", "options": []string{"yes", "no"}, "session": m.current})
+	m.event("decision_asked", m.current, time.Now(), d)
 	a, _ := json.Marshal(map[string]any{"id": "q1", "answer": "yes"})
 	m.event("decision_answered", "", time.Now(), a)
 	out := screen(m)
@@ -171,8 +171,8 @@ func TestTurnFooterOnlyUnderAnAnswerOnce(t *testing.T) {
 func TestLocalAnswerStaysAsQAOnce(t *testing.T) {
 	m := layoutView(140)
 	m.decide = func(id, a string) tea.Cmd { return nil }
-	d, _ := json.Marshal(map[string]any{"id": "q1", "question": "Ship it?", "options": []string{"yes", "no"}})
-	m.event("decision_asked", "", time.Now(), d)
+	d, _ := json.Marshal(map[string]any{"id": "q1", "question": "Ship it?", "options": []string{"yes", "no"}, "session": "s1"})
+	m.event("decision_asked", "s1", time.Now(), d)
 	m.answer("no")
 	m.decided(chatDecidedMsg{id: "q1"})
 	a, _ := json.Marshal(map[string]any{"id": "q1", "answer": "no"})
