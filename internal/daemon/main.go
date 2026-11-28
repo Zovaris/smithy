@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -226,6 +227,18 @@ type runOpts struct {
 	demo      bool
 }
 
+// waitBounded waits for wg up to d and reports whether it finished.
+func waitBounded(wg *sync.WaitGroup, d time.Duration) bool {
+	done := make(chan struct{})
+	go func() { wg.Wait(); close(done) }()
+	select {
+	case <-done:
+		return true
+	case <-time.After(d):
+		return false
+	}
+}
+
 func foreground(o runOpts) int {
 	name, port := o.name, o.port
 	st, err := store.Open(store.DefaultPath())
@@ -257,18 +270,27 @@ func foreground(o runOpts) int {
 	api.Route = api.RouteIntake(RouteBack)
 	_ = api.Resume()
 	tctx, stopTails := context.WithCancel(context.Background())
-	defer stopTails()
+	var bg sync.WaitGroup
+	defer func() {
+		stopTails()
+		if !waitBounded(&bg, 5*time.Second) {
+			fmt.Fprintf(os.Stderr, "%s: background loops still running after 5s; exiting anyway\n", name)
+		}
+	}()
+	spawn := func(f func()) { bg.Add(1); go func() { defer bg.Done(); f() }() }
 	api.Ctx = tctx
-	go api.RunTails(tctx, time.Second, &Tail{Path: events.File(), Source: "tail:events"}, &Tail{Path: events.ProxyFile(), Source: ProxySource})
+	spawn(func() {
+		api.RunTails(tctx, time.Second, &Tail{Path: events.File(), Source: "tail:events"}, &Tail{Path: events.ProxyFile(), Source: ProxySource})
+	})
 	api.Tend = NewTender()
 	api.Tend.Sources = func() []TendRef { return mergeRefs(TendSources(), api.SessionTendRefs()) }
-	go api.Tend.Run(tctx, 2*time.Minute)
+	spawn(func() { api.Tend.Run(tctx, 2*time.Minute) })
 	if api.Links == nil {
 		api.Links = NewLinker()
 	}
-	go api.Links.Run(tctx, api, 15*time.Second)
+	spawn(func() { api.Links.Run(tctx, api, 15*time.Second) })
 	api.Workflows = api.NewWorkflows(workflow.Store{Dir: workflow.Home()})
-	go api.Workflows.Loop(tctx)
+	spawn(func() { api.Workflows.Loop(tctx) })
 	conns, cerr := connect.FromConfig()
 	if cerr != nil {
 		fmt.Fprintf(os.Stderr, "%s: chat connectors: %s\n", name, text.Clean(cerr.Error()))
@@ -278,9 +300,9 @@ func foreground(o runOpts) int {
 			Start: api.ChatStart, Free: FreeAnswer,
 			Answer: func(id, answer, by string) error { _, err := api.Answer(id, answer, by); return err },
 			Log:    func(l string) { _, _ = api.Append("log", "", map[string]string{"line": l}) }}
-		go api.RunNotes(tctx, hub, 30*time.Second)
-		go RunReport(tctx, hub, time.Hour)
-		go hub.Run(tctx)
+		spawn(func() { api.RunNotes(tctx, hub, 30*time.Second) })
+		spawn(func() { RunReport(tctx, hub, time.Hour) })
+		spawn(func() { hub.Run(tctx) })
 	}
 	parent := o.ctx
 	if parent == nil {
