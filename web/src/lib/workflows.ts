@@ -36,6 +36,7 @@ export type Step = {
   action?: string;
   pr?: string;
   op?: string;
+  code?: string;
 };
 export type StepResult = {
   id: string;
@@ -142,6 +143,7 @@ export function summary(s: Step): string {
     wait: s.for || s.check || "",
     github: `${s.action} ${s.pr ?? ""}`.trim(),
     file: `${s.op} ${s.path}`,
+    code: s.code ?? "",
   };
   if (s.kind === "agent" && s.items) by.agent = `each of ${s.items}: ${by.agent}`;
   return one((by[s.kind] ?? "") + (s.when ? ` (when ${c(s.when)})` : ""), 100);

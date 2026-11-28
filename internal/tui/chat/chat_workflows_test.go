@@ -25,7 +25,7 @@ func (f *fakeFlows) Workflows(context.Context) (api.WorkflowList, error) { retur
 func (f *fakeFlows) Workflow(_ context.Context, name string) (api.WorkflowDetail, error) {
 	st := time.Date(2026, 11, 27, 17, 0, 0, 0, time.Local)
 	return api.WorkflowDetail{Info: f.l.Workflows[0], History: []workflow.Record{{Workflow: name, Trigger: "schedule", Status: "ok", Started: st, Ended: st.Add(time.Minute),
-		Steps: []workflow.StepResult{{ID: "judge", Kind: "agent", Answer: "yes", Why: "patch bump"}}}}}, nil
+		Steps: []workflow.StepResult{{ID: "judge", Kind: "agent", Answer: "yes", Why: "patch bump"}, {ID: "stale", Kind: "code", Output: `[{"number":7}]`}}}}}, nil
 }
 
 func (f *fakeFlows) RunWorkflow(_ context.Context, name, via string, _ map[string]string) error {
@@ -79,7 +79,7 @@ func TestWorkflowsModal(t *testing.T) {
 		t.Fatalf("r runs: %v", f.runs)
 	}
 	m = cpress(m, ckey("enter"))
-	if out = screen(m); m.overlay != overlayInfo || !strings.Contains(out, "judge") || !strings.Contains(out, "patch bump") || !strings.Contains(out, "STEPS") {
+	if out = screen(m); m.overlay != overlayInfo || !strings.Contains(out, "judge") || !strings.Contains(out, "patch bump") || !strings.Contains(out, "STEPS") || !strings.Contains(out, `stale`) || !strings.Contains(out, `[{"number":7}]`) {
 		t.Fatalf("enter shows steps and runs:\n%s", out)
 	}
 	m = cpress(m, ckey("esc"))

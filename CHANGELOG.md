@@ -39,6 +39,7 @@ part above `### Details`.
 - Four more color themes, moss, dune, dusk and rose, and every theme is a whole palette, not only an accent.
 - The `/` menu lists commands first, then skills with their own mark, and matches descriptions too. The chat header shows the tend mode and how many PRs it tends; `/tend`, `/serve`, the theme and effort pickers change with left/right.
 - A vague product idea ("make me a landing page") starts with a brainstorm, questions, a spec and tasks before any build, and smithy offers the design skills you have installed.
+- Workflows get a `code` step: a few lines of JavaScript shape earlier steps' output (filter, map, pick) in the same sandbox as code mode, and later steps use the result. `smithy workflow example` adds `stale-prs`, which uses one.
 
 ### Fixed
 

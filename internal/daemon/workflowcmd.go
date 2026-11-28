@@ -223,7 +223,7 @@ func workflowMain(st workflow.Store, args []string, stdout, stderr io.Writer) in
 			fmt.Fprintf(stdout, "started %s on the daemon; smithy workflow history %s shows it\n", name, name)
 			return 0
 		}
-		sc := &workflow.Scheduler{Store: st, Env: workflow.Env{Shell: workflow.Shell, Agent: workflow.Agent, Guard: workflow.Guard,
+		sc := &workflow.Scheduler{Store: st, Env: workflow.Env{Shell: workflow.Shell, Agent: workflow.Agent, Guard: workflow.Guard, Code: workflowCode,
 			Notify: func(_, title, msg string) error { fmt.Fprintf(stdout, "notify: %s\n%s\n", title, msg); return nil }}}
 		r, err := sc.Start(context.Background(), name, workflow.Invocation{Trigger: "cli", Inputs: f.inputs})
 		if err != nil {

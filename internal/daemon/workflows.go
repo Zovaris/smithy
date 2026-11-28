@@ -16,6 +16,7 @@ import (
 	"time"
 
 	smithyauth "github.com/Zovaris/smithy/internal/auth"
+	"github.com/Zovaris/smithy/internal/codemode"
 	"github.com/Zovaris/smithy/internal/connect"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/workflow"
@@ -53,7 +54,7 @@ func (sv *Server) NewWorkflows(st workflow.Store) *workflow.Scheduler {
 	return &workflow.Scheduler{
 		Store:  st,
 		GitHub: workflow.GitHubEvents,
-		Env: workflow.Env{Shell: workflow.Shell, Agent: workflow.Agent, Guard: workflow.Guard, Ask: sv.workflowAsk,
+		Env: workflow.Env{Shell: workflow.Shell, Agent: workflow.Agent, Guard: workflow.Guard, Ask: sv.workflowAsk, Code: workflowCode,
 			Secret: workflowSecret,
 			Session: func(_ context.Context, dir, agent, prompt string) (string, error) {
 				s, err := sv.StartSession(agent, dir, prompt, "workflow")
@@ -457,4 +458,9 @@ func workflowSecret(name string) string {
 		return ""
 	}
 	return k
+}
+
+// workflowCode runs a workflow code step in code mode's sandbox (its default limits, no tools).
+func workflowCode(ctx context.Context, code, input string) (string, error) {
+	return codemode.Eval(ctx, code, input, codemode.Limits{})
 }

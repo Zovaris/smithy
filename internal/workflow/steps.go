@@ -47,6 +47,8 @@ func (r *runner) more(ctx context.Context, s Step, sc *scope, res *StepResult) e
 		return r.github(ctx, s, sc, res)
 	case KindFile:
 		return r.file(s, sc, res)
+	case KindCode:
+		return r.code(ctx, s, sc, res)
 	}
 	return fmt.Errorf("unknown step kind %q", s.Kind)
 }
@@ -458,5 +460,51 @@ func outside(err error) error {
 	if strings.Contains(err.Error(), "escapes") {
 		return fmt.Errorf("path is outside the workflow's files folders: %v", err)
 	}
+	return err
+}
+
+// code runs a code step: its JavaScript sees every earlier step (output, parsed json, exit,
+// answer, status), the inputs and the variables, never the environment or secrets.
+func (r *runner) code(ctx context.Context, s Step, sc *scope, res *StepResult) error {
+	res.Input = s.Code
+	if r.env.Code == nil {
+		return fmt.Errorf("code steps need the daemon or the smithy binary built with the harness")
+	}
+	type stepIn struct {
+		Output string          `json:"output"`
+		JSON   json.RawMessage `json:"json"`
+		Exit   int             `json:"exit"`
+		Answer string          `json:"answer,omitempty"`
+		Status string          `json:"status"`
+	}
+	in := struct {
+		Steps  map[string]stepIn `json:"steps"`
+		Inputs map[string]string `json:"inputs"`
+		Vars   map[string]string `json:"vars"`
+		Item   *string           `json:"item,omitempty"`
+		Index  *string           `json:"index,omitempty"`
+	}{Steps: map[string]stepIn{}, Inputs: sc.inputs, Vars: map[string]string{}}
+	sc.mu.Lock()
+	for id, st := range sc.steps {
+		out := strings.TrimSpace(st.Output)
+		js := json.RawMessage("null")
+		if json.Valid([]byte(out)) {
+			js = json.RawMessage(out)
+		}
+		in.Steps[id] = stepIn{Output: out, JSON: js, Exit: st.Exit, Answer: st.Answer, Status: st.Status}
+	}
+	for k, v := range sc.vars {
+		in.Vars[k] = v
+	}
+	sc.mu.Unlock()
+	if sc.index != "" {
+		in.Item, in.Index = &sc.item, &sc.index
+	}
+	b, err := json.Marshal(in)
+	if err != nil {
+		return err
+	}
+	out, err := r.env.Code(ctx, s.Code, string(b))
+	res.Output = clip(out)
 	return err
 }
