@@ -8,78 +8,61 @@ part above `### Details`.
 
 ## Unreleased
 
+### Highlights
+
+- Workflows and schedules: build a flow of steps (commands, agents, judges, loops, GitHub, your yes) and run it with one click or `/run`, or let a schedule start it on a cron line, a webhook, a GitHub event or a file change.
+- A new chat layout: session tabs, a sidebar with context, spend and linked PRs, folded tool calls, question cards and shell command blocks.
+- `/goal` keeps a session working until the goal is met, and `/refine` turns a rough prompt into a structured one.
+- Each session shows its PRs and issues live, and sessions can start and message each other.
+- Chat apps get a notifications channel and a chat channel where a message starts a session.
+- `/usage` shows tokens and cost per session, day, week and agent; `~/.smithy/prompt.md` replaces the agents' system prompt.
+- Four more themes, each a whole palette: moss, dune, dusk and rose.
+
 ### New
-- Workflows and schedules: a workflow is a flow of steps you run with one click or `/run` (a form asks for its inputs); a schedule starts one on a cron line, a webhook, a GitHub event (a Dependabot alert, a red PR, a labeled issue) or a file change. Steps compose: run a command, ask an agent (yes/no, a choice or JSON), branch, set variables, pick JSON fields, loop, ask you, notify you and call another workflow; every step can retry, time out, skip or recover. `smithy workflow`, `smithy schedule`, `/workflows`, `/schedules` and the web pages run them, show a run live, edit them with validation and show each step of past runs. `smithy workflow example` adds a daily Dependabot check, a repo health report and a webhook that replies with an agent's answer.
-- AI-first workflow steps: an agent per item with a parallel limit, a judge that grades work against criteria, a loop that repeats steps until a check passes, steps that open a chat session or start smelt or warden, plus http (with stored keys), parallel branches, wait, GitHub (list, comment, label, issue, PR, merge) and files in allowed folders. Steps that change things need the workflow's `allow_write`; opening or merging a PR and starting warden need your yes from an ask step first. New example `ship-a-fix`: an agent fixes, tests loop until green, a judge reviews, you approve, the PR opens.
-- The chat layout gains a tab strip of this folder's sessions with `+` for a new one, a right sidebar on wide terminals (`/sidebar` toggles it) with the title, context used and its share of the model's window, spend and linked PRs, tool calls and thoughts folded into one line such as "+ 2 commands, 1 thought" that opens on enter or a click, a dim agent · model · time · tok/s line under each answer, answered questions kept as a compact Q → A, and the composer with an accent bar and agent · model inside while the footer shows the context and the palette key.
-- Each session shows its linked work, live: the PRs it opened or works on (state, checks, review, mergeable, +/- lines) and the Linear and GitHub issues named in its branch, PRs or prompts. See them in the TUI's agents panel and `/links` (`/links TK-123` links one), the web's session side panel, and a Work section on the Agents page.
-- Scheduled workflows: a cron schedule and steps that run a command, ask an agent, branch on the result and notify you. `smithy workflow`, `/workflows` in the TUI and a Workflows page on the web run one now, turn it on or off, edit it and show each run's steps. `smithy workflow example` adds a daily Dependabot check whose agent tells you whether to merge, and why.
-- Daemon sessions can message each other: a session can start a child, and parent, children and siblings in one project send notes with the `send` tool. A note wakes an idle session or waits for a busy one; the TUI and web show the tree and the notes.
-- `/goal <text>` pins a goal on the open session, in the TUI and the web composer: each turn carries it, and the daemon keeps the session going until the agent reports it met with evidence, asks you, or hits `session.goal_max_turns` / `session.goal_max_cost`. `/goal` shows it, `/goal clear` drops it; only you set it.
-- New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 
-- New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
-- An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
-- The chat survives a terminal restart where the terminal supports it (OSC 7577): it reopens on the same server and session. `smithy chat --session <id>` opens a session directly.
-- `/usage` in the TUI chat and the web: tokens in, out and cached, and cost when the agent reports it, for this session, today, the last 7 days and all time, split per agent and per model.
-- A shell command typed as `!cmd` shows as its own block in the TUI and the web: the command with ok or exit N in color and how long it took, the output muted under a rule with stderr tinted, folded after 20 lines until you click it or press enter.
-- A question that takes several picks asks for them in Slack (a multi-select menu), Discord (a select menu) and Telegram (☐/☑ toggles and Done); single-pick questions keep one button per option.
-- Dependabot keeps Go modules, the web packages and the GitHub Actions current: one weekly PR per ecosystem for minor and patch updates, a separate PR for each major.
-
-### Fixed
-- The agents' system prompt is shorter and direct: answer first, short replies, the user's language, and it no longer names the CLI underneath (agents kept bringing up Claude Code).
-
-- A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
-- ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
-- `smithy tui` is gone: it was the old name of `smithy stats`; run `smithy stats`. The `tui.reduce_motion` setting is now `ui.reduce_motion` under the ui group; a saved `tui.reduce_motion` still works.
-
-### Details
-- Charm libraries: bubbletea v2.2.0; the chat view sets `ProgramResume` (exe, `chat`, its url, `--server` or `--standalone`, `--session <id>`, cwd) and drops it when quitting.
-- `internal/api` holds the daemon's wire types (state, sessions, settings, setup, projects, tasks, workflows, tend, bus) and its `Client`; the TUI, `smithy mcp` and warden use them from there, and the daemon keeps type aliases (ADR 0016). No behaviour change.
-- `internal/agents` split in three (ADR 0016): `agents` runs the CLIs, `agents/sandbox` holds the native and API sandboxes and the secret guard, `agents/skills` finds, installs and inventories skills. `catalog.Kind` names a CLI for both. No behaviour change.
-- `internal/tui` is split into `kit` (themes, dither ramp, charts, header, text helpers), `stats` (the `smithy stats` dashboard and `smithy serve` view) and `chat` (the chat, first-run walk, modals and attach; harness build only) (ADR 0016). No behaviour change.
-
-- ci: actions/checkout v7, setup-go v7, setup-node v7, cache v6, upload-artifact v7, attest-build-provenance v4, golangci-lint-action v9 (useblacksmith/checkout v1, setup-bun v2 and golangci-lint v2.15.0 were already latest).
-- deps(web): preact 11.2.0, typescript 7.0.2, vite 8.4.0, vitest 5.1.2, playwright 1.65.1; vite.config imports `defineConfig` from `vitest/config`, and the settings text/number input splits in two for the preact 11 input types. First load 29.8 KB gzip (budget 31 KB).
-- deps(go): go 1.27.4; openai-go v3.108.0, wazero v1.11.0 and the indirect modules to latest (charm.land left to its own PR). wazero stays below v1.12 until fastschema/qjs#50 lands: qjs v0.0.6 reuses a CompiledModule across runtimes, which v1.12 rejects.
-- workflow: new `internal/workflow` (own cron parser; steps run, agent, if, switch, set, json, foreach, ask, notify, call; per-step when, timeout, retry, on_error; templates `{{steps.x.output}}`, `{{vars.y}}`, `{{inputs.z}}`, `{{env.Z}}` (redacted), none in run commands; workflows in `~/.smithy/workflows`, schedules in `schedules/` with the enable pinned to the schedule file plus its workflow's call tree (sha256), runs in `runs/<name>/`, 50 kept; files with `schedule`/`webhook` are migrated to a schedule); daemon ticks every minute (cron, `gh`-polled GitHub events every 5 min, file watches) and serves `/v1/workflows` (list, detail with the live run, PUT, validate, run with inputs) and `/v1/schedules` (list, add, detail, enable, disable, delete; writes local-only) plus the token-checked, loopback-only `POST /v1/hooks/schedules/{name}`; ask steps are daemon decisions; notify steps are `workflow_note` store events sent to connectors as kind `workflow`; docs in `docs/workflows.md`.
-- workflow: steps judge, loop, session, smelt, warden, http, parallel, wait, github, file and agent `items` fan-out (`internal/workflow/steps.go`); `allow_write` and `files` on workflows; `{{secret.name}}` from `smithy auth` in http headers and body, redacted; http only to `guard.fetch_allow` hosts; github runs gh by argv; pr/merge/warden validated to need a `when` on an earlier ask's yes; the pin covers loop and parallel blocks.
-- Session links (TK-112): daemon `GET/POST /v1/sessions/{id}/links` and `GET /v1/links?dir=`, polled per session with backoff (1m doubling to 10m, reset on change) and pushed as `session_links` events; GitHub through gh or the token API (`ghx.LinkPR`, `LinkIssue`, `BranchPR`), Linear through the stored key (`linear.Lookup`), never an MCP connector. `smithy daemon --demo` links canned work with no network.
-- workflow: new `internal/workflow` (own cron parser, `run`/`agent`/`if`/`notify` steps, store in `~/.smithy/workflows` with the enable pinned to the file's sha256, runs in `runs/<name>/`, 50 kept); daemon ticks it every minute and serves `GET /v1/workflows[/{name}]`, `PUT /v1/workflows/{name}`, `POST /v1/workflows/{name}/run|enable|disable` (writes local-only); notify steps are `workflow_note` store events sent to connectors as kind `workflow`; docs in `docs/workflows.md`.
-- TUI: the top decision strip is gone; the question card (`overlayAsk`) opens when a decision arrives and the composer is empty, or on enter with an empty composer or `/answer`; 1-9, arrows and enter, space on multi-select, esc for later. The pill reads "waiting on you".
-- daemon: decisions carry `multi` and `other`; `/v1/asks` takes `multi` and accepts free text for every non-guard question; the MCP `ask` tool gains a `multi` flag.
-- usage: "usage" events carry `agent`, `model` and `session`; daemon sessions append one per reported usage (their `smithy agent` turns run with `SMITHY_EVENTS=off`, so nothing is counted twice); `events.Tally` sums them by period, agent and model; daemon `GET /v1/usage?session=`; TUI `/usage` opens the info modal, web `/usage` lazy-loads `features/chat/usage.ts` into the info panel.
-- shell: `daemon.RunShell` keeps stdout and stderr apart line by line and times the run; `POST /v1/sessions/{id}/shell` adds `lines` and `took_ms`; the TUI reuses it for `!cmd` (a `shell` transcript block, toggled like tool blocks) and the web draws `features/chat/shellblock.tsx`, lazy, its CSS out of the first load.
-- `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
-- The chat header shows the tend mode and how many PRs it tends.
-- `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.
-- A vague product idea ("make me a landing page") now starts with a brainstorm, grilling, spec and tasks before any build, and smithy offers the design or frontend skills you have installed.
+- Workflows: steps run a command, ask an agent (yes/no, a choice or JSON), branch, set variables, pick JSON fields, loop, ask you, notify you, call another workflow, make HTTP calls with stored keys, run in parallel, wait, work with GitHub and files in allowed folders, start a chat session, smelt or warden, fan out an agent per item, judge work against criteria and repeat until a check passes. Every step can retry, time out, skip or recover. Steps that change things need the workflow's `allow_write`; opening or merging a PR and starting warden need your yes first.
+- Schedules start a workflow on a cron line, a webhook, a GitHub event (a Dependabot alert, a red PR, a labeled issue) or a file change. `smithy workflow`, `smithy schedule`, `/workflows`, `/schedules`, `/run` and the web's Workflows and Schedules pages run them, show a run live, edit them with validation and show each step of past runs. `smithy workflow example` adds a daily Dependabot check, a repo health report, a webhook reply and `ship-a-fix` (an agent fixes, tests loop until green, a judge reviews, you approve, the PR opens).
+- The chat has a tab strip of this folder's sessions with `+` for a new one, a right sidebar on wide terminals (`/sidebar`) with the title, context used, spend and linked PRs, tool calls and thoughts folded into one line such as "+ 2 commands, 1 thought", an agent · model · time · tok/s line under each answer, and answered questions kept as a short Q → A.
+- An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, and several picks when the agent asks for them. Slack, Discord and Telegram ask for several picks with a menu or toggles, and you can answer any question in your own words by replying to its message.
+- A `!cmd` shows as its own block: the command, ok or exit N, how long it took, and the output folded after 20 lines.
+- Each session shows its linked PRs (state, checks, review, mergeable, lines changed) and the Linear and GitHub issues it names, live: in the TUI's agents panel, the sidebar and `/links`, the web's session panel and the Agents page.
+- `/goal <text>` pins a goal on a session: the daemon keeps it going until the agent reports it met with evidence, asks you, or hits `session.goal_max_turns` or `session.goal_max_cost`.
+- New `refine` skill: `/refine <rough prompt>` asks the few questions that matter and hands back a structured prompt to copy or start a session with.
+- Sessions can message each other: a session can start a child, and parent, children and siblings in one project send notes. The TUI and web show the tree and the notes.
+- Chat apps get two places each: a notifications channel for alerts and a chat channel where a new message starts a session in its own thread or topic. `/channels test` and the web settings send a test message to both.
+- `/usage` in the TUI and the web: tokens in, out and cached, and cost, for this session, today, the last 7 days and all time, per agent and model.
+- The agents' system prompt is an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show whether it is active.
+- `/effort` works before any session (it sets `agent.effort`) and completes the levels the agent takes, in the TUI and the web.
+- `/doctor` opens a modal: problems with their fix first, then things worth a look, then what is fine.
+- `/board` in the TUI shows your task files by status, like the web Board.
+- The chat survives a terminal restart where the terminal supports it, and `smithy chat --session <id>` opens a session directly.
+- Four more color themes, moss, dune, dusk and rose, and every theme is a whole palette, not only an accent.
+- The `/` menu lists commands first, then skills with their own mark, and matches descriptions too. The chat header shows the tend mode and how many PRs it tends; `/tend`, `/serve`, the theme and effort pickers change with left/right.
+- A vague product idea ("make me a landing page") starts with a brainstorm, questions, a spec and tasks before any build, and smithy offers the design skills you have installed.
 
 ### Fixed
+
+- The agents' system prompt is shorter and direct, and no longer names the CLI underneath.
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
+- ctrl+k and ctrl+l redraw the whole TUI, so clearing the terminal no longer leaves a dimmed screen.
+- `smithy tui` is gone: run `smithy stats`. The `tui.reduce_motion` setting is now `ui.reduce_motion`; a saved `tui.reduce_motion` still works.
 
 ### Details
-- CI: `check` runs as `go` (lint, both test builds, integration) and `web` on 2 vCPU runners; a pull request touching only Markdown or `docs/` skips the Go tests, `web` runs only when `web/` changes, drafts run nothing, and `build` (one job, every target), `demo` and `windows-launcher` run only for pull requests into `main` and pushes to `main`. `check` stays the one gate.
-- Session bus: `Session.parent`, `session_mail` events, `POST /v1/bus/start|send`, `GET /v1/bus/inbox` and `GET /v1/sessions/{id}/mail`, keyed per session by `SMITHY_SESSION_KEY` (memory only); `smithy mcp` adds `send`, `inbox` and `start_session` when the key is set. Bus messages reach the agent framed as data.
-- TUI: `infoPanel.set` holds one setting row cycled with left/right; `doctorPanel` groups `smithy doctor` output; the header reads `GET /v1/tend` once a minute.
-- `/board` in the TUI chat shows your task files by status, like the web Board: move a task with
-  left/right, tab through task dirs, enter opens the file, `o` opens its PR, blockers and PRs show on each row.
-- The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
-- Chat apps get two places each: a notifications channel for alerts and a chat channel where a new message starts a session in its own thread or topic, your replies continue it and its answers come back. `/channels test` and the web settings send a test message to both.
-- A question from the ask tool can be answered in your own words by replying to its message, besides its buttons.
-- `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).
-  `/effort ` completes the levels the agent takes, `off` included, and the top level plays a short shimmer.
-- The TUI's `/` menu lists commands first, then skills with their own mark and folder, and matches descriptions too.
-- Four more color themes, moss, dune, dusk and rose, and every theme is now a whole palette
-  (backgrounds, text, borders, accent and status colors), not only a new accent. Pick one with
-  `/theme` in the TUI or the web's command palette.
-- The web composer does the same: `/effort` works without a session, `/effort ` completes the levels,
-  the top level shimmers, and the `/` menu lists commands, then marked skills.
-- `connect.<telegram|slack|discord>.notify` and `.chat` settings; the old single keys (`notify.telegram.chat`, `connect.slack.channel`, `connect.discord.channel`) still set the notifications channel. `POST /v1/connect/test` builds the connectors from the current settings and sends to each channel. Chat-mode sessions start only for users in `connect.<name>.users`.
-- `ui.theme` palettes live in `internal/tui/theme.go` (`palettes`); `web/src/theme/temper.css`
-  maps the same hex onto Sephiro's tokens per `data-accent`, and a test checks they match.
-  256-color terminals get each palette's nearest colors; 16-color terminals keep steel's tiers with
-  the theme's accent.
+
+- workflow: `internal/workflow` with its own cron parser; steps run, agent, if, switch, set, json, foreach, ask, notify, call, judge, loop, session, smelt, warden, http, parallel, wait, github, file and agent `items` fan-out; per-step when, timeout, retry, on_error; templates `{{steps.x.output}}`, `{{vars.y}}`, `{{inputs.z}}`, `{{env.Z}}` and `{{secret.name}}` (redacted, none in run commands); http only to `guard.fetch_allow` hosts; github runs gh by argv; pr, merge and warden validated to need a `when` on an earlier ask's yes. Workflows in `~/.smithy/workflows`, schedules in `schedules/` with the enable pinned (sha256) to the schedule file plus its workflow's call tree, runs in `runs/<name>/`, 50 kept; older files with `schedule`/`webhook` are migrated to a schedule.
+- daemon: ticks schedules every minute (cron, `gh`-polled GitHub events every 5 min, file watches); `/v1/workflows` (list, detail with the live run, PUT, validate, run with inputs), `/v1/schedules` (list, add, detail, enable, disable, delete; writes local-only) and the token-checked, loopback-only `POST /v1/hooks/schedules/{name}`; notify steps are `workflow_note` events sent to connectors as kind `workflow`. Docs in `docs/workflows.md`.
+- Session links: `GET/POST /v1/sessions/{id}/links` and `GET /v1/links?dir=`, polled per session with backoff (1m doubling to 10m) and pushed as `session_links` events; GitHub through gh or the token API, Linear through the stored key, never an MCP connector. `smithy daemon --demo` links canned work offline.
+- Session bus: `Session.parent`, `session_mail` events, `POST /v1/bus/start|send`, `GET /v1/bus/inbox`, `GET /v1/sessions/{id}/mail`, keyed per session by `SMITHY_SESSION_KEY` (memory only); `smithy mcp` adds `send`, `inbox` and `start_session` when the key is set. Messages reach the agent framed as data.
+- Decisions carry `multi` and `other`; `/v1/asks` takes `multi` and free text for every non-guard question; the MCP `ask` tool gains `multi`. The TUI's decision strip is replaced by the question card (`overlayAsk`).
+- Usage events carry `agent`, `model` and `session`; `events.Tally` sums them; `GET /v1/usage?session=`. Daemon sessions' `smithy agent` turns run with `SMITHY_EVENTS=off`, so nothing is counted twice.
+- Shell: `daemon.RunShell` keeps stdout and stderr apart and times the run; `POST /v1/sessions/{id}/shell` adds `lines` and `took_ms`; the web block is lazy-loaded.
+- Connectors: `connect.<telegram|slack|discord>.notify` and `.chat`; the old `notify.telegram.chat`, `connect.slack.channel` and `connect.discord.channel` still set the notifications channel. `POST /v1/connect/test`. Chat-mode sessions start only for users in `connect.<name>.users`.
+- Themes: palettes in `internal/tui/kit/theme.go` (`Themes`); `web/src/theme/temper.css` maps the same hex onto Sephiro's tokens and a test checks they match. 256-color terminals get the nearest colors; 16-color terminals keep steel's tiers with the theme's accent.
+- Terminal resume: the chat sets bubbletea's `ProgramResume` (OSC 7577) with its server and `--session <id>` and drops it on quit.
+- Packages (ADR 0016, no behaviour change): `internal/api` holds the daemon's wire types and `Client`; `internal/agents` splits into `agents`, `agents/sandbox` and `agents/skills`; `internal/tui` into `kit`, `stats` and `chat`.
+- CI: `check` runs as `go` and `web` on 2 vCPU runners; Markdown- or `docs/`-only changes skip the Go tests, `web` runs only when `web/` changes, drafts run nothing, and `build`, `demo` and `windows-launcher` run only for pull requests into and pushes to `main`. Dependabot opens weekly grouped PRs for Go modules, `web/` packages and GitHub Actions, majors on their own.
+- deps: go 1.27.4, bubbletea v2.2.0, openai-go v3.108.0, wazero v1.11.0 (held below v1.12 until fastschema/qjs#50 lands); preact 11.2.0, typescript 7.0.2, vite 8.4.0, vitest 5.1.2, playwright 1.65.1 (first load 29.8 KB gzip, budget 31 KB); actions checkout, setup-go, setup-node v7, cache v6, upload-artifact v7, attest-build-provenance v4, golangci-lint-action v9.
+
 ## v0.25.0 — 2026-11-26
 
 ### Highlights
