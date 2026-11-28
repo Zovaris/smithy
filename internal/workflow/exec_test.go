@@ -4,6 +4,7 @@ package workflow
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
@@ -34,5 +35,13 @@ func TestGuardDefaults(t *testing.T) {
 	}
 	if Guard("gh api repos/x/y/dependabot/alerts") != "" {
 		t.Fatal("guard blocked a harmless command")
+	}
+}
+
+func TestShellEnvKeepsOnlyBasics(t *testing.T) {
+	env := map[string]string{"PATH": "/bin", "HOME": "/h", "ANTHROPIC_API_KEY": "sk-x", "GH_TOKEN": "ghp_y"}
+	got := strings.Join(ShellEnv(func(k string) string { return env[k] }), " ")
+	if strings.Contains(got, "ANTHROPIC") || !strings.Contains(got, "PATH=/bin") || !strings.Contains(got, "GH_TOKEN=ghp_y") {
+		t.Fatalf("%s", got)
 	}
 }

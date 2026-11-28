@@ -99,8 +99,14 @@ text (PR bodies, web pages) can be steered, so keep it read-only and its answer 
   and `auto.sandbox`, failing closed when the sandbox is unavailable.
 - Caps per run, calls and loops included: `max_minutes` (30), `max_agents` (3), `max_cost_usd`
   (1.00, from the agent's reported cost). A cap ends the run as `capped`; `on_error` doesn't catch it.
-- Values read through `{{env.X}}` are replaced by `***` in the history, the live view, outputs
-  and notifications.
+- Shell steps start from a small environment (PATH, HOME, USER, SHELL, LANG, TMPDIR, TERM,
+  XDG_CONFIG_HOME, SSH_AUTH_SOCK, GH_HOST, GH_TOKEN, GITHUB_TOKEN) plus the `SMITHY_*` values; the
+  daemon's other variables, API keys among them, never reach them.
+- Values read through `{{env.X}}` and the GitHub tokens are replaced by `***` in the history, the
+  live view, outputs and notifications. Only exact matches of 4 characters or more are caught: a
+  secret a step transforms (base64, say) is not.
+- Webhook inputs are untrusted text from whoever holds the token. They reach commands only as
+  `$SMITHY_INPUT_*` and agents only inside `<data>` tags, and agents are read-only.
 - Output is capped at 64 KiB per step while it runs.
 - An enabled workflow keeps the background daemon from its idle exit, so its schedule fires.
 - Running, enabling and editing over the API need this machine's daemon token; paired devices

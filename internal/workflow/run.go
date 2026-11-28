@@ -142,6 +142,9 @@ func RunWith(ctx context.Context, w Workflow, env Env, in Invocation) Record {
 	r := &runner{w: w, env: env, lim: &limits{}, secrets: &secrets{vals: map[string]bool{}}, trigger: in.Trigger,
 		runID: rec.Started.UTC().Format("20060102T150405.000"), rec: rec, recMu: &sync.Mutex{}}
 	r.exitOK = exitTested(w.Steps)
+	for _, k := range GitHubTokens {
+		r.secrets.add(env.Getenv(k))
+	}
 	sc := r.scope(in.Inputs)
 	rec.Inputs = sc.inputs
 	_, err := r.block(ctx, w.Steps, sc, &rec.Steps, true)

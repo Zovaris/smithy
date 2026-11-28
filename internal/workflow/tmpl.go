@@ -127,7 +127,7 @@ func (sc *scope) render(text string, data bool, clip int) string {
 		default:
 			v, name = sc.index, "index"
 		}
-		if clip > 0 && len(v) > clip {
+		if clip > 0 && len(v) > clip && g[5] == "" {
 			v = v[:clip] + "…"
 		}
 		if data {

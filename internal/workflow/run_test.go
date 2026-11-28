@@ -264,6 +264,10 @@ func TestSecretsRedacted(t *testing.T) {
 	w := parse(t, `{"name":"sec","outputs":{"o":"{{env.API_TOKEN}}"},"steps":[{"id":"a","kind":"agent","prompt":"use {{env.API_TOKEN}}"},{"id":"n","kind":"notify","message":"t={{env.API_TOKEN}} said {{steps.a.output}}"}]}`)
 	f := &fake{answers: []string{"echo sk-live-12345"}, getenv: map[string]string{"API_TOKEN": "sk-live-12345"}}
 	r := Run(context.Background(), w, f.env())
+	f2 := &fake{shell: map[string]shellOut{"gh x": {"token ghp_secretvalue1 leaked", 0}}, getenv: map[string]string{"GH_TOKEN": "ghp_secretvalue1"}}
+	if r2 := Run(context.Background(), parse(t, `{"name":"g","steps":[{"id":"a","kind":"run","run":"gh x"}]}`), f2.env()); strings.Contains(r2.Steps[0].Output, "ghp_secretvalue1") {
+		t.Fatalf("GitHub token leaked: %q", r2.Steps[0].Output)
+	}
 	all := r.Outputs["o"] + r.Steps[0].Input + r.Steps[0].Output + r.Steps[1].Output + strings.Join(f.notes, "")
 	if strings.Contains(all, "sk-live-12345") || !strings.Contains(r.Steps[0].Output, "***") {
 		t.Fatalf("secret leaked: %q", all)

@@ -171,7 +171,7 @@ func (sv *Server) proxyServer(w http.ResponseWriter, r *http.Request) {
 			pr.Out.URL.Path = strings.TrimRight(u.Path, "/") + rest
 			pr.Out.URL.RawPath = ""
 			pr.Out.Host = u.Host
-			for _, h := range []string{"Authorization", "Cookie", "Origin", "Referer", "X-Smithy-Who", LoginHeader, "Sec-Fetch-Site"} {
+			for _, h := range []string{"Authorization", "Cookie", "Origin", "Referer", "X-Smithy-Who", "X-Smithy-Hook", LoginHeader, "Sec-Fetch-Site"} {
 				pr.Out.Header.Del(h)
 			}
 			if target.Token != "" {

@@ -26,7 +26,7 @@ func Shell(ctx context.Context, dir, cmd string, env []string) (string, int, err
 		c = exec.CommandContext(ctx, "cmd", "/C", cmd)
 	}
 	c.Dir = dirOr(dir)
-	c.Env = append(os.Environ(), env...)
+	c.Env = append(ShellEnv(os.Getenv), env...)
 	c.WaitDelay = 5 * time.Second
 	out := &capped{}
 	c.Stdout, c.Stderr = out, out
@@ -128,4 +128,22 @@ func (c *capped) String() string {
 		return c.b.String() + "\n… (output cut at 64 KiB)"
 	}
 	return c.b.String()
+}
+
+// shellKeep are the variables a shell step inherits; the daemon's other variables (API keys among
+// them) never reach it. GitHubTokens are passed for gh and redacted from the record.
+var (
+	shellKeep    = []string{"PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TMPDIR", "TERM", "XDG_CONFIG_HOME", "SSH_AUTH_SOCK", "GH_HOST"}
+	GitHubTokens = []string{"GH_TOKEN", "GITHUB_TOKEN"}
+)
+
+// ShellEnv is the environment a shell step starts from.
+func ShellEnv(getenv func(string) string) []string {
+	var env []string
+	for _, k := range append(append([]string{}, shellKeep...), GitHubTokens...) {
+		if v := getenv(k); v != "" {
+			env = append(env, k+"="+v)
+		}
+	}
+	return env
 }
