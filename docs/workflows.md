@@ -65,8 +65,16 @@ Exactly one trigger:
 }
 ```
 
-`dir` is where steps run (home when empty). `inputs` are names with defaults, `vars` the starting
-variables, `outputs` templates filled when the run ends.
+`dir` is where steps run (home when empty). `inputs` are names with defaults (the form Run
+shows), `vars` the starting variables, `outputs` templates filled when the run ends.
+`allow_write: true` lets steps change things: a writing agent (`"write": true`), `session`,
+`smelt`, `warden`, `github` comment/label/issue/pr/merge, `http` other than GET and `file`
+write. Without it those steps fail validation. `files` lists the folders `file` steps may use.
+
+`smithy workflow example ship-a-fix` adds the AI-first example: an agent fixes the bug you
+describe and commits, the tests run in a `loop` until green (3 tries, each try seeing the last
+failure), a `judge` grades the diff against three criteria, an `ask` shows you the grade, and only
+on yes a `github pr` step pushes the branch and opens the PR.
 
 ### Every step
 
@@ -90,6 +98,17 @@ variables, `outputs` templates filled when the run ends.
 | `ask` | `question`, `options` (empty: any answer) | the person's answer, given in the TUI, web or a chat connector |
 | `notify` | `title`, `message` | sent to the TUI chat, the web page and the chat connectors' notifications channel (kind `workflow`) |
 | `call` | `workflow`, `with`: its inputs | the called workflow's outputs as JSON |
+| `agent` with `items` | a fan-out: the prompt once per item (`{{item}}`), `parallel` and `limit` as in `foreach`; each counts toward `max_agents` | a JSON array of the answers |
+| `judge` | `subject` (a template), `criteria` (a list), `pass` (score 0-1, default 0.7) | answer `pass` or `fail`, `why`, and the grade as JSON |
+| `loop` | `do`: steps run again until `until` (a condition) holds, at most `max` tries (default 3, at most 10); later tries see the earlier outputs | `done after N of M tries`; it fails when `until` never holds |
+| `session` | `prompt`, `agent`: opens a chat session on the daemon | the session's id (the web links to it, where its turns show live) |
+| `smelt` | `task`, `speed` (fast, normal, full): a session that runs smelt on the task | the session's id |
+| `warden` | `task` (a task dir or an idea): a session that starts a warden batch | the session's id |
+| `http` | `method`, `url`, `headers`, `body`; `{{secret.name}}` (a key from `smithy auth set`) works in headers and body only | the response body; `exit` is the status, 400 and up fails |
+| `parallel` | `branches`: lists of steps run at the same time; their results and variables join the run after | a JSON array of each branch's last output |
+| `wait` | `for` (a duration), or `check` (a command polled every `every`, default 30s, until it exits 0; `timeout` caps it) | the check's last output |
+| `github` | `action`: `alerts`, `prs`, `issues` (read), `comment` and `label` (with `pr`), `issue` (`title`, `body`), `pr` (pushes the branch and opens a PR with `title`, `body`), `merge` (with `pr`). Run with `gh`, no shell | gh's output |
+| `file` | `op`: `read`, `write` or `append`; `path`; `content`. Only inside the workflow's `files` folders (symlinks resolved) | the text read, or the bytes written |
 
 A condition tests one value: `value` (a template) or, when empty, step `step`'s answer (its output
 when it has none). Exactly one test: `exit` (step `step`'s exit code), `match` (regex), `equals`
@@ -115,9 +134,15 @@ text (PR bodies, web pages) can be steered, so keep it read-only and its answer 
 - Files from before schedules (a workflow with `schedule` or `webhook`) are moved on first use:
   the workflow loses those fields and a schedule of the same name gets them, enabled if the
   workflow was, keeping its webhook token.
+- Steps that change things need `allow_write: true` on the workflow (pinned with it). `github
+  pr` and `merge`, and `warden` (it starts paid sessions), also need an earlier `ask` step and
+  `when: {step: <ask>, equals: yes}`: validation refuses them otherwise.
+- `http` reaches only hosts listed in your `guard.fetch_allow` (`*` doesn't count), with no
+  redirects, 30 s and 1 MiB at most. `{{secret.name}}` values are redacted like `{{env.X}}`.
 - Shell steps go through the guard (`guard.block`, `guard.allow`). Nobody is there to answer, so a
   blocked command fails the step.
-- Agent steps run read-only through `smithy agent` with the auto profile: the unattended allow-list
+- Agent steps run read-only through `smithy agent` with the auto profile (a `"write": true`
+  agent drops read-only and keeps the rest): the unattended allow-list
   and `auto.sandbox`, failing closed when the sandbox is unavailable.
 - Caps per run, calls and loops included: `max_minutes` (30), `max_agents` (3), `max_cost_usd`
   (1.00, from the agent's reported cost). A cap ends the run as `capped`; `on_error` doesn't catch it.
