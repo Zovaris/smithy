@@ -87,6 +87,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `kit.mcp` | `true` | `false` stops giving driven CLIs smithy's own MCP server (`smithy mcp`). Toggled by `/skills` in the TUI and the web Setup screen. |
 | `kit.skills` | (empty) | Comma list of installed skills (smithy's, then `~/.agents/skills` and `~/.smithy/skills`) linked into every driven CLI that takes skills (claude, codex, opencode, pi). Toggled by `/skills`. |
 | `ui.splash` | `true` | `false` skips the short dither-and-anvil animation when `smithy` opens; it never plays without a terminal, color or motion, or under 80×24, and any key skips it. |
+| `ui.agent_tabs` | `false` | `true` shows the open sessions as tabs under the chat header; `false` puts an `agents N` chip in the header that opens the agents panel (`tab`, `/agents`). Shown as "Show agent tabs" in `/config`. |
 | `ui.theme` | `steel` | Color theme the TUI and web share: `steel`, `frost`, `plum`, `moss`, `dune`, `dusk` or `rose`. `/theme` in the TUI and the web palette set it. |
 | `ui.reduce_motion` | `false` | `true` draws every `smithy` and `smithy stats` frame still: no sparks, shimmer or sliding bars (like `--no-anim` or `SMITHY_REDUCE_MOTION`). |
 | `git.branch` | `{type}/{key}-{slug}` | Branch names (`smithy names`); e.g. `agent/{key}-{slug}`. |

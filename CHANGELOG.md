@@ -11,7 +11,7 @@ part above `### Details`.
 ### Highlights
 
 - Workflows and schedules: build a flow of steps (commands, agents, judges, loops, GitHub, your yes) and run it with one click or `/run`, or let a schedule start it on a cron line, a webhook, a GitHub event or a file change.
-- A new chat layout: session tabs, a sidebar with context, spend and linked PRs, folded tool calls, question cards and shell command blocks.
+- A new chat layout: an agents panel (optional session tabs), a sidebar with context, spend and linked PRs, folded tool calls, question cards and shell command blocks.
 - `/goal` keeps a session working until the goal is met, and `/refine` turns a rough prompt into a structured one.
 - Each session shows its PRs and issues live, and sessions can start and message each other.
 - Chat apps get a notifications channel and a chat channel where a message starts a session.
@@ -31,7 +31,7 @@ part above `### Details`.
 
 - Workflows: steps run a command, ask an agent (yes/no, a choice or JSON), branch, set variables, pick JSON fields, loop, ask you, notify you, call another workflow, make HTTP calls with stored keys, run in parallel, wait, work with GitHub and files in allowed folders, start a chat session, smelt or warden, fan out an agent per item, judge work against criteria and repeat until a check passes. Every step can retry, time out, skip or recover. Steps that change things need the workflow's `allow_write`; opening or merging a PR and starting warden need your yes first.
 - Schedules start a workflow on a cron line, a webhook, a GitHub event (a Dependabot alert, a red PR, a labeled issue) or a file change. `smithy workflow`, `smithy schedule`, `/workflows`, `/schedules`, `/run` and the web's Workflows and Schedules pages run them, show a run live, edit them with validation and show each step of past runs. `smithy workflow example` adds a daily Dependabot check, a repo health report, a webhook reply and `ship-a-fix` (an agent fixes, tests loop until green, a judge reviews, you approve, the PR opens).
-- The chat has a tab strip of this folder's sessions with `+` for a new one, a right sidebar on wide terminals (`/sidebar`) with the title, context used, spend and linked PRs, tool calls and thoughts folded into one line such as "+ 2 commands, 1 thought", an agent · model · time · tok/s line under each answer, and answered questions kept as a short Q → A.
+- The chat has optional tabs for this folder's sessions (`ui.agent_tabs`, off by default; an `agents N` chip in the header opens the agents panel instead) with `+` for a new one, a right sidebar on wide terminals (`/sidebar`) with the title, context used, spend and linked PRs, tool calls and thoughts folded into one line such as "+ 2 commands, 1 thought", an agent · model · time · tok/s line under each answer, and answered questions kept as a short Q → A.
 - An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, and several picks when the agent asks for them. Slack, Discord and Telegram ask for several picks with a menu or toggles, and you can answer any question in your own words by replying to its message.
 - A `!cmd` shows as its own block: the command, ok or exit N, how long it took, and the output folded after 20 lines.
 - Each session shows its linked PRs (state, checks, review, mergeable, lines changed) and the Linear and GitHub issues it names, live: in the TUI's agents panel, the sidebar and `/links`, the web's session panel and the Agents page.
@@ -62,7 +62,7 @@ part above `### Details`.
 - `smithy doctor --fix` reads its answers from one reader per run.
 - `smithy wait` stops on ctrl+c, even during a timer, with exit code 130.
 - Pricing a model no longer blocks other callers for up to 10 seconds while the daily price list downloads.
-- Session tabs work: `ctrl+n` and `ctrl+p` or a click switch tabs, `+` starts a new session, and the open tab is bold and underlined.
+- With `ui.agent_tabs` on, session tabs work: `ctrl+n` and `ctrl+p` or a click switch tabs, `+` starts a new session, and the open tab is bold and underlined.
 - An answered question stays in the session that asked it; a new session or another one no longer shows it, and a batch's questions stay out of every transcript.
 - The `/` menu floats over the transcript, at most eight rows, instead of pushing it up.
 - Messages sent during a turn wait in a queue under the input and go out in order when it ends; `↑` edits or drops the next one, and `esc` interrupts the turn.
