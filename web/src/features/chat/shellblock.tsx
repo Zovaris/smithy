@@ -1,11 +1,10 @@
 // ShellBlock is a `!cmd` run in the chat, as the TUI draws it: the command, exit status and time on
 // one row, the output under a rule, muted, stderr tinted, folded after FOLD lines until opened; a
-// cut run ends, open, with one line saying the rest was cut.
+// cut run carries its own "… N lines cut …" line between the head and the tail.
 import { useState } from "preact/hooks";
 import type { Shell } from "../../lib/store";
 import "./shellblock.css";
 
-export const CUT = "… the rest was cut (a run keeps 500 lines, 64 KiB)";
 
 export const FOLD = 20;
 
@@ -16,7 +15,7 @@ export default function ShellBlock({ x }: { x: Shell }) {
   const all = x.lines.length ? x.lines : [{ text: "(no output)" }];
   const folds = all.length > FOLD;
   const folded = !open && folds;
-  const shown = folded ? all.slice(0, FOLD) : x.cut ? [...all, { text: CUT }] : all;
+  const shown = folded ? all.slice(0, FOLD) : all;
   const more = all.length - FOLD;
   const status = x.error ? x.error : x.code ? "exit " + x.code : "ok";
   return (

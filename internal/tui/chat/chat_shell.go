@@ -186,8 +186,6 @@ func (m chatView) shellRows(i, w int) []string {
 	more := 0
 	if !c.open && len(lines) > shellFold {
 		more, lines = len(lines)-shellFold, lines[:shellFold]
-	} else if sh.run.Cut {
-		lines = append(lines[:len(lines):len(lines)], daemon.ShellLine{Text: api.ShellCutNote})
 	}
 	rule := p + "  " + dim.Render(t.G.Pipe) + " "
 	for _, l := range lines {

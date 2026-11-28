@@ -285,7 +285,8 @@ type ShellLine struct {
 }
 
 // ShellRun is a finished `!cmd` as a session_shell event keeps it: its lines in the order printed
-// (at most ShellMaxLines and ShellMaxBytes, Cut when there was more), the exit code (-1 when it
+// (the first and last half of ShellMaxLines and ShellMaxBytes; when there was more, Cut is set
+// and one "… N lines cut …" line sits between them), the exit code (-1 when it
 // never ran or was killed, with Err set) and how long it took.
 type ShellRun struct {
 	ID     string      `json:"id"`
@@ -298,11 +299,8 @@ type ShellRun struct {
 	Cut    bool        `json:"cut,omitempty"`
 }
 
-// ShellMaxLines and ShellMaxBytes cap what a `!cmd` keeps; the rest is cut.
+// ShellMaxLines and ShellMaxBytes cap what a `!cmd` keeps, half from the start, half from the end.
 const (
 	ShellMaxLines = 500
 	ShellMaxBytes = 64 << 10
 )
-
-// ShellCutNote is the one line that ends a cut run's output.
-const ShellCutNote = "… the rest was cut (a run keeps 500 lines, 64 KiB)"

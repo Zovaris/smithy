@@ -13,7 +13,8 @@ export type Sess = {
 };
 export type Tool = { id?: string; name: string; args?: unknown; output?: string; is_error?: boolean };
 export type Part = { kind: "text"; text: string } | { kind: "tools"; tools: Tool[] } | { kind: "decision"; id: string };
-// Shell is a `!cmd` run (session_shell): at most 500 lines kept, cut set when there was more.
+// Shell is a `!cmd` run (session_shell): the first and last 250 lines, cut set when a "… N lines
+// cut …" line sits between them.
 export type ShellLine = { text: string; err?: boolean };
 export type Shell = { id?: string; cmd: string; dir?: string; lines: ShellLine[]; code: number; error?: string; took_ms?: number; cut?: boolean };
 export type Item = { kind: "you"; text: string; at: string } | { kind: "agent"; parts: Part[]; at: string } | { kind: "shell"; x: Shell; at: string };

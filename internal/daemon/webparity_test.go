@@ -59,8 +59,10 @@ func TestSessionShellLandsInTheTranscriptCapped(t *testing.T) {
 	_, m := post(t, url+"/v1/sessions", `{"agent":"claude","dir":"`+dir+`","message":"hi"}`)
 	id := m["id"].(string)
 	waitStatus(t, sv, id, StatusDone)
-	code, m := post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"seq 2000; printf '\\033[31mred\\033[0m' >&2"}`)
-	if code != 200 || m["id"] == "" || m["cut"] != true || len(m["lines"].([]any)) != api.ShellMaxLines {
+	code, m := post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"seq 800; echo oops >&2"}`)
+	ls := m["lines"].([]any)
+	text := func(i int) any { return ls[i].(map[string]any)["text"] }
+	if code != 200 || m["id"] == "" || m["cut"] != true || len(ls) != api.ShellMaxLines+1 || text(0) != "1" || text(249) != "250" || text(250) != "… 301 lines cut …" || text(251) != "552" || text(500) != "oops" || ls[500].(map[string]any)["err"] != true {
 		t.Fatalf("shell: %d cut=%v lines=%d", code, m["cut"], len(m["lines"].([]any)))
 	}
 	evs, _ := sv.st.Since(0)
@@ -74,7 +76,7 @@ func TestSessionShellLandsInTheTranscriptCapped(t *testing.T) {
 			got = append(got, r)
 		}
 	}
-	if len(got) != 1 || got[0].ID != m["id"] || got[0].Cmd == "" || !strings.HasSuffix(got[0].Dir, filepath.Base(dir)) || !got[0].Cut || got[0].Lines[0].Text != "1" || len(got[0].Lines) != api.ShellMaxLines {
+	if len(got) != 1 || got[0].ID != m["id"] || got[0].Cmd == "" || !strings.HasSuffix(got[0].Dir, filepath.Base(dir)) || !got[0].Cut || got[0].Lines[0].Text != "1" || len(got[0].Lines) != api.ShellMaxLines+1 {
 		t.Fatalf("%d events, first cut=%v", len(got), len(got) > 0 && got[0].Cut)
 	}
 	_, m = post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"printf '\\033[31mred\\033[0m\\r\\n' >&2"}`)

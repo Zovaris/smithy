@@ -77,7 +77,7 @@ func TestShellEventFromAnotherClientShows(t *testing.T) {
 	}
 }
 
-func TestCutShellRunEndsWithOneNoteWhenOpen(t *testing.T) {
+func TestCutShellRunShowsItsMarkerWhenOpen(t *testing.T) {
 	m := newChatTest(0)
 	m.height = 80
 	m.current = "s1"
@@ -86,6 +86,7 @@ func TestCutShellRunEndsWithOneNoteWhenOpen(t *testing.T) {
 	for i := range 30 {
 		ls = append(ls, api.ShellLine{Text: fmt.Sprintf("line-%02d", i)})
 	}
+	ls[25] = api.ShellLine{Text: "… 9 lines cut …"}
 	m = shellEv(t, m, "s1", api.ShellRun{ID: "x", Cmd: "seq", Lines: ls, Cut: true})
 	out := screen(m)
 	if !strings.Contains(out, "10 more lines") || strings.Contains(out, "cut") || strings.Contains(out, "line-20") {
@@ -93,7 +94,7 @@ func TestCutShellRunEndsWithOneNoteWhenOpen(t *testing.T) {
 	}
 	m = chatStep(m, tea.MouseClickMsg{X: 5, Y: rowOf(t, m, "$ seq"), Button: tea.MouseLeft})
 	out = screen(m)
-	if !strings.Contains(out, "line-29") || strings.Count(out, "cut") != 1 || !strings.Contains(out, api.ShellCutNote) || strings.Contains(out, "more line") {
+	if !strings.Contains(out, "line-29") || strings.Count(out, "cut") != 1 || !strings.Contains(out, "… 9 lines cut …") || strings.Contains(out, "more line") {
 		t.Fatalf("open:\n%s", out)
 	}
 }
@@ -276,7 +277,7 @@ func TestRunShellCapsOutput(t *testing.T) {
 	for _, l := range r.Lines {
 		n += len(l.Text)
 	}
-	if n > api.ShellMaxBytes || !r.Cut {
+	if n > api.ShellMaxBytes+100 || !r.Cut {
 		t.Fatalf("output %d bytes, cut %v", n, r.Cut)
 	}
 }
