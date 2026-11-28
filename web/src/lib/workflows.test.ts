@@ -23,6 +23,8 @@ describe("workflows", () => {
     expect([ms(40), ms(2500), ms(180000)]).toEqual(["40ms", "2.5s", "3m"]);
     expect(summary({ id: "l", kind: "loop", do: [{ id: "t", kind: "run" }], until: { step: "t", exit: 0 } })).toBe("1 steps until t exit 0");
     expect(summary({ id: "a", kind: "agent", items: "{{steps.x.output}}", prompt: "review {{item}}" })).toBe("each of {{steps.x.output}}: review {{item}}");
+    expect(summary({ id: "c", kind: "code", code: "return lines(steps.a.output)" })).toBe("return lines(steps.a.output)");
+    expect(result({ id: "c", kind: "code", status: "ok", duration_ms: 3, exit: 0, output: "[1,2]" })).toBe("[1,2]");
     expect(opensSession({ id: "s", kind: "smelt", status: "ok", duration_ms: 0, exit: 0, output: "s-1" })).toBe(true);
   });
 });
