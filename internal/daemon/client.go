@@ -359,6 +359,13 @@ func (c *Client) Settings(ctx context.Context) (Settings, error) {
 	return s, err
 }
 
+// ConnectTest is POST /v1/connect/test: a test message on every chat connector's channels.
+func (c *Client) ConnectTest(ctx context.Context) (ConnectTestResult, error) {
+	var r ConnectTestResult
+	err := c.call(ctx, "POST", "/v1/connect/test", map[string]string{}, &r)
+	return r, err
+}
+
 // SetSetting is PUT /v1/settings/{key}: saves key in the user's file.
 func (c *Client) SetSetting(ctx context.Context, key, value string) error {
 	return c.call(ctx, "PUT", "/v1/settings/"+url.PathEscape(key), map[string]string{"value": value}, nil)
