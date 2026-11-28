@@ -62,6 +62,7 @@ func layoutView(w int) chatView {
 
 func TestTabStripShowsSessionsAndPlus(t *testing.T) {
 	m := layoutView(140)
+	m.tabsOn = true
 	row := ansi.Strip(m.header(140)[1])
 	if !strings.Contains(row, "Fix the login") || !strings.Contains(row, "+") {
 		t.Fatalf("tab strip lacks the title or +: %q", row)

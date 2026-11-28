@@ -44,7 +44,7 @@ func configGroup(k string) string {
 // configMain is the curated /config list: the settings people change, each with its label, in
 // the order shown. Every other setting sits under Advanced, which filtering still searches.
 var configMain = []struct{ key, label string }{
-	{"ui.theme", "Theme"}, {"chat.transcript", "Transcript"}, {"chat.sidebar", "Sidebar"}, {"ui.reduce_motion", "Reduce motion"}, {"ui.splash", "Splash"},
+	{"ui.theme", "Theme"}, {"chat.transcript", "Transcript"}, {"chat.sidebar", "Sidebar"}, {"ui.agent_tabs", "Show agent tabs"}, {"ui.reduce_motion", "Reduce motion"}, {"ui.splash", "Splash"},
 	{"agent.effort", "Effort"}, {"agent.code_mode", "Code mode"}, {"agent.timeout", "Turn timeout"}, {"kit.mcp", "smithy MCP server"},
 	{"tend.daemon", "Tend"}, {"tend.watch", "Tend watches"}, {"tend.label", "Tend label"},
 	{"serve", "Serve"}, {"auto.agent", "Serve agent"}, {"auto.max_per_day", "Runs a day"}, {"auto.max_cost_per_day", "Spend a day"}, {"daemon.idle_exit", "Daemon idles out after"},
@@ -262,6 +262,8 @@ func (m chatView) cycleSetting(r api.SettingRow, dir int) (tea.Model, tea.Cmd) {
 	}
 	m.vb = valueBump{key: r.Key, still: m.still}.start()
 	switch r.Key {
+	case "ui.agent_tabs":
+		m.tabsOn = v == "true"
 	case "chat.transcript":
 		for c := modeMinimal; c <= modeVerbose; c++ {
 			if c.String() == v {

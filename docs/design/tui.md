@@ -48,9 +48,11 @@ rail whose first cell of a block carries its mark (`✓ ✗ $ ?` or the spinner)
 your prompt is a bold heading on a heavy accent rail with the turn's result and time on its right,
 not a boxed message; tool runs fold into small tallies; the sidebar is a live session panel (pulse
 sparkline of steps per turn, heat, work, queue, links) that hides when there is nothing to show;
-an empty session opens a third of the way down on one wordmark line, one context line (folder,
-branch, agent, model) and up to five recent sessions that 1-5 opens: no art, never a centered logo
-and input.
+an empty session opens on a centred home that is responsive: from 130 transcript columns a darker
+panel (wordmark, branch, working tree, tend, agent as tiles) beside a raised "pick up where you left
+off" list; narrower, one stacked panel (wordmark and context, the repo pulse as tone chips, then the
+recent sessions); recent rows show title, agent, age and the last thing said; no art, never a
+centered logo and input.
 
 ## Colors
 
@@ -100,6 +102,10 @@ Rhythm: exactly one blank row (the rail runs through it) between blocks; tool ro
 horizontal rules: hierarchy comes from weight, colour and spacing.
 An agent answer is plain text on the rail; its agent, model, time and rate sit on the prompt heading
 once the turn ends. Text streamed in parts becomes that one answer, never repeated.
+Session tabs under the header are off by default (`ui.agent_tabs`, "Show agent tabs" in /config);
+with them off the header carries an `agents N` chip that opens the agents panel, and ctrl+n/p still
+switch sessions. The ask panel docks above the input with one blank row between them; the input keeps
+its rows (padding, prompt, blank, chips) and the footer sits one row below it.
 Sidebar (34 cols, 40 from 160 wide, Raised) shows from 120 cols when the session has something to show.
 
 80x24:

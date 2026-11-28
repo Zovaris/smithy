@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	tea "charm.land/bubbletea/v2"
+
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/Zovaris/smithy/internal/api"
@@ -155,4 +157,59 @@ func notes(m chatView) string {
 		}
 	}
 	return strings.Join(out, "\n")
+}
+
+func TestHomeSplitsWideAndStacksNarrow(t *testing.T) {
+	for w, split := range map[int]bool{80: false, 120: false, 200: true} {
+		m := newChatTest(0)
+		m.width, m.height = w, 40
+		out := screen(m)
+		if got := strings.Contains(out, "Pick up where you left off"); got != split {
+			t.Errorf("%d cols: split %v, want %v:\n%s", w, got, split, out)
+		}
+	}
+}
+
+func TestAgentTabsOffShowAChipThatOpensTheAgents(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 120, 30
+	started(&m, "s-1", "fix the login form")
+	started(&m, "s-2", "write release notes")
+	m.open("s-1")
+	lines := strings.Split(screen(m), "\n")
+	if !strings.Contains(lines[0], "agents 2") || strings.Contains(lines[1], "Write release notes") {
+		t.Fatalf("tabs off: chip in the header, no tab strip:\n%s", strings.Join(lines[:3], "\n"))
+	}
+	if !strings.Contains(screen(m), "ctrl+n/p sessions") {
+		t.Fatal("the footer names ctrl+n/p for sessions")
+	}
+	m = cpress(m, tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
+	if m.current != "s-2" {
+		t.Fatalf("ctrl+n still switches sessions, at %q", m.current)
+	}
+	x := strings.Index(lines[0], "agents 2")
+	m = click(m, ansi.StringWidth(lines[0][:x])+1, 0)
+	if m.overlay != overlayAgents {
+		t.Fatal("a click on the chip opens the agents panel")
+	}
+}
+
+func TestAskPanelLeavesTheInputWholeWithAGap(t *testing.T) {
+	m, _ := askScene()
+	m.setPending([]api.Decision{{ID: "d1", Question: "Ship it?", Options: []string{"yes", "no"}}})
+	m = chatStep(m, ckey("enter"))
+	lines := strings.Split(screen(m), "\n")
+	in := -1
+	for i, l := range lines {
+		if strings.Contains(l, "for commands") {
+			in = i
+		}
+	}
+	comp := m.composer(m.tw())
+	if in < 3 || strings.TrimSpace(lines[in-2]) != "" || !strings.Contains(strings.Join(lines[in-5:in-2], ""), "esc dismiss") {
+		t.Fatalf("one blank row between the ask panel and the input:\n%s", strings.Join(lines[max(in-6, 0):], "\n"))
+	}
+	if len(comp) < 4 || strings.TrimSpace(lines[in-1]) == "" || strings.TrimSpace(lines[in+1]) == "" {
+		t.Fatalf("the input keeps its rows:\n%s", strings.Join(lines[in-1:], "\n"))
+	}
 }

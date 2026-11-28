@@ -25,6 +25,7 @@ func click(m chatView, x, y int) chatView {
 func TestTabsSwitchByKeyAndClick(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 120, 30
+	m.tabsOn = true
 	started(&m, "s-1", "fix the login form")
 	started(&m, "s-2", "write release notes")
 	m.open("s-1")

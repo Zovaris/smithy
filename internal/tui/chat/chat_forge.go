@@ -6,7 +6,6 @@ import (
 	"charm.land/lipgloss/v2"
 	"fmt"
 	"image/color"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -79,11 +78,15 @@ func (m chatView) textWidth(w int) int {
 
 // home is the empty screen of a session with no turns yet, h rows, centred both ways: the
 // wordmark rising in on the spring, the repo's pulse as tone chips, the recent sessions as rich
-// rows (title, what was said last, agent and age) and one tip. SMITHY_TUI_HOME=split picks the
-// two-panel variant.
+// rows (title, what was said last, agent and age) and one tip. From homeSplitMin columns it
+// lays out as two panels, narrower as one stacked panel; each frame picks again, so a resize
+// switches it.
+// homeSplitMin is the narrowest transcript that fits the two-panel home comfortably.
+const homeSplitMin = 130
+
 func (m chatView) home(w, h int) []string {
 	var block []string
-	if os.Getenv("SMITHY_TUI_HOME") == "split" {
+	if w >= homeSplitMin {
 		block = m.homeSplit(min(w-2*m.pad(), 104))
 	} else {
 		block = m.homeStack(min(w-2*m.pad(), 76))
@@ -368,4 +371,25 @@ func ago(d time.Duration) string {
 		return fmt.Sprintf("%dh ago", int(d.Hours()))
 	}
 	return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+}
+
+// agentsChip is the header's way into the agents panel when tabs are off: the session count.
+func (m chatView) agentsChip() string {
+	t := m.th
+	n := len(m.listed())
+	return m.chip(fmt.Sprintf(" agents %d ", n), t.Text, t.Overlay, false)
+}
+
+// agentsChipAt reports whether column x of the header row is on the agents chip.
+func (m chatView) agentsChipAt(x int) bool {
+	if m.tabsOn {
+		return false
+	}
+	row := ansi.Strip(m.header(max(m.width, 20))[0])
+	at := strings.Index(row, " agents ")
+	if at < 0 {
+		return false
+	}
+	x0 := ansi.StringWidth(row[:at])
+	return x >= x0 && x < x0+ansi.StringWidth(ansi.Strip(m.agentsChip()))
 }

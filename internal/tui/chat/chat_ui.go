@@ -484,6 +484,11 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 		}
 	case msg.Y >= inputY && msg.Y < m.height-1:
 		m.setFocus(-1)
+	case msg.Y == 0 && m.agentsChipAt(msg.X):
+		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
+		return m, nil
+	case msg.Y == 1 && !m.tabsOn:
+		return m, nil
 	case msg.Y == 1:
 		_, hits, x := m.tabStrip(max(m.width, 20))
 		if msg.X >= x {

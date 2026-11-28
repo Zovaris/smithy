@@ -77,13 +77,22 @@ func (m chatView) header(w int) []string {
 		project = filepath.Base(m.dir)
 	}
 	pill := m.pill
+	if !m.tabsOn {
+		pill = func(bar lipgloss.Style) string { return m.agentsChip() + bar.Render(" ") + m.pill(bar) }
+	}
 	if tag := strings.TrimPrefix(strings.Join([]string{m.goalTag(), m.tendTag()}, "  "), "  "); strings.TrimSpace(tag) != "" {
 		tag = strings.TrimSpace(tag)
 		pill = func(bar lipgloss.Style) string {
+			if !m.tabsOn {
+				return m.agentsChip() + bar.Render(" ") + m.chip(" "+tag+" ", m.th.Muted, m.th.Overlay, false) + bar.Render(" ") + m.pill(bar)
+			}
 			return m.chip(" "+tag+" ", m.th.Muted, m.th.Overlay, false) + bar.Render(" ") + m.pill(bar)
 		}
 	}
 	tabs, _, _ := m.tabStrip(w)
+	if !m.tabsOn {
+		tabs = ""
+	}
 	return []string{m.th.HeadBar(w, m.pad(), project, pill, m.clockNow().Format("15:04")), tabs}
 }
 
@@ -242,7 +251,7 @@ func (m chatView) footer(w int) string {
 		return t.Fg(t.Text).Render(k) + t.Fg(t.Dim).Render(" "+what)
 	}
 	p := strings.Repeat(" ", m.pad())
-	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode"), hint("tab", "agents"), hint("ctrl+n/p", "tabs"), hint("?", "help"), hint("ctrl+s", "select")}
+	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode"), hint("tab", "agents"), hint("ctrl+n/p", map[bool]string{true: "tabs", false: "sessions"}[m.tabsOn]), hint("?", "help"), hint("ctrl+s", "select")}
 	if m.busy(m.current) {
 		hints = append([]string{hint("esc", "interrupt")}, hints...)
 	}

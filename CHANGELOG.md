@@ -33,6 +33,7 @@ part above `### Details`.
 - `/usage` is a dashboard: headline numbers, spend (or tokens) per day for 30 days, the split by agent and model with bars, and the token mix. Runs from before agents were recorded read "earlier runs, agent not recorded" instead of "unknown", in the web too.
 - opencode sessions show one answer with their tool calls as tool rows, instead of the reply twice with its raw banner lines.
 - The sidebar no longer shows GitHub's raw rate-limit error: links pause for 15 minutes and say when they retry.
+- The empty chat opens on a home with the repo's state and your recent sessions (1-5 opens one), two panels when wide and one when narrow. Session tabs are now a setting ("Show agent tabs", off): without them an agents chip in the header opens the agents panel.
 - `/config` shows about 20 settings by name (Theme, Sidebar, Effort, Tend, Serve…), booleans as on/off, and the rest under Advanced; tab titles are short and scroll with « » when they overflow.
 - A question waiting on you opens as a Questions panel above the input, each option with its description; the transcript keeps "Asked 1 question" and your answer.
 

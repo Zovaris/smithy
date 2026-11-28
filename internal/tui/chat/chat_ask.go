@@ -169,7 +169,7 @@ func (m chatView) askBox(screen []string, w, h int) []string {
 		hint = t.Fg(t.Dim).Render("↑↓ select " + t.G.Dot + " space pick " + t.G.Dot + " enter submit " + t.G.Dot + " esc dismiss")
 	}
 	rows = append(rows, row(bg, ""), row(bg, " "+hint), row(bg, ""))
-	bottom := len(screen) - 1 - len(m.composer(tw))
+	bottom := len(screen) - 2 - len(m.composer(tw)) - 1
 	top := max(bottom-len(rows), headRows)
 	rows = rows[len(rows)-(bottom-top):]
 	out := slices.Clone(screen)

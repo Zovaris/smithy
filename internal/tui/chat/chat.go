@@ -180,6 +180,7 @@ type chatView struct {
 	evAt      time.Time        // when the event being applied happened
 	dirty     int              // files changed in the folder's repo, -1 outside one
 	homeIn    valueBump        // the empty screen's entrance
+	tabsOn    bool             // ui.agent_tabs: the sessions as tabs under the header
 
 	server      string                    // the saved server name, local or URL this chat talks to
 	picker      *connectPicker            // /connect's state while its box is open
@@ -446,6 +447,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	m := newChatView(ch, url, kit.NewTheme(true, p, kit.Utf8Locale()))
 	m.splashOn = splashWanted(isTTY(os.Stdout), os.Getenv("NO_COLOR"), os.Getenv("SMITHY_REDUCE_MOTION"), config.Get("ui.splash", "true"), config.Get("ui.reduce_motion", "false"))
 	m.still = os.Getenv("SMITHY_REDUCE_MOTION") != "" || config.Get("ui.reduce_motion", "false") == "true"
+	m.tabsOn = config.Get("ui.agent_tabs", "false") == "true"
 	m.where = where
 	m.server = serverName
 	m.connectLoad = defaultConnectLoad(func() (string, string) {
