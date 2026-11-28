@@ -154,10 +154,10 @@ func (m chatView) projectKey(k string) (tea.Model, tea.Cmd) {
 	rows := m.projRows()
 	switch k {
 	case "up", "k":
-		m.proj.sel = max(m.proj.sel-1, 0)
+		m.proj.sel = wrapStep(m.proj.sel, -1, len(rows))
 		return m, nil
 	case "down", "j":
-		m.proj.sel = min(m.proj.sel+1, max(len(rows)-1, 0))
+		m.proj.sel = wrapStep(m.proj.sel, 1, len(rows))
 		return m, nil
 	}
 	if b := m.proj.browse; b != nil {

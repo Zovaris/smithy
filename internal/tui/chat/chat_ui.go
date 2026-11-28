@@ -601,9 +601,9 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc", "ctrl+k":
 		m.overlay, m.picker = overlayNone, nil
 	case "up":
-		m.pal.sel = max(m.pal.sel-1, 0)
+		m.pal.sel = wrapStep(m.pal.sel, -1, len(items))
 	case "down":
-		m.pal.sel = min(m.pal.sel+1, max(len(items)-1, 0))
+		m.pal.sel = wrapStep(m.pal.sel, 1, len(items))
 	case "left", "right":
 		if m.pal.sel < len(items) && items[m.pal.sel].cycle != nil {
 			return m, items[m.pal.sel].cycle(&m, map[string]int{"left": -1, "right": 1}[k])
@@ -645,9 +645,9 @@ func (m chatView) agentsKey(k string) (tea.Model, tea.Cmd) {
 	case "ctrl+k":
 		return m, m.openPalette("")
 	case "up", "k":
-		m.agentSel = max(m.agentSel-1, 0)
+		m.agentSel = wrapStep(m.agentSel, -1, len(m.listed()))
 	case "down", "j":
-		m.agentSel = min(m.agentSel+1, max(len(m.listed())-1, 0))
+		m.agentSel = wrapStep(m.agentSel, 1, len(m.listed()))
 	case "a":
 		m.allProj = !m.allProj
 		m.agentSel = min(m.agentSel, max(len(m.listed())-1, 0))

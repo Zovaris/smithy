@@ -191,10 +191,10 @@ func (m chatView) configKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.overlay = overlayNone
 		return m, nil
 	case "up":
-		m.pal.sel = max(m.pal.sel-1, 0)
+		m.pal.sel = wrapStep(m.pal.sel, -1, len(rows))
 		return m, nil
 	case "down", "tab":
-		m.pal.sel = min(m.pal.sel+1, max(len(rows)-1, 0))
+		m.pal.sel = wrapStep(m.pal.sel, 1, len(rows))
 		return m, nil
 	case "ctrl+u":
 		m.pal = palette{}

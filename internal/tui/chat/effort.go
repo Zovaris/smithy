@@ -202,9 +202,9 @@ func (m chatView) effortKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.overlay = overlayNone
 	case "up", "k":
-		m.effortSel = max(m.effortSel-1, 0)
+		m.effortSel = wrapStep(m.effortSel, -1, len(rows))
 	case "down", "j":
-		m.effortSel = min(m.effortSel+1, len(rows)-1)
+		m.effortSel = wrapStep(m.effortSel, 1, len(rows))
 	case "left", "h":
 		m.effortSel = (m.effortSel + len(rows) - 1) % len(rows)
 	case "right", "l":

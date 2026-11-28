@@ -287,9 +287,9 @@ type fileCache struct {
 func (m chatView) popupKey(msg tea.KeyPressMsg, items []popupItem) (chatView, tea.Cmd, bool) {
 	switch msg.String() {
 	case "up":
-		m.popSel = max(m.popSel-1, 0)
+		m.popSel = wrapStep(m.popSel, -1, len(items))
 	case "down":
-		m.popSel = min(m.popSel+1, len(items)-1)
+		m.popSel = wrapStep(m.popSel, 1, len(items))
 	case "tab":
 		m.input.SetValue(items[min(m.popSel, len(items)-1)].fill)
 		m.input.CursorEnd()
@@ -358,10 +358,15 @@ func (m chatView) popupRows(items []popupItem, w int) []string {
 		}
 		out = append(out, fill(st, w, ansi.Truncate(r, w-1, "…")))
 	}
-	if t.G.Unicode && !t.Plain {
-		out = append([]string{t.Fg(t.Accent).Render(strings.Repeat("▄", w))}, out...)
-	}
 	return out
+}
+
+// wrapStep moves i by d in a list of n, wrapping past either end.
+func wrapStep(i, d, n int) int {
+	if n <= 0 {
+		return 0
+	}
+	return ((i+d)%n + n) % n
 }
 
 // needsArgs reports whether a command takes required arguments, so enter fills it in instead of running it bare.
