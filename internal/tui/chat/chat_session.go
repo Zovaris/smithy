@@ -190,7 +190,7 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 			m.now(id, "")
 			return true
 		}
-		if m.lastText(id) != strings.TrimSpace(d.Text) {
+		if !m.adoptReply(id, d.Text) && m.lastText(id) != strings.TrimSpace(d.Text) {
 			m.into(id, chatMsg{who: "agent", text: strings.TrimSpace(d.Text)})
 			m.addStreamed(id, len(d.Text))
 		}
@@ -257,6 +257,35 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 }
 
 // lastText is the text of session id's last message, "" when it is not agent text.
+// adoptReply marks the text streamed since your last message as the agent's answer when the
+// final reply is that same text, so an answer streamed in parts shows once, as the agent's.
+func (m *chatView) adoptReply(id, reply string) bool {
+	msgs := m.convs[id]
+	if id == m.current {
+		msgs = m.msgs
+	}
+	var parts []*chatMsg
+	for i := len(msgs) - 1; i >= 0 && msgs[i].who != "you"; i-- {
+		if c := msgs[i]; c.who == "daemon" && c.kind == "" && c.tool == nil && c.sh == nil {
+			parts = append(parts, c)
+		}
+	}
+	if len(parts) == 0 {
+		return false
+	}
+	var got []string
+	for i := len(parts) - 1; i >= 0; i-- {
+		got = append(got, parts[i].text)
+	}
+	if strings.Join(strings.Fields(strings.Join(got, " ")), " ") != strings.Join(strings.Fields(reply), " ") {
+		return false
+	}
+	for _, c := range parts {
+		c.who, c.lines = "agent", nil
+	}
+	return true
+}
+
 func (m chatView) lastText(id string) string {
 	msgs := m.convs[id]
 	if id == m.current {

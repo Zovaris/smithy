@@ -170,6 +170,9 @@ func (r *cliRunner) env() []string {
 	if r.busKey != "" {
 		env = append(env, "SMITHY_SESSION="+r.busID, "SMITHY_SESSION_KEY="+r.busKey)
 	}
+	if r.agent == "opencode" {
+		env = append(env, "AGENT_ARGS=--format json")
+	}
 	if r.agent == "claude" {
 		env = append(env, "AGENT_ARGS=--output-format stream-json --verbose --append-system-prompt "+quoteArg(SystemPrompt(r.agent, false)))
 	}
@@ -186,8 +189,12 @@ func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e 
 	cmd := exec.Command(r.exe, "agent", "--cwd", r.dir, "--log", log, prompt)
 	cmd.Dir = r.dir
 	var cs *claudeStream
-	if r.agent == "claude" {
+	var oc *opencodeStream
+	switch r.agent {
+	case "claude":
 		cs = newClaudeStream()
+	case "opencode":
+		oc = &opencodeStream{}
 	}
 	cmd.Env = r.env()
 	var errOut capped
@@ -218,7 +225,7 @@ func (r *cliRunner) Turn(ctx context.Context, msg string, history []Exchange, e 
 		off += int64(len(b))
 		var keep []byte
 		for _, l := range bytes.SplitAfter(b, []byte("\n")) {
-			if cs != nil && cs.line(l, e) {
+			if cs != nil && cs.line(l, e) || oc != nil && oc.line(l, e) {
 				continue
 			}
 			if !bytes.HasPrefix(l, []byte(`{"type":`)) {
@@ -253,6 +260,8 @@ loop:
 	follow(true)
 	if cs != nil && cs.usage != nil {
 		e.Usage(*cs.usage)
+	} else if oc != nil && oc.usage != nil {
+		e.Usage(*oc.usage)
 	} else if u, ok := usage.Read(log); ok {
 		e.Usage(u)
 	}
@@ -265,6 +274,9 @@ loop:
 	reply := out.b.String()
 	if cs != nil {
 		reply = cs.result
+	}
+	if oc != nil {
+		reply = oc.reply()
 	}
 	if ctx.Err() != nil {
 		return reply, ctx.Err()
