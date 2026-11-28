@@ -41,6 +41,15 @@ func (f *fakeFlows) SetWorkflow(_ context.Context, name string, on bool) (workfl
 	return f.l.Workflows[0], nil
 }
 
+func TestWorkflowNoteShowsInChat(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 160, 48
+	m.event(daemon.KindWorkflowNote, "", time.Now(), []byte(`{"workflow":"dependabot-daily","title":"Dependabot: merge? yes","text":"patch bump, CI green"}`))
+	if out := screen(m); !strings.Contains(out, "workflow dependabot-daily · Dependabot: merge? yes: patch bump, CI green") {
+		t.Fatalf("note not shown:\n%s", out)
+	}
+}
+
 func TestWorkflowsModal(t *testing.T) {
 	w, _ := workflow.Parse([]byte(workflow.Example))
 	f := &fakeFlows{l: daemon.WorkflowList{Workflows: []workflow.Info{{Workflow: w, File: "/nowhere/dependabot-daily.json"}}}}

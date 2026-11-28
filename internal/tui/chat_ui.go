@@ -126,6 +126,12 @@ func (m *chatView) event(kind, session string, at time.Time, data json.RawMessag
 		if json.Unmarshal(data, &o) == nil {
 			m.unpend(o.ID)
 		}
+	case daemon.KindWorkflowNote:
+		var n struct{ Workflow, Title, Text string }
+		if json.Unmarshal(data, &n) == nil && n.Workflow != "" {
+			m.system(clean("workflow " + n.Workflow + " · " + n.Title + ": " + n.Text))
+		}
+		return
 	}
 	if t := eventText(kind, session, data); t != "" {
 		m.logNoise(noise{at: at, text: t, quiet: kind == daemon.KindAsked})

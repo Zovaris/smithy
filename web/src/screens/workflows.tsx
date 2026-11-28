@@ -1,4 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
+import { useLive } from "../lib/live";
 import { loadWorkflow, loadWorkflows, result, runWorkflow, saveWorkflow, setWorkflow, state, type WorkflowDetail, type WorkflowList } from "../lib/workflows";
 
 const when = (t?: string) => (t ? new Date(t).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
@@ -11,6 +12,7 @@ export default function Workflows() {
   const [d, setD] = useState<WorkflowDetail | null>(null);
   const [edit, setEdit] = useState<string | null>(null);
   const [err, setErr] = useState("");
+  const notes = useLive().store.notes.slice(-5).reverse();
 
   const reload = () => loadWorkflows().then(setL).catch((e) => setErr(String(e.message ?? e)));
   const detail = (name: string) => loadWorkflow(name).then(setD).catch((e) => setErr(String(e.message ?? e)));
@@ -44,6 +46,17 @@ export default function Workflows() {
         <p>{l.workflows.length ? `${l.workflows.filter((w) => w.enabled).length} of ${l.workflows.length} on a schedule.` : "No workflows yet."}</p>
       </header>
       {err && <p class="err" role="alert">{err}</p>}
+      {!!notes.length && (
+        <div aria-label="Notifications">
+          <div class="lbl">Notifications</div>
+          {notes.map((n) => (
+            <div class="card" style="padding:8px 16px;margin-top:6px">
+              <strong>{n.title}</strong> <span class="t3">{n.workflow} · {when(n.at)}</span>
+              <p class="hint" style="white-space:pre-wrap">{n.text}</p>
+            </div>
+          ))}
+        </div>
+      )}
       {!l.workflows.length && (
         <div class="card"><p class="hint" style="padding:16px">
           A workflow is a JSON file in <code>~/.smithy/workflows</code>: a cron schedule and steps that run a command, ask an agent, branch and notify you. <code>smithy workflow example</code> adds a daily Dependabot check.
