@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,19 +23,19 @@ var stdinTTY = func() bool {
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
-var stdinReader = bufio.NewReader(os.Stdin)
-
-var askFix = func(change string) bool {
+var askFix = func(in *bufio.Reader, change string) bool {
 	fmt.Printf("apply? %s [y/N] ", change)
-	line, _ := stdinReader.ReadString('\n')
+	line, _ := in.ReadString('\n')
 	a := strings.ToLower(strings.TrimSpace(line))
 	return a == "y" || a == "yes"
 }
 
-func applyFixes(fixes []fix, yes bool) {
+// applyFixes lists fixes and applies them, asking for each one on in unless yes.
+func applyFixes(fixes []fix, yes bool, in io.Reader) {
 	if len(fixes) == 0 {
 		return
 	}
+	answers := bufio.NewReader(in)
 	fmt.Println("fixes")
 	for _, f := range fixes {
 		fmt.Printf("  fix   %s\n", f.change)
@@ -48,7 +49,7 @@ func applyFixes(fixes []fix, yes bool) {
 			fmt.Println("skipped (grants a permission, answer it without --yes): " + f.change)
 			continue
 		}
-		if !yes && !askFix(f.change) {
+		if !yes && !askFix(answers, f.change) {
 			fmt.Println("skipped: " + f.change)
 			continue
 		}

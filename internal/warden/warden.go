@@ -464,7 +464,7 @@ func Doctor(args []string) int {
 		r.warn("no AGENTS.md / CLAUDE.md here or in a parent folder", "optional: workers follow smelt and the brief")
 	}
 	if fixing {
-		applyFixes(r.fixes, yes)
+		applyFixes(r.fixes, yes, os.Stdin)
 	}
 	if r.failed {
 		fmt.Println("not ready")
