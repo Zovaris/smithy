@@ -55,6 +55,38 @@ func TestRunWaitsForCycleOnCancel(t *testing.T) {
 	}
 }
 
+func TestRunOwnsACycleThatOutlastsTheGrace(t *testing.T) {
+	home(t)
+	fakeSmithy(t)
+	old := cycleGrace
+	cycleGrace = 20 * time.Millisecond
+	t.Cleanup(func() { cycleGrace = old })
+	src := &blockingSource{started: make(chan struct{}), release: make(chan struct{})}
+	Sources["slow"] = func(Settings) (Source, error) { return src, nil }
+	t.Cleanup(func() { delete(Sources, "slow") })
+	if err := config.Set(config.UserFile(), "auto.sources", "slow"); err != nil {
+		t.Fatal(err)
+	}
+	sv, err := NewServer(ServeOptions{Agent: "claude"}, func(string) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	ret := make(chan error, 1)
+	go func() { ret <- sv.Run(ctx) }()
+	<-src.started
+	cancel()
+	time.AfterFunc(200*time.Millisecond, func() { close(src.release) })
+	select {
+	case <-ret:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not return")
+	}
+	if !src.done.Load() {
+		t.Fatal("Run returned while its cycle was still running")
+	}
+}
+
 func TestCycleSkipsGitHubOutsideRepo(t *testing.T) {
 	home(t)
 	fakeSmithy(t)

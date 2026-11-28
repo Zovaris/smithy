@@ -199,7 +199,9 @@ type Server struct {
 	hb     Heartbeat
 	mkdr   func(string) (string, error)
 	note   *notify.Notifier
-	capDay string // local day a cap_reached event was last recorded (issue cap or spend cap)
+	// flushes counts notification flushes a cycle started; Run waits for them before it returns.
+	flushes sync.WaitGroup
+	capDay  string // local day a cap_reached event was last recorded (issue cap or spend cap)
 	// limitedAt is the reset time a "limited" event was last recorded for (smithy pool).
 	limitedAt time.Time
 }
@@ -339,6 +341,7 @@ func (sv *Server) logf(format string, a ...any) {
 // Run loops until ctx ends, --once's cycle is done or --max-hours passes, then removes the
 // heartbeat. A running orchestrator is left alone.
 func (sv *Server) Run(ctx context.Context) error {
+	defer sv.flushes.Wait()
 	defer func() {
 		sv.beatMu.Lock()
 		sv.ended = true
@@ -389,12 +392,13 @@ func (sv *Server) Run(ctx context.Context) error {
 var cycleGrace = 30 * time.Second
 
 // finishCycle waits for the cycle in flight so Run never returns while it still reads settings
-// or sources; a cycle stuck longer than cycleGrace is left behind and logged.
+// or sources; a cycle still running after cycleGrace is logged and still waited for.
 func (sv *Server) finishCycle(res <-chan time.Duration) {
 	select {
 	case <-res:
 	case <-time.After(cycleGrace):
-		sv.logf("serve: a cycle was still running %s after stop; leaving it", cycleGrace)
+		sv.logf("serve: a cycle was still running %s after stop; waiting for it", cycleGrace)
+		<-res
 	}
 }
 
@@ -506,7 +510,8 @@ func (sv *Server) Cycle() time.Duration {
 	}
 	_ = sv.beat()
 	if sv.note != nil {
-		go sv.note.Flush(now())
+		sv.flushes.Add(1)
+		go func() { defer sv.flushes.Done(); sv.note.Flush(now()) }()
 	}
 	return time.Duration(s.Every) * time.Second
 }
