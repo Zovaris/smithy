@@ -1,16 +1,52 @@
 import { useEffect, useState } from "preact/hooks";
 import { useLive } from "../lib/live";
-import { loadWorkflow, loadWorkflows, result, runWorkflow, saveWorkflow, setWorkflow, state, type WorkflowDetail, type WorkflowList } from "../lib/workflows";
+import { loadWorkflow, loadWorkflows, ms, result, runWorkflow, saveWorkflow, setWorkflow, state, summary, triggers, validateWorkflow, type RunRecord, type Step, type StepResult, type WorkflowDetail, type WorkflowList } from "../lib/workflows";
 
 const when = (t?: string) => (t ? new Date(t).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
 
-// Workflows lists the scheduled workflows the daemon runs: run one now, turn its schedule on or
-// off, read its runs with each step's output, or edit its file.
+function Steps({ steps }: { steps: Step[] }) {
+  return (
+    <ol style="margin:0;padding-left:20px">
+      {steps.map((s) => (
+        <li>
+          <code>{s.kind}</code> {s.id} <span class="t3">{summary(s)}</span>
+          {s.do && <Steps steps={s.do} />}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function Results({ steps }: { steps: StepResult[] }) {
+  return (
+    <ul style="margin:4px 0;padding-left:20px">
+      {steps.map((s) => (
+        <li>
+          <code>{s.id}</code> <span class={s.status === "failed" ? "err" : "t3"}>{s.status}</span> <span class="t3">{ms(s.duration_ms)}{s.attempts ? ` · ${s.attempts} tries` : ""}</span> {result(s)}
+          {(s.input || s.output) && s.kind !== "iteration" && (
+            <details>
+              <summary class="t3">input and output</summary>
+              {s.input && <pre style="white-space:pre-wrap;max-height:200px;overflow:auto">{s.input}</pre>}
+              {s.output && <pre style="white-space:pre-wrap;max-height:240px;overflow:auto">{s.output}</pre>}
+            </details>
+          )}
+          {s.steps && <Results steps={s.steps} />}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+const runHead = (r: RunRecord) => `${when(r.started)} · ${r.status} · ${r.trigger ?? ""}${r.cost_usd ? ` · $${r.cost_usd.toFixed(2)}` : ""}${r.error ? " · " + r.error : ""}`;
+
+// Workflows lists the workflows the daemon runs: run one now, turn its schedule and webhook on or
+// off, watch a run live, read past runs step by step, or edit its file with validation.
 export default function Workflows() {
   const [l, setL] = useState<WorkflowList | null>(null);
   const [open, setOpen] = useState("");
   const [d, setD] = useState<WorkflowDetail | null>(null);
   const [edit, setEdit] = useState<string | null>(null);
+  const [check, setCheck] = useState("");
   const [err, setErr] = useState("");
   const notes = useLive().store.notes.slice(-5).reverse();
 
@@ -26,6 +62,16 @@ export default function Workflows() {
     setEdit(null);
     if (open) detail(open);
   }, [open]);
+  useEffect(() => {
+    if (!open || !d?.running) return;
+    const t = setInterval(() => detail(open), 2000);
+    return () => clearInterval(t);
+  }, [open, d?.running]);
+  useEffect(() => {
+    if (edit === null) return setCheck("");
+    const t = setTimeout(() => validateWorkflow(edit).then((v) => setCheck(v.ok ? "" : v.error ?? "invalid")).catch(() => {}), 300);
+    return () => clearTimeout(t);
+  }, [edit]);
 
   const act = async (f: () => Promise<unknown>) => {
     setErr("");
@@ -35,7 +81,7 @@ export default function Workflows() {
       setErr((e as Error).message);
     }
     reload();
-    if (open) detail(open);
+    if (open) setTimeout(() => detail(open), 300);
   };
 
   if (!l) return <section class="page"><p class="t3">{err || "Reading the workflows…"}</p></section>;
@@ -43,7 +89,7 @@ export default function Workflows() {
     <section class="page" aria-label="Workflows">
       <header>
         <h2>Workflows</h2>
-        <p>{l.workflows.length ? `${l.workflows.filter((w) => w.enabled).length} of ${l.workflows.length} on a schedule.` : "No workflows yet."}</p>
+        <p>{l.workflows.length ? `${l.workflows.filter((w) => w.enabled).length} of ${l.workflows.length} on.` : "No workflows yet."}</p>
       </header>
       {err && <p class="err" role="alert">{err}</p>}
       {!!notes.length && (
@@ -59,7 +105,7 @@ export default function Workflows() {
       )}
       {!l.workflows.length && (
         <div class="card"><p class="hint" style="padding:16px">
-          A workflow is a JSON file in <code>~/.smithy/workflows</code>: a cron schedule and steps that run a command, ask an agent, branch and notify you. <code>smithy workflow example</code> adds a daily Dependabot check.
+          A workflow is a JSON file in <code>~/.smithy/workflows</code>: triggers (a schedule, a webhook, by hand) and steps that run commands, ask an agent or you, branch, loop and notify. <code>smithy workflow example</code> adds three.
         </p></div>
       )}
       {l.workflows.map((w) => {
@@ -68,42 +114,47 @@ export default function Workflows() {
           <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
             <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
               <strong>{w.name}</strong>
-              <span class="t3">{st}</span>
-              <code>{w.schedule}</code>
+              <span class={st === "error" ? "err" : "t3"}>{st}</span>
+              <code>{triggers(w)}</code>
               {w.next && <span class="t3">next {when(w.next)}</span>}
               {w.last && <span class="t3">last {w.last.status} {when(w.last.started)}</span>}
               <span class="btns" style="margin-left:auto">
                 <button class="btn sm" disabled={st === "running"} onClick={() => act(() => runWorkflow(w.name))}>Run now</button>
                 <button class="btn sm" disabled={!!w.error} onClick={() => act(() => setWorkflow(w.name, !w.enabled))}>{w.enabled ? "Turn off" : "Turn on"}</button>
-                <button class="btn sm" onClick={() => setOpen(open === w.name ? "" : w.name)} aria-expanded={open === w.name}>{open === w.name ? "Close" : "History"}</button>
+                <button class="btn sm" onClick={() => setOpen(open === w.name ? "" : w.name)} aria-expanded={open === w.name}>{open === w.name ? "Close" : "Open"}</button>
               </span>
             </div>
             {w.description && <p class="hint">{w.description}</p>}
             {w.error && <p class="err">{w.error}</p>}
-            {w.changed && <p class="hint">The file changed outside smithy since it was turned on; turn it on again to run it on schedule.</p>}
+            {w.changed && <p class="hint">The file changed since it was turned on; turn it on again to run it on its schedule or webhook.</p>}
             {open === w.name && d && (
               <div style="display:flex;flex-direction:column;gap:8px">
+                {d.hook && <p class="hint">Webhook: <code>POST /v1/hooks/workflows/{w.name}</code> with header <code>X-Smithy-Hook: {d.hook}</code> and a JSON object of inputs.</p>}
+                {d.live && (
+                  <div aria-label="Running now" aria-live="polite">
+                    <div class="lbl">Running now</div>
+                    <Results steps={d.live.steps} />
+                  </div>
+                )}
                 <div class="lbl">Steps</div>
-                <ol style="margin:0;padding-left:20px">
-                  {d.info.steps?.map((s) => <li><code>{s.kind}</code> {s.id} <span class="t3">{s.run ?? s.prompt ?? (s.step ? "on " + s.step : s.message) ?? ""}</span></li>)}
-                </ol>
+                <Steps steps={d.info.steps ?? []} />
                 <div class="lbl">Runs</div>
                 {!d.history.length && <p class="t3">No runs yet.</p>}
                 {d.history.map((r) => (
                   <details>
-                    <summary>{when(r.started)} · {r.status} · {r.trigger}{r.cost_usd ? ` · $${r.cost_usd.toFixed(2)}` : ""}{r.error ? " · " + r.error : ""}</summary>
-                    <ul style="margin:4px 0;padding-left:20px">
-                      {r.steps.map((s) => <li><code>{s.id}</code> {result(s)}{s.output && s.kind !== "if" && <pre style="white-space:pre-wrap;max-height:240px;overflow:auto">{s.output}</pre>}</li>)}
-                    </ul>
+                    <summary>{runHead(r)}</summary>
+                    {r.outputs && Object.keys(r.outputs).length > 0 && <p class="hint">outputs: {Object.entries(r.outputs).map(([k, v]) => `${k}=${v}`).join(", ")}</p>}
+                    <Results steps={r.steps} />
                   </details>
                 ))}
                 {edit === null ? (
                   <span class="btns"><button class="btn sm" onClick={() => setEdit(d.source)}>Edit</button></span>
                 ) : (
                   <div style="display:flex;flex-direction:column;gap:6px">
-                    <textarea aria-label={`Edit ${w.name}`} rows={16} spellcheck={false} style="font-family:var(--mono, monospace);width:100%" value={edit} onInput={(e) => setEdit(e.currentTarget.value)} />
+                    <textarea aria-label={`Edit ${w.name}`} aria-invalid={!!check} rows={18} spellcheck={false} style="font-family:var(--mono, monospace);width:100%" value={edit} onInput={(e) => setEdit(e.currentTarget.value)} />
+                    <p class={check ? "err" : "hint"} role="status">{check || "Valid."}</p>
                     <span class="btns">
-                      <button class="btn sm primary" onClick={() => act(async () => { await saveWorkflow(w.name, edit); setEdit(null); })}>{w.enabled ? "Save (turns it off)" : "Save"}</button>
+                      <button class="btn sm primary" disabled={!!check} onClick={() => act(async () => { await saveWorkflow(w.name, edit); setEdit(null); })}>{w.enabled ? "Save (turns it off)" : "Save"}</button>
                       <button class="btn sm" onClick={() => setEdit(null)}>Cancel</button>
                     </span>
                   </div>
