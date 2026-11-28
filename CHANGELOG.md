@@ -42,6 +42,7 @@ part above `### Details`.
 
 ### Fixed
 
+- The web `/theme` lists and accepts all seven themes, and the guide marks `/agents`, `/decisions`, `/bench` and `/settings` as web only.
 - The agents' system prompt is shorter and direct, and no longer names the CLI underneath.
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
 - ctrl+k and ctrl+l redraw the whole TUI, so clearing the terminal no longer leaves a dimmed screen.
