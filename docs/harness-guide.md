@@ -69,8 +69,6 @@ command, ok or exit N, how long it took and the output, folded after 20 lines.
 | `/theme [steel\|frost\|plum\|moss\|dune\|dusk\|rose]` | color theme, shared with the web (`ui.theme`) |
 | `/mode [minimal\|expandable\|verbose]` | how much of each turn the transcript shows |
 | `/stop` | stop the open session's turn |
-| `/ask [question]` | a sample question on the card, to try how decisions work |
-| `/answer [text]` | open the question waiting on you, or answer it in your words |
 | `/refine <rough prompt>` | the refine skill: a few questions, then a structured prompt to copy or start a session with |
 | `/connect` | which daemon this chat talks to |
 | `/web` | open the web UI |
@@ -81,7 +79,6 @@ command, ok or exit N, how long it took and the output, folded after 20 lines.
 | `/serve [on\|off]` | serve mode; off launches nothing new |
 | `/tend` | the PRs the daemon tends and their state |
 | `/doctor` | `smithy doctor` on the daemon's machine, in a modal: problems with their fix first, then things worth a look, then what is fine |
-| `/prompt` | the system prompt file (`~/.smithy/prompt.md`) and whether it replaces the default |
 | `/usage` | tokens in, out and cached, and cost: this session, today, 7 days, all time, per agent and model |
 | `/channels [test]` | chat connectors' notifications and chat channels; `test` sends to each |
 | `/board [task dir]` | task files by status: move with left/right, open a file or its PR |
@@ -89,7 +86,6 @@ command, ok or exit N, how long it took and the output, folded after 20 lines.
 | `/links`, `/links add <url\|TK-123\|#12>`, `/links rm <n\|url>` | this session's links, live: PRs (state, CI, review), issues (status, assignee) and any URL. A PR or issue URL the agent or you mention, the branch's PR and a Linear id in the branch link themselves. In the modal `enter` opens, `c` copies, `x` removes; in the sidebar a click opens and `×` removes. A PR going red, green, merged or closed posts one line |
 | `/workflows`, `/schedules` | run workflows and watch them live; turn schedules on or off ([workflows.md](workflows.md)) |
 | `/run <workflow> [input=value]…` | run a workflow now |
-| `/welcome` | walk the first-run steps again |
 | `/setup` | every agent, ready or missing, with its fix |
 | `/help` | keys and commands |
 | `/decisions`, `/bench` | web only: open that page of the web UI |
@@ -120,7 +116,7 @@ The web does what the TUI does:
 
 - **New session**: pick a project (added with a folder browser on the daemon's machine), the
   agent, its model and effort.
-- **Session**: the chat, with `!cmd`, pasted or dropped images, `/ask` and every TUI command
+- **Session**: the chat, with `!cmd`, pasted or dropped images and every TUI command
   under `/`; `ctrl+k` opens the palette. Shell commands and questions render as in the TUI.
 - **Decisions** (`2`), **Agents** (`3`: sessions, ready and missing agents, cost, tokens, tok/s
   and runs per hour as text charts), **Board** (`4`: local task files by status; moving a card

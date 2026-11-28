@@ -3,8 +3,6 @@
 package chat
 
 import (
-	"crypto/rand"
-	hexenc "encoding/hex"
 	"encoding/json"
 	"fmt"
 	"image/color"
@@ -391,20 +389,9 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 	case "skills":
 		m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
 		return m, m.loadSetup(false)
-	case "welcome":
-		m.openWelcome()
-		return m, tea.Batch(m.loadSetup(false), m.loadWelcomeSettings())
 	case "setup":
 		m.openPicker(overlaySetup)
 		return m, m.loadSetup(false)
-	case "ask":
-		return m, m.askDemo(arg)
-	case "answer":
-		if arg == "" {
-			m.openAsk()
-			return m, nil
-		}
-		return m, m.answer(arg)
 	case "detach":
 		return m.detach()
 	case "board", "tasks":
@@ -417,7 +404,7 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.openWorkflows(true)
 	case "run":
 		return m.runWorkflowCmd(arg)
-	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "prompt", "channels":
+	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "channels":
 		return m.settingsCommand(name, arg)
 	case "usage":
 		return m.openUsage()
@@ -913,23 +900,6 @@ func (m chatView) toolRows(i, w int, open, last bool) []string {
 		rows = append(rows, m.gap(w))
 	}
 	return rows
-}
-
-// askDemo asks a sample question (or the one typed) on the question card through the daemon,
-// the same path an agent's ask tool takes outside warden, so it can be seen and answered.
-func (m *chatView) askDemo(q string) tea.Cmd {
-	if m.ask == nil {
-		m.system("/ask needs smithy daemon running: it carries the question and the answer")
-		return nil
-	}
-	opts := []string{"yes", "no", "later"}
-	if q == "" {
-		q, opts = "Demo: which answer should this sample question get?", []string{"approve", "reject", "later"}
-	}
-	b := make([]byte, 4)
-	_, _ = rand.Read(b)
-	m.status("asked: answer it on the question card (a number, arrows and enter, or your own words)")
-	return m.ask("ask:demo"+hexenc.EncodeToString(b), q, opts)
 }
 
 func spread(left, right string, w int) string {

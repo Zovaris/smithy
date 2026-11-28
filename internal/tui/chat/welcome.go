@@ -78,7 +78,7 @@ func (m chatView) welcomeTo(s welcomeStep, agent string) (chatView, tea.Cmd) {
 		return m, nil
 	}
 	m.closeWelcome()
-	m.system("smithy is set up; /welcome walks these steps again, /set and /keys change them one by one")
+	m.system("smithy is set up; smithy welcome walks these steps again, /config and /keys change them one by one")
 	return m, nil
 }
 

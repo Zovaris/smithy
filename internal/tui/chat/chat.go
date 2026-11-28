@@ -54,7 +54,7 @@ command in the session folder; ctrl+v attaches a clipboard image; esc clears the
 const WelcomeUsage = `usage: smithy welcome [url | --server <name|url>]
 Opens the chat on the first-run walk: a short animated welcome, then the agents found on this
 machine, the model new sessions start with, the stored API keys and the Telegram notifications.
-esc leaves it at any step; /welcome in the chat walks it again.`
+esc leaves it at any step; smithy welcome walks it again.`
 
 // chatWhere is where the daemon the chat talks to runs.
 type chatWhere int
@@ -108,8 +108,6 @@ type chatView struct {
 	sessions []chatSession
 	// decide posts an answer to /v1/decisions and returns a chatDecidedMsg.
 	decide func(id, answer string) tea.Cmd
-	// ask posts a question to /v1/asks (the /ask demo); nil without a daemon.
-	ask func(id, question string, options []string) tea.Cmd
 
 	setup     setupAPI            // the daemon's setup endpoints; nil: none
 	cfg       settingsAPI         // the daemon's settings endpoints; nil: none
@@ -491,14 +489,6 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 		return func() tea.Msg {
 			_, err := c.Decide(ctx, id, answer)
 			return chatDecidedMsg{id: id, err: err}
-		}
-	}
-	m.ask = func(id, question string, options []string) tea.Cmd {
-		return func() tea.Msg {
-			if err := c.Ask(ctx, id, question, options); err != nil {
-				return chatDecidedMsg{id: id, err: err}
-			}
-			return nil
 		}
 	}
 	fm, err := tea.NewProgram(m).Run()

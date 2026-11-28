@@ -72,7 +72,7 @@ func TestWelcomeWalksAgentsModelKeysNotifications(t *testing.T) {
 		t.Fatalf("step 4 shows only the notification settings:\n%s", screen(m))
 	}
 	m = sendKey(m, ckey("enter"))
-	if m.overlay != overlayNone || m.welcome != welcomeOff || !strings.Contains(screen(m), "/welcome") {
+	if m.overlay != overlayNone || m.welcome != welcomeOff || !strings.Contains(screen(m), "smithy welcome") {
 		t.Fatalf("the last step closes the welcome and says how to reopen it: %v\n%s", m.overlay, screen(m))
 	}
 }
@@ -81,10 +81,6 @@ func TestWelcomeEscIsLater(t *testing.T) {
 	m := sendKey(welcomeScene(firstRunSetup()), ckey("esc"))
 	if m.overlay != overlayNone || m.welcome != welcomeOff {
 		t.Fatalf("esc on the welcome closes it: %v", m.overlay)
-	}
-	m = sendKey(typeIn(m, "/welcome"), ckey("enter"))
-	if m.overlay != overlayWelcome {
-		t.Fatalf("/welcome reopens it: %v", m.overlay)
 	}
 }
 

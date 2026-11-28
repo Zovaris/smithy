@@ -131,7 +131,7 @@ func (m chatView) setupUpdate(msg tea.Msg) (chatView, tea.Cmd, bool) {
 				return m, m.loadWelcomeSettings(), true
 			}
 			m.welcome = welcomeOff
-			m.system("/welcome sets smithy up: agents, model, API keys, notifications")
+			m.system("/setup shows every agent ready or missing; /config changes any setting")
 		}
 		return m, nil, true
 	case setupSavedMsg:

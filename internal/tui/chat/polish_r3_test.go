@@ -84,3 +84,16 @@ func TestModalsOpenAndCloseWithoutMotion(t *testing.T) {
 		t.Fatal("a modal closes at once")
 	}
 }
+
+func TestDemoCommandsAreGone(t *testing.T) {
+	for _, c := range []string{"ask", "answer", "welcome", "prompt"} {
+		if isCommand(c) {
+			t.Errorf("/%s is a demo or adds nothing; it is not a command", c)
+		}
+		n, _ := newChatScene().command("/" + c)
+		m := n.(chatView)
+		if m.overlay != overlayNone || !strings.Contains(screen(m), "unknown command /"+c) {
+			t.Errorf("/%s still does something:\n%s", c, screen(m))
+		}
+	}
+}
