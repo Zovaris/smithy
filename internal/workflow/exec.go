@@ -20,12 +20,13 @@ import (
 
 // Shell runs cmd with sh -c (cmd /C on Windows) in dir (home when empty) and returns its
 // combined output and exit code; a timeout kills it.
-func Shell(ctx context.Context, dir, cmd string) (string, int, error) {
+func Shell(ctx context.Context, dir, cmd string, env []string) (string, int, error) {
 	c := exec.CommandContext(ctx, "sh", "-c", cmd)
 	if runtime.GOOS == "windows" {
 		c = exec.CommandContext(ctx, "cmd", "/C", cmd)
 	}
 	c.Dir = dirOr(dir)
+	c.Env = append(ShellEnv(os.Getenv), env...)
 	c.WaitDelay = 5 * time.Second
 	out := &capped{}
 	c.Stdout, c.Stderr = out, out
@@ -52,7 +53,8 @@ func dirOr(dir string) string {
 
 // Agent runs one read-only agent through `smithy agent --profile auto` (the unattended
 // allow-list and auto.sandbox, failing closed) and returns its answer and known cost.
-func Agent(ctx context.Context, dir, prompt string, timeout time.Duration) (string, float64, error) {
+func Agent(ctx context.Context, a AgentCall) (string, float64, error) {
+	dir, prompt, timeout := a.Dir, a.Prompt, a.Timeout
 	exe, err := os.Executable()
 	if err != nil {
 		return "", 0, err
@@ -70,8 +72,14 @@ func Agent(ctx context.Context, dir, prompt string, timeout time.Duration) (stri
 	if mins < 1 {
 		mins = 1
 	}
-	c := exec.CommandContext(ctx, exe, "agent", "--readonly", "--profile", "auto", "--timeout", strconv.Itoa(mins),
-		"--cwd", dirOr(dir), "--log", log, pf)
+	args := []string{"agent", "--readonly", "--profile", "auto", "--timeout", strconv.Itoa(mins), "--cwd", dirOr(dir), "--log", log}
+	if a.Model != "" {
+		args = append(args, "--model", a.Model)
+	}
+	if a.Effort != "" {
+		args = append(args, "--effort", a.Effort)
+	}
+	c := exec.CommandContext(ctx, exe, append(args, pf)...)
 	c.Dir = dirOr(dir)
 	c.WaitDelay = 5 * time.Second
 	var out, errb bytes.Buffer
@@ -120,4 +128,22 @@ func (c *capped) String() string {
 		return c.b.String() + "\n… (output cut at 64 KiB)"
 	}
 	return c.b.String()
+}
+
+// shellKeep are the variables a shell step inherits; the daemon's other variables (API keys among
+// them) never reach it. GitHubTokens are passed for gh and redacted from the record.
+var (
+	shellKeep    = []string{"PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "TMPDIR", "TERM", "XDG_CONFIG_HOME", "SSH_AUTH_SOCK", "GH_HOST"}
+	GitHubTokens = []string{"GH_TOKEN", "GITHUB_TOKEN"}
+)
+
+// ShellEnv is the environment a shell step starts from.
+func ShellEnv(getenv func(string) string) []string {
+	var env []string
+	for _, k := range append(append([]string{}, shellKeep...), GitHubTokens...) {
+		if v := getenv(k); v != "" {
+			env = append(env, k+"="+v)
+		}
+	}
+	return env
 }

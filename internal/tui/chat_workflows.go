@@ -14,23 +14,28 @@ import (
 	"github.com/Zovaris/smithy/internal/workflow"
 )
 
-// workflowAPI is the part of the daemon client /workflows uses.
+// workflowAPI is the part of the daemon client /workflows and /schedules use.
 type workflowAPI interface {
 	Workflows(ctx context.Context) (daemon.WorkflowList, error)
 	Workflow(ctx context.Context, name string) (daemon.WorkflowDetail, error)
-	RunWorkflow(ctx context.Context, name, via string) error
-	SetWorkflow(ctx context.Context, name string, on bool) (workflow.Info, error)
+	RunWorkflow(ctx context.Context, name, via string, inputs map[string]string) error
+	Schedules(ctx context.Context) (daemon.ScheduleList, error)
+	Schedule(ctx context.Context, name string) (daemon.ScheduleDetail, error)
+	SetSchedule(ctx context.Context, name string, on bool) (workflow.SchedInfo, error)
 }
 
-// workflowsView is the open /workflows: the list and the selected workflow.
+// workflowsView is the open /workflows or /schedules (tab switches): the lists and the selection.
 type workflowsView struct {
-	l    *daemon.WorkflowList
-	name string
-	err  string
+	sched bool
+	wl    *daemon.WorkflowList
+	sl    *daemon.ScheduleList
+	name  string
+	err   string
 }
 
 type workflowsMsg struct {
-	l   daemon.WorkflowList
+	wl  daemon.WorkflowList
+	sl  daemon.ScheduleList
 	err error
 }
 
@@ -41,24 +46,49 @@ type workflowDoneMsg struct {
 
 type workflowDetailMsg struct {
 	d   daemon.WorkflowDetail
+	sd  *daemon.ScheduleDetail
 	err error
 }
 
-// openWorkflows is /workflows: the scheduled workflows in the shared modal.
-func (m chatView) openWorkflows() (tea.Model, tea.Cmd) {
+// openWorkflows is /workflows (or /schedules with sched): the lists in the shared modal.
+func (m chatView) openWorkflows(sched bool) (tea.Model, tea.Cmd) {
 	if m.flows == nil {
 		m.system("/workflows needs the daemon")
 		return m, nil
 	}
-	m.overlay, m.flowSt = overlayWorkflows, workflowsView{}
+	m.overlay, m.flowSt = overlayWorkflows, workflowsView{sched: sched}
 	return m, m.loadWorkflows()
+}
+
+// runWorkflowCmd is /run <name> [k=v]...: start a workflow with those inputs.
+func (m chatView) runWorkflowCmd(arg string) (tea.Model, tea.Cmd) {
+	f := strings.Fields(arg)
+	if m.flows == nil || len(f) == 0 {
+		m.system("usage: /run <workflow> [input=value]…  (/workflows lists them)")
+		return m, nil
+	}
+	in := map[string]string{}
+	for _, kv := range f[1:] {
+		if k, v, ok := strings.Cut(kv, "="); ok && k != "" {
+			in[k] = v
+		}
+	}
+	api, name := m.flows, f[0]
+	m.status("running " + name)
+	return m, func() tea.Msg {
+		return workflowDoneMsg{what: "started: /workflows shows it live", name: name, err: api.RunWorkflow(context.Background(), name, "tui", in)}
+	}
 }
 
 func (m chatView) loadWorkflows() tea.Cmd {
 	api := m.flows
 	return func() tea.Msg {
-		l, err := api.Workflows(context.Background())
-		return workflowsMsg{l: l, err: err}
+		wl, err := api.Workflows(context.Background())
+		if err != nil {
+			return workflowsMsg{err: err}
+		}
+		sl, err := api.Schedules(context.Background())
+		return workflowsMsg{wl: wl, sl: sl, err: err}
 	}
 }
 
@@ -67,19 +97,34 @@ func (m chatView) workflowsLoaded(msg workflowsMsg) (tea.Model, tea.Cmd) {
 		m.flowSt.err = msg.err.Error()
 		return m, nil
 	}
-	m.flowSt.l, m.flowSt.err = &msg.l, ""
-	if m.flowSel() < 0 && len(msg.l.Workflows) > 0 {
-		m.flowSt.name = msg.l.Workflows[0].Name
+	m.flowSt.wl, m.flowSt.sl, m.flowSt.err = &msg.wl, &msg.sl, ""
+	if m.flowSel() < 0 {
+		m.flowSt.name = ""
+		if n := m.flowNames(); len(n) > 0 {
+			m.flowSt.name = n[0]
+		}
 	}
 	return m, nil
 }
 
-func (m chatView) flowSel() int {
-	if m.flowSt.l == nil {
-		return -1
+func (m chatView) flowNames() []string {
+	var out []string
+	switch {
+	case m.flowSt.sched && m.flowSt.sl != nil:
+		for _, s := range m.flowSt.sl.Schedules {
+			out = append(out, s.Name)
+		}
+	case !m.flowSt.sched && m.flowSt.wl != nil:
+		for _, w := range m.flowSt.wl.Workflows {
+			out = append(out, w.Name)
+		}
 	}
-	for i, w := range m.flowSt.l.Workflows {
-		if w.Name == m.flowSt.name {
+	return out
+}
+
+func (m chatView) flowSel() int {
+	for i, n := range m.flowNames() {
+		if n == m.flowSt.name {
 			return i
 		}
 	}
@@ -87,10 +132,10 @@ func (m chatView) flowSel() int {
 }
 
 func (m chatView) flowRunning(name string) bool {
-	if m.flowSt.l == nil {
+	if m.flowSt.wl == nil {
 		return false
 	}
-	for _, n := range m.flowSt.l.Running {
+	for _, n := range m.flowSt.wl.Running {
 		if n == name {
 			return true
 		}
@@ -102,20 +147,24 @@ func (m chatView) workflowsBox(screen []string, w, h int) []string {
 	t := m.th
 	bw, bh := m.boxSize(w, h)
 	st := m.flowSt
+	title := "Workflows " + t.g.dot + " [workflows] schedules"
+	if st.sched {
+		title = "Schedules " + t.g.dot + " workflows [schedules]"
+	}
 	var items []boxItem
 	switch {
 	case st.err != "":
 		items = append(items, boxItem{glyph: t.g.off, color: t.err, label: st.err, static: true})
-	case st.l == nil:
+	case st.wl == nil:
 		items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: "reading the workflows…", static: true})
-	case len(st.l.Workflows) == 0:
+	case len(m.flowNames()) == 0 && st.sched:
+		items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: "no schedules yet", hint: `smithy schedule add <name> --workflow <w> --cron "0 9 * * *"`, static: true})
+	case len(m.flowNames()) == 0:
 		items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: "no workflows yet", hint: "smithy workflow example", static: true})
-	default:
-		for _, in := range st.l.Workflows {
+	case st.sched:
+		for _, in := range st.sl.Schedules {
 			g, col, key := t.g.off, t.muted, "off"
 			switch {
-			case m.flowRunning(in.Name):
-				g, col, key = t.g.half, t.info, "running"
 			case in.Err != "":
 				g, col, key = t.g.fail, t.err, "error"
 			case in.Changed:
@@ -123,7 +172,7 @@ func (m chatView) workflowsBox(screen []string, w, h int) []string {
 			case in.Enabled:
 				g, col, key = t.g.on, t.ok, "on"
 			}
-			hint := []string{in.Schedule}
+			hint := []string{in.Trigger() + " → " + in.Workflow}
 			if in.Next != nil {
 				hint = append(hint, "next "+in.Next.Local().Format("Mon 15:04"))
 			}
@@ -132,60 +181,104 @@ func (m chatView) workflowsBox(screen []string, w, h int) []string {
 			}
 			items = append(items, boxItem{glyph: g, color: col, label: in.Name, hint: strings.Join(hint, " "+t.g.dot+" "), key: key})
 		}
+	default:
+		for _, in := range st.wl.Workflows {
+			g, col, key := t.g.off, t.muted, ""
+			switch {
+			case m.flowRunning(in.Name):
+				g, col, key = t.g.half, t.info, "running"
+			case in.Err != "":
+				g, col, key = t.g.fail, t.err, "error"
+			case in.Last != nil && in.Last.Status == workflow.StatusOK:
+				g, col = t.g.pass, t.ok
+			case in.Last != nil:
+				g, col = t.g.fail, t.warn
+			}
+			hint := []string{fmt.Sprintf("%d steps", len(in.Steps))}
+			if len(in.Schedules) > 0 {
+				hint = append(hint, "schedules "+strings.Join(in.Schedules, ", "))
+			}
+			if in.Last != nil {
+				hint = append(hint, "last "+in.Last.Status)
+			}
+			items = append(items, boxItem{glyph: g, color: col, label: in.Name, hint: strings.Join(hint, " "+t.g.dot+" "), key: key})
+		}
 	}
-	sel := m.flowSel()
-	if sel < 0 {
-		sel = 0
+	sel := max(m.flowSel(), 0)
+	foot := "  " + keyHints(t, "↑↓", "move", "r", "run", "enter", "steps · live · history", "e", "edit", "tab", "schedules", "esc", "close")
+	if st.sched {
+		foot = "  " + keyHints(t, "↑↓", "move", "←→", "on/off", "enter", "history", "tab", "workflows", "esc", "close")
 	}
-	foot := "  " + keyHints(t, "↑↓", "move", "←→", "on/off", "r", "run now", "enter", "history", "e", "edit", "esc", "close")
-	return m.overBox(screen, m.floatBox(bw, bh, "", "Workflows", items, sel, foot), w)
+	return m.overBox(screen, m.floatBox(bw, bh, "", title, items, sel, foot), w)
 }
 
 func (m chatView) workflowsKey(k string) (tea.Model, tea.Cmd) {
-	var list []workflow.Info
-	if m.flowSt.l != nil {
-		list = m.flowSt.l.Workflows
-	}
+	names := m.flowNames()
 	cur := m.flowSel()
 	api := m.flows
 	switch k {
 	case "esc", "q":
 		m.overlay = overlayNone
 		return m, nil
+	case "tab", "shift+tab":
+		m.flowSt.sched, m.flowSt.name = !m.flowSt.sched, ""
+		if n := m.flowNames(); len(n) > 0 {
+			m.flowSt.name = n[0]
+		}
+		return m, nil
 	case "up", "k":
 		if cur > 0 {
-			m.flowSt.name = list[cur-1].Name
+			m.flowSt.name = names[cur-1]
 		}
 		return m, nil
 	case "down", "j":
-		if cur+1 < len(list) {
-			m.flowSt.name = list[cur+1].Name
+		if cur+1 < len(names) {
+			m.flowSt.name = names[cur+1]
 		}
 		return m, nil
 	}
 	if cur < 0 {
 		return m, nil
 	}
-	in := list[cur]
-	switch k {
-	case "left", "right", "h", "l", "space":
-		on := !in.Enabled
-		return m, func() tea.Msg {
-			_, err := api.SetWorkflow(context.Background(), in.Name, on)
-			what := "disabled"
-			if on {
-				what = "enabled"
+	name := names[cur]
+	if m.flowSt.sched {
+		in := m.flowSt.sl.Schedules[cur]
+		switch k {
+		case "left", "right", "h", "l", "space":
+			on := !in.Enabled
+			return m, func() tea.Msg {
+				_, err := api.SetSchedule(context.Background(), name, on)
+				what := "disabled"
+				if on {
+					what = "enabled"
+				}
+				return workflowDoneMsg{what: what, name: name, err: err}
 			}
-			return workflowDoneMsg{what: what, name: in.Name, err: err}
+		case "enter":
+			return m, func() tea.Msg {
+				d, err := api.Schedule(context.Background(), name)
+				return workflowDetailMsg{sd: &d, err: err}
+			}
 		}
+		return m, nil
+	}
+	in := m.flowSt.wl.Workflows[cur]
+	switch k {
 	case "r":
-		m.status("running " + in.Name)
+		if len(in.Inputs) > 0 {
+			m.overlay = overlayNone
+			m.input.SetValue("/run " + name + " " + inputsLine(in.Inputs))
+			m.input.CursorEnd()
+			m.status("set the inputs, then enter")
+			return m, nil
+		}
+		m.status("running " + name)
 		return m, func() tea.Msg {
-			return workflowDoneMsg{what: "started", name: in.Name, err: api.RunWorkflow(context.Background(), in.Name, "tui")}
+			return workflowDoneMsg{what: "started", name: name, err: api.RunWorkflow(context.Background(), name, "tui", nil)}
 		}
 	case "enter":
 		return m, func() tea.Msg {
-			d, err := api.Workflow(context.Background(), in.Name)
+			d, err := api.Workflow(context.Background(), name)
 			return workflowDetailMsg{d: d, err: err}
 		}
 	case "e":
@@ -197,7 +290,7 @@ func (m chatView) workflowsKey(k string) (tea.Model, tea.Cmd) {
 		if open == nil {
 			open = openURL
 		}
-		m.status("opening " + in.File + " (a change made outside smithy needs enabling again)")
+		m.status("opening " + in.File + " (a change turns off its schedules until enabled again)")
 		f := in.File
 		return m, func() tea.Msg {
 			if err := open(f); err != nil {
@@ -209,75 +302,105 @@ func (m chatView) workflowsKey(k string) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func inputsLine(in map[string]string) string {
+	var parts []string
+	for _, k := range sortedNames(in) {
+		parts = append(parts, k+"="+in[k])
+	}
+	return strings.Join(parts, " ")
+}
+
+func sortedNames(m map[string]string) []string {
+	var k []string
+	for x := range m {
+		k = append(k, x)
+	}
+	for i := 1; i < len(k); i++ {
+		for j := i; j > 0 && k[j] < k[j-1]; j-- {
+			k[j], k[j-1] = k[j-1], k[j]
+		}
+	}
+	return k
+}
+
 func (m chatView) workflowDone(msg workflowDoneMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		m.status(msg.name + ": " + msg.err.Error())
 		return m, nil
 	}
 	m.status(msg.name + " " + msg.what)
-	return m, m.loadWorkflows()
+	if m.overlay == overlayWorkflows {
+		return m, m.loadWorkflows()
+	}
+	return m, nil
 }
 
-// workflowDetail shows a workflow's steps and newest runs with each step's result; esc goes back.
+// workflowDetail shows a workflow's live run, steps and runs, or a schedule's runs; esc goes back.
 func (m chatView) workflowDetail(msg workflowDetailMsg) (tea.Model, tea.Cmd) {
 	if msg.err != nil {
 		m.status(msg.err.Error())
 		return m, nil
 	}
-	d := msg.d
-	lines := []string{"-> " + d.Info.File, "#STEPS"}
-	for i, s := range d.Info.Steps {
-		lines = append(lines, fmt.Sprintf("%d. %s %s\t%s", i+1, s.Kind, s.ID, workflowStepText(s)))
+	var lines []string
+	var title string
+	var hist []workflow.Record
+	if sd := msg.sd; sd != nil {
+		title = sd.Info.Name + " · " + sd.Info.Trigger() + " → " + sd.Info.Workflow
+		lines = append(lines, "-> "+sd.Info.File)
+		if sd.Hook != "" {
+			lines = append(lines, "webhook\tPOST /v1/hooks/schedules/"+sd.Info.Name+" (smithy schedule hook "+sd.Info.Name+")")
+		}
+		hist = sd.History
+	} else {
+		d := msg.d
+		title = d.Info.Name
+		lines = append(lines, "-> "+d.Info.File)
+		for _, k := range sortedNames(d.Info.Inputs) {
+			lines = append(lines, "input "+k+"\tdefault "+d.Info.Inputs[k])
+		}
+		if d.Live != nil {
+			lines = append(lines, "#RUNNING NOW")
+			lines = append(lines, resultLines(d.Live.Steps, "")...)
+		}
+		lines = append(lines, "#STEPS")
+		lines = append(lines, stepLines(d.Info.Steps, "")...)
+		hist = d.History
 	}
 	lines = append(lines, "#RUNS")
-	if len(d.History) == 0 {
-		lines = append(lines, "no runs yet: r runs it now")
+	if len(hist) == 0 {
+		lines = append(lines, "no runs yet")
 	}
-	for _, r := range d.History {
-		head := fmt.Sprintf("%s %s %s\t%s", r.Started.Local().Format("Jan 2 15:04"), r.Status, r.Trigger, r.Ended.Sub(r.Started).Round(time.Second))
+	for _, r := range hist {
+		trig := r.Trigger
+		if r.Schedule != "" {
+			trig += ":" + r.Schedule
+		}
+		head := fmt.Sprintf("%s %s %s\t%s", r.Started.Local().Format("Jan 2 15:04"), r.Status, trig, r.Ended.Sub(r.Started).Round(time.Second))
 		if r.Error != "" {
 			head += " · " + r.Error
 		}
 		lines = append(lines, head)
-		for _, s := range r.Steps {
-			lines = append(lines, "  "+s.ID+"\t"+workflowResultText(s))
-		}
+		lines = append(lines, resultLines(r.Steps, "  ")...)
 	}
-	m.info = infoPanel{title: d.Info.Name + " · " + d.Info.Schedule, lines: lines, scroll: true}
+	m.info = infoPanel{title: title, lines: lines, scroll: true}
 	m.overlay, m.infoBack = overlayInfo, overlayWorkflows
 	return m, nil
 }
 
-func workflowStepText(s workflow.Step) string {
-	switch s.Kind {
-	case workflow.KindRun:
-		return clipLine(s.Run, 80)
-	case workflow.KindAgent:
-		return clipLine(s.Prompt, 70)
-	case workflow.KindIf:
-		return "on " + s.Step
+func stepLines(steps []workflow.Step, indent string) []string {
+	var out []string
+	for i, s := range steps {
+		out = append(out, fmt.Sprintf("%s%d. %s %s\t%s", indent, i+1, s.Kind, s.ID, s.Summary()))
+		out = append(out, stepLines(s.Do, indent+"   ")...)
 	}
-	return clipLine(s.Title+" "+s.Message, 80)
+	return out
 }
 
-func workflowResultText(s workflow.StepResult) string {
-	switch {
-	case s.Error != "":
-		return "error: " + clipLine(s.Error, 90)
-	case s.Kind == workflow.KindIf:
-		return "→ " + s.Branch
-	case s.Answer != "":
-		return s.Answer + " " + clipLine(s.Why, 80)
-	case s.Kind == workflow.KindRun:
-		return fmt.Sprintf("exit %d · %s", s.Exit, clipLine(s.Output, 80))
+func resultLines(rs []workflow.StepResult, indent string) []string {
+	var out []string
+	for _, s := range rs {
+		out = append(out, fmt.Sprintf("%s%s %s\t%s", indent, s.ID, s.Status, s.Line()))
+		out = append(out, resultLines(s.Steps, indent+"  ")...)
 	}
-	return clipLine(s.Output, 90)
-}
-
-func clipLine(s string, n int) string {
-	s = strings.Join(strings.Fields(s), " ")
-	if r := []rune(s); len(r) > n {
-		return string(r[:n]) + "…"
-	}
-	return s
+	return out
 }

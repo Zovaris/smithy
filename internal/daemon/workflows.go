@@ -3,12 +3,16 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/connect"
@@ -16,7 +20,7 @@ import (
 	"github.com/Zovaris/smithy/internal/workflow"
 )
 
-// Store event kinds of scheduled workflows: a notify step's message, and a finished run.
+// Store event kinds of workflows: a notify step's message, and a finished run.
 const (
 	KindWorkflowNote = "workflow_note"
 	KindWorkflowRun  = "workflow_run"
@@ -28,12 +32,28 @@ type WorkflowList struct {
 	Running   []string        `json:"running"`
 }
 
-// WorkflowDetail is GET /v1/workflows/{name}: the parsed file, its source and newest runs.
+// WorkflowDetail is GET /v1/workflows/{name}: the parsed file, its source, newest runs and the
+// run in progress.
 type WorkflowDetail struct {
 	Info    workflow.Info     `json:"info"`
 	Source  string            `json:"source"`
 	History []workflow.Record `json:"history"`
 	Running bool              `json:"running"`
+	Live    *workflow.Record  `json:"live,omitempty"`
+}
+
+// ScheduleList is GET /v1/schedules.
+type ScheduleList struct {
+	Schedules []workflow.SchedInfo `json:"schedules"`
+}
+
+// ScheduleDetail is GET /v1/schedules/{name}: the schedule, its source, the runs it started and,
+// for a webhook on this machine, its token.
+type ScheduleDetail struct {
+	Info    workflow.SchedInfo `json:"info"`
+	Source  string             `json:"source"`
+	History []workflow.Record  `json:"history"`
+	Hook    string             `json:"hook,omitempty"`
 }
 
 type workflowNote struct {
@@ -44,6 +64,7 @@ type workflowNote struct {
 
 type workflowRun struct {
 	Workflow string  `json:"workflow"`
+	Schedule string  `json:"schedule,omitempty"`
 	Status   string  `json:"status"`
 	Trigger  string  `json:"trigger"`
 	Error    string  `json:"error,omitempty"`
@@ -51,18 +72,23 @@ type workflowRun struct {
 }
 
 // NewWorkflows is the daemon's workflow scheduler over st: shell steps behind the guard, agent
-// steps through `smithy agent --profile auto`, notify steps as store events (TUI, web and the
-// chat connectors).
+// steps through `smithy agent --profile auto`, ask steps as decisions, notify steps as store
+// events (TUI, web and the chat connectors), GitHub events through gh. Files from before
+// schedules are migrated first.
 func (sv *Server) NewWorkflows(st workflow.Store) *workflow.Scheduler {
+	if moved := st.Migrate(time.Now()); len(moved) > 0 && sv.log != nil {
+		sv.log("workflows: moved schedules out of " + strings.Join(moved, ", "))
+	}
 	return &workflow.Scheduler{
-		Store: st,
-		Env: workflow.Env{Shell: workflow.Shell, Agent: workflow.Agent, Guard: workflow.Guard,
+		Store:  st,
+		GitHub: workflow.GitHubEvents,
+		Env: workflow.Env{Shell: workflow.Shell, Agent: workflow.Agent, Guard: workflow.Guard, Ask: sv.workflowAsk,
 			Notify: func(wf, title, text string) error {
 				_, err := sv.Append(KindWorkflowNote, "", workflowNote{Workflow: wf, Title: title, Text: text})
 				return err
 			}},
 		OnRun: func(r workflow.Record) {
-			_, _ = sv.Append(KindWorkflowRun, "", workflowRun{Workflow: r.Workflow, Status: r.Status, Trigger: r.Trigger, Error: r.Error, CostUSD: r.CostUSD})
+			_, _ = sv.Append(KindWorkflowRun, "", workflowRun{Workflow: r.Workflow, Schedule: r.Schedule, Status: r.Status, Trigger: r.Trigger, Error: r.Error, CostUSD: r.CostUSD})
 		},
 	}
 }
@@ -88,11 +114,7 @@ func (sv *Server) listWorkflows(w http.ResponseWriter, r *http.Request) {
 	if !sv.workflowsOn(w) {
 		return
 	}
-	l, err := sv.Workflows.Store.List()
-	if err != nil {
-		writeJSON(w, 500, map[string]string{"error": err.Error()})
-		return
-	}
+	l, _ := sv.Workflows.Store.List()
 	out := WorkflowList{Workflows: l, Running: []string{}}
 	if out.Workflows == nil {
 		out.Workflows = []workflow.Info{}
@@ -129,7 +151,11 @@ func (sv *Server) getWorkflow(w http.ResponseWriter, r *http.Request) {
 	if h == nil {
 		h = []workflow.Record{}
 	}
-	writeJSON(w, 200, WorkflowDetail{Info: in, Source: string(src), History: h, Running: sv.Workflows.Running()[name]})
+	d := WorkflowDetail{Info: in, Source: string(src), History: h, Running: sv.Workflows.Running()[name]}
+	if l, ok := sv.Workflows.Live(name); ok {
+		d.Live = &l
+	}
+	writeJSON(w, 200, d)
 }
 
 func (sv *Server) workflowWrite(w http.ResponseWriter, r *http.Request) (string, bool) {
@@ -144,7 +170,14 @@ func (sv *Server) workflowWrite(w http.ResponseWriter, r *http.Request) (string,
 	return name, true
 }
 
-// runWorkflow is POST /v1/workflows/{name}/run: start one run now, enabled or not.
+func (sv *Server) lifetime() context.Context {
+	if sv.Ctx != nil {
+		return sv.Ctx
+	}
+	return context.Background()
+}
+
+// runWorkflow is POST /v1/workflows/{name}/run with {"inputs": {...}}: start one run now.
 func (sv *Server) runWorkflow(w http.ResponseWriter, r *http.Request) {
 	name, ok := sv.workflowWrite(w, r)
 	if !ok {
@@ -154,42 +187,25 @@ func (sv *Server) runWorkflow(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 409, map[string]string{"error": "workflow " + name + " is already running"})
 		return
 	}
-	ctx := sv.Ctx
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	trigger := "web"
-	if r.URL.Query().Get("via") == "tui" || r.URL.Query().Get("via") == "cli" {
-		trigger = r.URL.Query().Get("via")
+	if v := r.URL.Query().Get("via"); v == "tui" || v == "cli" {
+		trigger = v
 	}
-	go func() { _, _ = sv.Workflows.RunNow(ctx, name, trigger) }()
+	var req struct {
+		Inputs map[string]string `json:"inputs"`
+	}
+	if b, err := readAllCapped(w, r, 16<<10); err != nil || len(b) > 0 && json.Unmarshal(b, &req) != nil {
+		writeJSON(w, 400, map[string]string{"error": `body must be {"inputs": {name: value}}`})
+		return
+	}
+	go func() {
+		_, _ = sv.Workflows.Start(sv.lifetime(), name, workflow.Invocation{Trigger: trigger, Inputs: req.Inputs})
+	}()
 	writeJSON(w, 202, map[string]string{"status": "started"})
 }
 
-func (sv *Server) enableWorkflow(w http.ResponseWriter, r *http.Request) {
-	if op := r.PathValue("op"); op != "enable" && op != "disable" {
-		http.NotFound(w, r)
-		return
-	}
-	name, ok := sv.workflowWrite(w, r)
-	if !ok {
-		return
-	}
-	var err error
-	if r.PathValue("op") == "enable" {
-		err = sv.Workflows.Store.Enable(name, time.Now())
-	} else {
-		err = sv.Workflows.Store.Disable(name)
-	}
-	if err != nil {
-		writeJSON(w, 400, map[string]string{"error": err.Error()})
-		return
-	}
-	in, _ := sv.workflowInfo(name)
-	writeJSON(w, 200, in)
-}
-
 // saveWorkflow is PUT /v1/workflows/{name}: the edited file, validated; the name can't change.
+// A change turns off every schedule that pins the workflow.
 func (sv *Server) saveWorkflow(w http.ResponseWriter, r *http.Request) {
 	name, ok := sv.workflowWrite(w, r)
 	if !ok {
@@ -221,20 +237,239 @@ func readAllCapped(w http.ResponseWriter, r *http.Request, n int64) ([]byte, err
 	return io.ReadAll(http.MaxBytesReader(w, r.Body, n))
 }
 
-// WorkflowsScheduled reports whether a workflow runs or is enabled: the idle exit must wait, or
-// its schedule would never fire.
+// validateWorkflow is POST /v1/workflows/validate: the editor's check, nothing saved.
+func (sv *Server) validateWorkflow(w http.ResponseWriter, r *http.Request) {
+	b, err := readAllCapped(w, r, 64<<10)
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": "body must be a workflow file up to 64 KiB"})
+		return
+	}
+	if _, err := workflow.Parse(b); err != nil {
+		writeJSON(w, 200, map[string]any{"ok": false, "error": err.Error()})
+		return
+	}
+	writeJSON(w, 200, map[string]any{"ok": true})
+}
+
+func (sv *Server) schedInfo(name string) (workflow.SchedInfo, bool) {
+	l, _ := sv.Workflows.Store.Schedules()
+	for _, in := range l {
+		if in.Name == name {
+			return in, true
+		}
+	}
+	return workflow.SchedInfo{}, false
+}
+
+func (sv *Server) listSchedules(w http.ResponseWriter, r *http.Request) {
+	if !sv.workflowsOn(w) {
+		return
+	}
+	l, _ := sv.Workflows.Store.Schedules()
+	if l == nil {
+		l = []workflow.SchedInfo{}
+	}
+	writeJSON(w, 200, ScheduleList{Schedules: l})
+}
+
+func (sv *Server) getSchedule(w http.ResponseWriter, r *http.Request) {
+	if !sv.workflowsOn(w) {
+		return
+	}
+	name := r.PathValue("name")
+	in, ok := sv.schedInfo(name)
+	if !ok {
+		writeJSON(w, 404, map[string]string{"error": "no schedule named " + name})
+		return
+	}
+	_, src, _ := sv.Workflows.Store.GetSchedule(name)
+	h, _ := sv.Workflows.Store.ScheduleHistory(name, 20)
+	if h == nil {
+		h = []workflow.Record{}
+	}
+	d := ScheduleDetail{Info: in, Source: string(src), History: h}
+	if in.Webhook && in.Enabled && r.Header.Get("X-Smithy-Who") == "local" {
+		d.Hook = sv.Workflows.Store.HookToken(name)
+	}
+	writeJSON(w, 200, d)
+}
+
+// addSchedule is POST /v1/schedules: a new schedule file, saved disabled.
+func (sv *Server) addSchedule(w http.ResponseWriter, r *http.Request) {
+	if !writeGuard(w, r) || !sv.workflowsOn(w) {
+		return
+	}
+	b, err := readAllCapped(w, r, 16<<10)
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": "body must be a schedule up to 16 KiB"})
+		return
+	}
+	sc, err := workflow.ParseSchedule(b)
+	if err == nil {
+		if _, exists := sv.schedInfo(sc.Name); exists {
+			err = fmt.Errorf("schedule %s already exists", sc.Name)
+		} else if _, _, werr := sv.Workflows.Store.Get(sc.Workflow); werr != nil {
+			err = werr
+		}
+	}
+	if err == nil {
+		err = sv.Workflows.Store.SaveSchedule(sc)
+	}
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
+	in, _ := sv.schedInfo(sc.Name)
+	writeJSON(w, 200, in)
+}
+
+func (sv *Server) scheduleWrite(w http.ResponseWriter, r *http.Request) (string, bool) {
+	if !writeGuard(w, r) || !sv.workflowsOn(w) {
+		return "", false
+	}
+	name := r.PathValue("name")
+	if _, ok := sv.schedInfo(name); !ok {
+		writeJSON(w, 404, map[string]string{"error": "no schedule named " + name})
+		return "", false
+	}
+	return name, true
+}
+
+// setSchedule is POST /v1/schedules/{name}/enable or /disable.
+func (sv *Server) setSchedule(w http.ResponseWriter, r *http.Request) {
+	op := r.PathValue("op")
+	if op != "enable" && op != "disable" {
+		http.NotFound(w, r)
+		return
+	}
+	name, ok := sv.scheduleWrite(w, r)
+	if !ok {
+		return
+	}
+	var err error
+	if op == "enable" {
+		err = sv.Workflows.Store.EnableSchedule(name, time.Now())
+	} else {
+		err = sv.Workflows.Store.DisableSchedule(name)
+	}
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
+	in, _ := sv.schedInfo(name)
+	writeJSON(w, 200, in)
+}
+
+func (sv *Server) removeSchedule(w http.ResponseWriter, r *http.Request) {
+	name, ok := sv.scheduleWrite(w, r)
+	if !ok {
+		return
+	}
+	if err := sv.Workflows.Store.RemoveSchedule(name); err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, 200, map[string]string{"removed": name})
+}
+
+// WorkflowsScheduled reports whether a workflow runs or a schedule is enabled: the idle exit must
+// wait, or the schedule would never fire.
 func (sv *Server) WorkflowsScheduled() bool {
 	if sv.Workflows == nil {
 		return false
 	}
-	if len(sv.Workflows.Running()) > 0 {
-		return true
+	return len(sv.Workflows.Running()) > 0 || len(sv.Workflows.Store.Enabled()) > 0
+}
+
+// HookWait is how long a webhook call waits for its run before answering 202.
+var HookWait = 2 * time.Minute
+
+// scheduleHook is POST /v1/hooks/schedules/{name}, outside the daemon token, from this machine
+// only: the schedule's own token (X-Smithy-Hook or a Bearer header) opens it, only when it is a
+// webhook schedule enabled with nothing it pins changed. The JSON body's fields the workflow
+// declares become inputs; the answer holds the run's status and outputs, or 202 past HookWait.
+func (sv *Server) scheduleHook(w http.ResponseWriter, r *http.Request, name string) {
+	notFound := func() { writeJSON(w, 404, map[string]string{"error": "not found"}) }
+	if sv.Workflows == nil {
+		notFound()
+		return
 	}
-	l, _ := sv.Workflows.Store.List()
-	for _, in := range l {
-		if in.Enabled {
-			return true
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err != nil || !net.ParseIP(host).IsLoopback() {
+		notFound()
+		return
+	}
+	tok := r.Header.Get("X-Smithy-Hook")
+	if tok == "" {
+		tok = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	}
+	sc, ok := sv.Workflows.Store.CheckHook(name, tok)
+	if !ok {
+		notFound()
+		return
+	}
+	b, err := readAllCapped(w, r, 64<<10)
+	if err != nil {
+		writeJSON(w, 413, map[string]string{"error": "body up to 64 KiB"})
+		return
+	}
+	body := map[string]string{}
+	if len(bytes.TrimSpace(b)) > 0 {
+		var obj map[string]any
+		if json.Unmarshal(b, &obj) != nil {
+			writeJSON(w, 400, map[string]string{"error": "body must be a JSON object"})
+			return
+		}
+		for k, v := range obj {
+			if s, isStr := v.(string); isStr {
+				body[k] = s
+			} else {
+				vb, _ := json.Marshal(v)
+				body[k] = string(vb)
+			}
 		}
 	}
-	return false
+	done := make(chan workflow.Record, 1)
+	errc := make(chan error, 1)
+	go func() {
+		rec, err := sv.Workflows.Webhook(sv.lifetime(), sc, body)
+		if err != nil {
+			errc <- err
+			return
+		}
+		done <- rec
+	}()
+	select {
+	case rec := <-done:
+		writeJSON(w, 200, map[string]any{"status": rec.Status, "outputs": rec.Outputs, "error": rec.Error})
+	case err := <-errc:
+		writeJSON(w, 409, map[string]string{"error": err.Error()})
+	case <-time.After(HookWait):
+		writeJSON(w, 202, map[string]string{"status": "running"})
+	}
+}
+
+// workflowAsk is an ask step: the question goes out like any decision (TUI, web, chat
+// connectors) and the step waits for its answer.
+func (sv *Server) workflowAsk(ctx context.Context, id, question string, options []string) (string, error) {
+	q := "Workflow " + strings.SplitN(strings.TrimPrefix(id, "workflow:"), ":", 2)[0] + ": " + question
+	if err := sv.askDecision(Decision{ID: id, Question: q, Options: options, Other: len(options) == 0}); err != nil {
+		return "", err
+	}
+	for {
+		sv.mu.Lock()
+		d := sv.decisions[id]
+		var o *Outcome
+		if d != nil {
+			o = d.Outcome
+		}
+		sv.mu.Unlock()
+		if o != nil {
+			return o.Answer, nil
+		}
+		select {
+		case <-ctx.Done():
+			return "", fmt.Errorf("no answer before the step's timeout")
+		case <-time.After(300 * time.Millisecond):
+		}
+	}
 }

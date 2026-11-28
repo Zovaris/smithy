@@ -31,7 +31,8 @@ var harnessSummary = map[string]string{
 	"pair":     "one-time code another machine trades for a device token",
 	"servers":  "the daemons this machine talks to: list, add, use, discover",
 	"mcp":      "MCP server (stdio) for driven CLIs: board, ask, secret calls, search",
-	"workflow": "scheduled workflows the daemon runs: list, run, history, enable, disable",
+	"workflow": "workflows: flows of steps you run: list, show, run, history, validate",
+	"schedule": "start workflows on a cron, webhook, GitHub event or file change",
 }
 
 var helpDocs = map[string]helpDoc{
@@ -48,7 +49,8 @@ var helpDocs = map[string]helpDoc{
 	"servers":  {groupDaily, []string{"smithy servers", "smithy servers discover", "smithy servers add home http://100.64.0.2:7478 --code ABCD-2345", "smithy servers use home"}, []string{"pair", "chat"}},
 	"pair":     {groupDaily, []string{"smithy pair", "smithy pair list", "smithy pair revoke laptop"}, []string{"servers", "daemon"}},
 	"web":      {groupDaily, []string{"smithy web", "smithy web open"}, []string{"daemon"}},
-	"workflow": {groupDaily, []string{"smithy workflow example", "smithy workflow list", "smithy workflow run dependabot-daily", "smithy workflow history dependabot-daily"}, []string{"daemon", "guard"}},
+	"workflow": {groupDaily, []string{"smithy workflow example", "smithy workflow run repo-health", "smithy workflow history repo-health"}, []string{"schedule", "guard"}},
+	"schedule": {groupDaily, []string{`smithy schedule add nightly --workflow repo-health --cron "0 9 * * 1-5"`, "smithy schedule enable nightly", "smithy schedule list"}, []string{"workflow", "daemon"}},
 	"board":    {groupDaily, []string{`smithy board add "Fix login" --priority 1`, "smithy board list --state todo", "smithy board show B-1"}, []string{"auto", "tasks"}},
 	"bench":    {groupMaint, []string{"smithy bench list", "smithy bench run --agent claude --skills v0.22.0", "smithy bench run --agent codex --task bug-sum-last"}, []string{"agent", "receipt"}},
 	"report":   {groupDaily, []string{"smithy report week"}, []string{"stats", "decisions"}},

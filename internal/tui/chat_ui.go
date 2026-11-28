@@ -47,7 +47,7 @@ const (
 	overlayWelcome
 	overlayAsk       // the question card for the first decision waiting on you
 	overlayBoard     // /board: the task files by status
-	overlayWorkflows // /workflows: the scheduled workflows
+	overlayWorkflows // /workflows and /schedules
 )
 
 // chatTool is the data of a "tool" event: one tool call of a session's turn.
@@ -375,7 +375,11 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 	case "links":
 		return m.linksCommand(arg)
 	case "workflows", "workflow":
-		return m.openWorkflows()
+		return m.openWorkflows(false)
+	case "schedules", "schedule":
+		return m.openWorkflows(true)
+	case "run":
+		return m.runWorkflowCmd(arg)
 	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "prompt", "channels":
 		return m.settingsCommand(name, arg)
 	case "quit":

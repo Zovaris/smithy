@@ -1,105 +1,181 @@
 package workflow
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
 
-const simple = `{"name":"hello","schedule":"0 17 * * *","steps":[{"id":"a","kind":"run","run":"echo hi"}]}`
+const simple = `{"name":"hello","steps":[{"id":"a","kind":"run","run":"echo hi"}]}`
 
-func TestStoreEnablePinsHash(t *testing.T) {
+func store(t *testing.T) Store {
+	t.Helper()
 	s := Store{Dir: t.TempDir()}
-	src := filepath.Join(t.TempDir(), "hello.json")
-	os.WriteFile(src, []byte(simple), 0o644)
+	os.WriteFile(filepath.Join(s.Dir, "hello.json"), []byte(simple), 0o600)
+	return s
+}
+
+func addSched(t *testing.T, s Store, js string) {
+	t.Helper()
+	src := filepath.Join(t.TempDir(), "s.json")
+	os.WriteFile(src, []byte(js), 0o600)
 	if _, err := s.Add(src); err != nil {
 		t.Fatal(err)
 	}
-	l, _ := s.List()
+}
+
+func TestSchedulePinsWorkflowAndCalls(t *testing.T) {
+	s := store(t)
+	os.WriteFile(filepath.Join(s.Dir, "outer.json"), []byte(`{"name":"outer","steps":[{"id":"c","kind":"call","workflow":"hello"}]}`), 0o600)
+	addSched(t, s, `{"name":"daily","workflow":"outer","cron":"0 17 * * *"}`)
+	l, _ := s.Schedules()
 	if len(l) != 1 || l[0].Enabled {
-		t.Fatalf("added workflow must start disabled: %+v", l)
+		t.Fatalf("an added schedule starts disabled: %+v", l)
 	}
-	now := at("2026-11-27 10:00")
-	if err := s.Enable("hello", now); err != nil {
+	if err := s.EnableSchedule("daily", at("2026-11-27 10:00")); err != nil {
 		t.Fatal(err)
 	}
-	if l[0].Next != nil {
-		t.Fatal("a disabled workflow has no next run")
+	if len(s.Due(at("2026-11-27 16:59"))) != 0 || len(s.Due(at("2026-11-27 17:00"))) != 1 {
+		t.Fatal("due")
 	}
-	if l, _ = s.List(); !l[0].Enabled || l[0].Next == nil {
-		t.Fatal("not enabled")
-	}
-	if got := s.Due(at("2026-11-27 16:59")); len(got) != 0 {
-		t.Fatalf("due early: %v", got)
-	}
-	if got := s.Due(at("2026-11-27 17:00")); len(got) != 1 {
-		t.Fatalf("not due: %v", got)
-	}
-	os.WriteFile(filepath.Join(s.Dir, "hello.json"), []byte(simple[:len(simple)-1]+`,"description":"x"}`), 0o644)
-	l, _ = s.List()
-	if l[0].Enabled || !l[0].Changed {
-		t.Fatalf("a changed file must stop running: %+v", l[0])
-	}
-	if got := s.Due(at("2026-11-27 17:00")); len(got) != 0 {
-		t.Fatal("changed file is due")
-	}
-	s.Disable("hello")
-	if l, _ = s.List(); l[0].Enabled || l[0].Changed {
+	if l, _ = s.Schedules(); !l[0].Enabled || l[0].Next == nil {
 		t.Fatalf("%+v", l[0])
 	}
+	os.WriteFile(filepath.Join(s.Dir, "hello.json"), []byte(strings.Replace(simple, "echo hi", "echo changed", 1)), 0o600)
+	if l, _ = s.Schedules(); l[0].Enabled || !l[0].Changed || len(s.Due(at("2026-11-27 17:00"))) != 0 {
+		t.Fatalf("a change to a called workflow must stop the schedule: %+v", l[0])
+	}
+	s.EnableSchedule("daily", at("2026-11-27 10:00"))
+	w, _, _ := s.Get("outer")
+	w.Description = "edited"
+	s.Save(w)
+	if l, _ = s.Schedules(); l[0].Enabled {
+		t.Fatal("saving the workflow must stop its schedule")
+	}
+	s.EnableSchedule("daily", at("2026-11-27 10:00"))
+	os.WriteFile(l[0].File, []byte(`{"name":"daily","workflow":"outer","cron":"* * * * *"}`), 0o600)
+	if l, _ = s.Schedules(); l[0].Enabled {
+		t.Fatal("editing the schedule file must stop it")
+	}
+	if wl, _ := s.List(); len(wl) != 2 || wl[1].Name != "outer" || wl[1].Schedules[0] != "daily" {
+		t.Fatalf("list: %+v", wl)
+	}
 }
 
-func TestStoreSaveTurnsOff(t *testing.T) {
-	s := Store{Dir: t.TempDir()}
-	w, _ := Parse([]byte(simple))
-	if err := s.Save(w); err != nil {
-		t.Fatal(err)
+func TestScheduleValidate(t *testing.T) {
+	bad := []string{
+		`{"name":"x","workflow":"hello"}`,
+		`{"name":"x","workflow":"hello","cron":"@daily","webhook":true}`,
+		`{"name":"x","workflow":"../y","cron":"@daily"}`,
+		`{"name":"x","workflow":"hello","github":{"event":"push"}}`,
+		`{"name":"x","workflow":"hello","github":{"event":"issue_labeled"}}`,
+		`{"name":"x","workflow":"hello","github":{"event":"issue_labeled","label":"bug'; rm -rf ~"}}`,
+		`{"name":"x","workflow":"hello","cron":"bad"}`,
 	}
-	s.Enable("hello", time.Now())
-	w.Description = "edited in smithy"
-	if err := s.Save(w); err != nil {
-		t.Fatal(err)
+	for _, b := range bad {
+		if _, err := ParseSchedule([]byte(b)); err == nil {
+			t.Errorf("want error: %s", b)
+		}
 	}
-	if l, _ := s.List(); l[0].Enabled || l[0].Changed {
-		t.Fatalf("an edit needs a new enable: %+v", l[0])
+	if _, err := Parse([]byte(`{"name":"x","schedule":"@daily","steps":[{"id":"a","kind":"run","run":"ls"}]}`)); err == nil || !strings.Contains(err.Error(), "moved to schedules") {
+		t.Fatalf("legacy field: %v", err)
 	}
 }
 
-func TestStoreHistory(t *testing.T) {
-	s := Store{Dir: t.TempDir(), Keep: 3}
+func TestStoreHistoryBySchedule(t *testing.T) {
+	s := store(t)
+	s.Keep = 3
+	addSched(t, s, `{"name":"daily","workflow":"hello","cron":"@daily"}`)
 	for i := 0; i < 5; i++ {
 		r := Record{Workflow: "hello", Started: at("2026-11-27 10:00").Add(time.Duration(i) * time.Minute), Status: StatusOK}
-		if err := s.Record(r); err != nil {
-			t.Fatal(err)
+		if i%2 == 0 {
+			r.Schedule = "daily"
 		}
+		s.Record(r)
 	}
-	h, err := s.History("hello", 10)
-	if err != nil || len(h) != 3 || !h[0].Started.Equal(at("2026-11-27 10:04")) {
-		t.Fatalf("%v %d %+v", err, len(h), h)
-	}
-	l, _ := s.List()
-	_ = l
-}
-
-func TestStoreMissedRunCatchUp(t *testing.T) {
-	s := Store{Dir: t.TempDir()}
-	w, _ := Parse([]byte(simple))
-	s.Save(w)
-	s.Enable("hello", at("2026-11-20 10:00"))
-	if got := s.Due(at("2026-11-27 10:00")); len(got) != 0 {
-		t.Fatal("a run missed days ago must not fire at startup")
-	}
-	if got := s.Due(at("2026-11-27 17:30")); len(got) != 1 {
-		t.Fatal("a run missed within the hour should fire")
+	h, _ := s.History("hello", 10)
+	sh, _ := s.ScheduleHistory("daily", 10)
+	if len(h) != 3 || !h[0].Started.Equal(at("2026-11-27 10:04")) || len(sh) != 2 {
+		t.Fatalf("%d %d", len(h), len(sh))
 	}
 }
 
-func TestStoreRejectsBadName(t *testing.T) {
-	s := Store{Dir: t.TempDir()}
-	for _, n := range []string{"../x", "a/b", ""} {
-		if err := s.Enable(n, time.Now()); err == nil {
-			t.Errorf("%q", n)
-		}
+func TestMissedRunCatchUp(t *testing.T) {
+	s := store(t)
+	addSched(t, s, `{"name":"daily","workflow":"hello","cron":"0 17 * * *"}`)
+	s.EnableSchedule("daily", at("2026-11-20 10:00"))
+	if len(s.Due(at("2026-11-27 10:00"))) != 0 || len(s.Due(at("2026-11-27 17:30"))) != 1 {
+		t.Fatal("catch-up")
 	}
 }
+
+func TestHookToken(t *testing.T) {
+	s := store(t)
+	addSched(t, s, `{"name":"hook","workflow":"hello","webhook":true}`)
+	addSched(t, s, `{"name":"cron","workflow":"hello","cron":"@daily"}`)
+	if _, ok := s.CheckHook("hook", "x"); ok {
+		t.Fatal("disabled schedule opened")
+	}
+	s.EnableSchedule("hook", time.Now())
+	s.EnableSchedule("cron", time.Now())
+	tok := s.HookToken("hook")
+	if _, ok := s.CheckHook("hook", tok); !ok || len(tok) < 32 {
+		t.Fatal("right token refused")
+	}
+	if _, ok := s.CheckHook("hook", tok+"x"); ok {
+		t.Fatal("wrong token opened")
+	}
+	if _, ok := s.CheckHook("cron", s.HookToken("cron")); ok {
+		t.Fatal("a cron schedule opened as a webhook")
+	}
+	s.DisableSchedule("hook")
+	s.EnableSchedule("hook", time.Now())
+	if s.HookToken("hook") != tok {
+		t.Fatal("token should survive a re-enable")
+	}
+}
+
+func TestMigrate(t *testing.T) {
+	s := Store{Dir: t.TempDir()}
+	old := []byte(`{"name":"dep","schedule":"0 17 * * *","webhook":true,"steps":[{"id":"a","kind":"run","run":"ls"}]}`)
+	os.WriteFile(filepath.Join(s.Dir, "dep.json"), old, 0o600)
+	os.WriteFile(filepath.Join(s.Dir, "plain.json"), []byte(simple), 0o600)
+	st := state{Enabled: map[string]string{"dep": hash(old)}, Hooks: map[string]string{"dep": "tok-old-123456"}}
+	b, _ := json.Marshal(st)
+	os.WriteFile(filepath.Join(s.Dir, "state.json"), b, 0o600)
+	moved := s.Migrate(time.Now())
+	if len(moved) != 1 || moved[0] != "dep" {
+		t.Fatalf("moved %v", moved)
+	}
+	if _, _, err := s.Get("dep"); err != nil {
+		t.Fatalf("workflow after migrate: %v", err)
+	}
+	l, _ := s.Schedules()
+	if len(l) != 2 || l[0].Cron != "0 17 * * *" || !l[0].Enabled || !l[1].Webhook || !l[1].Enabled {
+		t.Fatalf("schedules: %+v", l)
+	}
+	if s.HookToken("dep") != "tok-old-123456" {
+		t.Fatal("token lost")
+	}
+	s2 := Store{Dir: t.TempDir()}
+	old2 := []byte(`{"name":"z","schedule":"@daily","webhook":true,"steps":[{"id":"a","kind":"run","run":"ls"}]}`)
+	os.WriteFile(filepath.Join(s2.Dir, "z.json"), old2, 0o600)
+	os.MkdirAll(filepath.Join(s2.Dir, "schedules"), 0o700)
+	os.WriteFile(filepath.Join(s2.Dir, "schedules", "z-webhook.json"), []byte(`{"name":"z-webhook","workflow":"z","webhook":true}`), 0o600)
+	b2, _ := json.Marshal(state{Enabled: map[string]string{"z": hash(old2)}})
+	os.WriteFile(filepath.Join(s2.Dir, "state.json"), b2, 0o600)
+	s2.Migrate(time.Now())
+	for _, in := range must(s2.Schedules()) {
+		if in.Name == "z-webhook" && in.Enabled {
+			t.Fatal("migrate enabled a schedule file it did not write")
+		}
+	}
+	if again := s.Migrate(time.Now()); len(again) != 0 {
+		t.Fatal("migrate twice")
+	}
+}
+
+func must[T any](v T, _ error) T { return v }
