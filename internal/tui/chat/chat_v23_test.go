@@ -166,7 +166,7 @@ func TestSessionEventsRenderInTheirSession(t *testing.T) {
 	m = chatStep(m, sev(4, daemon.KindSessionUsage, "s-1", map[string]any{"input_tokens": 10, "cost_usd": 0.42}))
 	m = chatStep(m, sev(5, daemon.KindSessionMessage, "s-2", map[string]string{"role": "user", "text": "other"}))
 	out := screen(m)
-	for _, want := range []string{"fix it", "+ 1 command", "Done: fixed.", "$0.42"} {
+	for _, want := range []string{"fix it", "1 command", "Done: fixed.", "$0.42"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("lacks %q:\n%s", want, out)
 		}

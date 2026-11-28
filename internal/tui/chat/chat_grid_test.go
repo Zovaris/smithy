@@ -26,13 +26,20 @@ func bgSpan(line string, limit int) (lo, hi int) {
 			}
 			if j < len(line) && line[j] == 'm' {
 				ps := strings.Split(line[i+2:j], ";")
-				for _, p := range ps {
-					n, _ := strconv.Atoi(p)
-					if p == "" || n == 0 || n == 49 {
+				for k := 0; k < len(ps); k++ {
+					n, _ := strconv.Atoi(ps[k])
+					switch {
+					case ps[k] == "" || n == 0 || n == 49:
 						on = false
-					} else if n == 48 || n >= 40 && n <= 47 {
+					case n == 38 || n == 48:
+						on = on || n == 48
+						if k+1 < len(ps) && ps[k+1] == "2" {
+							k += 4
+						} else {
+							k += 2
+						}
+					case n >= 40 && n <= 47 || n >= 100 && n <= 107:
 						on = true
-						break
 					}
 				}
 			}
@@ -103,29 +110,26 @@ func TestBlocksShareOneGrid(t *testing.T) {
 				edges[name] = [2]int{lo, hi}
 			}
 		}
-		if len(edges) != 3 {
+		delete(edges, "user")
+		_, want, _ := m.grid(m.tw())
+		if len(edges) != 2 {
 			t.Fatalf("%d cols: blocks found %v:\n%s", w, edges, strings.Join(plain, "\n"))
 		}
-		if edges["user"] != edges["shell"] || edges["user"] != edges["input"] {
+		if edges["shell"] != edges["input"] || edges["shell"][0] != want-1 {
 			t.Fatalf("%d cols: edges differ (lo, hi): %v", w, edges)
 		}
-		want := edges["user"][0] + 3
 		for k, c := range textCol {
 			if c != want {
 				t.Fatalf("%d cols: %s text at column %d, want %d (%v)", w, k, c, want, textCol)
 			}
-		}
-		right := func(l string) int { return ansi.StringWidth(strings.TrimRight(l, " ")) }
-		if right(plain[0]) != right(plain[len(plain)-1]) {
-			t.Fatalf("%d cols: header ends at %d, footer at %d", w, right(plain[0]), right(plain[len(plain)-1]))
 		}
 		if m.sideOn() {
 			if _, hi := bgSpan(raw[3], w); hi != w-m.pad()-1 {
 				t.Fatalf("%d cols: sidebar ends at %d, want %d", w, hi, w-m.pad()-1)
 			}
 		}
-		if m.sideOn() && edges["user"][1] != m.sideX()-sideGap-1 {
-			t.Fatalf("%d cols: blocks end at %d, the sidebar starts at %d", w, edges["user"][1], m.sideX())
+		if m.sideOn() && edges["shell"][1] != m.sideX()-sideGap-1 {
+			t.Fatalf("%d cols: blocks end at %d, the sidebar starts at %d", w, edges["shell"][1], m.sideX())
 		}
 	}
 }

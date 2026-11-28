@@ -1,5 +1,20 @@
    ◆ smithy dev                                             ? waiting on you   ⠋ 1 running  09:07   
     TK-6   ⠋ TK-29   TES-9   + 
+       
+       new session
+       started 23:28
+       
+     ┃ Add usage-limit detection for Pi (TK-6).                                            ✓ 0.0s
+     │ 
+   ✓ │ ▪ 1 thought                                                                               
+     │ 
+     │ Pi prints its limit errors from packages/ai/src/errors.ts. I'll match those near the end
+     │ of a failed run.
+     │ 
+   ✓ │ ▪ 1 command  ▪ 1 edit  ▪ 2 reads                                                      4.5s
+     │ 
+     │ Done: a Pi limit now marks the account limited until its reset.
+     │ 
 
 
 
@@ -7,26 +22,11 @@
 
 
 
-   ▌                                                                                                
-   ▌  Add usage-limit detection for Pi (TK-6).                                                      
-   ▌                                                                                                
-
-    ✓ + 1 thought                                                                                   
-
-      Pi prints its limit errors from packages/ai/src/errors.ts. I'll match those near the end
-      of a failed run.
-
-    ✓ + 1 command, 1 edit, 2 reads                                                           4.5s   
-
-    ▏ 
-    ▏ Done: a Pi limit now marks the account limited until its reset.
-    ▏ 0.0s
 
                                                               ▪ connecting  http://127.0.0.1:7477   
 
-   ▌                                                                                                
-   ▌› Ask, or / for commands                                                                        
-   ▌                                                                                                
-   ▌                                                                                                
-   ▌                                                                                                
+     ┃ 
+   › ┃ Ask, or / for commands                  
+     ┃ 
+     ┃ 
    enter send   shift+enter newline   ctrl+o mode   tab agents          minimal   ctrl+k palette    

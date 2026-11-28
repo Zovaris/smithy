@@ -5,6 +5,7 @@ package chat
 import (
 	"fmt"
 	"image/color"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,11 +14,16 @@ import (
 	"github.com/Zovaris/smithy/internal/tui/kit"
 )
 
-// sideW is the right sidebar's width; sideMin the narrowest screen that shows it.
-const (
-	sideW   = 38
-	sideMin = 120
-)
+// sideMin is the narrowest screen that shows the sidebar.
+const sideMin = 120
+
+// sideW is the sidebar's width: 34 columns, 40 from 160 columns on.
+func (m chatView) sideW() int {
+	if m.width >= 160 {
+		return 40
+	}
+	return 34
+}
 
 // activityLabel is a collapsed run of tool calls and thoughts as one line: "+ 2 commands, 1 thought".
 func activityLabel(tools []chatTool, thoughts int) string {
@@ -141,13 +147,19 @@ func nonEmpty(ss ...string) []string {
 func (m chatView) ctxNow() string { return ctxLabel(m.ctx[m.current], m.curModel()) }
 
 // sideOn reports whether the sidebar shows: wide enough and not turned off with /sidebar.
-func (m chatView) sideOn() bool { return !m.sideOff && m.width >= sideMin }
+func (m chatView) sideOn() bool {
+	if m.sideOff || m.width < sideMin {
+		return false
+	}
+	s, _ := m.session()
+	return len(m.pulse()) > 0 || m.ctx[m.current] > 0 || s.links != nil || len(s.prs) > 0 || len(m.queues[m.current]) > 0
+}
 
 // tw is the transcript's width: the screen less the sidebar when it shows.
 func (m chatView) tw() int {
 	w := max(m.width, 20)
 	if m.sideOn() {
-		w -= sideW + sideGap
+		w -= m.sideW() + sideGap
 	}
 	return w
 }
@@ -156,7 +168,7 @@ func (m chatView) tw() int {
 const sideGap = 2
 
 // sideX is the sidebar's first column: it ends on the page's right edge, the gutter before it.
-func (m chatView) sideX() int { return max(m.width, 20) - m.pad() - sideW }
+func (m chatView) sideX() int { return max(m.width, 20) - m.pad() - m.sideW() }
 
 // tabHit is where one tab sits in the tab strip: columns [x0, x1) open session id ("" is the
 // unsent new session).
@@ -278,51 +290,99 @@ func tabTitle(title string) string {
 func (m chatView) sideRows() (rows, urls []string) {
 	t := m.th
 	s, _ := m.session()
-	head, dim, txt := t.Fg(t.Accent).Bold(true), t.Fg(t.Dim), t.Fg(t.Text)
-	title := s.title
-	if title == "" {
-		title = "new session"
-	}
-	iw := sideW - 4
+	dim, txt := t.Fg(t.Dim), t.Fg(t.Text)
+	iw := m.sideW() - 4
+	head := func(n string) string { return t.Fg(t.Accent).Bold(true).Render(n) }
 	two := func(l, r string) string { return spread(l, r, iw) }
-	if tt := tabTitle(title); tt != "" {
-		title = tt
-	}
-	rows = []string{t.Fg(t.Strong).Bold(true).Render(kit.Short(title, iw))}
-	for _, l := range strings.Split(ansi.Wordwrap(m.agentModel(), iw, " /"), "\n") {
-		if l != "" {
-			rows = append(rows, dim.Render(kit.Short(strings.TrimSpace(l), iw)))
+	turns := m.pulse()
+	rows = []string{head("pulse")}
+	if len(turns) > 0 {
+		if vals := turns[max(len(turns)-iw, 0):]; len(vals) > 1 {
+			rows = append(rows, t.Fg(t.Accent).Render(kit.Sparkline(vals, len(vals), t.G.Ticks)))
 		}
+		n := 0
+		for _, v := range turns {
+			n += v
+		}
+		rows = append(rows, dim.Render(fmt.Sprintf("%d turn%s %s %d step%s", len(turns), plural(len(turns)), t.G.Dot, n, plural(n))))
+	} else {
+		rows = append(rows, dim.Render("no turns yet"))
 	}
-	rows = append(rows, "")
+	if m.branch != "" {
+		rows = append(rows, dim.Render(kit.Short("on "+m.branch, iw)))
+	}
+	rows = append(rows, "", head("heat"))
 	used, win := m.ctx[m.current], ctxWindow(m.curModel())
 	switch {
 	case used > 0 && win > 0:
 		pct := int((used*100 + win/2) / win)
-		rows = append(rows, two(head.Render("Context"), t.Fg(t.Strong).Render(fmt.Sprintf("%d%%", pct))))
 		rows = append(rows, m.meter(iw, float64(used)/float64(win)))
-		rows = append(rows, txt.Render(kTokUp(used))+dim.Render(" of "+kTokUp(win)+" tokens"))
+		rows = append(rows, two(txt.Render(kTokUp(used))+dim.Render(" of "+kTokUp(win)), t.Fg(t.Strong).Render(fmt.Sprintf("%d%%", pct))))
 	case used > 0:
-		rows = append(rows, head.Render("Context"), txt.Render(kTokUp(used)+" tokens"))
+		rows = append(rows, txt.Render(kTokUp(used)+" tokens"))
 	default:
-		rows = append(rows, head.Render("Context"), dim.Render("nothing used yet"))
+		rows = append(rows, dim.Render("no context used yet"))
 	}
 	if c, ok := m.cost[m.current]; ok {
-		rows = append(rows, "", head.Render("Spent"))
-		rows = append(rows, two(t.Fg(t.Muted).Render("session"), t.Fg(t.Strong).Render(fmt.Sprintf("$%.2f", c))))
+		r := t.Fg(t.Strong).Render(fmt.Sprintf("$%.2f", c))
 		if all := m.totalCost(); all > c+0.005 {
-			rows = append(rows, two(t.Fg(t.Muted).Render("all sessions"), t.Fg(t.Strong).Render(fmt.Sprintf("$%.2f", all))))
+			r += dim.Render(fmt.Sprintf(" of $%.2f", all))
+		}
+		rows = append(rows, two(dim.Render("spent"), r))
+	}
+	if work, files := m.workDone(iw); work != "" {
+		rows = append(rows, "", head("work"), txt.Render(work))
+		for _, f := range files {
+			rows = append(rows, t.Fg(t.Info).Render(t.G.On+" ")+dim.Render(f))
 		}
 	}
-	rows = append(rows, "", head.Render("Links"))
+	if q := m.queues[m.current]; len(q) > 0 {
+		rows = append(rows, "", head("queued"))
+		for i, x := range q[:min(len(q), 3)] {
+			rows = append(rows, t.Fg(t.Accent).Render(fmt.Sprintf("%d ", i+1))+txt.Render(kit.Short(kit.Clean(x), iw-2)))
+		}
+	}
 	lr, lu := m.sideLinks(s, iw)
-	urls = append(make([]string, len(rows)), lu...)
-	return append(rows, lr...), urls
+	if len(lu) > 0 && !(len(lr) == 1 && lu[0] == "" && strings.Contains(ansi.Strip(lr[0]), "no PRs")) {
+		rows = append(rows, "", head("links"))
+		urls = append(make([]string, len(rows)), lu...)
+		rows = append(rows, lr...)
+	}
+	return rows, urls
+}
+
+// workDone is what the open session did: its tool calls counted by kind, and the last files it
+// edited, each cut to w.
+func (m chatView) workDone(w int) (string, []string) {
+	var tools []chatTool
+	var files []string
+	for _, c := range m.msgs {
+		if c.tool == nil {
+			continue
+		}
+		tools = append(tools, *c.tool)
+		switch c.tool.Name {
+		case "Edit", "Write", "MultiEdit":
+			if f := c.tool.Arg; f != "" && !slices.Contains(files, f) {
+				files = append(files, f)
+			}
+		}
+	}
+	if len(tools) == 0 {
+		return "", nil
+	}
+	if len(files) > 4 {
+		files = files[len(files)-4:]
+	}
+	for i, f := range files {
+		files[i] = kit.Short(f, w-2)
+	}
+	return strings.TrimPrefix(activityLabel(tools, 0), "+ "), files
 }
 
 func (m chatView) sidebar(h int) []string {
 	t := m.th
-	iw := sideW - 4
+	iw := m.sideW() - 4
 	rows, _ := m.sideRows()
 	note := m.whereNote()
 	out := make([]string, h)
@@ -335,7 +395,7 @@ func (m chatView) sidebar(h int) []string {
 		if k := len(note) - (h - 1 - i); k >= 0 && k < len(note) && i > len(rows) {
 			r = t.Fg(t.Dim).Render(note[k])
 		}
-		out[i] = fill(side, sideW, "  "+ansi.Truncate(r, iw, "…"))
+		out[i] = fill(side, m.sideW(), "  "+ansi.Truncate(r, iw, "…"))
 	}
 	return out
 }
@@ -368,20 +428,9 @@ func (m chatView) besideSide(body []string) []string {
 // qaRows is an answered question kept in the transcript: the question dim, the answer below.
 func (m chatView) qaRows(c *chatMsg, w int) []string {
 	t := m.th
-	g := strings.Repeat(" ", m.pad())
-	bw := max(w-2*m.pad()-6, 10)
-	out := []string{g + " " + t.Fg(t.Warn).Render("→ ") + t.Fg(t.Muted).Render("Asked 1 question")}
-	for _, l := range strings.Split(ansi.Wrap(c.text, bw, ""), "\n") {
-		out = append(out, g+"   "+t.Fg(t.Text).Render(l))
-	}
-	out = append(out, g+"   "+t.Fg(t.Accent).Render("→ ")+t.Fg(t.Strong).Bold(true).Render(c.ans))
-	return append(out, "")
-}
-
-// footRows is the dim turn footer under an agent's answer.
-func (m chatView) footRows(c *chatMsg) []string {
-	t := m.th
-	return []string{strings.Repeat(" ", m.pad()) + " " + t.Fg(t.Border).Render(agentGutter(t.G.Unicode)) + " " + t.Fg(t.Dim).Render(c.text), ""}
+	ans := m.chip(" "+kit.Short(c.ans, 30)+" ", t.Surface, t.Accent, true)
+	q := t.Fg(t.Text).Render(kit.Short(c.text, m.textWidth(w)-ansi.StringWidth(ans)-4))
+	return []string{m.spreadLane(w, t.Fg(t.Warn).Render("?"), m.railMark(false), t.Border, q, ans, nil), m.gap(w)}
 }
 
 // answered reports whether session id's turn has agent text since your last message and no
@@ -469,4 +518,19 @@ func (m chatView) sideLinks(s chatSession, iw int) (rows, urls []string) {
 		rows, urls = append(rows, dim.Render("no PRs or issues yet")), append(urls, "")
 	}
 	return rows, urls
+}
+
+// pulse is the open session's work per turn: tool calls and answers between your prompts, the
+// session's rhythm for the sidebar's sparkline.
+func (m chatView) pulse() []int {
+	var out []int
+	for _, c := range m.msgs {
+		switch {
+		case c.who == "you":
+			out = append(out, 0)
+		case len(out) > 0 && (c.tool != nil || c.who == "agent" || c.sh != nil):
+			out[len(out)-1]++
+		}
+	}
+	return out
 }

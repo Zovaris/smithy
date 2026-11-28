@@ -60,7 +60,7 @@ func (m chatView) themeLoaded(msg themeMsg) chatView {
 		return m
 	}
 	m.th = m.th.Renamed(msg.name)
-	m.input.SetPromptFunc(2, composerPrompt(m.th))
+	m.input.SetPromptFunc(0, composerPrompt(m.th))
 	m.input.SetStyles(composerStyles(m.th))
 	if msg.note != "" {
 		m.status(msg.note)

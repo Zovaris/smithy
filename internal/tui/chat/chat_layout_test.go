@@ -73,7 +73,7 @@ func TestSidebarWideOnlyAndToggles(t *testing.T) {
 	m.ctx = map[string]int64{"s1": 29400}
 	m.cost = map[string]float64{"s1": 0.12}
 	out := screen(m)
-	for _, want := range []string{"Context", "29.4K", "15%", "$0.12", "Links"} {
+	for _, want := range []string{"heat", "29.4K", "15%", "$0.12"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("sidebar lacks %q:\n%s", want, out)
 		}
@@ -104,7 +104,7 @@ func TestMinimalCollapsesActivityAndExpands(t *testing.T) {
 	m.push(chatMsg{who: "daemon", tool: &chatTool{Name: "Bash", Arg: "go vet", Status: "ok"}})
 	m.push(chatMsg{who: "agent", text: "done"})
 	out := screen(m)
-	if !strings.Contains(out, "+ 2 commands, 1 thought") || strings.Contains(out, "considering the fix") {
+	if !strings.Contains(out, "2 commands") || !strings.Contains(out, "1 thought") || strings.Contains(out, "considering the fix") {
 		t.Fatalf("activity not collapsed:\n%s", out)
 	}
 	m = m.toggle(1)
@@ -131,7 +131,7 @@ func TestAnsweredAskStaysAsQA(t *testing.T) {
 	a, _ := json.Marshal(map[string]any{"id": "q1", "answer": "yes"})
 	m.event("decision_answered", "", time.Now(), a)
 	out := screen(m)
-	if !strings.Contains(out, "Merge now?") || !strings.Contains(out, "→ yes") {
+	if !strings.Contains(out, "Merge now?") || !strings.Contains(out, " yes ") {
 		t.Fatalf("no Q → A block:\n%s", out)
 	}
 }
@@ -177,7 +177,7 @@ func TestLocalAnswerStaysAsQAOnce(t *testing.T) {
 	m.decided(chatDecidedMsg{id: "q1"})
 	a, _ := json.Marshal(map[string]any{"id": "q1", "answer": "no"})
 	m.event("decision_answered", "", time.Now(), a)
-	if out := screen(m); strings.Count(out, "Ship it?") != 1 || !strings.Contains(out, "→ no") {
+	if out := screen(m); strings.Count(out, "Ship it?") != 1 || !strings.Contains(out, " no ") {
 		t.Fatalf("want one Q → A block:\n%s", out)
 	}
 }

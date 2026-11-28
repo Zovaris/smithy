@@ -1,32 +1,32 @@
    ◆ smithy dev                                             ? waiting on you   ⠋ 1 running  09:07   
     TK-6   ⠋ TK-29   TES-9   + 
-
+       
                                                                                               
         › Search actions, sessions, settings                                             esc  
                                                                                               
-         Waiting on you                                                                       
-      ▌  ?  Merge #142 into release/v0.17?  merge · later                                     
-                                                                                              
-   ▌     Actions                                                                                    
-   ▌     +  New session  your next message starts it                                    /new        
-   ▌     ▸  Agent and model                                                           ctrl+l        
-         ≡  Skills and MCP  what goes into every session                             /skills  
-    ✓    ≡  Verbosity: minimal  minimal · expandable · verbose                        ctrl+o        
-         ▪  Agents panel  sessions and waiting items                                     tab  
-         ≡  Board  the task files by status                                           /board  
-         →  Open the web UI  same sessions in the browser                               /web  
+     ┃   Waiting on you                                                                       .0s
+     │▌  ?  Merge #142 into release/v0.17?  merge · later                                     
+   ✓ │                                                                                           
+     │   Actions                                                                              
+     │   +  New session  your next message starts it                                    /new  d
+     │   ▸  Agent and model                                                           ctrl+l  
+     │   ≡  Skills and MCP  what goes into every session                             /skills  
+   ✓ │   ≡  Verbosity: minimal  minimal · expandable · verbose                        ctrl+o  .5s
+     │   ▪  Agents panel  sessions and waiting items                                     tab  
+     │   ≡  Board  the task files by status                                           /board  
+     │   →  Open the web UI  same sessions in the browser                               /web  
          →  Connect  http://127.0.0.1:7477                                          /connect  
-    ✓    ·  Daemon log  0 events                                                        /log  .5s   
+         ·  Daemon log  0 events                                                        /log  
          ↓  Jump to latest                                                               end  
-    ▏    ✗  Quit                                                                      ctrl+c  
-    ▏                                                                                         
-    ▏    Sessions                                                                             
+         ✗  Quit                                                                      ctrl+c  
+                                                                                              
+         Sessions                                                                             
          ✓  TK-6  done                                                                        
-         ▪  TK-29  running                                                                    477   
-         ✗  TES-9  failed                                                                     
-   ▌                                                                                                
-   ▌›    Settings                                                                                   
-   ▌     ·  chat.mode  ‹ minimal ›  how much of each turn the transcript shows                      
-   ▌     ·  daemon  http://127.0.0.1:7477                                                           
-   ▌                                                                                                
+         ▪  TK-29  running                                                                    
+         ✗  TES-9  failed                                                                     477   
+                                                                                              
+     ┃   Settings                                                                             
+   › ┃   ·  chat.mode  ‹ minimal ›  how much of each turn the transcript shows                
+     ┃   ·  daemon  http://127.0.0.1:7477                                                     
+     ┃                                                                                        
    ent  ↑↓ move   enter run   tab next group                                    17 results    te    

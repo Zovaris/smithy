@@ -43,8 +43,13 @@ surface from flat bands of background colour: no borders, no radius. Principles:
 - Signals (Ok, Warn, Err, Info) only for state. Evidence over decoration.
 - Few concepts: one chip, one rail, one status vocabulary everywhere.
 
-Lineage, ideas only: OpenCode (input accent bar, ask panel), Claude Code and Codex (one accent, `›`
-prompt), Posting and atuin (panels without hard borders), Crush (Charm v2 peer), btop (offset shadow).
+What makes it smithy's, not another agent TUI: the transcript hangs off one forge timeline, a
+rail with a one-cell mark gutter (`✓ ✗ $ ?` and the spinner sit on the first line of their block);
+your prompt is a bold heading on a heavy accent rail with the turn's result and time on its right,
+not a boxed message; tool runs fold into small tallies; the sidebar is a live session panel (pulse
+sparkline of steps per turn, heat, work, queue, links) that hides when there is nothing to show;
+an empty session opens on the anvil with recent sessions and keys, left-aligned, never a centered
+logo and input.
 
 ## Colors
 
@@ -82,10 +87,17 @@ a UTF-8 locale the ASCII set applies.
 
 ## Layout
 
-Rhythm: 2-col gutter, 3-col indent, 1 blank row between blocks, tool rows tight, 1-col chip gaps.
-An agent answer opens with its name (Info, bold) and the model (Dim) and runs beside a thin Border
-gutter `▏`; text streamed in parts becomes that one answer, never repeated.
-Sidebar (38 cols, Raised) shows only at 120 cols and wider.
+Grid: page gutter `pad` (3 cols from 100 wide, else 1); mark column at `pad`, rail at `pad+2`, text
+column at `pad+4`; under 80 columns the mark replaces the rail. Bands (shell output, open tools, the
+input) run from one cell before the text column to `width - pad`. The sidebar ends on that same right
+edge, after a fixed 2-col gap; header and footer right chips end there too. `TestBlocksShareOneGrid`
+checks it at 120 and 200 columns. A short session starts at the top under a 2-line intro (title;
+agent, model, branch, started) and grows down; once it fills the screen it stays anchored to the input.
+Rhythm: exactly one blank row (the rail runs through it) between blocks; tool rows tight; no
+horizontal rules: hierarchy comes from weight, colour and spacing.
+An agent answer is plain text on the rail; its agent, model, time and rate sit on the prompt heading
+once the turn ends. Text streamed in parts becomes that one answer, never repeated.
+Sidebar (34 cols, 40 from 160 wide, Raised) shows from 120 cols when the session has something to show.
 
 80x24:
 ```

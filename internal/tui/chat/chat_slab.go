@@ -122,11 +122,3 @@ func (v valueBump) shift(key string) int {
 	}
 	return int((1-v.pos)*2 + 0.5)
 }
-
-// agentGutter is the thin line left of an agent's answer, in the border colour.
-func agentGutter(uni bool) string {
-	if uni {
-		return "▏"
-	}
-	return "|"
-}

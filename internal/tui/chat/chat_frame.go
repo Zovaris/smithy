@@ -218,7 +218,7 @@ func (m chatView) whereNote() []string {
 	case whereStandalone:
 		return []string{"standalone daemon", "stops with this chat"}
 	case whereRemote:
-		return []string{kit.Short(m.url, sideW-4)}
+		return []string{kit.Short(m.url, m.sideW()-4)}
 	}
 	return nil
 }
@@ -569,8 +569,7 @@ func (m chatView) spinRow(w int) string {
 	if !since.IsZero() {
 		right = append(right, fmt.Sprintf("%.1fs", time.Since(since).Seconds()))
 	}
-	p := strings.Repeat(" ", m.pad())
-	return spread(p+" "+t.Fg(t.Warn).Render(t.Spinner(m.frame))+" "+t.Fg(t.Muted).Render(what), t.Fg(t.Dim).Render(strings.Join(right, "  "))+p, w)
+	return m.spreadLane(w, t.Fg(t.Warn).Render(t.Spinner(m.frame)), m.railMark(false), t.Warn, t.Fg(t.Muted).Render(what), t.Fg(t.Dim).Render(strings.Join(right, "  ")), nil)
 }
 
 // fill lays s on st's background w cells wide, cut to fit. Unlike Style.Width it keeps the

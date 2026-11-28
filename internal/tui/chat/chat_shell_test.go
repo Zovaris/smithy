@@ -56,7 +56,7 @@ func TestBangInASessionRunsThroughTheDaemonOnce(t *testing.T) {
 	r := f.run
 	r.Cmd = "ls"
 	m = shellEv(t, m, "s1", r)
-	if out := screen(m); strings.Count(out, "$ ls") != 1 || !strings.Contains(out, "a.go") {
+	if out := screen(m); strings.Count(out, "$ | ls") != 1 || !strings.Contains(out, "a.go") {
 		t.Fatalf("want one block:\n%s", out)
 	}
 }
@@ -69,7 +69,7 @@ func TestShellEventFromAnotherClientShows(t *testing.T) {
 	m = shellEv(t, m, "s1", api.ShellRun{ID: "sh-9", Cmd: "git status", Lines: []api.ShellLine{{Text: "clean"}}, Code: 1})
 	m = shellEv(t, m, "s2", api.ShellRun{ID: "sh-8", Cmd: "pwd"})
 	out := screen(m)
-	if !strings.Contains(out, "$ git status") || !strings.Contains(out, "clean") || !strings.Contains(out, "exit 1") || strings.Contains(out, "pwd") {
+	if !strings.Contains(out, "$ | git status") || !strings.Contains(out, "clean") || !strings.Contains(out, "exit 1") || strings.Contains(out, "pwd") {
 		t.Fatalf("event not drawn:\n%s", out)
 	}
 	if len(m.convs["s2"]) != 1 || m.convs["s2"][0].sh.run == nil {
@@ -92,7 +92,7 @@ func TestCutShellRunShowsItsMarkerWhenOpen(t *testing.T) {
 	if !strings.Contains(out, "10 more lines") || strings.Contains(out, "cut") || strings.Contains(out, "line-20") {
 		t.Fatalf("folded:\n%s", out)
 	}
-	m = chatStep(m, tea.MouseClickMsg{X: 5, Y: rowOf(t, m, "$ seq"), Button: tea.MouseLeft})
+	m = chatStep(m, tea.MouseClickMsg{X: 5, Y: rowOf(t, m, "$ | seq"), Button: tea.MouseLeft})
 	out = screen(m)
 	if !strings.Contains(out, "line-29") || strings.Count(out, "cut") != 1 || !strings.Contains(out, "… 9 lines cut …") || strings.Contains(out, "more line") {
 		t.Fatalf("open:\n%s", out)
@@ -118,7 +118,7 @@ func TestBangRunsShellInSessionFolderAndShowsOutput(t *testing.T) {
 		t.Fatalf("shell line went to the agent: %v %v", f.started, f.sent)
 	}
 	out := screen(m)
-	for _, s := range []string{"$ ls -1", "exit 0", "40ms", "a.go", "b.go"} {
+	for _, s := range []string{"$ | ls -1", "exit 0", "40ms", "a.go", "b.go"} {
 		if !strings.Contains(out, s) {
 			t.Fatalf("%q missing:\n%s", s, out)
 		}
@@ -163,7 +163,7 @@ func TestShellBlockFoldsLongOutputAndExpandsOnClick(t *testing.T) {
 	if !strings.Contains(out, "line-19") || strings.Contains(out, "line-20") || !strings.Contains(out, "10 more lines") {
 		t.Fatalf("not folded after 20 lines:\n%s", out)
 	}
-	m = chatStep(m, tea.MouseClickMsg{X: 5, Y: rowOf(t, m, "$ seq 30"), Button: tea.MouseLeft})
+	m = chatStep(m, tea.MouseClickMsg{X: 5, Y: rowOf(t, m, "$ | seq 30"), Button: tea.MouseLeft})
 	if out := screen(m); !strings.Contains(out, "line-29") {
 		t.Fatalf("a click did not expand:\n%s", out)
 	}

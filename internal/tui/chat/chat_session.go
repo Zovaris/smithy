@@ -186,7 +186,11 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 			return true
 		}
 		if d.Role == "user" {
-			m.into(id, chatMsg{who: "you", text: kit.Clean(d.Text)})
+			c := chatMsg{who: "you", text: kit.Clean(d.Text)}
+			if !m.evAt.IsZero() {
+				c.at = m.evAt.Local().Format("15:04")
+			}
+			m.into(id, c)
 			m.now(id, "")
 			return true
 		}

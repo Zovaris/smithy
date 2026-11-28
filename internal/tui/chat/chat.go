@@ -177,6 +177,7 @@ type chatView struct {
 	vb        valueBump        // the setting value that just changed, settling
 	usage     *events.Report   // /usage's report, nil while it loads
 	cfgAdv    bool             // /config shows its Advanced settings
+	evAt      time.Time        // when the event being applied happened
 
 	server      string                    // the saved server name, local or URL this chat talks to
 	picker      *connectPicker            // /connect's state while its box is open
@@ -208,28 +209,19 @@ func newChatView(stream <-chan api.ClientMsg, url string, th kit.Theme) chatView
 // ember ›, three rows tall, growing to ten then scrolling; enter sends, shift+enter, alt+enter
 // or ctrl+j breaks the line.
 // composerPrompt draws the accent › on the first row; a theme change sets it again.
-func composerPrompt(th kit.Theme) func(textarea.PromptInfo) string {
-	return func(i textarea.PromptInfo) string {
-		st := lipgloss.NewStyle()
-		if th.Focus != nil {
-			st = st.Background(th.Focus)
-		}
-		if i.LineNumber == 0 {
-			return th.Fg(th.Accent).Inherit(st).Render(th.G.Prompt) + st.Render(" ")
-		}
-		return st.Render("  ")
-	}
+func composerPrompt(kit.Theme) func(textarea.PromptInfo) string {
+	return func(textarea.PromptInfo) string { return "" }
 }
 
 func newComposer(th kit.Theme) textarea.Model {
 	in := textarea.New()
 	in.ShowLineNumbers = false
 	in.Placeholder = "Ask, or / for commands"
-	in.DynamicHeight, in.MinHeight, in.MaxHeight, in.MaxContentHeight = true, 3, 10, 1<<20
+	in.DynamicHeight, in.MinHeight, in.MaxHeight, in.MaxContentHeight = true, 1, 10, 1<<20
 	in.KeyMap.InsertNewline.SetKeys("shift+enter", "alt+enter", "ctrl+j")
-	in.SetPromptFunc(2, composerPrompt(th))
+	in.SetPromptFunc(0, composerPrompt(th))
 	in.SetStyles(composerStyles(th))
-	in.SetHeight(3)
+	in.SetHeight(1)
 	in.Focus()
 	return in
 }
@@ -855,7 +847,7 @@ func eventText(kind, session string, data json.RawMessage) string {
 // line and the gap under it, the composer, the footer and the spinner row while the open
 // session works.
 func (m chatView) rows() int {
-	n := m.height - headRows - 1 - m.input.Height() - 3
+	n := m.height - headRows - 1 - m.input.Height() - 4
 	if strings.TrimSpace(ansi.Strip(m.statusLine(m.tw()))) != "" {
 		n--
 	}
@@ -898,25 +890,29 @@ func (m chatView) wrap(i int) []string {
 // blank row after each.
 func (m chatView) textRows(c *chatMsg, w int) []string {
 	t := m.th
-	p := m.pad()
-	gut := strings.Repeat(" ", p)
-	bw := w - 2*p
+	bw := m.textWidth(w)
 	if c.who == "you" {
-		row := lipgloss.NewStyle()
-		if t.Raised != nil {
-			row = row.Background(t.Raised)
+		var lines []string
+		res := m.turnResult(c)
+		if c.at != "" {
+			res = strings.TrimSpace(res + "  " + t.Fg(t.Dim).Render(c.at))
 		}
-		rail := t.Fg(t.Accent).Render(railGlyph(t.G.Unicode))
-		edge := gut + fill(row, bw, rail) + gut
-		lines := []string{edge}
-		for n, l := range strings.Split(ansi.Wrap(c.text, max(bw-12, 10), ""), "\n") {
-			text := rail + "  " + t.Fg(t.Strong).Bold(true).Render(l)
-			if n == 0 && c.at != "" {
-				text = spread(text, t.Fg(t.Dim).Render(c.at)+"  ", bw)
+		below := bw-ansi.StringWidth(res)-2 < max(bw/2, 30)
+		room := bw - ansi.StringWidth(res) - 2
+		if below {
+			room = bw
+		}
+		for n, l := range strings.Split(ansi.Wrap(c.text, room, ""), "\n") {
+			right := ""
+			if n == 0 && !below {
+				right = res
 			}
-			lines = append(lines, gut+fill(row, bw, text)+gut)
+			lines = append(lines, m.spreadLane(w, "", m.railMark(true), t.Accent, t.Fg(t.Strong).Bold(true).Render(l), right, nil))
 		}
-		return append(lines, edge, "")
+		if below && res != "" {
+			lines = append(lines, m.lane(w, "", m.railMark(true), t.Accent, ansi.Truncate(res, bw, "…"), nil))
+		}
+		return append(lines, m.gap(w))
 	}
 	body := t.Fg(t.Text)
 	text := c.text
@@ -930,18 +926,14 @@ func (m chatView) textRows(c *chatMsg, w int) []string {
 	case c.kind != "":
 		body = t.Fg(t.Dim)
 	}
-	if c.at != "" {
+	if c.at != "" && c.who != "agent" {
 		text = c.at + " " + text
 	}
-	lead := gut + "   "
-	if c.who == "agent" {
-		lead = gut + " " + t.Fg(t.Border).Render(agentGutter(t.G.Unicode)) + " "
-	}
 	var lines []string
-	for _, l := range strings.Split(ansi.Wrap(text, max(bw-5, 10), ""), "\n") {
-		lines = append(lines, lead+m.linkify(l, body))
+	for _, l := range strings.Split(ansi.Wrap(text, bw, ""), "\n") {
+		lines = append(lines, m.lane(w, "", m.railMark(false), t.Border, m.linkify(l, body), nil))
 	}
-	return append(lines, "")
+	return append(lines, m.gap(w))
 }
 
 // linkify draws l in st: file paths in the link color, `code` spans on the raised tier
@@ -1031,10 +1023,21 @@ func (m chatView) View() tea.View {
 	out = append(out, m.header(w)...)
 	vis, _ := m.visible()
 	body := make([]string, 0, m.rows()+2)
-	for range m.rows() - len(vis) {
-		body = append(body, "")
+	if m.fresh() && !m.working() && m.offset == 0 {
+		body = append(body, m.home(m.tw(), m.rows()-len(vis))...)
+		body = append(body, vis...)
+	} else if intro := m.intro(m.tw()); m.lead(len(vis)) == len(intro) {
+		body = append(body, intro...)
+		body = append(body, vis...)
+		for len(body) < m.rows() {
+			body = append(body, "")
+		}
+	} else {
+		for range m.rows() - len(vis) {
+			body = append(body, "")
+		}
+		body = append(body, vis...)
 	}
-	body = append(body, vis...)
 	if m.working() {
 		body = append(body, m.spinRow(m.tw()), "")
 	}
@@ -1144,30 +1147,34 @@ func cwd() string {
 // accent › inside it, and a row of chips under the text: agent, model and effort.
 func (m chatView) composer(w int) []string {
 	t := m.th
-	tier := on(t.Focus)
-	p := strings.Repeat(" ", m.pad())
-	bw := w - 2*m.pad()
-	edge := t.Fg(t.Accent).Inherit(tier).Render(railGlyph(t.G.Unicode))
-	row := func(s string) string { return p + fill(tier, bw, edge+s) + p }
+	_, tx, right := m.grid(w)
+	bw := right - tx
+	row := func(mark, s string) string {
+		return m.lane(w, mark, m.railMark(true), t.Accent, ansi.Truncate(s, bw, ""), t.Focus)
+	}
 	var out []string
 	if c := m.chips(); c != "" {
-		out = append(out, row("  "+c+"  esc drops"))
+		out = append(out, row("", c+"  esc drops"))
 	}
-	out = append(out, row(""))
-	for _, l := range strings.Split(m.input.View(), "\n") {
+	out = append(out, row("", ""))
+	for n, l := range strings.Split(m.input.View(), "\n") {
 		if m.shimmer > 0 {
 			l = t.Shimmer(ansi.Strip(l), float64(bw)*float64(shimmerFrames-m.shimmer)/shimmerFrames)
 		}
-		out = append(out, row(l))
+		mark := ""
+		if n == 0 {
+			mark = t.Fg(t.Accent).Bold(true).Render(t.G.Prompt)
+		}
+		out = append(out, row(mark, l))
 	}
-	out = append(out, row("  "+m.metaChips()))
-	for _, r := range m.queueRows(bw) {
+	out = append(out, row("", ""), row("", m.metaChips()))
+	p := strings.Repeat(" ", tx-1)
+	for _, r := range m.queueRows(bw + 1) {
 		out = append(out, p+r)
 	}
 	return out
 }
 
-// metaChips is the composer's last row: the agent, the model and the effort as flat chips.
 func (m chatView) metaChips() string {
 	t := m.th
 	parts := strings.Split(m.agentModel(), " "+t.G.Dot+" ")
@@ -1186,6 +1193,16 @@ func (m chatView) metaChips() string {
 		out = append(out, m.chip(" effort ", t.Muted, t.Overlay, false)+m.chip(s.effort+" ", t.Accent, t.Overlay, true))
 	}
 	return strings.Join(out, on(t.Focus).Render(" "))
+}
+
+// metaText is the agent, model, effort and mode the next turn runs with, for the input's rule.
+func (m chatView) metaText() string {
+	parts := nonEmpty(strings.Split(m.agentModel(), " "+m.th.G.Dot+" ")...)
+	if s, ok := m.session(); ok && s.effort != "" {
+		parts = append(parts, "effort "+s.effort)
+	}
+	parts = append(parts, m.mode.String())
+	return strings.Join(parts, " "+m.th.G.Dot+" ")
 }
 
 // gitBranch is dir's current branch, "" outside a repo.

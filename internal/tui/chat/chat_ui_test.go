@@ -123,12 +123,12 @@ func TestChatModesCycleWithCtrlO(t *testing.T) {
 		t.Fatalf("starts in %v", m.mode)
 	}
 	out := screen(m)
-	if !strings.Contains(out, "✓ + 1 command, 1 edit, 2 reads") || strings.Contains(out, "134 lines read") || strings.Contains(out, "typed classes") {
+	if !strings.Contains(out, "1 command") || !strings.Contains(out, "2 reads") || strings.Contains(out, "134 lines read") || strings.Contains(out, "typed classes") {
 		t.Fatalf("minimal shows tool details:\n%s", out)
 	}
 	m = chatStep(m, ckey("ctrl+o"))
 	out = screen(m)
-	if m.mode != modeExpandable || !strings.Contains(out, "▪ Grep  \"LimitError\" in pi") || strings.Contains(out, "134 lines read") {
+	if m.mode != modeExpandable || !strings.Contains(out, "Grep  \"LimitError\" in pi") || strings.Contains(out, "134 lines read") {
 		t.Fatalf("expandable:\n%s", out)
 	}
 	m = chatStep(m, ckey("ctrl+o"))
@@ -164,8 +164,8 @@ func TestChatClickExpandsToolBlock(t *testing.T) {
 
 func TestChatClickMinimalSummaryOpensRun(t *testing.T) {
 	m := newChatScene()
-	m = chatStep(m, tea.MouseClickMsg{X: 5, Y: rowOf(t, m, "+ 1 command"), Button: tea.MouseLeft})
-	if out := screen(m); !strings.Contains(out, "▪ Bash") || strings.Contains(out, "+ 1 command") {
+	m = chatStep(m, tea.MouseClickMsg{X: 5, Y: rowOf(t, m, "1 command"), Button: tea.MouseLeft})
+	if out := screen(m); !strings.Contains(out, "Bash") {
 		t.Fatalf("summary click did not open the run:\n%s", out)
 	}
 }
