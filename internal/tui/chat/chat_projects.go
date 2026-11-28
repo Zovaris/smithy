@@ -4,6 +4,7 @@ package chat
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 
 	tea "charm.land/bubbletea/v2"
@@ -38,6 +39,8 @@ type dirsMsg struct {
 	l   api.DirList
 	err error
 }
+
+var errNoProjects = errors.New("projects need a running daemon")
 
 // projRow is one row of the modal: a project, this folder, the add row, or a folder to open.
 type projRow struct {
@@ -125,8 +128,11 @@ func (m chatView) projRows() []projRow {
 }
 
 func (m chatView) listDirs(dir string) tea.Cmd {
-	pa, _ := m.sess.(projectAPI)
+	pa, ok := m.sess.(projectAPI)
 	return func() tea.Msg {
+		if !ok {
+			return dirsMsg{err: errNoProjects}
+		}
 		l, err := pa.ListDirs(context.Background(), dir)
 		return dirsMsg{l: l, err: err}
 	}
@@ -163,7 +169,11 @@ func (m chatView) projectKey(k string) (tea.Model, tea.Cmd) {
 				return m, m.listDirs(b.Parent)
 			}
 		case "a":
-			pa, _ := m.sess.(projectAPI)
+			pa, ok := m.sess.(projectAPI)
+			if !ok {
+				m.proj.err = errNoProjects.Error()
+				return m, nil
+			}
 			dir := b.Dir
 			l, err := pa.AddProject(context.Background(), dir, false)
 			if err != nil {
