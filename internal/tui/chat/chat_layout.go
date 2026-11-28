@@ -165,42 +165,106 @@ type tabHit struct {
 func (m chatView) tabStrip(w int) (string, []tabHit, int) {
 	t := m.th
 	p := strings.Repeat(" ", max(m.pad()-1, 0))
-	row := p
-	var hits []tabHit
-	add := func(id, title string) {
-		tab := " " + kit.Short(title, 24) + " "
-		if id != "" && m.sessionRunning(id) {
-			tab = " " + t.Spinner(m.frame) + tab
-		}
-		x := ansi.StringWidth(row)
-		if id == m.current {
-			row += m.chip(tab, t.Surface, t.Accent, true)
-		} else {
-			row += m.chip(tab, t.Muted, t.Raised, false)
-		}
-		hits = append(hits, tabHit{x, ansi.StringWidth(row), id})
-		row += " "
-	}
+	type tab struct{ id, text string }
+	var tabs []tab
 	for _, s := range m.listed() {
-		title := s.title
+		title := tabTitle(s.title)
 		if title == "" {
 			title = kit.Short(s.id, 8)
 		}
-		add(s.id, title)
+		text := " " + title + " "
+		if m.sessionRunning(s.id) {
+			text = " " + t.Spinner(m.frame) + text
+		}
+		tabs = append(tabs, tab{s.id, text})
 	}
 	if m.current == "" {
-		add("", "new")
+		tabs = append(tabs, tab{"", " new "})
+	}
+	cur := 0
+	for i, tb := range tabs {
+		if tb.id == m.current {
+			cur = i
+		}
+	}
+	room := w - len(p) - 4 - 4
+	width := func(a, b int) int {
+		n := 0
+		for _, tb := range tabs[a:b] {
+			n += ansi.StringWidth(tb.text) + 1
+		}
+		return n
+	}
+	lo, hi := 0, len(tabs)
+	for width(lo, hi) > room && hi-lo > 1 {
+		if cur-lo > hi-1-cur {
+			lo++
+		} else {
+			hi--
+		}
+	}
+	row := p
+	if lo > 0 {
+		row += t.Fg(t.Accent).Render("« ")
+	}
+	var hits []tabHit
+	for _, tb := range tabs[lo:hi] {
+		x := ansi.StringWidth(row)
+		if tb.id == m.current {
+			row += m.chip(tb.text, t.Surface, t.Accent, true)
+		} else {
+			row += m.chip(tb.text, t.Muted, t.Raised, false)
+		}
+		hits = append(hits, tabHit{x, ansi.StringWidth(row), tb.id})
+		row += " "
+	}
+	if hi < len(tabs) {
+		row += t.Fg(t.Accent).Render("» ")
 	}
 	x := ansi.StringWidth(row)
 	row += m.chip(" + ", t.Accent, t.Raised, true)
-	if over := ansi.StringWidth(row) - w; over > 0 {
-		row = ansi.TruncateLeft(row, over+1, "…")
-		for i := range hits {
-			hits[i].x0, hits[i].x1 = hits[i].x0-over, hits[i].x1-over
-		}
-		x -= over
+	if ansi.StringWidth(row) > w {
+		row = ansi.Truncate(row, w, "")
 	}
 	return row, hits, x
+}
+
+// tabFiller are openings a tab title drops: they say nothing about the session.
+var tabFiller = []string{"please ", "can you ", "could you ", "would you ", "i want you to ", "i want to ", "i need you to ", "help me ", "let's ", "lets ", "go ahead and ", "now "}
+
+// tabTitle is a session's tab label: its title without polite openings, cut at a word near 24
+// cells, or with a middle ellipsis when one word is longer.
+func tabTitle(title string) string {
+	s := strings.Join(strings.Fields(kit.Clean(title)), " ")
+	for changed := true; changed; {
+		changed = false
+		for _, f := range tabFiller {
+			if len(s) > len(f) && strings.EqualFold(s[:len(f)], f) {
+				s, changed = s[len(f):], true
+			}
+		}
+	}
+	s = strings.TrimRight(s, " ?.!,:;")
+	if s == "" {
+		return ""
+	}
+	s = strings.ToUpper(s[:1]) + s[1:]
+	const most = 24
+	if ansi.StringWidth(s) <= most {
+		return s
+	}
+	out := ""
+	for _, wd := range strings.Fields(s) {
+		if ansi.StringWidth(out)+1+ansi.StringWidth(wd) > most-1 {
+			break
+		}
+		out = strings.TrimSpace(out + " " + wd)
+	}
+	if ansi.StringWidth(out) >= 10 {
+		return strings.TrimRight(out, " ,.:;") + "…"
+	}
+	r := []rune(s)
+	return string(r[:most/2-1]) + "…" + string(r[len(r)-(most/2-1):])
 }
 
 // sidebar is the right column beside the transcript, h rows: the session's title, its context
@@ -375,7 +439,7 @@ func (m chatView) sideLinks(s chatSession, iw int) (rows, urls []string) {
 			sub(u.URL, u.Title)
 		}
 		if l.Error != "" {
-			rows, urls = append(rows, t.Fg(t.Err).Render(kit.Short(l.Error, iw))), append(urls, "")
+			rows, urls = append(rows, t.Fg(t.Muted).Render(kit.Short(l.Error, iw))), append(urls, "")
 		}
 	} else {
 		for _, u := range s.prs {

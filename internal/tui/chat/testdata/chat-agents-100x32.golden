@@ -1,4 +1,4 @@
-  ◆ smithy dev                                                ▪ waiting on you · 1 running  09:07   
+  ◆ smithy dev                                              ? waiting on you   ⠋ 1 running  09:07   
    TK-6   ⠋ TK-29   TES-9   + 
 
 
@@ -17,8 +17,8 @@
          ?  Merge #142 into release/v0.17?  merge · later                                     
      ✓                                                                                        s     
         ↑↓ move   enter open   s stop   n new session   a all   tab close                     
-     
-     Done: a Pi limit now marks the account limited until its reset.
+    ▏ 
+    ▏ Done: a Pi limit now marks the account limited until its reset.
 
      0.0s
 
@@ -29,4 +29,4 @@
    ▌                                                                                                
    ▌                                                                                                
    ▌                                                                                                
-    enter  send   shift+enter  newline   ctrl+o  mode   tab  agents     minimal   ctrl+k palette    
+   enter send   shift+enter newline   ctrl+o mode   tab agents          minimal   ctrl+k palette    

@@ -161,8 +161,11 @@ func (t Theme) HeadBar(w, gutter int, project string, pill func(bar lipgloss.Sty
 		left += bar.Foreground(t.Dim).Render(" "+t.G.Dot+" ") + bar.Foreground(t.Muted).Render(project)
 	}
 	right := bar.Foreground(t.Text).Render(clock) + bar.Render(p)
+	if !t.Plain && t.Overlay != nil {
+		right = lipgloss.NewStyle().Background(t.Overlay).Foreground(t.Strong).Render(" "+clock+" ") + bar.Render(p)
+	}
 	if s := pill(bar); s != "" {
-		if full := s + bar.Render("  ") + right; w-ansi.StringWidth(left)-ansi.StringWidth(full) >= 1 {
+		if full := s + bar.Render(" ") + right; w-ansi.StringWidth(left)-ansi.StringWidth(full) >= 1 {
 			right = full
 		}
 	}

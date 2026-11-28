@@ -954,7 +954,7 @@ func (m chatView) agentHead(w int) string {
 	if name == "" {
 		name = m.agentLabel()
 	}
-	head := strings.Repeat(" ", m.pad()) + "  " + t.Fg(t.Info).Bold(true).Render(name)
+	head := strings.Repeat(" ", m.pad()) + " " + t.Fg(t.Border).Render(agentGutter(t.G.Unicode)) + " " + t.Fg(t.Info).Bold(true).Render(name)
 	if len(rest) > 0 {
 		head += "  " + t.Fg(t.Dim).Render(strings.Join(rest, " "+t.G.Dot+" "))
 	}

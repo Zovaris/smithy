@@ -1,4 +1,4 @@
-  ◆ smithy dev                                                ▪ waiting on you · 1 running  09:07   
+  ◆ smithy dev                                              ? waiting on you   ⠋ 1 running  09:07   
    TK-6   ⠋ TK-29   TES-9   + 
 
                                                                                               
@@ -17,8 +17,8 @@
          →  Open the web UI  same sessions in the browser                               /web  
      ✓   →  Connect  http://127.0.0.1:7477                                          /connect  s     
          ·  Daemon log  0 events                                                        /log  
-         ↓  Jump to latest                                                               end  
-     D   ✗  Quit                                                                      ctrl+c  
+    ▏    ↓  Jump to latest                                                               end  
+    ▏    ✗  Quit                                                                      ctrl+c  
                                                                                               
      0   Sessions                                                                             
          ✓  TK-6  done                                                                        
@@ -29,4 +29,4 @@
    ▌     ·  chat.mode  ‹ minimal ›  how much of each turn the transcript shows                      
    ▌     ·  daemon  http://127.0.0.1:7477                                                           
    ▌                                                                                                
-    en  ↑↓ move   enter run   tab next group                                    17 results    te    
+   ent  ↑↓ move   enter run   tab next group                                    17 results    te    

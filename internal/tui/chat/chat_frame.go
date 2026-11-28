@@ -80,7 +80,7 @@ func (m chatView) header(w int) []string {
 	if tag := strings.TrimPrefix(strings.Join([]string{m.goalTag(), m.tendTag()}, "  "), "  "); strings.TrimSpace(tag) != "" {
 		tag = strings.TrimSpace(tag)
 		pill = func(bar lipgloss.Style) string {
-			return bar.Foreground(m.th.Dim).Render(tag) + bar.Render("  ") + m.pill(bar)
+			return m.chip(" "+tag+" ", m.th.Muted, m.th.Overlay, false) + bar.Render(" ") + m.pill(bar)
 		}
 	}
 	tabs, _, _ := m.tabStrip(w)
@@ -118,16 +118,16 @@ func (m chatView) pill(bar lipgloss.Style) string {
 		}
 	}
 	if len(m.pending) > 0 {
-		w := bar.Foreground(t.Warn).Render(t.G.On) + bar.Foreground(t.Text).Render(" waiting on you")
+		w := m.chip(" ? waiting on you ", t.Surface, t.Warn, true)
 		if n > 0 {
-			w += bar.Foreground(t.Dim).Render(fmt.Sprintf(" · %d running", n))
+			w += bar.Render(" ") + m.chip(fmt.Sprintf(" %s %d running ", t.Spinner(m.frame), n), t.Warn, t.Overlay, false)
 		}
 		return w
 	}
 	if n == 0 {
-		return bar.Foreground(t.Dim).Render("idle")
+		return m.chip(" idle ", t.Muted, t.Overlay, false)
 	}
-	return bar.Foreground(t.Warn).Render(t.Spinner(m.frame)) + bar.Foreground(t.Text).Render(fmt.Sprintf(" %d running", n))
+	return m.chip(" "+t.Spinner(m.frame)+fmt.Sprintf(" %d running ", n), t.Warn, t.Overlay, false)
 }
 
 // kTok is a token count with a k or M suffix past a thousand.
@@ -216,7 +216,7 @@ func (m chatView) footer(w int) string {
 	t := m.th
 	dim, key := t.Fg(t.Dim), t.Fg(t.Text)
 	hint := func(k, what string) string {
-		return m.chip(" "+k+" ", t.Strong, t.Overlay, false) + t.Fg(t.Muted).Render(" "+what)
+		return t.Fg(t.Text).Render(k) + t.Fg(t.Dim).Render(" "+what)
 	}
 	p := strings.Repeat(" ", m.pad())
 	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode"), hint("tab", "agents"), hint("ctrl+n/p", "tabs"), hint("?", "help"), hint("ctrl+s", "select")}
@@ -237,10 +237,10 @@ func (m chatView) footer(w int) string {
 		info = append(info, dim.Render(fmt.Sprintf("$%.2f", c)))
 	}
 	right := strings.Join(info, dim.Render(" "+t.G.Dot+" ")) + " " + m.chip(" "+m.mode.String()+" ", t.Surface, t.Muted, true) + " " + m.chip(" ctrl+k palette ", t.Surface, t.Accent, true) + p
-	left := p + strings.Join(hints, "  ")
+	left := p + strings.Join(hints, "   ")
 	for len(hints) > 1 && w-ansi.StringWidth(left)-ansi.StringWidth(right) < 1 {
 		hints = hints[:len(hints)-1]
-		left = p + strings.Join(hints, "  ")
+		left = p + strings.Join(hints, "   ")
 	}
 	if gap := w - ansi.StringWidth(left) - ansi.StringWidth(right); gap >= 1 {
 		return left + strings.Repeat(" ", gap) + right

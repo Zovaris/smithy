@@ -176,6 +176,7 @@ type chatView struct {
 	mo        motion           // the spring that lifts an overlay in as it opens
 	vb        valueBump        // the setting value that just changed, settling
 	usage     *events.Report   // /usage's report, nil while it loads
+	cfgAdv    bool             // /config shows its Advanced settings
 
 	server      string                    // the saved server name, local or URL this chat talks to
 	picker      *connectPicker            // /connect's state while its box is open
@@ -929,9 +930,13 @@ func (m chatView) textRows(c *chatMsg, w int) []string {
 	if c.at != "" {
 		text = c.at + " " + text
 	}
+	lead := gut + "  "
+	if c.who == "agent" {
+		lead = gut + " " + t.Fg(t.Border).Render(agentGutter(t.G.Unicode)) + " "
+	}
 	var lines []string
-	for _, l := range strings.Split(ansi.Wrap(text, max(bw-4, 10), ""), "\n") {
-		lines = append(lines, gut+"  "+m.linkify(l, body))
+	for _, l := range strings.Split(ansi.Wrap(text, max(bw-5, 10), ""), "\n") {
+		lines = append(lines, lead+m.linkify(l, body))
 	}
 	return append(lines, "")
 }

@@ -1,4 +1,4 @@
-  ◆ smithy dev                                                ▪ waiting on you · 1 running  09:07   
+  ◆ smithy dev                                              ? waiting on you   ⠋ 1 running  09:07   
    TK-6   ⠋ TK-29   TES-9   + 
 
 
@@ -17,8 +17,8 @@
      ▪ Edit  internal/pool/detect.go                                             ✓ +6 −1   0.2s     
      ▪ Bash  go test ./internal/pool                                            ✓ exit 0   3.8s     
 
-     
-     Done: a Pi limit now marks the account limited until its reset.
+    ▏ 
+    ▏ Done: a Pi limit now marks the account limited until its reset.
 
      0.0s
 
@@ -29,4 +29,4 @@
    ▌                                                                                                
    ▌                                                                                                
    ▌                                                                                                
-    enter  send   shift+enter  newline   ctrl+o  mode                expandable   ctrl+k palette    
+   enter send   shift+enter newline   ctrl+o mode   tab agents       expandable   ctrl+k palette    

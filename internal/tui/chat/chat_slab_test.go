@@ -23,13 +23,13 @@ func TestConfigGroupsFiltersAndChangesAValue(t *testing.T) {
 		t.Fatal("/config opens the settings modal")
 	}
 	out := screen(m)
-	for _, s := range []string{"Settings", "Look", "chat.transcript", "chat.sidebar", "ui.theme", "Serve", "auto.paused", "‹ "} {
+	for _, s := range []string{"Settings", "Look", "Transcript", "Sidebar", "Theme", "Serve", "Advanced", "‹ "} {
 		if !strings.Contains(out, s) {
 			t.Fatalf("%q missing:\n%s", s, out)
 		}
 	}
 	m = typeIn(m, "theme")
-	if out := screen(m); !strings.Contains(out, "1 shown") || strings.Contains(out, "auto.paused") {
+	if out := screen(m); !strings.Contains(out, "1 shown") || strings.Contains(out, "Advanced") {
 		t.Fatalf("filter keeps only the theme:\n%s", out)
 	}
 	m = cpress(m, ckey("right"))
@@ -96,5 +96,51 @@ func TestAskPanelDocksAboveTheInput(t *testing.T) {
 		if !strings.Contains(out, s) {
 			t.Fatalf("%q missing:\n%s", s, out)
 		}
+	}
+}
+
+func TestTabTitleIsShortAndDropsOpenings(t *testing.T) {
+	for in, want := range map[string]string{
+		"please read the file go.mod and tell me which Charm libraries it uses": "Read the file go.mod…",
+		"fix login": "Fix login",
+		"can you supercalifragilisticexpialidocious-thing": "Supercalifr…cious-thing",
+	} {
+		if got := tabTitle(in); got != want || ansi.StringWidth(got) > 24 {
+			t.Errorf("tabTitle(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestConfigAdvancedOpensAndBooleansReadOnOff(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 140, 40
+	m.cfg = &fakeSettings{}
+	m = cpress(typeIn(m, "/config"), ckey("enter"))
+	if strings.Contains(screen(m), "Paused") {
+		t.Fatal("Advanced starts collapsed")
+	}
+	rows := m.configRows()
+	m.pal.sel = len(rows) - 1
+	m = cpress(m, ckey("enter"))
+	if out := screen(m); !strings.Contains(out, "Paused") || !strings.Contains(out, "off") || strings.Contains(out, "false") {
+		t.Fatalf("Advanced open, booleans on/off:\n%s", out)
+	}
+}
+
+func TestStreamedPartsBecomeTheAnswerOnce(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 140, 40
+	m.current = "s1"
+	m.push(chatMsg{who: "you", text: "go"})
+	m.push(chatMsg{who: "daemon", text: "Reading it."})
+	m.push(chatMsg{who: "daemon", text: "It uses four libraries."})
+	if !m.adoptReply("s1", "Reading it.\n\nIt uses four libraries.") {
+		t.Fatal("the reply equals the streamed parts")
+	}
+	if out := screen(m); strings.Count(out, "four libraries") != 1 {
+		t.Fatalf("answer shown once:\n%s", out)
+	}
+	if m.msgs[1].who != "agent" || m.adoptReply("s1", "something else") {
+		t.Fatal("parts become the agent's; a different reply is not adopted")
 	}
 }

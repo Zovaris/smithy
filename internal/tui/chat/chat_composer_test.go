@@ -66,7 +66,7 @@ func TestComposerGrowsToTenThenScrollsAndShrinksAfterSend(t *testing.T) {
 
 func TestFooterShowsNewlineHint(t *testing.T) {
 	m := newChatTest(0)
-	if !strings.Contains(screen(m), "shift+enter  newline") {
+	if !strings.Contains(screen(m), "shift+enter newline") {
 		t.Fatalf("no newline hint:\n%s", screen(m))
 	}
 }

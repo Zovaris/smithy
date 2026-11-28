@@ -4,7 +4,6 @@ package chat
 
 import (
 	"cmp"
-	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -30,6 +29,9 @@ var configGroups = []struct {
 
 // configGroup is the group key k is listed under; "Other" for the rest.
 func configGroup(k string) string {
+	if k == advancedKey || !slices.ContainsFunc(configMain, func(c struct{ key, label string }) bool { return c.key == k }) {
+		return "Advanced"
+	}
 	head, _, _ := strings.Cut(k, ".")
 	for _, g := range configGroups {
 		if slices.Contains(g.prefixes, head) {
@@ -39,15 +41,77 @@ func configGroup(k string) string {
 	return "Other"
 }
 
-// configRows is the settings /config lists for query q: matched on key or meaning, ordered by
-// group, then key.
+// configMain is the curated /config list: the settings people change, each with its label, in
+// the order shown. Every other setting sits under Advanced, which filtering still searches.
+var configMain = []struct{ key, label string }{
+	{"ui.theme", "Theme"}, {"chat.transcript", "Transcript"}, {"chat.sidebar", "Sidebar"}, {"ui.reduce_motion", "Reduce motion"}, {"ui.splash", "Splash"},
+	{"agent.effort", "Effort"}, {"agent.code_mode", "Code mode"}, {"agent.timeout", "Turn timeout"}, {"kit.mcp", "smithy MCP server"},
+	{"tend.daemon", "Tend"}, {"tend.watch", "Tend watches"}, {"tend.label", "Tend label"},
+	{"serve", "Serve"}, {"auto.agent", "Serve agent"}, {"auto.max_per_day", "Runs a day"}, {"auto.max_cost_per_day", "Spend a day"}, {"daemon.idle_exit", "Daemon idles out after"},
+	{"notify.kinds", "Notify about"}, {"notify.style", "Message style"}, {"notify.telegram.chat", "Telegram chat"},
+}
+
+// advancedKey is the collapsed Advanced row.
+const advancedKey = "\x00advanced"
+
+// configLabel is how /config names key k: its curated label, else its last part in words.
+func configLabel(k string) string {
+	for _, c := range configMain {
+		if c.key == k {
+			return c.label
+		}
+	}
+	if k == advancedKey {
+		return "Advanced"
+	}
+	parts := strings.Split(k, ".")
+	l := strings.ReplaceAll(parts[len(parts)-1], "_", " ")
+	if len(parts) > 2 {
+		l = parts[len(parts)-2] + " " + l
+	}
+	return strings.ToUpper(l[:1]) + l[1:]
+}
+
+// shownValue is a setting's value as /config reads it: booleans as on and off.
+func shownValue(v string) string {
+	switch v {
+	case "true":
+		return "on"
+	case "false":
+		return "off"
+	}
+	return v
+}
+
+// configRows is what /config lists: the curated settings by group, then Advanced, collapsed until
+// opened; a query searches every setting by label, key or meaning.
 func (m chatView) configRows() []api.SettingRow {
 	q := strings.ToLower(m.pal.query)
-	var rows []api.SettingRow
-	for _, r := range append(m.localRows(), m.palSet...) {
-		if q == "" || strings.Contains(strings.ToLower(r.Key+" "+r.Meaning), q) {
-			rows = append(rows, r)
+	all := append(m.localRows(), m.palSet...)
+	byKey := map[string]api.SettingRow{}
+	for _, r := range all {
+		byKey[r.Key] = r
+	}
+	var main, adv []api.SettingRow
+	for _, c := range configMain {
+		if r, ok := byKey[c.key]; ok {
+			main = append(main, r)
+			delete(byKey, c.key)
 		}
+	}
+	for _, r := range all {
+		if _, ok := byKey[r.Key]; ok {
+			adv = append(adv, r)
+		}
+	}
+	if q != "" {
+		var rows []api.SettingRow
+		for _, r := range append(main, adv...) {
+			if strings.Contains(strings.ToLower(configLabel(r.Key)+" "+r.Key+" "+r.Meaning), q) {
+				rows = append(rows, r)
+			}
+		}
+		return rows
 	}
 	rank := func(k string) int {
 		g := configGroup(k)
@@ -58,10 +122,12 @@ func (m chatView) configRows() []api.SettingRow {
 		}
 		return len(configGroups)
 	}
-	slices.SortStableFunc(rows, func(a, b api.SettingRow) int {
-		return cmp.Or(cmp.Compare(rank(a.Key), rank(b.Key)), cmp.Compare(a.Key, b.Key))
-	})
-	return rows
+	slices.SortStableFunc(main, func(a, b api.SettingRow) int { return cmp.Compare(rank(a.Key), rank(b.Key)) })
+	main = append(main, api.SettingRow{Key: advancedKey, Value: fmt.Sprint(len(adv)), Meaning: "every other setting, by its config key; typing searches them too"})
+	if m.cfgAdv {
+		main = append(main, adv...)
+	}
+	return main
 }
 
 // localRows are the settings of this chat /config lists beside the daemon's: the transcript mode,
@@ -100,7 +166,9 @@ func (m chatView) openPaletteLoad() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		s, err := a.Settings(context.Background())
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		s, err := a.Settings(ctx)
 		if err != nil {
 			return sessionErrMsg{what: "reading settings", err: err}
 		}
@@ -144,10 +212,18 @@ func (m chatView) configKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if k == "left" {
 			dir = -1
 		}
+		if rows[m.pal.sel].Key == advancedKey {
+			m.cfgAdv = k == "right"
+			return m, nil
+		}
 		return m.cycleSetting(rows[m.pal.sel], dir)
 	case "enter":
 		if m.pal.sel < len(rows) {
 			r := rows[m.pal.sel]
+			if r.Key == advancedKey {
+				m.cfgAdv = !m.cfgAdv
+				return m, nil
+			}
 			if len(r.Options) > 0 {
 				return m.cycleSetting(r, 1)
 			}
@@ -240,7 +316,24 @@ func (m chatView) configBox(screen []string, w, h int) []string {
 	selAt, group := 0, ""
 	nameW := 24
 	for i, r := range rows {
-		if g := configGroup(r.Key); g != group {
+		if r.Key == advancedKey {
+			if group != "" {
+				list = append(list, row(""))
+			}
+			group = "Advanced"
+			mark, st := "  ", bg
+			if i == sel {
+				mark, st, selAt = t.Fg(t.Accent).Render(railGlyph(t.G.Unicode))+" ", focus, len(list)
+			}
+			open := "›"
+			if m.cfgAdv {
+				open = "‹"
+			}
+			rule := t.Fg(t.Border).Render(" " + strings.Repeat("─", max(bw-30, 1)))
+			list = append(list, fill(st, bw, spread(mark+t.Fg(t.Accent).Bold(true).Render("Advanced")+t.Fg(t.Dim).Render(" ("+r.Value+")")+rule, t.Fg(t.Muted).Render(open)+"    ", bw)))
+			continue
+		}
+		if g := configGroup(r.Key); g != group && g != "Advanced" {
 			if group != "" {
 				list = append(list, row(""))
 			}
@@ -248,7 +341,7 @@ func (m chatView) configBox(screen []string, w, h int) []string {
 			rule := t.Fg(t.Border).Render(" " + strings.Repeat("─", max(bw-8-len(g), 1)))
 			list = append(list, row("  "+t.Fg(t.Accent).Bold(true).Render(g)+rule))
 		}
-		val := cmp.Or(r.Value, r.Default)
+		val := shownValue(cmp.Or(r.Value, r.Default, "not set"))
 		if r.Secret && r.Value != "" {
 			val = "****"
 		}
@@ -256,7 +349,7 @@ func (m chatView) configBox(screen []string, w, h int) []string {
 		if edited(r) {
 			mark = t.Fg(t.Accent).Render("• ")
 		}
-		name := fmt.Sprintf("%-*s", nameW, kit.Short(r.Key, nameW))
+		name := fmt.Sprintf("%-*s", nameW, kit.Short(configLabel(r.Key), nameW))
 		if i != sel {
 			vc := t.Muted
 			if edited(r) {
@@ -292,8 +385,10 @@ func (m chatView) configBox(screen []string, w, h int) []string {
 	desc, meta := "", ""
 	if sel < len(rows) {
 		r := rows[sel]
-		desc = t.Fg(t.Accent).Bold(true).Render(r.Key) + "  " + t.Fg(t.Text).Render(r.Meaning)
-		meta = t.Fg(t.Dim).Render("default " + cmp.Or(r.Default, "none") + " " + t.G.Dot + " from " + cmp.Or(r.Src, "default"))
+		desc = t.Fg(t.Accent).Bold(true).Render(configLabel(r.Key)) + "  " + t.Fg(t.Text).Render(r.Meaning)
+		if r.Key != advancedKey {
+			meta = t.Fg(t.Muted).Render(r.Key) + t.Fg(t.Dim).Render("  "+t.G.Dot+" default "+shownValue(cmp.Or(r.Default, "none"))+" "+t.G.Dot+" from "+cmp.Or(r.Src, "default"))
+		}
 	}
 	ov := on(t.Overlay)
 	out = append(out, fill(ov, bw, "  "+ansi.Truncate(desc, bw-4, "…")), fill(ov, bw, "  "+meta), row(""))
@@ -317,12 +412,12 @@ func (m chatView) optionChips(r api.SettingRow, val string, room int) string {
 		if r.Key == "ui.theme" && !t.Plain {
 			bg, fg = t.Renamed(o).Accent, t.Surface
 		}
-		c := m.chip(" "+o+" ", fg, bg, false)
-		if o == val {
+		c := m.chip(" "+shownValue(o)+" ", fg, bg, false)
+		if shownValue(o) == val {
 			if r.Key != "ui.theme" {
 				bg = t.Accent
 			}
-			c = m.chip(" "+o+" ", t.Surface, bg, true)
+			c = m.chip(" "+shownValue(o)+" ", t.Surface, bg, true)
 			if r.Key == "ui.theme" {
 				c = m.chip("▸"+o+" ", t.Surface, bg, true)
 			}
