@@ -81,6 +81,8 @@ func (s Step) Summary() string {
 		out = strings.TrimSpace(s.Action + " " + s.PR)
 	case KindFile:
 		out = s.Op + " " + s.Path
+	case KindCode:
+		out = s.Code
 	}
 	if s.Kind == KindAgent && s.Items != "" {
 		out = "each of " + s.Items + ": " + out

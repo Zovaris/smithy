@@ -54,6 +54,9 @@ type Env struct {
 	Exec func(ctx context.Context, dir string, argv []string) (string, int, error)
 	// Fetch does an http step's request; nil: net/http with the guard's fetch allow-list.
 	Fetch func(ctx context.Context, method, url string, headers map[string]string, body string) (int, string, error)
+	// Code runs a code step's JavaScript over input (JSON) in the code mode sandbox and returns
+	// its result (nil: code steps fail).
+	Code func(ctx context.Context, code, input string) (string, error)
 }
 
 // Invocation is how a run was started: its trigger and inputs.

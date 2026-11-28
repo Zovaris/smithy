@@ -90,7 +90,27 @@ const exampleShipFix = `{
 }
 `
 
-func init() { Examples["ship-a-fix"] = exampleShipFix }
+func init() {
+	Examples["ship-a-fix"] = exampleShipFix
+	Examples["stale-prs"] = exampleStalePRs
+}
+
+const exampleStalePRs = `{
+  "name": "stale-prs",
+  "description": "Open PRs untouched for a while: a code step picks the stale ones from gh's JSON and you get the list.",
+  "dir": "",
+  "inputs": {"days": "14"},
+  "max_minutes": 5,
+  "steps": [
+    {"id": "prs", "kind": "run", "retry": {"count": 1, "backoff": "20s"},
+     "run": "gh pr list --state open --limit 100 --json number,title,url,updatedAt"},
+    {"id": "stale", "kind": "code",
+     "code": "const cutoff = Date.now() - Number(inputs.days || 14) * 864e5;\nreturn steps.prs.json\n  .filter(p => Date.parse(p.updatedAt) < cutoff)\n  .map(p => ({number: p.number, title: p.title, url: p.url}));"},
+    {"id": "any", "kind": "if", "if": {"step": "stale", "match": "\\{"}, "else": "stop"},
+    {"id": "tell", "kind": "notify", "title": "Stale PRs (over {{inputs.days}} days)", "message": "{{steps.stale.output}}"}
+  ]
+}
+`
 
 // ExampleSchedules attach the examples to their triggers; they are added disabled.
 var ExampleSchedules = map[string]string{

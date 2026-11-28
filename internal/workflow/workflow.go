@@ -36,10 +36,11 @@ const (
 	KindWait    = "wait"
 	KindGitHub  = "github"
 	KindFile    = "file"
+	KindCode    = "code"
 )
 
 var kinds = []string{KindRun, KindAgent, KindIf, KindSwitch, KindSet, KindJSON, KindForeach, KindAsk, KindNotify, KindCall,
-	KindJudge, KindLoop, KindSession, KindSmelt, KindWarden, KindHTTP, KindPar, KindWait, KindGitHub, KindFile}
+	KindJudge, KindLoop, KindSession, KindSmelt, KindWarden, KindHTTP, KindPar, KindWait, KindGitHub, KindFile, KindCode}
 
 // GitHub actions; the write ones need allow_write, pr and merge an ask step before them.
 var (
@@ -156,6 +157,7 @@ type Step struct {
 	Label    string            `json:"label,omitempty"`
 	Op       string            `json:"op,omitempty"`
 	Content  string            `json:"content,omitempty"`
+	Code     string            `json:"code,omitempty"`
 }
 
 // children are a step's nested blocks: a foreach's or loop's do, a parallel's branches.
@@ -637,6 +639,13 @@ func (v validator) step(s Step, target func(string, string, ...string) error) er
 			return fmt.Errorf("file needs a path")
 		}
 		return v.tmpl(s.Path + s.Content)
+	case KindCode:
+		if strings.TrimSpace(s.Code) == "" {
+			return fmt.Errorf("code needs a JavaScript function body")
+		}
+		if strings.Contains(s.Code, "{{") {
+			return fmt.Errorf("code takes no templates: read steps.<id>.output, inputs.x and vars.x instead")
+		}
 	default:
 		return fmt.Errorf("kind is one of %s, not %q", strings.Join(kinds, ", "), s.Kind)
 	}
