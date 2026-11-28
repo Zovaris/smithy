@@ -154,6 +154,39 @@ func TestTelegramThreadSendUpdate(t *testing.T) {
 	}
 }
 
+func TestTelegramTogglesMultiSelect(t *testing.T) {
+	api := &botAPI{}
+	c := tg(t, api)
+	c.Users = map[string]bool{"5": true}
+	h := hub(t, c)
+	var answers []string
+	h.Answer = func(id, ans, by string) error { answers = append(answers, ans+"@"+by); return nil }
+	ctx := context.Background()
+	h.Notify(ctx, Note{Key: "d", Kind: "decision", Title: "Which?", Options: []string{"a", "b"}, Decision: "ask:1", Multi: true})
+	hd := handle("ask:1")
+	if mk := api.forms[0]["reply_markup"]; !strings.Contains(mk, "☐ a") || !strings.Contains(mk, `"`+hd+`:done"`) {
+		t.Fatalf("keyboard %q", mk)
+	}
+	api.updates = `[{"update_id":1,"callback_query":{"id":"c1","from":{"id":5},"data":"` + hd + `:1","message":{"message_id":9,"chat":{"id":-100500}}}},
+ {"update_id":2,"callback_query":{"id":"c2","from":{"id":8},"data":"` + hd + `:0","message":{"message_id":9,"chat":{"id":-100500}}}}]`
+	ins, _ := c.Receive(ctx)
+	for _, in := range ins {
+		h.Handle(ctx, c, in)
+	}
+	i := len(api.calls) - 1
+	if api.calls[i] != "editMessageReplyMarkup" || api.forms[i]["message_id"] != "9" || !strings.Contains(api.forms[i]["reply_markup"], "☑ b") || !strings.Contains(api.forms[i]["reply_markup"], "☐ a") {
+		t.Fatalf("toggle: %v %v", api.calls, api.forms[i])
+	}
+	api.updates = `[{"update_id":3,"callback_query":{"id":"c3","from":{"id":5},"data":"` + hd + `:done","message":{"message_id":9,"chat":{"id":-100500}}}}]`
+	ins, _ = c.Receive(ctx)
+	for _, in := range ins {
+		h.Handle(ctx, c, in)
+	}
+	if len(answers) != 1 || answers[0] != "b@telegram:5" {
+		t.Fatalf("answers %q", answers)
+	}
+}
+
 func TestTelegramErrorsNeverCarryTheToken(t *testing.T) {
 	api := &botAPI{fail: "createForumTopic"}
 	c := tg(t, api)

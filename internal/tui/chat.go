@@ -104,6 +104,8 @@ type chatView struct {
 	cfg       settingsAPI        // the daemon's settings endpoints; nil: none
 	board     boardAPI           // the daemon's task endpoints; nil: none
 	boardSt   boardView          // the open /board
+	flows     workflowAPI        // the daemon's workflow endpoints; nil: none
+	flowSt    workflowsView      // the open /workflows
 	opener    func(string) error // opens a URL; nil: the default browser
 	infoBack  chatOverlay        // where esc on the info panel goes back to
 	setupSt   *daemon.Setup      // last GET /v1/setup
@@ -442,7 +444,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
 	m.offerAsk()
-	m.setup, m.sess, m.cfg, m.board = c, c, c, c
+	m.setup, m.sess, m.cfg, m.board, m.flows = c, c, c, c, c
 	m.dir, _ = os.Getwd()
 	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
@@ -578,6 +580,12 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.boardLoaded(msg)
 	case boardMovedMsg:
 		return m.boardMoved(msg)
+	case workflowsMsg:
+		return m.workflowsLoaded(msg)
+	case workflowDoneMsg:
+		return m.workflowDone(msg)
+	case workflowDetailMsg:
+		return m.workflowDetail(msg)
 	case effortDefaultMsg:
 		m.effortDefaultSet(msg)
 		return m, nil
@@ -982,6 +990,8 @@ func (m chatView) View() tea.View {
 		out = m.askBox(out, w, m.height)
 	case overlayBoard:
 		out = m.boardBox(out, w, m.height)
+	case overlayWorkflows:
+		out = m.workflowsBox(out, w, m.height)
 	}
 	if len(out) > m.height {
 		out = out[len(out)-m.height:]

@@ -257,6 +257,39 @@ func TestRunKit(t *testing.T) {
 	}
 }
 
+func TestRunKitPassesTheSessionBusKey(t *testing.T) {
+	old := KitMCP
+	t.Cleanup(func() { KitMCP = old })
+	KitMCP = []string{"/bin/smithy", "mcp"}
+	home := t.TempDir()
+	t.Setenv("WARDEN_HOME", home)
+	log := filepath.Join(home, "b1", "i1.log")
+	os.MkdirAll(filepath.Dir(log), 0o755)
+	env := map[string]string{"SMITHY_SESSION": "s-1", "SMITHY_SESSION_KEY": "k1"}
+	read := func() map[string]string {
+		b, _ := os.ReadFile(filepath.Join(log+".kit", "claude-mcp.json"))
+		var cfg struct {
+			MCPServers map[string]struct {
+				Env map[string]string `json:"env"`
+			} `json:"mcpServers"`
+		}
+		json.Unmarshal(b, &cfg)
+		return cfg.MCPServers["smithy"].Env
+	}
+	if _, err := RunKit("claude", Options{Log: log}, func(k string) string { return env[k] }); err != nil {
+		t.Fatal(err)
+	}
+	if e := read(); e["SMITHY_SESSION"] != "s-1" || e["SMITHY_SESSION_KEY"] != "k1" {
+		t.Fatalf("the MCP server gets the session's bus key: %v", e)
+	}
+	if _, err := RunKit("claude", Options{Log: log, ReadOnly: true}, func(k string) string { return env[k] }); err != nil {
+		t.Fatal(err)
+	}
+	if e := read(); e["SMITHY_SESSION_KEY"] != "" {
+		t.Fatalf("a read-only run gets no bus key: %v", e)
+	}
+}
+
 func TestRunKitFollowsKitChoice(t *testing.T) {
 	old := KitMCP
 	t.Cleanup(func() { KitMCP = old })

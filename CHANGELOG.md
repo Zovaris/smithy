@@ -10,13 +10,23 @@ part above `### Details`.
 
 ### New
 - The chat takes a few layout ideas from OpenCode in its own flat style: a tab strip of this folder's sessions with `+` for a new one, a right sidebar on wide terminals (`/sidebar` toggles it) with the title, context used and its share of the model's window, spend and linked PRs, tool calls and thoughts folded into one line such as "+ 2 commands, 1 thought" that opens on enter or a click, a dim agent · model · time · tok/s line under each answer, answered questions kept as a compact Q → A, and the composer with an accent bar and agent · model inside while the footer shows the context and the palette key.
+- Scheduled workflows: a cron schedule and steps that run a command, ask an agent, branch on the result and notify you. `smithy workflow`, `/workflows` in the TUI and a Workflows page on the web run one now, turn it on or off, edit it and show each run's steps. `smithy workflow example` adds a daily Dependabot check whose agent tells you whether to merge, and why.
+- Daemon sessions can message each other: a session can start a child, and parent, children and siblings in one project send notes with the `send` tool. A note wakes an idle session or waits for a busy one; the TUI and web show the tree and the notes.
 - `/goal <text>` pins a goal on the open session, in the TUI and the web composer: each turn carries it, and the daemon keeps the session going until the agent reports it met with evidence, asks you, or hits `session.goal_max_turns` / `session.goal_max_cost`. `/goal` shows it, `/goal clear` drops it; only you set it.
 - New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 
+- New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 - An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
+- A question that takes several picks asks for them in Slack (a multi-select menu), Discord (a select menu) and Telegram (☐/☑ toggles and Done); single-pick questions keep one button per option.
+
+### Fixed
+
+- A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
+- ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
 
 ### Details
 
+- workflow: new `internal/workflow` (own cron parser, `run`/`agent`/`if`/`notify` steps, store in `~/.smithy/workflows` with the enable pinned to the file's sha256, runs in `runs/<name>/`, 50 kept); daemon ticks it every minute and serves `GET /v1/workflows[/{name}]`, `PUT /v1/workflows/{name}`, `POST /v1/workflows/{name}/run|enable|disable` (writes local-only); notify steps are `workflow_note` store events sent to connectors as kind `workflow`; docs in `docs/workflows.md`.
 - TUI: the top decision strip is gone; the question card (`overlayAsk`) opens when a decision arrives and the composer is empty, or on enter with an empty composer or `/answer`; 1-9, arrows and enter, space on multi-select, esc for later. The pill reads "waiting on you".
 - daemon: decisions carry `multi` and `other`; `/v1/asks` takes `multi` and accepts free text for every non-guard question; the MCP `ask` tool gains a `multi` flag.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
@@ -28,12 +38,11 @@ part above `### Details`.
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
 
 ### Details
+- Session bus: `Session.parent`, `session_mail` events, `POST /v1/bus/start|send`, `GET /v1/bus/inbox` and `GET /v1/sessions/{id}/mail`, keyed per session by `SMITHY_SESSION_KEY` (memory only); `smithy mcp` adds `send`, `inbox` and `start_session` when the key is set. Bus messages reach the agent framed as data.
 - TUI: `infoPanel.set` holds one setting row cycled with left/right; `doctorPanel` groups `smithy doctor` output; the header reads `GET /v1/tend` once a minute.
-
 - `/board` in the TUI chat shows your task files by status, like the web Board: move a task with
   left/right, tab through task dirs, enter opens the file, `o` opens its PR, blockers and PRs show on each row.
 - The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
-
 - Chat apps get two places each: a notifications channel for alerts and a chat channel where a new message starts a session in its own thread or topic, your replies continue it and its answers come back. `/channels test` and the web settings send a test message to both.
 - A question from the ask tool can be answered in your own words by replying to its message, besides its buttons.
 - `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).
@@ -44,18 +53,11 @@ part above `### Details`.
   `/theme` in the TUI or the web's command palette.
 - The web composer does the same: `/effort` works without a session, `/effort ` completes the levels,
   the top level shimmers, and the `/` menu lists commands, then marked skills.
-
-### Details
-
 - `connect.<telegram|slack|discord>.notify` and `.chat` settings; the old single keys (`notify.telegram.chat`, `connect.slack.channel`, `connect.discord.channel`) still set the notifications channel. `POST /v1/connect/test` builds the connectors from the current settings and sends to each channel. Chat-mode sessions start only for users in `connect.<name>.users`.
 - `ui.theme` palettes live in `internal/tui/theme.go` (`palettes`); `web/src/theme/temper.css`
   maps the same hex onto Sephiro's tokens per `data-accent`, and a test checks they match.
   256-color terminals get each palette's nearest colors; 16-color terminals keep steel's tiers with
   the theme's accent.
-### Fixed
-
-- ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
-
 ## v0.25.0 — 2026-11-26
 
 ### Highlights

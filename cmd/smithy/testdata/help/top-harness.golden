@@ -39,6 +39,8 @@ Daily
   tasks         the shared task list (smithy tasks board --all)
   wait          wait without tokens for PRs, runs, branches, issues or a batch
   web           print or open the daemon's web UI link (harness build)
+  workflow      scheduled workflows the daemon runs: list, run, history, enable,
+                disable (harness build)
 
 Accounts and secrets
   auth          source API keys in ~/.smithy/auth.json: set (stdin only), list,

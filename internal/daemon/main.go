@@ -26,6 +26,7 @@ import (
 	"github.com/Zovaris/smithy/internal/remote"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/text"
+	"github.com/Zovaris/smithy/internal/workflow"
 )
 
 // Usage is the text for `smithy daemon --help`.
@@ -259,6 +260,8 @@ func foreground(o runOpts) int {
 	api.Tend = NewTender()
 	api.Tend.Sources = func() []TendRef { return mergeRefs(TendSources(), api.SessionTendRefs()) }
 	go api.Tend.Run(tctx, 2*time.Minute)
+	api.Workflows = api.NewWorkflows(workflow.Store{Dir: workflow.Home()})
+	go api.Workflows.Loop(tctx)
 	conns, cerr := connect.FromConfig()
 	if cerr != nil {
 		fmt.Fprintf(os.Stderr, "%s: chat connectors: %s\n", name, text.Clean(cerr.Error()))
@@ -317,7 +320,7 @@ func foreground(o runOpts) int {
 			}
 			_, _ = api.Append("daemon_up", "", map[string]any{"pid": info.PID, "addr": info.Addr})
 			if o.idle > 0 {
-				busy := func() bool { hb := sv.Heartbeat(); return hb.SessionRunning() }
+				busy := func() bool { hb := sv.Heartbeat(); return hb.SessionRunning() || api.WorkflowsScheduled() }
 				go api.WatchIdle(life, o.idle, 15*time.Second, busy, func() {
 					_, _ = api.Append("log", "", map[string]string{"line": fmt.Sprintf("daemon: idle for %s with no clients and no running work; exiting", o.idle)})
 					quit()

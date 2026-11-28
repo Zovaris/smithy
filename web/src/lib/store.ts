@@ -7,7 +7,7 @@ export type Status = "working" | "needs_you" | "done" | "failed";
 export type Usage = { input_tokens?: number; output_tokens?: number; cost_usd?: number };
 export type Sess = {
   id: string; agent: string; model?: string; effort?: string; dir: string; title: string;
-  status: Status; detail?: string; created: string; updated: string; usage?: Usage;
+  status: Status; detail?: string; created: string; updated: string; usage?: Usage; parent?: string;
   goal?: string; goal_state?: string;
 };
 export type Tool = { id?: string; name: string; args?: unknown; output?: string; is_error?: boolean };
@@ -25,9 +25,12 @@ export type Store = {
   diffs: Record<string, Diff>;
   decisions: Dec[];
   log: string[];
+  notes: Note[];
 };
 
-export const blank = (): Store => ({ last: 0, order: [], sessions: {}, convo: {}, diffs: {}, decisions: [], log: [] });
+export type Note = { at: string; workflow: string; title: string; text: string };
+
+export const blank = (): Store => ({ last: 0, order: [], sessions: {}, convo: {}, diffs: {}, decisions: [], log: [], notes: [] });
 
 const obj = (d: unknown): Record<string, any> => (d && typeof d === "object" ? (d as Record<string, any>) : {});
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -168,6 +171,10 @@ export function fold(s: Store, e: Ev): Store {
       }
       return next;
     }
+    case "workflow_note": {
+      next.notes = [...s.notes, { at, workflow: str(d.workflow), title: str(d.title), text: str(d.text) }].slice(-20);
+      return next;
+    }
     case "log": {
       if (str(d.line)) next.log = [...s.log, str(d.line)].slice(-200);
       return next;
@@ -189,6 +196,9 @@ export function seed(s: Store, pending: { id: string; question: string; options?
 }
 
 export const open = (s: Store) => s.decisions.filter((d) => d.answer == null);
+export const tree = (l: Sess[], up?: string): Sess[] =>
+  l.filter((s) => s.parent == up || (!up && !l.some((p) => p.id == s.parent))).flatMap((s) => [s, ...tree(l, s.id)]);
+
 export const sessions = (s: Store) => s.order.map((id) => s.sessions[id]).filter(Boolean);
 
 export const STATUS_WORD: Record<Status, string> = { working: "working", needs_you: "needs you", done: "done", failed: "failed" };
