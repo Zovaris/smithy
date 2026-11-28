@@ -72,7 +72,10 @@ func Agent(ctx context.Context, a AgentCall) (string, float64, error) {
 	if mins < 1 {
 		mins = 1
 	}
-	args := []string{"agent", "--readonly", "--profile", "auto", "--timeout", strconv.Itoa(mins), "--cwd", dirOr(dir), "--log", log}
+	args := []string{"agent", "--profile", "auto", "--timeout", strconv.Itoa(mins), "--cwd", dirOr(dir), "--log", log}
+	if !a.Write {
+		args = append(args, "--readonly")
+	}
 	if a.Model != "" {
 		args = append(args, "--model", a.Model)
 	}

@@ -221,8 +221,10 @@ func (s Store) pin(sched []byte, workflow string) (string, error) {
 						return err
 					}
 				}
-				if err := calls(st.Do); err != nil {
-					return err
+				for _, ch := range st.children() {
+					if err := calls(ch); err != nil {
+						return err
+					}
 				}
 			}
 			return nil

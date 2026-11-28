@@ -10,7 +10,7 @@ import (
 	"sync"
 )
 
-var tmplRe = regexp.MustCompile(`\{\{\s*(?:steps\.([a-z0-9][a-z0-9_-]*)\.(output|answer|why|exit|status)|vars\.([A-Za-z_][A-Za-z0-9_]*)|inputs\.([A-Za-z_][A-Za-z0-9_]*)|env\.([A-Z_][A-Z0-9_]*)|(item|index))\s*\}\}`)
+var tmplRe = regexp.MustCompile(`\{\{\s*(?:steps\.([a-z0-9][a-z0-9_-]*)\.(output|answer|why|exit|status)|vars\.([A-Za-z_][A-Za-z0-9_]*)|inputs\.([A-Za-z_][A-Za-z0-9_]*)|env\.([A-Z_][A-Z0-9_]*)|(item|index)|secret\.([a-z0-9][a-z0-9_.-]*))\s*\}\}`)
 
 // scope is what templates and conditions read: step results, variables, inputs, the loop item
 // and the environment. Each foreach iteration gets its own copy.
@@ -22,6 +22,7 @@ type scope struct {
 	item    string
 	index   string
 	env     func(string) string
+	secret  func(string) string
 	secrets *secrets
 }
 
@@ -124,10 +125,16 @@ func (sc *scope) render(text string, data bool, clip int) string {
 			name = "env." + g[5]
 		case g[6] == "item":
 			v, name = sc.item, "item"
-		default:
+		case g[6] == "index":
 			v, name = sc.index, "index"
+		default:
+			if sc.secret != nil {
+				v = sc.secret(g[7])
+			}
+			sc.secrets.add(v)
+			name = "secret." + g[7]
 		}
-		if clip > 0 && len(v) > clip && g[5] == "" {
+		if clip > 0 && len(v) > clip && g[5] == "" && g[7] == "" {
 			v = v[:clip] + "…"
 		}
 		if data {
