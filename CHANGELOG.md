@@ -44,7 +44,15 @@ part above `### Details`.
 
 - The web `/theme` lists and accepts all seven themes, and the guide marks `/agents`, `/decisions`, `/bench` and `/settings` as web only.
 - The agents' system prompt is shorter and direct, and no longer names the CLI underneath.
-- A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
+- A settings command's usage line names only that command, and enter on a command that needs arguments fills it in instead of running it bare. A bare `/set` opens the settings list in the palette.
+- `/model ` lists the current agent's models as you type, like `/effort ` lists its levels.
+- The ctrl+k palette lists every setting, found by key or meaning (typing "sett" finds them), and left/right step an enum or on/off setting such as `chat.mode` or `ui.theme`.
+- Esc on a view opened from a list (a workflow's steps, a board file) closes them all, backspace goes back one level, and `/` on a list goes to the input, so typed text never runs a list's shortcuts.
+- The `GOAL MET:` line an agent ends a goal turn with is hidden in the TUI and web; the "goal met" line stays.
+- The status line names workflow runs and events in words ("workflow repo-health running") instead of raw event names.
+- The agents reply in the language of your latest message.
+- `smithy workflow --help` and other help tables keep their description column when a line wraps.
+- The `/` popup lifts the transcript instead of drawing over its latest lines.
 - ctrl+k and ctrl+l redraw the whole TUI, so clearing the terminal no longer leaves a dimmed screen.
 - `smithy tui` is gone: run `smithy stats`. The `tui.reduce_motion` setting is now `ui.reduce_motion`; a saved `tui.reduce_motion` still works.
 
