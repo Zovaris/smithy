@@ -476,6 +476,13 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if k == "ctrl+c" {
 		return m.quit()
 	}
+	if k == "/" && (m.overlay == overlayWorkflows || m.overlay == overlayBoard || m.overlay == overlayAgents) {
+		m.overlay, m.infoBack = overlayNone, overlayNone
+		m.input.SetValue("/")
+		m.input.CursorEnd()
+		m.setFocus(-1)
+		return m, nil
+	}
 	switch m.overlay {
 	case overlaySetup, overlayPicker, overlaySkills, overlayWelcome:
 		return m.setupKey(msg)
@@ -508,13 +515,17 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if k == "q" && m.overlay == overlayHelp {
 				break
 			}
-			m.overlay, m.infoBack = m.infoBack, overlayNone
+			m.overlay, m.infoBack = overlayNone, overlayNone
 			return m, nil
 		case "up":
 			m.pal.sel = max(m.pal.sel-1, 0)
 		case "down":
 			m.pal.sel++
 		case "backspace":
+			if m.overlay == overlayInfo && m.infoBack != overlayNone {
+				m.overlay, m.infoBack = m.infoBack, overlayNone
+				return m, nil
+			}
 			if r := []rune(m.pal.query); len(r) > 0 {
 				m.pal = palette{query: string(r[:len(r)-1])}
 			}

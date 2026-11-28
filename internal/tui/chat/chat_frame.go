@@ -488,6 +488,9 @@ func (m chatView) infoBox(screen []string, w, h int) []string {
 		sel = m.pal.sel
 	}
 	foot := "  " + keyHints(t, "esc", "close")
+	if m.infoBack != overlayNone {
+		foot = "  " + keyHints(t, "⌫", "back", "esc", "close")
+	}
 	switch {
 	case m.info.set != nil:
 		foot = "  " + keyHints(t, "←→", "change", "enter", "save", "esc", "close")

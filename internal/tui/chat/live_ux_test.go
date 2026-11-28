@@ -5,6 +5,9 @@ package chat
 import (
 	"strings"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/api"
+	"github.com/Zovaris/smithy/internal/workflow"
 )
 
 func TestModelSpaceCompletesTheAgentsModels(t *testing.T) {
@@ -86,5 +89,39 @@ func TestBareSetOpensTheSettingsList(t *testing.T) {
 		if it.group != "SETTINGS" {
 			t.Fatalf("filtered to settings, got %+v", it)
 		}
+	}
+}
+
+func TestEscFromANestedViewClosesTheStack(t *testing.T) {
+	w, _ := workflow.Parse([]byte(workflow.Example))
+	f := &fakeFlows{l: api.WorkflowList{Workflows: []workflow.Info{{Workflow: w, File: "/nowhere/x.json"}}}}
+	m := newChatTest(0)
+	m.width, m.height = 160, 48
+	m.flows = f
+	m = cpress(typeIn(m, "/workflows"), ckey("enter"))
+	m = cpress(m, ckey("enter"))
+	if m.overlay != overlayInfo {
+		t.Fatalf("enter opens the steps")
+	}
+	m = cpress(m, ckey("esc"))
+	if m.overlay != overlayNone {
+		t.Fatalf("esc closes the whole stack, overlay %v", m.overlay)
+	}
+	m = typeIn(m, "/goal ship r")
+	if len(f.runs) != 0 || m.input.Value() != "/goal ship r" {
+		t.Fatalf("typed text reaches the input: runs %v input %q", f.runs, m.input.Value())
+	}
+}
+
+func TestSlashOnAListGoesToTheInput(t *testing.T) {
+	w, _ := workflow.Parse([]byte(workflow.Example))
+	f := &fakeFlows{l: api.WorkflowList{Workflows: []workflow.Info{{Workflow: w, File: "/nowhere/x.json"}}}}
+	m := newChatTest(0)
+	m.width, m.height = 160, 48
+	m.flows = f
+	m = cpress(typeIn(m, "/workflows"), ckey("enter"))
+	m = typeIn(m, "/goal r")
+	if len(f.runs) != 0 || m.overlay != overlayNone || m.input.Value() != "/goal r" {
+		t.Fatalf("/ leaves the list for the input: runs %v overlay %v input %q", f.runs, m.overlay, m.input.Value())
 	}
 }
