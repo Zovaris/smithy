@@ -64,11 +64,11 @@ func probeServer(ctx context.Context, s RemoteServer) serverRow {
 	defer cancel()
 	get := func(path string, v any) error {
 		c := &Client{Base: s.URL, Token: s.Token}
-		req, err := c.req(ctx, "GET", path, nil)
+		req, err := c.NewRequest(ctx, "GET", path, nil)
 		if err != nil {
 			return err
 		}
-		res, err := c.http().Do(req)
+		res, err := c.HTTPClient().Do(req)
 		if err != nil {
 			return err
 		}

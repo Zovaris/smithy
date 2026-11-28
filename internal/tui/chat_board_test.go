@@ -10,21 +10,21 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 )
 
 type fakeBoard struct {
-	b       daemon.TaskBoard
+	b       api.TaskBoard
 	project []string
 	moves   [][2]string
 }
 
-func (f *fakeBoard) Tasks(_ context.Context, project string) (daemon.TaskBoard, error) {
+func (f *fakeBoard) Tasks(_ context.Context, project string) (api.TaskBoard, error) {
 	f.project = append(f.project, project)
 	return f.b, nil
 }
 
-func (f *fakeBoard) MoveTask(_ context.Context, file, status string) (daemon.TaskCard, error) {
+func (f *fakeBoard) MoveTask(_ context.Context, file, status string) (api.TaskCard, error) {
 	f.moves = append(f.moves, [2]string{file, status})
 	for _, l := range f.b.Lists {
 		for i := range l.Tasks {
@@ -34,7 +34,7 @@ func (f *fakeBoard) MoveTask(_ context.Context, file, status string) (daemon.Tas
 			}
 		}
 	}
-	return daemon.TaskCard{}, nil
+	return api.TaskCard{}, nil
 }
 
 func boardFixture(t *testing.T) (*fakeBoard, string) {
@@ -43,13 +43,13 @@ func boardFixture(t *testing.T) (*fakeBoard, string) {
 	if err := os.WriteFile(f1, []byte("# 01 · Schema\nStatus: done\n\n## What\nthe tables\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return &fakeBoard{b: daemon.TaskBoard{Project: dir, Statuses: []string{"todo", "doing", "done", "dropped"}, Lists: []daemon.TaskList{
-		{Dir: dir + "/v1", Name: "v1", Tasks: []daemon.TaskCard{
+	return &fakeBoard{b: api.TaskBoard{Project: dir, Statuses: []string{"todo", "doing", "done", "dropped"}, Lists: []api.TaskList{
+		{Dir: dir + "/v1", Name: "v1", Tasks: []api.TaskCard{
 			{File: f1, NN: "01", Title: "Schema", Status: "done", Blockers: []string{}},
 			{File: dir + "/02-api.md", NN: "02", Title: "API", Status: "doing", PR: "https://github.com/o/r/pull/12", Blockers: []string{"01"}},
 			{File: dir + "/03-ui.md", NN: "03", Title: "UI", Status: "todo", Blockers: []string{"02"}},
 		}},
-		{Dir: dir + "/v2", Name: "v2", Tasks: []daemon.TaskCard{{File: dir + "/01-later.md", NN: "01", Title: "Later", Status: "todo", Blockers: []string{}}}},
+		{Dir: dir + "/v2", Name: "v2", Tasks: []api.TaskCard{{File: dir + "/01-later.md", NN: "01", Title: "Later", Status: "todo", Blockers: []string{}}}},
 	}}}, f1
 }
 

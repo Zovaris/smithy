@@ -31,28 +31,7 @@ const (
 	linkTextMax      = 8 << 10
 )
 
-// LinkIssue is one issue a session links: a Linear issue (ID TK-123) or a GitHub issue (ID #12).
-type LinkIssue struct {
-	Kind      string `json:"kind"`
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	URL       string `json:"url"`
-	Status    string `json:"status"`
-	Assignee  string `json:"assignee,omitempty"`
-	Milestone string `json:"milestone,omitempty"`
-}
-
-// SessionLinks is GET /v1/sessions/{id}/links: the PRs a session opened or works on (its
-// branch's PR, a linked URL) and the issues named in its branch, PRs, prompts or /link refs.
-type SessionLinks struct {
-	Session string       `json:"session"`
-	PRs     []ghx.PRLink `json:"prs"`
-	Issues  []LinkIssue  `json:"issues"`
-	Error   string       `json:"error,omitempty"`
-	Checked time.Time    `json:"checked"`
-}
-
-func (a SessionLinks) same(b SessionLinks) bool {
+func sameLinks(a, b SessionLinks) bool {
 	x, _ := json.Marshal([]any{a.PRs, a.Issues, a.Error})
 	y, _ := json.Marshal([]any{b.PRs, b.Issues, b.Error})
 	return string(x) == string(y)
@@ -251,7 +230,7 @@ func (sv *Server) refreshLinks(id string) (SessionLinks, bool) {
 	sv.mu.Unlock()
 
 	out := k.collect(id, dir, prs, refs, texts)
-	changed := !out.same(prev)
+	changed := !sameLinks(out, prev)
 	k.schedule(id, changed)
 	sv.mu.Lock()
 	if changed {

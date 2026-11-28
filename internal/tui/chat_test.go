@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/charmbracelet/colorprofile"
 )
@@ -94,11 +95,11 @@ func TestChatScrollUpAndClampAtTop(t *testing.T) {
 
 func TestChatStreamResumesAfterLastSeq(t *testing.T) {
 	m := newChatTest(0)
-	m = chatStep(m, daemon.ClientMsg{Connected: true})
+	m = chatStep(m, api.ClientMsg{Connected: true})
 	m = chatStep(m, ev(1, "log", map[string]string{"line": "cycle started"}))
-	m = chatStep(m, daemon.ClientMsg{Err: fmt.Errorf("lost")})
+	m = chatStep(m, api.ClientMsg{Err: fmt.Errorf("lost")})
 	m = chatStep(m, ev(1, "log", map[string]string{"line": "cycle started"}))
-	m = chatStep(m, ev(2, daemon.KindAsked, daemon.Decision{ID: "d1", Question: "merge?"}))
+	m = chatStep(m, ev(2, daemon.KindAsked, api.Decision{ID: "d1", Question: "merge?"}))
 	if len(m.noise) != 2 || len(m.pending) != 1 || m.last != 2 || m.conn != "reconnecting" {
 		t.Fatalf("noise %d pending %d last %d conn %s", len(m.noise), len(m.pending), m.last, m.conn)
 	}

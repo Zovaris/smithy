@@ -9,6 +9,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -30,7 +31,7 @@ func TestTypingAMessageNeverAnswersTheDecision(t *testing.T) {
 func TestSkillsModalFitsTheScreenWithManySkills(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 140, 35
-	s := &daemon.Setup{Paths: map[string]string{}}
+	s := &api.Setup{Paths: map[string]string{}}
 	for i := range 40 {
 		s.Skills = append(s.Skills, fmt.Sprintf("skill-%02d", i))
 	}
@@ -62,7 +63,7 @@ func TestSkillsModalFitsTheScreenWithManySkills(t *testing.T) {
 func TestPendingDecisionShowsOnce(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 100, 24
-	m = chatStep(m, evNow(1, daemon.KindAsked, daemon.Decision{ID: "d1", Question: "Ship it now?", Options: []string{"yes", "no"}}))
+	m = chatStep(m, evNow(1, daemon.KindAsked, api.Decision{ID: "d1", Question: "Ship it now?", Options: []string{"yes", "no"}}))
 	if n := strings.Count(screen(m), "Ship it now?"); n != 1 {
 		t.Fatalf("the question shows %d times:\n%s", n, screen(m))
 	}
@@ -71,7 +72,7 @@ func TestPendingDecisionShowsOnce(t *testing.T) {
 func TestHeaderSaysWaitingWhileADecisionWaits(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 100, 24
-	m.setPending([]daemon.Decision{{ID: "d1", Question: "Ship?", Options: []string{"yes"}}})
+	m.setPending([]api.Decision{{ID: "d1", Question: "Ship?", Options: []string{"yes"}}})
 	head := strings.Split(screen(m), "\n")[0]
 	if !strings.Contains(head, "waiting") || strings.Contains(head, "idle") {
 		t.Fatalf("header pill: %q", head)
@@ -148,7 +149,7 @@ func TestWelcomeIntroWraps(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 80, 30
 	m.welcome, m.overlay = welcomeAgents, overlaySetup
-	m.setupSt = &daemon.Setup{}
+	m.setupSt = &api.Setup{}
 	out := screen(m)
 	if !strings.Contains(out, "later.") {
 		t.Fatalf("welcome intro cut:\n%s", out)
@@ -186,7 +187,7 @@ func TestCtrlOCyclesTheViewAndLoneQuestionMarkOpensHelp(t *testing.T) {
 
 // evNow is ev stamped now: an event that happens while the chat is open, not one replayed.
 
-func evNow(seq int64, kind string, data any) daemon.ClientMsg {
+func evNow(seq int64, kind string, data any) api.ClientMsg {
 	msg := ev(seq, kind, data)
 	msg.Event.Time = time.Now()
 	return msg

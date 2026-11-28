@@ -6,14 +6,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 )
 
 func TestAgentsListThisProjectFirst(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 100, 40
 	m.dir = "/w/alpha"
-	for _, s := range []daemon.Session{{ID: "a1", Title: "here one", Dir: "/w/alpha"}, {ID: "b1", Title: "elsewhere", Dir: "/w/beta"}, {ID: "a2", Title: "here two", Dir: "/w/alpha/sub"}} {
+	for _, s := range []api.Session{{ID: "a1", Title: "here one", Dir: "/w/alpha"}, {ID: "b1", Title: "elsewhere", Dir: "/w/beta"}, {ID: "a2", Title: "here two", Dir: "/w/alpha/sub"}} {
 		m.meta(s.ID, s)
 	}
 	got := m.listed()
@@ -45,7 +45,7 @@ func TestAgentsPanelShowsTheSessionsPRs(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 120, 40
 	m.dir = "/w/alpha"
-	m.meta("a1", daemon.Session{ID: "a1", Title: "ship it", Dir: "/w/alpha", PRs: []string{"https://github.com/acme/app/pull/7", "https://github.com/acme/app/pull/12"}})
+	m.meta("a1", api.Session{ID: "a1", Title: "ship it", Dir: "/w/alpha", PRs: []string{"https://github.com/acme/app/pull/7", "https://github.com/acme/app/pull/12"}})
 	view := strings.Join(m.agentsBox(make([]string, 40), 120, 40), "\n")
 	if !strings.Contains(view, "PR #7 #12") {
 		t.Errorf("the row names the PRs the session opened:\n%s", view)

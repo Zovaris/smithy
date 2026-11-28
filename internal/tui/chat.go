@@ -19,6 +19,7 @@ import (
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/models"
@@ -82,7 +83,7 @@ type chatView struct {
 	resumeDir     string
 	quitting      bool
 	url           string
-	stream        <-chan daemon.ClientMsg
+	stream        <-chan api.ClientMsg
 	conn, connErr string
 	last          int64
 	msgs          []*chatMsg
@@ -96,7 +97,7 @@ type chatView struct {
 	focus    int // focused message, -1 for none
 	overlay  chatOverlay
 	pal      palette
-	pending  []daemon.Decision
+	pending  []api.Decision
 	where    chatWhere
 	held     []string // notes shown once the history replay reaches heldTo
 	heldTo   int64
@@ -114,7 +115,7 @@ type chatView struct {
 	flowSt    workflowsView      // the open /workflows
 	opener    func(string) error // opens a URL; nil: the default browser
 	infoBack  chatOverlay        // where esc on the info panel goes back to
-	setupSt   *daemon.Setup      // last GET /v1/setup
+	setupSt   *api.Setup         // last GET /v1/setup
 	setupSel  int
 	setupStep setupStep
 	setupNote string // a fix, an error or install output shown in the open overlay
@@ -130,7 +131,7 @@ type chatView struct {
 	welcome      welcomeStep
 	welcomeAgent string
 	welcomeNote  string // the walk's last saved pick, printed once when it ends
-	welcomeSet   *daemon.Settings
+	welcomeSet   *api.Settings
 
 	sess     sessionAPI            // the daemon's sessions endpoints; nil: offline
 	current  string                // the open session, "" before the first message
@@ -184,7 +185,7 @@ type infoPanel struct {
 	set    *panelSetting // a setting row on top, cycled with left/right; nil: none
 }
 
-func newChatView(stream <-chan daemon.ClientMsg, url string, th theme) chatView {
+func newChatView(stream <-chan api.ClientMsg, url string, th theme) chatView {
 	return chatView{th: th, url: url, stream: stream, conn: "connecting", input: newComposer(th), width: 80, height: 24, at: &anchor{}, focus: -1, files: &fileCache{}}
 }
 
@@ -292,7 +293,7 @@ func versionNote(daemonV, mine string) string {
 }
 
 // startedNote is the first transcript line after bare smithy started the daemon itself.
-func startedNote(i *daemon.Info, idle time.Duration) string {
+func startedNote(i *api.Info, idle time.Duration) string {
 	when := "until smithy stop"
 	if idle > 0 {
 		when = "until " + shortDur(idle) + " with no clients and no running work, or smithy stop"
@@ -368,9 +369,9 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 			fmt.Fprintf(os.Stderr, "smithy --standalone: a background daemon runs (pid %d); stop it first with smithy stop, or run smithy to use it\n", i.PID)
 			return 1, nil
 		}
-		ready := make(chan daemon.Info, 1)
+		ready := make(chan api.Info, 1)
 		ended := make(chan int, 1)
-		go func() { ended <- daemon.Standalone(ctx, func(i daemon.Info) { ready <- i }) }()
+		go func() { ended <- daemon.Standalone(ctx, func(i api.Info) { ready <- i }) }()
 		select {
 		case i := <-ready:
 			url = i.URL()
@@ -382,7 +383,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 		where = whereStandalone
 	case url == "":
 		var idle time.Duration
-		i, fresh, err := daemon.Ensure(daemon.Running, func() (*daemon.Info, error) {
+		i, fresh, err := daemon.Ensure(daemon.Running, func() (*api.Info, error) {
 			port, err := daemon.ConfigPort()
 			if err != nil {
 				return nil, err
@@ -410,7 +411,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 		}
 		tok = t
 	}
-	c := &daemon.Client{Base: url, Token: tok}
+	c := &api.Client{Base: url, Token: tok}
 	st, err := c.State(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "smithy chat: %s: %v\n", serverName, err)
@@ -422,7 +423,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	if n := versionNote(st.Version, Version); n != "" && where != whereStandalone {
 		notes = append(notes, n)
 	}
-	ch := make(chan daemon.ClientMsg, 256)
+	ch := make(chan api.ClientMsg, 256)
 	go c.Follow(ctx, 0, ch)
 	p := colorprofile.TrueColor
 	if os.Getenv("NO_COLOR") != "" {
@@ -616,7 +617,7 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sessionErrMsg:
 		m.system(m.th.g.fail + " " + msg.what + " failed: " + msg.err.Error())
 		return m, nil
-	case daemon.ClientMsg:
+	case api.ClientMsg:
 		switch {
 		case msg.Connected:
 			m.conn, m.connErr = "connected", ""
@@ -760,13 +761,13 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func eventText(kind, session string, data json.RawMessage) string {
 	switch kind {
 	case daemon.KindAsked:
-		var d daemon.Decision
+		var d api.Decision
 		if json.Unmarshal(data, &d) != nil || d.ID == "" {
 			return ""
 		}
 		return "? " + d.Question
 	case daemon.KindAnswered:
-		var o daemon.Outcome
+		var o api.Outcome
 		if json.Unmarshal(data, &o) != nil {
 			return ""
 		}

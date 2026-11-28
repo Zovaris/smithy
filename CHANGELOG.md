@@ -34,6 +34,7 @@ part above `### Details`.
 
 ### Details
 - Charm libraries: bubbletea v2.2.0; the chat view sets `ProgramResume` (exe, `chat`, its url, `--server` or `--standalone`, `--session <id>`, cwd) and drops it when quitting.
+- `internal/api` holds the daemon's wire types (state, sessions, settings, setup, projects, tasks, workflows, tend, bus) and its `Client`; the TUI, `smithy mcp` and warden use them from there, and the daemon keeps type aliases (ADR 0016). No behaviour change.
 
 - ci: actions/checkout v7, setup-go v7, setup-node v7, cache v6, upload-artifact v7, attest-build-provenance v4, golangci-lint-action v9 (useblacksmith/checkout v1, setup-bun v2 and golangci-lint v2.15.0 were already latest).
 - deps(web): preact 11.2.0, typescript 7.0.2, vite 8.4.0, vitest 5.1.2, playwright 1.65.1; vite.config imports `defineConfig` from `vitest/config`, and the settings text/number input splits in two for the preact 11 input types. First load 29.8 KB gzip (budget 31 KB).

@@ -7,35 +7,35 @@ import (
 	"path/filepath"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 )
 
 // projectAPI is the part of the daemon client the project modal uses; a sessions API without it
 // starts every session in the chat's folder.
 type projectAPI interface {
-	Projects(ctx context.Context) (daemon.ProjectList, error)
-	AddProject(ctx context.Context, dir string, def bool) (daemon.ProjectList, error)
-	ListDirs(ctx context.Context, dir string) (daemon.DirList, error)
+	Projects(ctx context.Context) (api.ProjectList, error)
+	AddProject(ctx context.Context, dir string, def bool) (api.ProjectList, error)
+	ListDirs(ctx context.Context, dir string) (api.DirList, error)
 }
 
 // projectPick is the modal a new session's first message opens: which saved project of the
 // daemon it starts in. dir is the pick; it is fixed once the session runs.
 type projectPick struct {
 	dir     string
-	pending string              // the message that starts the session once a project is picked
-	list    *daemon.ProjectList // nil while it loads
+	pending string           // the message that starts the session once a project is picked
+	list    *api.ProjectList // nil while it loads
 	sel     int
-	browse  *daemon.DirList // the folder picker, nil when it is closed
+	browse  *api.DirList // the folder picker, nil when it is closed
 	err     string
 }
 
 type projectsMsg struct {
-	l   daemon.ProjectList
+	l   api.ProjectList
 	err error
 }
 
 type dirsMsg struct {
-	l   daemon.DirList
+	l   api.DirList
 	err error
 }
 

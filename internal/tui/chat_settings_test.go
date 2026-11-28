@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 )
 
 type fakeSettings struct {
@@ -20,8 +20,8 @@ type fakeSettings struct {
 	doctor  []string
 }
 
-func (f *fakeSettings) Settings(context.Context) (daemon.Settings, error) {
-	return daemon.Settings{Serve: true, Prompt: daemon.PromptState{Path: "/home/dev/.smithy/prompt.md", Active: true}, Keys: []daemon.KeyRow{{Service: "linear", Masked: "****wxyz"}}}, nil
+func (f *fakeSettings) Settings(context.Context) (api.Settings, error) {
+	return api.Settings{Serve: true, Prompt: api.PromptState{Path: "/home/dev/.smithy/prompt.md", Active: true}, Keys: []api.KeyRow{{Service: "linear", Masked: "****wxyz"}}}, nil
 }
 func (f *fakeSettings) SetSetting(_ context.Context, k, v string) error {
 	f.set = append(f.set, [2]string{k, v})
@@ -96,11 +96,11 @@ func TestSettingsCommandsGoThroughTheDaemon(t *testing.T) {
 	}
 }
 
-func (f *fakeSettings) Tend(context.Context) (daemon.TendList, error) {
-	return daemon.TendList{Mode: "fix", PRs: []daemon.TendPR{
-		{TendRef: daemon.TendRef{URL: "https://github.com/o/r/pull/7", Batch: "b1", Item: "01"}, Action: "fix-ci", Checks: "red", Status: "fixing", PID: 42},
-		{TendRef: daemon.TendRef{URL: "https://github.com/o/r/pull/8", Batch: "b1", Item: "02"}, Action: "done", Checks: "green", Status: "green"},
-		{TendRef: daemon.TendRef{URL: "https://github.com/o/r/pull/9", Session: "s-abc"}, Action: "wait", Checks: "pending", Status: "waiting"},
+func (f *fakeSettings) Tend(context.Context) (api.TendList, error) {
+	return api.TendList{Mode: "fix", PRs: []api.TendPR{
+		{TendRef: api.TendRef{URL: "https://github.com/o/r/pull/7", Batch: "b1", Item: "01"}, Action: "fix-ci", Checks: "red", Status: "fixing", PID: 42},
+		{TendRef: api.TendRef{URL: "https://github.com/o/r/pull/8", Batch: "b1", Item: "02"}, Action: "done", Checks: "green", Status: "green"},
+		{TendRef: api.TendRef{URL: "https://github.com/o/r/pull/9", Session: "s-abc"}, Action: "wait", Checks: "pending", Status: "waiting"},
 	}}, nil
 }
 

@@ -9,19 +9,19 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/Zovaris/smithy/internal/agents"
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/models"
 )
 
-// setupAPI is the daemon's setup endpoints; *daemon.Client is one.
+// setupAPI is the daemon's setup endpoints; *api.Client is one.
 type setupAPI interface {
-	Setup(ctx context.Context) (daemon.Setup, error)
+	Setup(ctx context.Context) (api.Setup, error)
 	SetDefault(ctx context.Context, agent, model string) error
-	SetKit(ctx context.Context, k daemon.KitChoice) error
+	SetKit(ctx context.Context, k api.KitChoice) error
 	InstallSkills(ctx context.Context, harness string) (string, error)
 }
 
-// modelsAPI is the daemon's model list; *daemon.Client is one. A setupAPI without it gets
+// modelsAPI is the daemon's model list; *api.Client is one. A setupAPI without it gets
 // the typed field only.
 type modelsAPI interface {
 	Models(ctx context.Context, agent string, refresh bool) (models.List, error)
@@ -43,7 +43,7 @@ const (
 )
 
 type setupLoadedMsg struct {
-	s     daemon.Setup
+	s     api.Setup
 	first bool
 	err   error
 }
@@ -84,7 +84,7 @@ func (m chatView) saveDefault(agent, model string) tea.Cmd {
 	}
 }
 
-func (m chatView) saveKit(k daemon.KitChoice) tea.Cmd {
+func (m chatView) saveKit(k api.KitChoice) tea.Cmd {
 	api := m.setup
 	if api == nil {
 		return nil

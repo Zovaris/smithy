@@ -16,6 +16,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/charmbracelet/x/ansi"
@@ -69,7 +70,7 @@ type chatSession struct {
 	dir                      string // the folder it started in; "" for batch events
 	parent                   string
 	prs                      []string
-	links                    *daemon.SessionLinks
+	links                    *api.SessionLinks
 	since, turn              time.Time
 }
 
@@ -118,13 +119,13 @@ func (m *chatView) event(kind, session string, at time.Time, data json.RawMessag
 		}
 		return
 	case daemon.KindAsked:
-		var d daemon.Decision
+		var d api.Decision
 		if json.Unmarshal(data, &d) == nil && d.ID != "" {
 			m.setPending(append(m.pending, d))
 			m.offerAsk()
 		}
 	case daemon.KindAnswered:
-		var o daemon.Outcome
+		var o api.Outcome
 		if json.Unmarshal(data, &o) == nil {
 			m.keepQA(o.ID, o.Answer)
 			m.unpend(o.ID)
@@ -173,8 +174,8 @@ func (m *chatView) track(id, kind string) {
 }
 
 // setPending replaces the decisions waiting on the user, keeping one per id in arrival order.
-func (m *chatView) setPending(ds []daemon.Decision) {
-	var out []daemon.Decision
+func (m *chatView) setPending(ds []api.Decision) {
+	var out []api.Decision
 	seen := map[string]bool{}
 	for _, d := range ds {
 		if d.ID != "" && d.Outcome == nil && !seen[d.ID] {
@@ -186,7 +187,7 @@ func (m *chatView) setPending(ds []daemon.Decision) {
 }
 
 func (m *chatView) unpend(id string) {
-	var out []daemon.Decision
+	var out []api.Decision
 	for _, d := range m.pending {
 		if d.ID != id {
 			out = append(out, d)

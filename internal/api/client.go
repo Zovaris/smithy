@@ -1,6 +1,6 @@
 //go:build harness
 
-package daemon
+package api
 
 import (
 	"bufio"
@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/workflow"
@@ -37,14 +38,16 @@ type ClientMsg struct {
 	Err       error
 }
 
-func (c *Client) http() *http.Client {
+// HTTPClient is the client's HTTP client, http.DefaultClient when unset.
+func (c *Client) HTTPClient() *http.Client {
 	if c.HTTP != nil {
 		return c.HTTP
 	}
 	return http.DefaultClient
 }
 
-func (c *Client) req(ctx context.Context, method, path string, body []byte) (*http.Request, error) {
+// NewRequest builds an authenticated request to path on the daemon.
+func (c *Client) NewRequest(ctx context.Context, method, path string, body []byte) (*http.Request, error) {
 	r, err := http.NewRequestWithContext(ctx, method, strings.TrimRight(c.Base, "/")+path, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -64,11 +67,11 @@ func (c *Client) req(ctx context.Context, method, path string, body []byte) (*ht
 // State is GET /v1/state.
 func (c *Client) State(ctx context.Context) (State, error) {
 	var st State
-	r, err := c.req(ctx, "GET", "/v1/state", nil)
+	r, err := c.NewRequest(ctx, "GET", "/v1/state", nil)
 	if err != nil {
 		return st, err
 	}
-	res, err := c.http().Do(r)
+	res, err := c.HTTPClient().Do(r)
 	if err != nil {
 		return st, err
 	}
@@ -83,12 +86,12 @@ func (c *Client) State(ctx context.Context) (State, error) {
 func (c *Client) Decide(ctx context.Context, id, answer string) (Outcome, error) {
 	var o Outcome
 	b, _ := json.Marshal(map[string]string{"id": id, "answer": answer})
-	r, err := c.req(ctx, "POST", "/v1/decisions", b)
+	r, err := c.NewRequest(ctx, "POST", "/v1/decisions", b)
 	if err != nil {
 		return o, err
 	}
 	r.Header.Set("Content-Type", "application/json")
-	res, err := c.http().Do(r)
+	res, err := c.HTTPClient().Do(r)
 	if err != nil {
 		return o, err
 	}
@@ -107,11 +110,11 @@ func (c *Client) Ask(ctx context.Context, id, question string, options []string)
 // AskMulti is Ask for a question whose options may be picked together when multi is true.
 func (c *Client) AskMulti(ctx context.Context, id, question string, options []string, multi bool) error {
 	b, _ := json.Marshal(map[string]any{"id": id, "question": question, "options": options, "multi": multi})
-	r, err := c.req(ctx, "POST", "/v1/asks", b)
+	r, err := c.NewRequest(ctx, "POST", "/v1/asks", b)
 	if err != nil {
 		return err
 	}
-	res, err := c.http().Do(r)
+	res, err := c.HTTPClient().Do(r)
 	if err != nil {
 		return err
 	}
@@ -125,11 +128,11 @@ func (c *Client) AskMulti(ctx context.Context, id, question string, options []st
 // Decision is GET /v1/decisions/{id}; Outcome is nil until someone answers.
 func (c *Client) Decision(ctx context.Context, id string) (Decision, error) {
 	var d Decision
-	r, err := c.req(ctx, "GET", "/v1/decisions/"+url.PathEscape(id), nil)
+	r, err := c.NewRequest(ctx, "GET", "/v1/decisions/"+url.PathEscape(id), nil)
 	if err != nil {
 		return d, err
 	}
-	res, err := c.http().Do(r)
+	res, err := c.HTTPClient().Do(r)
 	if err != nil {
 		return d, err
 	}
@@ -176,13 +179,13 @@ func (c *Client) Follow(ctx context.Context, since int64, out chan<- ClientMsg) 
 
 // stream reads one SSE connection; connected reports whether it got a 200.
 func (c *Client) stream(ctx context.Context, last *int64, out chan<- ClientMsg) (connected bool, err error) {
-	r, err := c.req(ctx, "GET", "/v1/events?since="+strconv.FormatInt(*last, 10), nil)
+	r, err := c.NewRequest(ctx, "GET", "/v1/events?since="+strconv.FormatInt(*last, 10), nil)
 	if err != nil {
 		return false, err
 	}
 	r.Header.Set("Accept", "text/event-stream")
 	r.Header.Set("Last-Event-ID", strconv.FormatInt(*last, 10))
-	res, err := c.http().Do(r)
+	res, err := c.HTTPClient().Do(r)
 	if err != nil {
 		return false, err
 	}
@@ -221,14 +224,14 @@ func (c *Client) call(ctx context.Context, method, path string, body, out any) e
 	if body != nil {
 		b, _ = json.Marshal(body)
 	}
-	r, err := c.req(ctx, method, path, b)
+	r, err := c.NewRequest(ctx, method, path, b)
 	if err != nil {
 		return err
 	}
 	if body != nil {
 		r.Header.Set("Content-Type", "application/json")
 	}
-	res, err := c.http().Do(r)
+	res, err := c.HTTPClient().Do(r)
 	if err != nil {
 		return err
 	}
@@ -477,7 +480,7 @@ type BusClient struct {
 
 func (b *BusClient) call(ctx context.Context, method, path string, body, out any) error {
 	c := *b.C
-	c.Header = map[string]string{busKeyHeader: b.Key}
+	c.Header = map[string]string{BusKeyHeader: b.Key}
 	return c.call(ctx, method, path, body, out)
 }
 
@@ -508,3 +511,20 @@ func (c *Client) Mail(ctx context.Context, id string) ([]Mail, error) {
 	err := c.call(ctx, "GET", "/v1/sessions/"+url.PathEscape(id)+"/mail", nil, &ms)
 	return ms, err
 }
+
+// Tend is GET /v1/tend: the PRs the daemon tends and what it is doing on each.
+func (c *Client) Tend(ctx context.Context) (TendList, error) {
+	var out TendList
+	err := c.call(ctx, "GET", "/v1/tend", nil, &out)
+	return out, err
+}
+
+// Usage is GET /v1/usage: the token report for session ("" for none).
+func (c *Client) Usage(ctx context.Context, session string) (events.Report, error) {
+	var out events.Report
+	err := c.call(ctx, "GET", "/v1/usage?session="+url.QueryEscape(session), nil, &out)
+	return out, err
+}
+
+// BusKeyHeader carries a session's bus key on its requests.
+const BusKeyHeader = "X-Smithy-Session-Key"

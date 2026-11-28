@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/auth"
 	"github.com/Zovaris/smithy/internal/board"
 	"github.com/Zovaris/smithy/internal/daemon"
@@ -88,7 +89,7 @@ func init() {
 				if err != nil {
 					return nil, err
 				}
-				return busAdapter{&daemon.BusClient{C: a.C, Key: key}}, nil
+				return busAdapter{&api.BusClient{C: a.C, Key: key}}, nil
 			})...)
 		}
 		s := &mcp.Server{Name: "smithy", Version: version, Tools: tools}
@@ -100,7 +101,7 @@ func init() {
 	})
 }
 
-type busAdapter struct{ b *daemon.BusClient }
+type busAdapter struct{ b *api.BusClient }
 
 func (a busAdapter) Send(ctx context.Context, to, text string) (any, error) {
 	return a.b.Send(ctx, to, text)
@@ -111,5 +112,5 @@ func (a busAdapter) Inbox(ctx context.Context, since int64) (any, error) {
 }
 
 func (a busAdapter) Start(ctx context.Context, agent, dir, msg string) (any, error) {
-	return a.b.Start(ctx, daemon.BusStartReq{Agent: agent, Dir: dir, Message: msg})
+	return a.b.Start(ctx, api.BusStartReq{Agent: agent, Dir: dir, Message: msg})
 }

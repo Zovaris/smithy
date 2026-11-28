@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 )
 
-func (f *fakeSettings) ConnectTest(context.Context) (daemon.ConnectTestResult, error) {
+func (f *fakeSettings) ConnectTest(context.Context) (api.ConnectTestResult, error) {
 	f.tested++
-	return daemon.ConnectTestResult{Results: []string{"slack notifications: sent", "slack chat: HTTP 403 not_in_channel"}}, nil
+	return api.ConnectTestResult{Results: []string{"slack notifications: sent", "slack chat: HTTP 403 not_in_channel"}}, nil
 }
 
 func TestChannelsPanelAndTestSend(t *testing.T) {

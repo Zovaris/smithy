@@ -59,28 +59,6 @@ const (
 	sessionIDPrefix = "s-"
 )
 
-// Session is one conversation with an agent in a folder.
-type Session struct {
-	ID      string       `json:"id"`
-	Agent   string       `json:"agent"`
-	Model   string       `json:"model,omitempty"`
-	Effort  string       `json:"effort,omitempty"`
-	Dir     string       `json:"dir"`
-	Title   string       `json:"title"`
-	Status  string       `json:"status"`
-	Detail  string       `json:"detail,omitempty"`
-	Created time.Time    `json:"created"`
-	Updated time.Time    `json:"updated"`
-	Usage   *usage.Usage `json:"usage,omitempty"`
-	PRs     []string     `json:"prs,omitempty"`
-	Links   []string     `json:"links,omitempty"`
-	Parent  string       `json:"parent,omitempty"`
-	// Goal is pinned by a person (/goal); the daemon continues the session toward it.
-	Goal      string `json:"goal,omitempty"`
-	GoalState string `json:"goal_state,omitempty"`
-	GoalTurns int    `json:"goal_turns,omitempty"`
-}
-
 // ToolEvent is one finished tool call of a session.
 type ToolEvent struct {
 	ID      string          `json:"id,omitempty"`
@@ -791,13 +769,6 @@ func (sv *Server) stopSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, map[string]string{"id": r.PathValue("id"), "status": StatusDone})
-}
-
-// SessionList is GET /v1/sessions.
-type SessionList struct {
-	Sessions  []Session `json:"sessions"`
-	LastAgent string    `json:"last_agent"`
-	LastModel string    `json:"last_model,omitempty"`
 }
 
 func (sv *Server) listSessions(w http.ResponseWriter, r *http.Request) {

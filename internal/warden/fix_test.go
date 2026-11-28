@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 )
 
@@ -17,7 +18,7 @@ func fixEnv(t *testing.T, tty bool, answers ...string) doctorEnv {
 	t.Setenv("WARDEN_HARNESS", "claude-code")
 	writeFile(t, filepath.Join(d.home, ".claude", "settings.json"), `{"model":"x","permissions":{"allow":["Bash(ls:*)"]}}`)
 	os.MkdirAll(filepath.Join(d.root, "smithy"), 0o700)
-	daemon.WriteInfo(daemon.Info{PID: 999999, Addr: "127.0.0.1:7477", Started: time.Now()})
+	daemon.WriteInfo(api.Info{PID: 999999, Addr: "127.0.0.1:7477", Started: time.Now()})
 	os.WriteFile(daemon.TokenFile(), []byte("x\n"), 0o644)
 	oldTTY, oldAsk := stdinTTY, askFix
 	stdinTTY = func() bool { return tty }
@@ -167,7 +168,7 @@ func TestDoctorFixKeepsRevivedDaemonInfo(t *testing.T) {
 	askOld := askFix
 	askFix = func(c string) bool {
 		if strings.HasPrefix(c, "remove stale") {
-			daemon.WriteInfo(daemon.Info{PID: os.Getpid(), Addr: "127.0.0.1:7477", Started: time.Now()})
+			daemon.WriteInfo(api.Info{PID: os.Getpid(), Addr: "127.0.0.1:7477", Started: time.Now()})
 		}
 		return askOld(c)
 	}

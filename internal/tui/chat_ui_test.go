@@ -11,12 +11,13 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 )
 
-func sev(seq int64, kind, session string, data any) daemon.ClientMsg {
+func sev(seq int64, kind, session string, data any) api.ClientMsg {
 	msg := ev(seq, kind, data)
 	msg.Event.Session = session
 	return msg
@@ -28,10 +29,10 @@ func newChatScene() chatView {
 	m := newChatView(nil, "http://127.0.0.1:7477", newTheme(true, colorprofile.Ascii, true))
 	m.width, m.height = 100, 32
 	m.clock = func() time.Time { return time.Date(2026, 11, 25, 9, 7, 0, 0, time.Local) }
-	m.setPending([]daemon.Decision{{ID: "d1", Question: "Merge #142 into release/v0.17?", Options: []string{"merge", "later"}}})
+	m.setPending([]api.Decision{{ID: "d1", Question: "Merge #142 into release/v0.17?", Options: []string{"merge", "later"}}})
 	m.current = "TK-6"
 	m.push(chatMsg{who: "you", text: "Add usage-limit detection for Pi (TK-6)."})
-	steps := []daemon.ClientMsg{
+	steps := []api.ClientMsg{
 		sev(1, "thinking", "TK-6", map[string]string{"text": "Pi's limit errors are typed classes; match their names, not prose."}),
 		sev(2, daemon.KindSessionText, "TK-6", map[string]string{"text": "Pi prints its limit errors from packages/ai/src/errors.ts. I'll match those near the end of a failed run."}),
 		sev(3, "tool", "TK-6", chatTool{Name: "Read", Arg: "internal/pool/detect.go", Stat: "134 lines", Took: "0.1s", Status: "ok", Lines: []string{"134 lines read"}}),

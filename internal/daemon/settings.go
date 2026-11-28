@@ -19,32 +19,6 @@ import (
 	"github.com/Zovaris/smithy/internal/text"
 )
 
-// SettingRow is one known key with its effective value and where it comes from; secrets are masked.
-type SettingRow struct {
-	Key     string   `json:"key"`
-	Value   string   `json:"value"`
-	Src     string   `json:"src"`
-	Default string   `json:"default"`
-	Meaning string   `json:"meaning"`
-	Secret  bool     `json:"secret,omitempty"`
-	Kind    string   `json:"kind"`
-	Options []string `json:"options,omitempty"`
-}
-
-// KeyRow is one stored API key, masked.
-type KeyRow struct {
-	Service string `json:"service"`
-	Masked  string `json:"masked"`
-}
-
-// Settings is GET /v1/settings: every setting, the stored API keys and whether serve may launch.
-type Settings struct {
-	Settings []SettingRow `json:"settings"`
-	Keys     []KeyRow     `json:"keys"`
-	Serve    bool         `json:"serve"`
-	Prompt   PromptState  `json:"prompt"`
-}
-
 func loadSettings() (Settings, error) {
 	out := Settings{Settings: []SettingRow{}, Keys: []KeyRow{}, Prompt: PromptStatus()}
 	eff := config.Snapshot()
@@ -238,12 +212,6 @@ func (sv *Server) doctor(w http.ResponseWriter, r *http.Request) {
 		run = runDoctor
 	}
 	writeJSON(w, 200, map[string][]string{"lines": run(r.Context())})
-}
-
-// ConnectTestResult is POST /v1/connect/test: one line per channel tried, or why none was.
-type ConnectTestResult struct {
-	Results []string `json:"results"`
-	Error   string   `json:"error,omitempty"`
 }
 
 // connectTest sends a test message through each chat connector built from the current config

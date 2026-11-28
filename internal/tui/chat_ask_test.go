@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 )
 
@@ -68,7 +69,7 @@ func TestAskCardFreeTextOther(t *testing.T) {
 
 func TestAskCardMultiSelect(t *testing.T) {
 	m, got := askScene()
-	m.setPending([]daemon.Decision{{ID: "d9", Question: "Which checks?", Options: []string{"lint", "test", "e2e"}, Multi: true}})
+	m.setPending([]api.Decision{{ID: "d9", Question: "Which checks?", Options: []string{"lint", "test", "e2e"}, Multi: true}})
 	m = chatStep(m, ckey("enter"))
 	m = chatStep(m, ckey("1"))
 	m = chatStep(m, ckey("down"))
@@ -86,7 +87,7 @@ func TestAskCardMultiSelect(t *testing.T) {
 func TestAskArrivingOpensCardOnlyWhenNotTyping(t *testing.T) {
 	m, _ := askScene()
 	m.setPending(nil)
-	m = chatStep(m, ev(30, daemon.KindAsked, daemon.Decision{ID: "d2", Question: "Approve secret POST?", Options: []string{"approve", "deny"}}))
+	m = chatStep(m, ev(30, daemon.KindAsked, api.Decision{ID: "d2", Question: "Approve secret POST?", Options: []string{"approve", "deny"}}))
 	if m.overlay != overlayAsk {
 		t.Fatal("an ask on an idle composer does not open the card")
 	}
@@ -97,7 +98,7 @@ func TestAskArrivingOpensCardOnlyWhenNotTyping(t *testing.T) {
 	m, _ = askScene()
 	m.setPending(nil)
 	m = typeIn(m, "half a messa")
-	m = chatStep(m, ev(31, daemon.KindAsked, daemon.Decision{ID: "d3", Question: "Ship?", Options: []string{"yes"}}))
+	m = chatStep(m, ev(31, daemon.KindAsked, api.Decision{ID: "d3", Question: "Ship?", Options: []string{"yes"}}))
 	m = typeIn(m, "ge")
 	if m.overlay == overlayAsk || m.input.Value() != "half a message" {
 		t.Fatalf("typed text eaten: overlay %v input %q", m.overlay, m.input.Value())
@@ -109,7 +110,7 @@ func TestAskArrivingOpensCardOnlyWhenNotTyping(t *testing.T) {
 
 func TestAskCardShowsOtherOnMultiSelect(t *testing.T) {
 	m, _ := askScene()
-	m.setPending([]daemon.Decision{{ID: "d9", Question: "Which checks?", Options: []string{"lint", "unit tests", "e2e", "screenshots"}, Multi: true}})
+	m.setPending([]api.Decision{{ID: "d9", Question: "Which checks?", Options: []string{"lint", "unit tests", "e2e", "screenshots"}, Multi: true}})
 	m.width, m.height = 140, 40
 	m = chatStep(m, ckey("enter"))
 	if !strings.Contains(screen(m), "Other:") {

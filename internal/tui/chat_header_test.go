@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/usage"
 	"github.com/charmbracelet/colorprofile"
@@ -17,7 +18,7 @@ func headerTest() chatView {
 	m := newChatTest(0)
 	m.width, m.height = 160, 40
 	m.dir, m.effort, m.current, m.branch = "/work/proj", "medium", "s-1", "main"
-	m.setupSt = &daemon.Setup{Default: daemon.AgentChoice{Agent: "claude", Model: "haiku"}}
+	m.setupSt = &api.Setup{Default: api.AgentChoice{Agent: "claude", Model: "haiku"}}
 	m.clock = func() time.Time { return time.Date(2026, 11, 25, 9, 7, 0, 0, time.Local) }
 	return m
 }
@@ -133,7 +134,7 @@ func TestClockTicksOncePerMinute(t *testing.T) {
 
 func TestRunningCountShowsOnlyInTheHeaderPill(t *testing.T) {
 	m := headerTest()
-	m.setPending([]daemon.Decision{{ID: "d1", Question: "Commit?", Options: []string{"commit", "not yet"}}})
+	m.setPending([]api.Decision{{ID: "d1", Question: "Commit?", Options: []string{"commit", "not yet"}}})
 	m.sessions = []chatSession{{id: "s-1", state: "running", title: "add a health endpoint"}}
 	if n := strings.Count(screen(m), "running"); n != 1 {
 		t.Fatalf("\"running\" shows %d times:\n%s", n, screen(m))

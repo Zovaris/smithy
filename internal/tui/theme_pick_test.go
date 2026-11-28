@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 )
 
 type themeSettings struct {
@@ -15,8 +15,8 @@ type themeSettings struct {
 	theme string
 }
 
-func (f *themeSettings) Settings(context.Context) (daemon.Settings, error) {
-	return daemon.Settings{Settings: []daemon.SettingRow{{Key: "ui.theme", Value: f.theme}}}, nil
+func (f *themeSettings) Settings(context.Context) (api.Settings, error) {
+	return api.Settings{Settings: []api.SettingRow{{Key: "ui.theme", Value: f.theme}}}, nil
 }
 
 func TestThemeModalPicksAndSavesTheTheme(t *testing.T) {

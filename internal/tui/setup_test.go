@@ -11,24 +11,24 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/Zovaris/smithy/internal/agents"
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 )
 
 type fakeSetup struct {
-	s       daemon.Setup
+	s       api.Setup
 	set     []string
-	kits    []daemon.KitChoice
+	kits    []api.KitChoice
 	install []string
 	fail    error
 }
 
-func (f *fakeSetup) Setup(context.Context) (daemon.Setup, error) { return f.s, f.fail }
+func (f *fakeSetup) Setup(context.Context) (api.Setup, error) { return f.s, f.fail }
 func (f *fakeSetup) SetDefault(_ context.Context, a, m string) error {
 	f.set = append(f.set, a+"|"+m)
-	f.s.Default, f.s.Chosen = daemon.AgentChoice{Agent: a, Model: m}, true
+	f.s.Default, f.s.Chosen = api.AgentChoice{Agent: a, Model: m}, true
 	return f.fail
 }
-func (f *fakeSetup) SetKit(_ context.Context, k daemon.KitChoice) error {
+func (f *fakeSetup) SetKit(_ context.Context, k api.KitChoice) error {
 	f.kits = append(f.kits, k)
 	f.s.Kit = k
 	return f.fail
@@ -39,15 +39,15 @@ func (f *fakeSetup) InstallSkills(_ context.Context, h string) (string, error) {
 }
 
 func firstRunSetup() *fakeSetup {
-	return &fakeSetup{s: daemon.Setup{
+	return &fakeSetup{s: api.Setup{
 		Agents: []agents.Ready{
 			{Name: "claude", Kind: "cli", Ready: true, Detail: "/opt/homebrew/bin/claude"},
 			{Name: "codex", Kind: "cli", Detail: "codex not found", Fix: "npm install -g @openai/codex"},
 			{Name: "api:anthropic", Kind: "api", Ready: true, Detail: "smithy auth"},
 			{Name: "api:openai", Kind: "api", Detail: "no key", Fix: "smithy auth set openai"},
 		},
-		Default: daemon.AgentChoice{Agent: "claude"},
-		Kit:     daemon.KitChoice{MCP: true, Skills: []string{}},
+		Default: api.AgentChoice{Agent: "claude"},
+		Kit:     api.KitChoice{MCP: true, Skills: []string{}},
 		Skills:  []string{"smelt", "hush"},
 		Harnesses: []agents.HarnessInventory{
 			{Harness: "claude", Present: true, SkillsDir: "~/.claude/skills", Smithy: []string{"smelt", "hush"}, Missing: []string{"use-smithy", "warden", "ledger", "scout", "tend", "simple"}, MCP: []string{"linear"}},

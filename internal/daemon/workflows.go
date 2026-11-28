@@ -27,36 +27,6 @@ const (
 	KindWorkflowRun  = "workflow_run"
 )
 
-// WorkflowList is GET /v1/workflows.
-type WorkflowList struct {
-	Workflows []workflow.Info `json:"workflows"`
-	Running   []string        `json:"running"`
-}
-
-// WorkflowDetail is GET /v1/workflows/{name}: the parsed file, its source, newest runs and the
-// run in progress.
-type WorkflowDetail struct {
-	Info    workflow.Info     `json:"info"`
-	Source  string            `json:"source"`
-	History []workflow.Record `json:"history"`
-	Running bool              `json:"running"`
-	Live    *workflow.Record  `json:"live,omitempty"`
-}
-
-// ScheduleList is GET /v1/schedules.
-type ScheduleList struct {
-	Schedules []workflow.SchedInfo `json:"schedules"`
-}
-
-// ScheduleDetail is GET /v1/schedules/{name}: the schedule, its source, the runs it started and,
-// for a webhook on this machine, its token.
-type ScheduleDetail struct {
-	Info    workflow.SchedInfo `json:"info"`
-	Source  string             `json:"source"`
-	History []workflow.Record  `json:"history"`
-	Hook    string             `json:"hook,omitempty"`
-}
-
 type workflowNote struct {
 	Workflow string `json:"workflow"`
 	Title    string `json:"title"`

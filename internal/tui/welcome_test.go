@@ -8,21 +8,21 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 )
 
 type welcomeSettings struct{ fakeSettings }
 
-func (welcomeSettings) Settings(context.Context) (daemon.Settings, error) {
-	return daemon.Settings{Serve: true,
-		Settings: []daemon.SettingRow{
+func (welcomeSettings) Settings(context.Context) (api.Settings, error) {
+	return api.Settings{Serve: true,
+		Settings: []api.SettingRow{
 			{Key: "notify.telegram.chat", Src: "unset", Meaning: "Telegram chat id serve notifies"},
 			{Key: "notify.kinds", Value: "pr_ready,blocked", Src: "default"},
 			{Key: "warden.max", Value: "4"},
 		},
-		Keys: []daemon.KeyRow{{Service: "linear", Masked: "****wxyz"}}}, nil
+		Keys: []api.KeyRow{{Service: "linear", Masked: "****wxyz"}}}, nil
 }
 
 func welcomeScene(f *fakeSetup) chatView {

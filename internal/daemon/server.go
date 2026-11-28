@@ -34,36 +34,6 @@ const (
 	KindRouted = "decision_routed"
 )
 
-// Decision is a question waiting on (or answered by) someone.
-type Decision struct {
-	ID       string    `json:"id"`
-	Question string    `json:"question"`
-	Options  []string  `json:"options,omitempty"`
-	Multi    bool      `json:"multi,omitempty"` // several options may be picked; the answer joins them with ", "
-	Other    bool      `json:"other,omitempty"` // a free-text answer is taken besides the options
-	Asked    time.Time `json:"asked"`
-	Outcome  *Outcome  `json:"outcome,omitempty"`
-}
-
-// Outcome is the recorded answer. Won is true only in the response to the answer that won.
-type Outcome struct {
-	ID     string    `json:"id"`
-	Answer string    `json:"answer"`
-	By     string    `json:"by"`
-	At     time.Time `json:"at"`
-	Won    bool      `json:"won"`
-}
-
-// State is GET /v1/state.
-type State struct {
-	PID     int        `json:"pid"`
-	Started time.Time  `json:"started"`
-	LastSeq int64      `json:"last_seq"`
-	Pending []Decision `json:"pending"`
-	Serve   any        `json:"serve,omitempty"`
-	Version string     `json:"version,omitempty"`
-}
-
 // Server serves the API over one store.
 type Server struct {
 	// Connectors builds the chat connectors from the current config (nil: connect.FromConfig).
