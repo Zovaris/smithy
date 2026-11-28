@@ -20,12 +20,13 @@ import (
 
 // Shell runs cmd with sh -c (cmd /C on Windows) in dir (home when empty) and returns its
 // combined output and exit code; a timeout kills it.
-func Shell(ctx context.Context, dir, cmd string) (string, int, error) {
+func Shell(ctx context.Context, dir, cmd string, env []string) (string, int, error) {
 	c := exec.CommandContext(ctx, "sh", "-c", cmd)
 	if runtime.GOOS == "windows" {
 		c = exec.CommandContext(ctx, "cmd", "/C", cmd)
 	}
 	c.Dir = dirOr(dir)
+	c.Env = append(os.Environ(), env...)
 	c.WaitDelay = 5 * time.Second
 	out := &capped{}
 	c.Stdout, c.Stderr = out, out
@@ -52,7 +53,8 @@ func dirOr(dir string) string {
 
 // Agent runs one read-only agent through `smithy agent --profile auto` (the unattended
 // allow-list and auto.sandbox, failing closed) and returns its answer and known cost.
-func Agent(ctx context.Context, dir, prompt string, timeout time.Duration) (string, float64, error) {
+func Agent(ctx context.Context, a AgentCall) (string, float64, error) {
+	dir, prompt, timeout := a.Dir, a.Prompt, a.Timeout
 	exe, err := os.Executable()
 	if err != nil {
 		return "", 0, err
@@ -70,8 +72,14 @@ func Agent(ctx context.Context, dir, prompt string, timeout time.Duration) (stri
 	if mins < 1 {
 		mins = 1
 	}
-	c := exec.CommandContext(ctx, exe, "agent", "--readonly", "--profile", "auto", "--timeout", strconv.Itoa(mins),
-		"--cwd", dirOr(dir), "--log", log, pf)
+	args := []string{"agent", "--readonly", "--profile", "auto", "--timeout", strconv.Itoa(mins), "--cwd", dirOr(dir), "--log", log}
+	if a.Model != "" {
+		args = append(args, "--model", a.Model)
+	}
+	if a.Effort != "" {
+		args = append(args, "--effort", a.Effort)
+	}
+	c := exec.CommandContext(ctx, exe, append(args, pf)...)
 	c.Dir = dirOr(dir)
 	c.WaitDelay = 5 * time.Second
 	var out, errb bytes.Buffer

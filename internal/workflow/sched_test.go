@@ -11,10 +11,7 @@ func TestSchedulerTickRunsDueOnce(t *testing.T) {
 	w, _ := Parse([]byte(simple))
 	s.Save(w)
 	s.Enable("hello", at("2026-11-27 10:00"))
-	f := &fake{shell: map[string]struct {
-		out  string
-		exit int
-	}{"echo hi": {"hi\n", 0}}}
+	f := &fake{shell: map[string]shellOut{"echo hi": {"hi\n", 0}}}
 	sc := &Scheduler{Store: s, Env: f.env()}
 	sc.Tick(context.Background(), at("2026-11-27 17:00"))
 	sc.Wait()
@@ -24,7 +21,7 @@ func TestSchedulerTickRunsDueOnce(t *testing.T) {
 		t.Fatalf("ran %d times", len(f.ran))
 	}
 	h, _ := s.History("hello", 5)
-	if len(h) != 1 || h[0].Trigger != "schedule" || h[0].Steps[0].Output != "hi\n" {
+	if len(h) != 1 || h[0].Trigger != TriggerSchedule || h[0].Steps[0].Output != "hi\n" {
 		t.Fatalf("%+v", h)
 	}
 }
@@ -33,10 +30,7 @@ func TestSchedulerRunNowDisabledAndBusy(t *testing.T) {
 	s := Store{Dir: t.TempDir()}
 	w, _ := Parse([]byte(simple))
 	s.Save(w)
-	f := &fake{shell: map[string]struct {
-		out  string
-		exit int
-	}{}}
+	f := &fake{shell: map[string]shellOut{}}
 	sc := &Scheduler{Store: s, Env: f.env()}
 	r, err := sc.RunNow(context.Background(), "hello", "cli")
 	if err != nil || r.Status != StatusOK || r.Trigger != "cli" {
