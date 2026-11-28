@@ -158,7 +158,7 @@ func TestSessionLinksLiveFromPRsBranchPromptAndLink(t *testing.T) {
 	if e := sv.Links.every(id); e != time.Minute {
 		t.Fatalf("a change resets the backoff, got %v", e)
 	}
-	for _, bad := range []string{`{"ref":"rm -rf"}`, `{"ref":"https://evil.com/x"}`, `{"ref":""}`} {
+	for _, bad := range []string{`{"ref":"rm -rf"}`, `{"ref":"file:///etc/passwd"}`, `{"ref":""}`} {
 		if code, _ := post(t, url+"/v1/sessions/"+id+"/links", bad); code != 400 {
 			t.Fatalf("%s: %d, want 400", bad, code)
 		}

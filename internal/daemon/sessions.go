@@ -101,6 +101,7 @@ type live struct {
 	stopped  bool
 	lastDiff string
 	links    *SessionLinks
+	hidden   []string // links removed by hand (session_unlink)
 	mail     []Mail
 	sent     []time.Time
 	goalBase float64
@@ -191,7 +192,7 @@ func (sv *Server) applySession(e store.Event) {
 		if json.Unmarshal(e.Data, &t) == nil {
 			sv.notePRsLocked(e.Session, t)
 		}
-	case KindSessionLink, KindSessionLinks:
+	case KindSessionLink, KindSessionLinks, KindSessionUnlink:
 		sv.applyLinks(e)
 	case KindSessionMail:
 		sv.applyMailLocked(e)
@@ -657,7 +658,7 @@ func (e *emitter) Ask(ctx context.Context, question string, options []string) (s
 	}
 	l.asks++
 	id := "perm:" + e.id + "/" + strconv.Itoa(l.asks)
-	d := Decision{ID: id, Question: line1(question, MaxQuestion), Options: options, Asked: time.Now().UTC()}
+	d := Decision{ID: id, Question: line1(question, MaxQuestion), Options: options, Asked: time.Now().UTC(), Session: e.id}
 	if _, err := sv.appendLocked(KindAsked, e.id, d); err != nil {
 		sv.mu.Unlock()
 		return "", err
