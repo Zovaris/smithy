@@ -113,7 +113,7 @@ func TestDaemonNoiseGoesToStatusLineNotTranscript(t *testing.T) {
 	m = chatStep(m, ckey("/"))
 	m = typeIn(m, "log")
 	m = chatStep(m, ckey("enter"))
-	if !strings.Contains(screen(m), "daemon_up") {
+	if !strings.Contains(screen(m), "daemon up") {
 		t.Fatalf("/log does not show the daemon log:\n%s", screen(m))
 	}
 }

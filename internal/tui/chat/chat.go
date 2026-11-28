@@ -4,6 +4,7 @@
 package chat
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -788,7 +789,24 @@ func eventText(kind, session string, data json.RawMessage) string {
 		if json.Unmarshal(data, &d) == nil {
 			return kit.Clean(d.Line)
 		}
+	case daemon.KindWorkflowRun:
+		var r struct{ Workflow, Status, Error string }
+		if json.Unmarshal(data, &r) != nil || r.Workflow == "" {
+			return ""
+		}
+		return strings.TrimSpace("workflow " + r.Workflow + " " + r.Status + " " + r.Error)
+	case "event":
+		var e struct{ Kind, Batch, Item, Detail string }
+		if json.Unmarshal(data, &e) != nil || e.Kind == "" {
+			return ""
+		}
+		what := strings.TrimSpace(strings.ReplaceAll(e.Kind, "_", " ") + " " + e.Detail)
+		if who := cmp.Or(e.Item, e.Batch); who != "" {
+			return who + " · " + what
+		}
+		return what
 	}
+	kind = strings.ReplaceAll(kind, "_", " ")
 	if session != "" {
 		return kind + " " + session
 	}

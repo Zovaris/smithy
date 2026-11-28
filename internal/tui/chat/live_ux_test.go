@@ -135,3 +135,22 @@ func TestGoalMetMarkerIsHidden(t *testing.T) {
 		t.Fatalf("the marker line is hidden, the reply kept:\n%s", out)
 	}
 }
+
+func TestStatusLineNamesEventsInWords(t *testing.T) {
+	cases := map[string][2]string{
+		"workflow_run": {`{"workflow":"repo-health","status":"running","trigger":"tui"}`, "workflow repo-health running"},
+		"event":        {`{"kind":"ci","item":"TK-1","detail":"red"}`, "TK-1 · ci red"},
+	}
+	for kind, c := range cases {
+		got := eventText(kind, "", []byte(c[0]))
+		if got != c[1] {
+			t.Errorf("%s: got %q want %q", kind, got, c[1])
+		}
+	}
+	if got := eventText("event", "", []byte(`{}`)); got != "" {
+		t.Errorf("an empty event says nothing, got %q", got)
+	}
+	if got := eventText("some_kind", "", nil); got != "some kind" {
+		t.Errorf("an unknown kind reads as words, got %q", got)
+	}
+}
