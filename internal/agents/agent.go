@@ -571,7 +571,7 @@ func jsonResult(argv []string) bool {
 
 // finish rewrites a claude json log to text and records its usage: the sidecar next to a named
 // log and a "usage" event (batch and item from a <warden home>/<batch>/<item>.log path).
-func finish(log string, named bool, account string) {
+func finish(log string, named bool, base events.Event) {
 	u, ok := usage.Finish(log)
 	if !named {
 		os.Remove(usage.Sidecar(log))
@@ -579,7 +579,8 @@ func finish(log string, named bool, account string) {
 	if !ok {
 		return
 	}
-	e := events.Event{Kind: "usage", Usage: &u, Account: account}
+	e := base
+	e.Kind, e.Usage = "usage", &u
 	if named {
 		e.Detail = filepath.Base(log)
 		if dir := filepath.Dir(log); realPath(filepath.Dir(dir)) == realPath(layout.WardenHome()) {
@@ -890,7 +891,7 @@ func Run(o Options) int {
 	out.Close()
 	hit := acct.Name != "" && limited(acct, out.Name(), Kind(cli), rc)
 	if asJSON {
-		finish(out.Name(), o.Log != "", o.Account)
+		finish(out.Name(), o.Log != "", events.Event{Account: o.Account, Agent: Kind(cli), Model: o.Model})
 	}
 	if hit {
 		if len(o.poolSkip) == 0 && (o.ReadOnly || untouched(o.Cwd, o.poolStart)) {

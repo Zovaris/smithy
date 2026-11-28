@@ -21,6 +21,7 @@ import (
 	"github.com/Zovaris/smithy/internal/agents"
 	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/Zovaris/smithy/internal/config"
+	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/proof"
 	"github.com/Zovaris/smithy/internal/store"
@@ -645,17 +646,24 @@ func (e *emitter) Tool(t ToolEvent) {
 func (e *emitter) Usage(u usage.Usage) {
 	sv := e.sv
 	sv.mu.Lock()
-	defer sv.mu.Unlock()
 	if _, err := sv.appendLocked(KindSessionUsage, e.id, u); err != nil {
+		sv.mu.Unlock()
 		return
 	}
+	ev := events.Event{Kind: "usage", Usage: &u, Session: e.id}
 	if l := sv.sessions[e.id]; l != nil {
 		t := u
 		if l.s.Usage != nil {
 			t = l.s.Usage.Add(u)
 		}
 		l.s.Usage = &t
+		ev.Agent, ev.Model = l.s.Agent, l.s.Model
 	}
+	sv.mu.Unlock()
+	if ev.Agent == "" {
+		ev.Agent = "default"
+	}
+	_ = events.Append(ev)
 }
 
 // Ask records a decision perm:<session>/<n> and waits for its answer; the session shows
