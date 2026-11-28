@@ -125,3 +125,13 @@ func TestSlashOnAListGoesToTheInput(t *testing.T) {
 		t.Fatalf("/ leaves the list for the input: runs %v overlay %v input %q", f.runs, m.overlay, m.input.Value())
 	}
 }
+
+func TestGoalMetMarkerIsHidden(t *testing.T) {
+	m := newChatTest(0)
+	m.width, m.height = 120, 30
+	m.push(chatMsg{who: "agent", text: "all tests pass\nGOAL MET: go test ./... ok"})
+	out := screen(m)
+	if strings.Contains(out, "GOAL MET") || !strings.Contains(out, "all tests pass") {
+		t.Fatalf("the marker line is hidden, the reply kept:\n%s", out)
+	}
+}

@@ -861,6 +861,7 @@ func (m chatView) textRows(c *chatMsg, w int) []string {
 	switch {
 	case c.who == "agent":
 		body = t.Fg(t.Strong)
+		text = hideGoalMark(text)
 	case c.kind == "thinking":
 		body = t.Fg(t.Dim).Italic(true)
 		text = "thinking " + t.G.Dot + " " + text

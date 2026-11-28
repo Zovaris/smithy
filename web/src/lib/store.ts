@@ -37,12 +37,14 @@ export const blank = (): Store => ({ last: 0, order: [], sessions: {}, convo: {}
 const obj = (d: unknown): Record<string, any> => (d && typeof d === "object" ? (d as Record<string, any>) : {});
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 // prose drops the machine lines a CLI agent's log can leak into its text (one JSON object per
-// line, stream-json); people never write those, so the conversation keeps only what reads.
+// line, stream-json); people never write those, so the conversation keeps only what reads. It
+// drops a goal turn's GOAL MET: line too: the "goal met" line says it.
 export function prose(t: string): string {
   return t
     .split("\n")
     .filter((l) => {
       const x = l.trim();
+      if (x.startsWith("GOAL MET:")) return false;
       if (!x.startsWith("{") || !x.endsWith("}")) return true;
       try {
         return typeof JSON.parse(x) !== "object";

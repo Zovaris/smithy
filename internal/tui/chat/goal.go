@@ -107,3 +107,15 @@ func (m chatView) goalTag() string {
 	}
 	return tag
 }
+
+// hideGoalMark drops the GOAL MET: line a goal turn ends with; the "goal met" line says it.
+func hideGoalMark(text string) string {
+	lines := strings.Split(text, "\n")
+	out := lines[:0]
+	for _, l := range lines {
+		if !strings.HasPrefix(strings.TrimSpace(l), "GOAL MET:") {
+			out = append(out, l)
+		}
+	}
+	return strings.TrimRight(strings.Join(out, "\n"), "\n")
+}
