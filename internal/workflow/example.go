@@ -83,8 +83,8 @@ const exampleShipFix = `{
     {"id": "diff", "kind": "run", "run": "git diff HEAD~1 --stat && git diff HEAD~1"},
     {"id": "review", "kind": "judge", "subject": "{{steps.diff.output}}", "pass": 0.7,
      "criteria": ["fixes the bug described: {{inputs.bug}}", "adds a test that fails without the fix", "changes nothing unrelated"]},
-    {"id": "ok", "kind": "ask", "question": "Open a PR for the fix? Review: {{steps.review.answer}}. {{steps.review.why}}", "options": ["yes", "no"], "timeout": "24h"},
-    {"id": "open", "kind": "github", "action": "pr", "when": {"step": "ok", "equals": "yes"},
+    {"id": "approve", "kind": "ask", "question": "Open a PR for the fix? Review: {{steps.review.answer}}. {{steps.review.why}}", "options": ["yes", "no"], "timeout": "24h"},
+    {"id": "open", "kind": "github", "action": "pr", "when": {"step": "approve", "equals": "yes"},
      "title": "fix: {{inputs.bug}}", "body": "Opened by the ship-a-fix workflow.\n\nReview: {{steps.review.why}}"}
   ]
 }
