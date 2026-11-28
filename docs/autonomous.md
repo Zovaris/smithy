@@ -68,6 +68,17 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   the decision `perm:<id>/<n>` (allow/deny) and the session shows `needs_you` until someone
   answers; the secret rules are never asked. Other agents run `smithy agent` once per turn with
   the conversation so far in the prompt. A reply in a session's chat thread is its next message.
+- Session bus: a CLI session's turns get `SMITHY_SESSION` and a secret `SMITHY_SESSION_KEY` (in
+  daemon memory only; a restart gives new keys). With the key in `X-Smithy-Session-Key` (and the
+  daemon token): `POST /v1/bus/start` (`{"agent","model","dir","message"}`: a child session in the
+  caller's project; it records `parent` and takes the parent's agent, model and effort unless the request names an agent), `POST /v1/bus/send` (`{"to","text"}`, `to` a session id
+  or `parent`, text up to 16 KB) and `GET /v1/bus/inbox?since=<n>`. Only family talks (parent,
+  child, sibling) and only inside one project; anything else is 403. An idle receiver gets the
+  message as a new turn, a busy one after its current turn (up to 8 queued); a session sends at most 20 messages a minute. The turn frames it as
+  data from another agent that never overrides the receiver's rules. `session_mail`
+  (`{"n","from","to","text"}`) streams on `/v1/events`; `GET /v1/sessions/{id}/mail` lists a
+  session's sent and received mail. The TUI agents panel and the web panel draw children under
+  their parent; both conversations show the message (`←` received, `→` sent).
   At most 16 sessions working at once and 8 queued messages each (429 past that); a permission question shows the whole call, and tool output and text are redacted before they are stored.
 - Setup: `GET /v1/setup` lists every agent CLI and API key as ready or missing with its fix, the
   default agent and model (`chosen` is false until one is picked or used: first run), the kit
@@ -182,7 +193,8 @@ own per-run config (never your global one): `search` over the working folder, `b
 `board_show`, `board_claim` and `board_set`, `secret_call` to call an API with a key you bound
 with `smithy auth bind` (the agent never sees the key; writes follow the bind's methods and asks),
 and `ask`, which puts a decision on the run's warden card and waits for your answer from the TUI,
-web or chat. `--readonly` runs get search and board reads only.
+web or chat. In a daemon session it also gets `send`, `inbox` and `start_session` (the session
+bus above). `--readonly` runs get search and board reads only.
 
 ## Notifications
 

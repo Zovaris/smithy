@@ -9,6 +9,7 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+- Daemon sessions can message each other: a session can start a child, and parent, children and siblings in one project send notes with the `send` tool. A note wakes an idle session or waits for a busy one; the TUI and web show the tree and the notes.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
 - The chat header shows the tend mode and how many PRs it tends.
 - `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.
@@ -18,6 +19,7 @@ part above `### Details`.
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
 
 ### Details
+- Session bus: `Session.parent`, `session_mail` events, `POST /v1/bus/start|send`, `GET /v1/bus/inbox` and `GET /v1/sessions/{id}/mail`, keyed per session by `SMITHY_SESSION_KEY` (memory only); `smithy mcp` adds `send`, `inbox` and `start_session` when the key is set. Bus messages reach the agent framed as data.
 - TUI: `infoPanel.set` holds one setting row cycled with left/right; `doctorPanel` groups `smithy doctor` output; the header reads `GET /v1/tend` once a minute.
 
 - `/board` in the TUI chat shows your task files by status, like the web Board: move a task with
