@@ -58,11 +58,12 @@ command, ok or exit N, how long it took and the output, folded after 20 lines.
 | Command | What it does |
 |---|---|
 | `/new` | start a new session; your next message opens it |
-| `/sessions` | agents and sessions: open, stop, see what waits on you |
+| `/sessions`, `/agents` | agents and sessions: open, stop, see what waits on you (in the web, `/agents` opens the Agents page) |
 | `/agent [name]` | the agent new sessions start with |
 | `/model [name]` | the model of the open session, else new sessions |
 | `/effort [off\|low\|medium…]` | reasoning effort: the open session's, else the next session's (`agent.effort`) |
 | `/goal [text\|clear]` | pin a goal on the open session; the daemon continues it until the agent ends a reply with `GOAL MET: <evidence>` or `GOAL BLOCKED: <question>`, or a cap (`session.goal_max_turns`, `session.goal_max_cost`) stops it |
+| `/config [filter]`, `/settings` | every setting in one modal, filtered as you type; in the web, `/settings` opens the Settings page |
 | `/skills` | skills and MCP injected into every session |
 | `/name` or `$name` | run an installed skill on the rest of the line |
 | `/theme [steel\|frost\|plum\|moss\|dune\|dusk\|rose]` | color theme, shared with the web (`ui.theme`) |
@@ -91,7 +92,7 @@ command, ok or exit N, how long it took and the output, folded after 20 lines.
 | `/welcome` | walk the first-run steps again |
 | `/setup` | every agent, ready or missing, with its fix |
 | `/help` | keys and commands |
-| `/agents`, `/decisions`, `/bench`, `/settings` | web only: open that page of the web UI |
+| `/decisions`, `/bench` | web only: open that page of the web UI |
 | `/detach` | quit and leave the daemon running |
 | `/quit` | leave; a background daemon keeps running |
 
