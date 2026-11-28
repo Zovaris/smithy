@@ -265,6 +265,13 @@ func (c *Client) SetSessionModel(ctx context.Context, id, model, effort string) 
 	return s, err
 }
 
+// SetSessionGoal is PUT /v1/sessions/{id}/goal: the goal the daemon continues it toward ("" clears).
+func (c *Client) SetSessionGoal(ctx context.Context, id, goal string) (Session, error) {
+	var s Session
+	err := c.call(ctx, "PUT", "/v1/sessions/"+url.PathEscape(id)+"/goal", map[string]string{"goal": goal}, &s)
+	return s, err
+}
+
 // Sessions is GET /v1/sessions.
 func (c *Client) Sessions(ctx context.Context) (SessionList, error) {
 	var l SessionList

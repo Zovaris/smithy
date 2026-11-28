@@ -26,10 +26,10 @@ var bools = map[string]bool{"auto.paused": true, "auto.retry_stronger": true, "a
 
 var numbers = map[string]bool{"warden.max": true, "warden.stuck_minutes": true, "ask.timeout": true, "agent.timeout": true,
 	"watch.every": true, "watch.max": true, "decide.timeout": true, "auto.max_per_day": true, "auto.every": true, "auto.session_hours": true,
-	"auto.max_cost_per_day": true}
+	"auto.max_cost_per_day": true, "session.goal_max_turns": true, "session.goal_max_cost": true}
 
 // decimals are read with ParseFloat; the other numbers with Atoi.
-var decimals = map[string]bool{"auto.max_cost_per_day": true, "watch.every": true, "watch.max": true, "auto.session_hours": true,
+var decimals = map[string]bool{"auto.max_cost_per_day": true, "session.goal_max_cost": true, "watch.every": true, "watch.max": true, "auto.session_hours": true,
 	"warden.stuck_minutes": true, "agent.timeout": true, "ask.timeout": true}
 
 // atLeastOne are whole numbers the code rejects below 1.

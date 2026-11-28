@@ -76,7 +76,8 @@ func (m chatView) header(w int) []string {
 		project = filepath.Base(m.dir)
 	}
 	pill := m.pill
-	if tag := m.tendTag(); tag != "" {
+	if tag := strings.TrimPrefix(strings.Join([]string{m.goalTag(), m.tendTag()}, "  "), "  "); strings.TrimSpace(tag) != "" {
+		tag = strings.TrimSpace(tag)
 		pill = func(bar lipgloss.Style) string {
 			return bar.Foreground(m.th.dim).Render(tag) + bar.Render("  ") + m.pill(bar)
 		}

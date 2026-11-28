@@ -64,6 +64,7 @@ type chatSession struct {
 	id, kind, state          string
 	title, agent, model, now string
 	effort                   string
+	goal, goalState          string
 	dir                      string // the folder it started in; "" for batch events
 	prs                      []string
 	since, turn              time.Time
@@ -314,6 +315,8 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.modelCommand(arg)
 	case "effort":
 		return m.effortCommand(arg)
+	case "goal":
+		return m.goalCommand(arg)
 	case "theme":
 		return m.themeCommand(arg)
 	case "skills":

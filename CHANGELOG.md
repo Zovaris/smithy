@@ -9,6 +9,8 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+- `/goal <text>` pins a goal on the open session, in the TUI and the web composer: each turn carries it, and the daemon keeps the session going until the agent reports it met with evidence, asks you, or hits `session.goal_max_turns` / `session.goal_max_cost`. `/goal` shows it, `/goal clear` drops it; only you set it.
+- New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 
 - New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 - An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
