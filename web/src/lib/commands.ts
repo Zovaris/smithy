@@ -34,6 +34,7 @@ const HINTS: Record<string, string> = {
   doctor: "smithy doctor",
   prompt: "system prompt file",
   tend: "PRs kept green",
+  channels: "chat channels, test-send",
   settings: "settings",
 };
 
