@@ -45,7 +45,8 @@ const (
 	overlayInfo    // /connect, /remote, /web, /log
 	overlayProject // which project a new session starts in
 	overlayWelcome
-	overlayBoard // /board: the task files by status
+	overlayBoard     // /board: the task files by status
+	overlayWorkflows // /workflows: the scheduled workflows
 )
 
 // chatTool is the data of a "tool" event: one tool call of a session's turn.
@@ -357,6 +358,8 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.detach()
 	case "board", "tasks":
 		return m.openBoard(arg)
+	case "workflows", "workflow":
+		return m.openWorkflows()
 	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "prompt":
 		return m.settingsCommand(name, arg)
 	case "quit":
@@ -448,6 +451,8 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.projectKey(k)
 	case overlayBoard:
 		return m.boardKey(k)
+	case overlayWorkflows:
+		return m.workflowsKey(k)
 	case overlayHelp, overlayInfo:
 		if p := m.info.set; p != nil && m.overlay == overlayInfo {
 			switch k {
@@ -583,6 +588,7 @@ func (m chatView) palItems() []palItem {
 		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Verbosity: " + m.mode.String(), hint: "minimal · expandable · verbose", key: "ctrl+o", run: cycle},
 		palItem{group: "ACTIONS", glyph: t.g.on, color: t.muted, label: "Agents panel", hint: "sessions and waiting items", key: "tab", run: agents},
 		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Board", hint: "the task files by status", key: "/board", run: func(m *chatView) tea.Cmd { n, c := m.openBoard(""); *m = n.(chatView); return c }},
+		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Workflows", hint: "scheduled runs: run now, on/off, history", key: "/workflows", run: func(m *chatView) tea.Cmd { n, c := m.openWorkflows(); *m = n.(chatView); return c }},
 		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Open the web UI", hint: "same sessions in the browser", key: "/web", run: func(m *chatView) tea.Cmd { _, c := m.openWeb(); return c }},
 		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Connect", hint: strings.TrimPrefix(m.server+" "+t.g.dot+" "+m.url, " "+t.g.dot+" "), key: "/connect", run: func(m *chatView) tea.Cmd { return m.showConnect() }},
 		palItem{group: "ACTIONS", glyph: t.g.dot, color: t.muted, label: "Daemon log", hint: fmt.Sprintf("%d events", len(m.noise)), key: "/log", run: func(m *chatView) tea.Cmd { m.showLog(); return nil }},
