@@ -151,11 +151,25 @@ func TestConfigFullscreenWithADetailPane(t *testing.T) {
 	if w := ansi.StringWidth(lines[1]); w < 196 {
 		t.Fatalf("fullscreen spans the screen: %d", w)
 	}
+	if !strings.Contains(ansi.Strip(screen(m)), "fullscreen") {
+		t.Fatalf("the key hints stay on screen in fullscreen:\n%s", screen(m))
+	}
 	if !strings.Contains(ansi.Strip(screen(m)), "Default") {
 		t.Fatalf("the detail pane names the default:\n%s", screen(m))
 	}
 	m = cpress(m, ckey("f"))
 	if m.cfgFull {
 		t.Fatal("f again leaves fullscreen")
+	}
+}
+
+func TestConfigEditorHintsMatchItsKind(t *testing.T) {
+	m := cpress(selectKey(t, configChat(knownRows()...), "tend.daemon"), ckey("enter"))
+	if strings.Contains(ansi.Strip(screen(m)), "space check") {
+		t.Fatal("a picker has nothing to check")
+	}
+	m = cpress(selectKey(t, configChat(knownRows()...), "notify.kinds"), ckey("enter"))
+	if !strings.Contains(ansi.Strip(screen(m)), "space check") {
+		t.Fatal("a multi-select says space checks")
 	}
 }

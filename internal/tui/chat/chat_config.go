@@ -327,7 +327,7 @@ func (m chatView) configBox(screen []string, w, h int) []string {
 	bw := max(min(110, w-6), min(w, 40))
 	bh := max(min(h-4, 44), 14)
 	if m.cfgFull {
-		bw, bh = w, h
+		bw, bh = w, h-2
 	}
 	lw := bw
 	if m.cfgFull && bw >= 100 {
@@ -448,7 +448,10 @@ func (m chatView) configBox(screen []string, w, h int) []string {
 	}
 	hints := "  " + keyHints(t, "↑↓", "move", "←→", "change", "enter", "pick or edit", "f", "fullscreen", "type", "filter", "esc", "close") + "   " + t.Fg(t.Accent).Render("•") + t.Fg(t.Dim).Render(" changed")
 	if m.cfgEd != nil {
-		hints = "  " + keyHints(t, "↑↓", "move", "space", "check", "enter", "save", "esc", "cancel")
+		hints = "  " + keyHints(t, "↑↓", "move", "enter", "save", "esc", "cancel")
+		if m.cfgEd.kind == "multi" {
+			hints = "  " + keyHints(t, "↑↓", "move", "space", "check", "enter", "save", "esc", "cancel")
+		}
 		if m.cfgEd.kind == "text" {
 			hints = "  " + keyHints(t, "type", "edit", "ctrl+u", "clear", "enter", "save", "esc", "cancel")
 		}
