@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import popup from "../../../internal/tui/chat_popup.go?raw";
+import popup from "../../../internal/tui/chat/chat_popup.go?raw";
 import slash from "../features/chat/slash.ts?raw";
 import { ACTIONS, action, suggest } from "./commands";
 import { nextDetail } from "./detail";

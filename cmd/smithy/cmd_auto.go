@@ -3,7 +3,8 @@ package main
 import (
 	"github.com/Zovaris/smithy/internal/auto"
 	_ "github.com/Zovaris/smithy/internal/linear"
-	"github.com/Zovaris/smithy/internal/tui"
+	"github.com/Zovaris/smithy/internal/tui/kit"
+	"github.com/Zovaris/smithy/internal/tui/stats"
 )
 
 func init() {
@@ -19,8 +20,8 @@ var serveMain = auto.ServeMain
 
 func autoMain(args []string) int {
 	if len(args) > 0 && args[0] == "serve" {
-		tui.Version = version
-		return serveMain(args[1:], tui.RunServeView)
+		kit.Version = version
+		return serveMain(args[1:], stats.RunServeView)
 	}
 	return auto.Main(args)
 }

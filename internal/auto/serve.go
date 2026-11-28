@@ -644,7 +644,7 @@ func defaultSandboxReady(agent string) error {
 }
 
 // View draws the live serve view until done closes or the user stops serve; logs carries each
-// event line. smithy wires tui.RunServeView here (charm modules stay in internal/tui).
+// event line. smithy wires stats.RunServeView here (charm modules stay in internal/tui).
 type View func(done <-chan struct{}, sv *Server, logs <-chan string) error
 
 // Hooks let smithy daemon wrap the serve loop: Tap sees every event line; Started runs once the
