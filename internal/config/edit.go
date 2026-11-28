@@ -19,6 +19,7 @@ var enums = map[string][]string{
 	"auto.mode":      {"labeled", "all"},
 	"auto.sandbox":   {"off", "native"},
 	"tend.daemon":    {"off", "watch", "fix"},
+	"notify.style":   {"emoji", "plain"},
 	"ui.theme":       {"steel", "frost", "plum", "moss", "dune", "dusk", "rose"},
 }
 
