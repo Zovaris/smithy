@@ -24,6 +24,11 @@ describe("fold", () => {
     expect(s.log.length).toBe(200);
     expect(s.log[199]).toBe("daemon: 204");
   });
+  it("keeps workflow notifications, newest last and at most 20", () => {
+    const s = run(...Array.from({ length: 22 }, (_, i) => ev("workflow_note", { workflow: "d", title: "t" + i, text: "why" }, "")));
+    expect(s.notes.length).toBe(20);
+    expect(s.notes[19]).toEqual({ at: "2026-11-25T10:00:00Z", workflow: "d", title: "t21", text: "why" });
+  });
   it("pins a session's goal and notes each change in the conversation", () => {
     const s = run(started(), ev("session_goal", { goal: "ship it" }), ev("session_goal", { goal: "ship it", state: "met", turns: 2 }));
     expect([s.sessions["s-1"].goal, s.sessions["s-1"].goal_state]).toEqual(["ship it", "met"]);

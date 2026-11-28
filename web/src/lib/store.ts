@@ -25,9 +25,12 @@ export type Store = {
   diffs: Record<string, Diff>;
   decisions: Dec[];
   log: string[];
+  notes: Note[];
 };
 
-export const blank = (): Store => ({ last: 0, order: [], sessions: {}, convo: {}, diffs: {}, decisions: [], log: [] });
+export type Note = { at: string; workflow: string; title: string; text: string };
+
+export const blank = (): Store => ({ last: 0, order: [], sessions: {}, convo: {}, diffs: {}, decisions: [], log: [], notes: [] });
 
 const obj = (d: unknown): Record<string, any> => (d && typeof d === "object" ? (d as Record<string, any>) : {});
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -166,6 +169,10 @@ export function fold(s: Store, e: Ev): Store {
         turn.parts.push({ kind: "decision", id: did });
         next.convo = { ...s.convo, [sid]: items };
       }
+      return next;
+    }
+    case "workflow_note": {
+      next.notes = [...s.notes, { at, workflow: str(d.workflow), title: str(d.title), text: str(d.text) }].slice(-20);
       return next;
     }
     case "log": {

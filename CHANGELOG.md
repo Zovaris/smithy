@@ -9,6 +9,7 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+- Scheduled workflows: a cron schedule and steps that run a command, ask an agent, branch on the result and notify you. `smithy workflow`, `/workflows` in the TUI and a Workflows page on the web run one now, turn it on or off, edit it and show each run's steps. `smithy workflow example` adds a daily Dependabot check whose agent tells you whether to merge, and why.
 - Daemon sessions can message each other: a session can start a child, and parent, children and siblings in one project send notes with the `send` tool. A note wakes an idle session or waits for a busy one; the TUI and web show the tree and the notes.
 - `/goal <text>` pins a goal on the open session, in the TUI and the web composer: each turn carries it, and the daemon keeps the session going until the agent reports it met with evidence, asks you, or hits `session.goal_max_turns` / `session.goal_max_cost`. `/goal` shows it, `/goal clear` drops it; only you set it.
 - New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
@@ -24,6 +25,7 @@ part above `### Details`.
 
 ### Details
 
+- workflow: new `internal/workflow` (own cron parser, `run`/`agent`/`if`/`notify` steps, store in `~/.smithy/workflows` with the enable pinned to the file's sha256, runs in `runs/<name>/`, 50 kept); daemon ticks it every minute and serves `GET /v1/workflows[/{name}]`, `PUT /v1/workflows/{name}`, `POST /v1/workflows/{name}/run|enable|disable` (writes local-only); notify steps are `workflow_note` store events sent to connectors as kind `workflow`; docs in `docs/workflows.md`.
 - TUI: the top decision strip is gone; the question card (`overlayAsk`) opens when a decision arrives and the composer is empty, or on enter with an empty composer or `/answer`; 1-9, arrows and enter, space on multi-select, esc for later. The pill reads "waiting on you".
 - daemon: decisions carry `multi` and `other`; `/v1/asks` takes `multi` and accepts free text for every non-guard question; the MCP `ask` tool gains a `multi` flag.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
