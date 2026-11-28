@@ -26,7 +26,7 @@ func (f *fakeFlows) Workflow(_ context.Context, name string) (daemon.WorkflowDet
 		Steps: []workflow.StepResult{{ID: "judge", Kind: "agent", Answer: "yes", Why: "patch bump"}}}}}, nil
 }
 
-func (f *fakeFlows) RunWorkflow(_ context.Context, name, via string) error {
+func (f *fakeFlows) RunWorkflow(_ context.Context, name, via string, _ map[string]string) error {
 	f.runs = append(f.runs, name+"@"+via)
 	return nil
 }

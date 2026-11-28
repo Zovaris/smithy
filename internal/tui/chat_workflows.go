@@ -18,7 +18,7 @@ import (
 type workflowAPI interface {
 	Workflows(ctx context.Context) (daemon.WorkflowList, error)
 	Workflow(ctx context.Context, name string) (daemon.WorkflowDetail, error)
-	RunWorkflow(ctx context.Context, name, via string) error
+	RunWorkflow(ctx context.Context, name, via string, inputs map[string]string) error
 	SetWorkflow(ctx context.Context, name string, on bool) (workflow.Info, error)
 }
 
@@ -181,7 +181,7 @@ func (m chatView) workflowsKey(k string) (tea.Model, tea.Cmd) {
 	case "r":
 		m.status("running " + in.Name)
 		return m, func() tea.Msg {
-			return workflowDoneMsg{what: "started", name: in.Name, err: api.RunWorkflow(context.Background(), in.Name, "tui")}
+			return workflowDoneMsg{what: "started", name: in.Name, err: api.RunWorkflow(context.Background(), in.Name, "tui", nil)}
 		}
 	case "enter":
 		return m, func() tea.Msg {
@@ -225,10 +225,16 @@ func (m chatView) workflowDetail(msg workflowDetailMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	d := msg.d
-	lines := []string{"-> " + d.Info.File, "#STEPS"}
-	for i, s := range d.Info.Steps {
-		lines = append(lines, fmt.Sprintf("%d. %s %s\t%s", i+1, s.Kind, s.ID, workflowStepText(s)))
+	lines := []string{"-> " + d.Info.File}
+	if d.Hook != "" {
+		lines = append(lines, "webhook\tPOST /v1/hooks/workflows/"+d.Info.Name+" with X-Smithy-Hook (smithy workflow hook "+d.Info.Name+")")
 	}
+	if d.Live != nil {
+		lines = append(lines, "#RUNNING NOW")
+		lines = append(lines, resultLines(d.Live.Steps, "")...)
+	}
+	lines = append(lines, "#STEPS")
+	lines = append(lines, stepLines(d.Info.Steps, "")...)
 	lines = append(lines, "#RUNS")
 	if len(d.History) == 0 {
 		lines = append(lines, "no runs yet: r runs it now")
@@ -239,39 +245,11 @@ func (m chatView) workflowDetail(msg workflowDetailMsg) (tea.Model, tea.Cmd) {
 			head += " · " + r.Error
 		}
 		lines = append(lines, head)
-		for _, s := range r.Steps {
-			lines = append(lines, "  "+s.ID+"\t"+workflowResultText(s))
-		}
+		lines = append(lines, resultLines(r.Steps, "  ")...)
 	}
 	m.info = infoPanel{title: d.Info.Name + " · " + d.Info.Schedule, lines: lines, scroll: true}
 	m.overlay, m.infoBack = overlayInfo, overlayWorkflows
 	return m, nil
-}
-
-func workflowStepText(s workflow.Step) string {
-	switch s.Kind {
-	case workflow.KindRun:
-		return clipLine(s.Run, 80)
-	case workflow.KindAgent:
-		return clipLine(s.Prompt, 70)
-	case workflow.KindIf:
-		return "on " + s.Step
-	}
-	return clipLine(s.Title+" "+s.Message, 80)
-}
-
-func workflowResultText(s workflow.StepResult) string {
-	switch {
-	case s.Error != "":
-		return "error: " + clipLine(s.Error, 90)
-	case s.Kind == workflow.KindIf:
-		return "→ " + s.Branch
-	case s.Answer != "":
-		return s.Answer + " " + clipLine(s.Why, 80)
-	case s.Kind == workflow.KindRun:
-		return fmt.Sprintf("exit %d · %s", s.Exit, clipLine(s.Output, 80))
-	}
-	return clipLine(s.Output, 90)
 }
 
 func clipLine(s string, n int) string {
@@ -280,4 +258,22 @@ func clipLine(s string, n int) string {
 		return string(r[:n]) + "…"
 	}
 	return s
+}
+
+func stepLines(steps []workflow.Step, indent string) []string {
+	var out []string
+	for i, s := range steps {
+		out = append(out, fmt.Sprintf("%s%d. %s %s\t%s", indent, i+1, s.Kind, s.ID, s.Summary()))
+		out = append(out, stepLines(s.Do, indent+"   ")...)
+	}
+	return out
+}
+
+func resultLines(rs []workflow.StepResult, indent string) []string {
+	var out []string
+	for _, s := range rs {
+		out = append(out, fmt.Sprintf("%s%s %s\t%s", indent, s.ID, s.Status, s.Line()))
+		out = append(out, resultLines(s.Steps, indent+"  ")...)
+	}
+	return out
 }
