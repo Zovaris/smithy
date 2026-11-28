@@ -279,7 +279,7 @@ func New(noAnim, demo bool) Model {
 	return m
 }
 
-// motionOn is false for --no-anim, SMITHY_REDUCE_MOTION, tui.reduce_motion=true or no color:
+// motionOn is false for --no-anim, SMITHY_REDUCE_MOTION, ui.reduce_motion=true or no color:
 // then every frame is static.
 func motionOn(noAnim bool, env, setting string, p colorprofile.Profile) bool {
 	return !noAnim && env == "" && setting != "true" && p != colorprofile.Ascii
