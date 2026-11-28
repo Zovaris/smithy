@@ -2,6 +2,7 @@
 // session with its status and usage, its conversation as turns, its latest diff, and every
 // decision with the session it belongs to.
 import type { Ev } from "./model";
+import type { Links } from "./links";
 
 export type Status = "working" | "needs_you" | "done" | "failed";
 export type Usage = { input_tokens?: number; output_tokens?: number; cost_usd?: number };
@@ -25,6 +26,7 @@ export type Store = {
   diffs: Record<string, Diff>;
   decisions: Dec[];
   log: string[];
+  links?: Record<string, Links>;
   notes: Note[];
 };
 
@@ -93,6 +95,10 @@ export function fold(s: Store, e: Ev): Store {
       const st: Status = STATUSES.includes(d.status) ? d.status : sess.status;
       next.sessions = { ...s.sessions, [id]: { ...sess, status: st, detail: str(d.detail), updated: at } };
       next.order = touch(s, id);
+      return next;
+    }
+    case "session_links": {
+      next.links = { ...s.links, [id]: d as Links };
       return next;
     }
     case "session_model": {

@@ -102,3 +102,11 @@ func TestDemoRunnerRefineEndsWithARefinedBlock(t *testing.T) {
 		t.Fatalf("refine turn: %q %v asked=%q tools=%v", out, err, e.asked, e.tools)
 	}
 }
+
+func TestDemoLinkerLinksAPRAndIssuesWithoutNetwork(t *testing.T) {
+	k := DemoLinker()
+	l := k.collect("s-1", t.TempDir(), nil, nil, []string{"fix the health check"})
+	if len(l.PRs) != 1 || l.PRs[0].Number != 42 || len(l.Issues) != 2 || l.Issues[0].ID != "TK-112" || l.Issues[1].ID != "#12" || l.Error != "" {
+		t.Fatalf("demo links %+v", l)
+	}
+}

@@ -1,7 +1,7 @@
 // The smithy commands the composer and the palette run here, loaded on first use: the TUI's
 // /model, /effort, /goal, /theme, /mode, /ask, /answer, /serve, /set, /unset, /key rm, the panels (/help,
-// /log, /remote, /tend) and the ones that open Settings.
-import { removeKey, runShell, sampleAsk, setServe, setSessionGoal, setSessionModel, setSetting, unsetSetting } from "../../lib/actions";
+// /log, /remote, /tend, /links) and the ones that open Settings.
+import { addLink, removeKey, runShell, sampleAsk, setServe, setSessionGoal, setSessionModel, setSetting, unsetSetting } from "../../lib/actions";
 import { ACTIONS } from "../../lib/commands";
 import { nextDetail, type Detail } from "../../lib/detail";
 import type { Info } from "../../components/info";
@@ -102,12 +102,13 @@ export function run(a: string, arg: string, ctx: Ctx): void {
   } else if (a === "help") setInfo(help());
   else if (a === "remote") setInfo(remote());
   else if (a === "log") setInfo({ title: "Log", lines: ["#DAEMON LOG · " + log.length + " EVENTS", ...(log.length ? log : ["nothing yet"])] });
-  else if (a === "tend") {
-    const side = document.querySelector<HTMLElement>(".rail:not(.sheet) #tend");
+  else if (a === "links" && arg && s) say(addLink(s.id, arg.trim()), "linked " + arg.trim());
+  else if (a === "tend" || a === "links") {
+    const side = document.querySelector<HTMLElement>(".rail:not(.sheet) #" + a);
     if (side?.offsetParent) side.scrollIntoView({ block: "start" });
     else {
       showTend();
-      setTimeout(() => document.querySelector(".rail.sheet #tend")?.scrollIntoView({ block: "start" }), 300);
+      setTimeout(() => document.querySelector(".rail.sheet #" + a)?.scrollIntoView({ block: "start" }), 300);
     }
   }
   else if (a === "key" && /^rm\s+\S+$/.test(arg)) {
