@@ -44,6 +44,9 @@ type Slack struct {
 
 func (s *Slack) Name() string { return "slack" }
 
+// MultiSelect: a multi-select decision is one multi_static_select menu.
+func (s *Slack) MultiSelect() bool { return true }
+
 func (s *Slack) scrub(v string) string {
 	for _, t := range []string{s.Token, s.AppToken} {
 		if t != "" {
@@ -129,6 +132,22 @@ func slackText(n Note) string {
 
 func slackBlocks(n Note, buttons []Button) []any {
 	blocks := []any{map[string]any{"type": "section", "text": map[string]any{"type": "mrkdwn", "text": slackText(n)}}}
+	if n.Multi && len(buttons) > 1 {
+		var opts []any
+		for i, b := range buttons {
+			if i == 100 {
+				break
+			}
+			label := clip(text.Clean(b.Label), 75)
+			if label == "" {
+				label = "-"
+			}
+			opts = append(opts, map[string]any{"value": b.Data, "text": map[string]any{"type": "plain_text", "text": label}})
+		}
+		sel := map[string]any{"type": "multi_static_select", "action_id": "smithy_multi", "options": opts,
+			"max_selected_items": len(opts), "placeholder": map[string]any{"type": "plain_text", "text": "Pick any"}}
+		return append(blocks, map[string]any{"type": "actions", "elements": []any{sel}})
+	}
 	if len(buttons) > 0 {
 		var els []any
 		for i, b := range buttons {
@@ -255,7 +274,11 @@ type slackEnvelope struct {
 			TS string `json:"ts"`
 		} `json:"message"`
 		Actions []struct {
-			Value string `json:"value"`
+			Type     string `json:"type"`
+			Value    string `json:"value"`
+			Selected []struct {
+				Value string `json:"value"`
+			} `json:"selected_options"`
 		} `json:"actions"`
 	} `json:"payload"`
 }
@@ -274,6 +297,19 @@ func (s *Slack) inbound(e slackEnvelope) []Inbound {
 			return []Inbound{{Thread: ev.ThreadTS, Text: clip(slackUnesc(ev.Text), 4000), By: ev.User}}
 		}
 	case "interactive":
+		if p.Type == "block_actions" && len(p.Actions) == 1 && p.Actions[0].Type == "multi_static_select" && s.allowed(p.Channel.ID, p.User.ID) {
+			var picks []string
+			for _, o := range p.Actions[0].Selected {
+				if len(o.Value) > 64 || strings.Contains(o.Value, ",") {
+					return nil
+				}
+				picks = append(picks, o.Value)
+			}
+			if len(picks) == 0 || len(picks) > 100 {
+				return nil
+			}
+			return []Inbound{{Picks: strings.Join(picks, ","), Ref: p.Message.TS, By: p.User.ID}}
+		}
 		if p.Type == "block_actions" && len(p.Actions) == 1 && len(p.Actions[0].Value) <= 64 && s.allowed(p.Channel.ID, p.User.ID) {
 			return []Inbound{{Button: p.Actions[0].Value, Ref: p.Message.TS, By: p.User.ID}}
 		}
