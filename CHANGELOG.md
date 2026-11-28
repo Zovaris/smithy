@@ -20,6 +20,7 @@ part above `### Details`.
 
 - New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 - An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
+- The chat survives a terminal restart where the terminal supports it (OSC 7577): it reopens on the same server and session. `smithy chat --session <id>` opens a session directly.
 - A question that takes several picks asks for them in Slack (a multi-select menu), Discord (a select menu) and Telegram (☐/☑ toggles and Done); single-pick questions keep one button per option.
 
 ### Fixed
@@ -28,6 +29,7 @@ part above `### Details`.
 - ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
 
 ### Details
+- Charm libraries: bubbletea v2.2.0; the chat view sets `ProgramResume` (exe, `chat`, its url, `--server` or `--standalone`, `--session <id>`, cwd) and drops it when quitting.
 
 - workflow: new `internal/workflow` (own cron parser; steps run, agent, if, switch, set, json, foreach, ask, notify, call; per-step when, timeout, retry, on_error; templates `{{steps.x.output}}`, `{{vars.y}}`, `{{inputs.z}}`, `{{env.Z}}` (redacted), none in run commands; workflows in `~/.smithy/workflows`, schedules in `schedules/` with the enable pinned to the schedule file plus its workflow's call tree (sha256), runs in `runs/<name>/`, 50 kept; files with `schedule`/`webhook` are migrated to a schedule); daemon ticks every minute (cron, `gh`-polled GitHub events every 5 min, file watches) and serves `/v1/workflows` (list, detail with the live run, PUT, validate, run with inputs) and `/v1/schedules` (list, add, detail, enable, disable, delete; writes local-only) plus the token-checked, loopback-only `POST /v1/hooks/schedules/{name}`; ask steps are daemon decisions; notify steps are `workflow_note` store events sent to connectors as kind `workflow`; docs in `docs/workflows.md`.
 - workflow: steps judge, loop, session, smelt, warden, http, parallel, wait, github, file and agent `items` fan-out (`internal/workflow/steps.go`); `allow_write` and `files` on workflows; `{{secret.name}}` from `smithy auth` in http headers and body, redacted; http only to `guard.fetch_allow` hosts; github runs gh by argv; pr/merge/warden validated to need a `when` on an earlier ask's yes; the pin covers loop and parallel blocks.

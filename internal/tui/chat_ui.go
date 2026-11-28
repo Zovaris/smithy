@@ -383,7 +383,7 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "prompt", "channels":
 		return m.settingsCommand(name, arg)
 	case "quit":
-		return m, tea.Quit
+		return m.quit()
 	case "help":
 		m.overlay, m.pal = overlayHelp, palette{}
 	default:
@@ -463,7 +463,7 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	k := msg.String()
 	if k == "ctrl+c" {
-		return m, tea.Quit
+		return m.quit()
 	}
 	switch m.overlay {
 	case overlaySetup, overlayPicker, overlaySkills, overlayWelcome:
@@ -617,7 +617,7 @@ func (m chatView) palItems() []palItem {
 		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Connect", hint: strings.TrimPrefix(m.server+" "+t.g.dot+" "+m.url, " "+t.g.dot+" "), key: "/connect", run: func(m *chatView) tea.Cmd { return m.showConnect() }},
 		palItem{group: "ACTIONS", glyph: t.g.dot, color: t.muted, label: "Daemon log", hint: fmt.Sprintf("%d events", len(m.noise)), key: "/log", run: func(m *chatView) tea.Cmd { m.showLog(); return nil }},
 		palItem{group: "ACTIONS", glyph: "↓", color: t.muted, label: "Jump to latest", key: "end", run: func(m *chatView) tea.Cmd { m.offset = 0; return nil }},
-		palItem{group: "ACTIONS", glyph: t.g.fail, color: t.muted, label: "Quit", key: "ctrl+c", run: func(*chatView) tea.Cmd { return tea.Quit }},
+		palItem{group: "ACTIONS", glyph: t.g.fail, color: t.muted, label: "Quit", key: "ctrl+c", run: func(m *chatView) tea.Cmd { m.quitting = true; return tea.Quit }},
 	)
 	for _, s := range m.sessions {
 		g, c := m.sessionGlyph(s.state)

@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -27,7 +28,7 @@ import (
 )
 
 // ChatUsage is the text for `smithy chat --help`; `smithy` with no arguments opens it too.
-const ChatUsage = `usage: smithy chat [url | --server <name|url> | --standalone]
+const ChatUsage = `usage: smithy chat [url | --server <name|url> | --standalone] [--session <id>]
 A fullscreen chat over a smithy daemon: its events stream into the transcript and the input stays
 pinned at the bottom. A lost connection retries and resumes after the last event seen.
 Keys: enter send; pgup/pgdn, wheel or ctrl+u/ctrl+d scroll; home/end top/bottom; click a tool block
@@ -41,7 +42,8 @@ command in the session folder; ctrl+v attaches a clipboard image; esc clears the
                 tailscale serve URL needs no token (daemon.allow decides)
   --server      a saved server (smithy servers), local or a URL; default: SMITHY_SERVER, then the
                 default /connect or smithy servers use saved, then this machine
-  --standalone  run a private daemon inside this process instead; it stops when the chat quits`
+  --standalone  run a private daemon inside this process instead; it stops when the chat quits
+  --session     open this session once connected`
 
 // WelcomeUsage is `smithy welcome`: the chat opened on its first-run walk.
 const WelcomeUsage = `usage: smithy welcome [url | --server <name|url>]
@@ -75,6 +77,9 @@ type anchor struct{ offset, i, r, width int }
 
 type chatView struct {
 	th            theme
+	resume        []string // the command that reopens this chat (OSC 7577); the open session is appended
+	resumeDir     string
+	quitting      bool
 	url           string
 	stream        <-chan daemon.ClientMsg
 	conn, connErr string
@@ -248,6 +253,11 @@ func parseChatArgs(args []string) (chatArgs, error) {
 				return a, errors.New("--server takes a name or url")
 			}
 			a.server, i = args[i+1], i+1
+		case x == "--session":
+			if i+1 >= len(args) || args[i+1] == "" {
+				return a, errors.New("--session takes a session id")
+			}
+			a.open, i = args[i+1], i+1
 		case strings.HasPrefix(x, "--server="):
 			if a.server = strings.TrimPrefix(x, "--server="); a.server == "" {
 				return a, errors.New("--server takes a name or url")
@@ -435,6 +445,7 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	})
 	m.connectUse = func(n string) error { return remote.Use(remote.File(), n) }
 	m.connectAdd = func(s remote.Server) error { return remote.Add(remote.File(), s) }
+	m.resume, m.resumeDir = resumeArgs(a, where), cwd()
 	if a.open != "" {
 		m.open(a.open)
 	}
@@ -671,7 +682,7 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		page := max(m.rows()-1, 1)
 		switch msg.String() {
 		case "ctrl+c":
-			return m, tea.Quit
+			return m.quit()
 		case "ctrl+v":
 			return m, m.pasteImage()
 		case "esc":
@@ -1002,7 +1013,44 @@ func (m chatView) View() tea.View {
 	if t.surface != nil {
 		v.BackgroundColor = t.surface
 	}
+	if !m.quitting && len(m.resume) > 0 {
+		args := slices.Clone(m.resume)
+		if m.current != "" && m.where != whereStandalone {
+			args = append(args, "--session", m.current)
+		}
+		v.ProgramResume = &tea.ProgramResume{Args: args, Dir: m.resumeDir}
+	}
 	return v
+}
+
+// quit ends the program and withdraws the resume command, so a terminal restart does not reopen it.
+func (m chatView) quit() (tea.Model, tea.Cmd) {
+	m.quitting = true
+	return m, tea.Quit
+}
+
+// resumeArgs is the command that reopens this chat against the same server; nil when the
+// executable cannot be found.
+func resumeArgs(a chatArgs, where chatWhere) []string {
+	exe, err := os.Executable()
+	if err != nil {
+		return nil
+	}
+	args := []string{exe, "chat"}
+	switch {
+	case where == whereStandalone:
+		args = append(args, "--standalone")
+	case a.url != "":
+		args = append(args, a.url)
+	case a.server != "":
+		args = append(args, "--server", a.server)
+	}
+	return args
+}
+
+func cwd() string {
+	d, _ := os.Getwd()
+	return d
 }
 
 // composer is the input block: the raised tier from gutter to gutter, the ember › inside it.
