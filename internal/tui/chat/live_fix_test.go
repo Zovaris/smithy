@@ -52,9 +52,7 @@ func TestSkillsModalFitsTheScreenWithManySkills(t *testing.T) {
 	if foot < 0 || foot >= len(lines)-1 && bottom < 0 {
 		t.Fatalf("footer or bottom border cut:\n%s", screen(m))
 	}
-	for range 45 {
-		m = chatStep(m, ckey("down"))
-	}
+	m = chatStep(m, ckey("up"))
 	if !strings.Contains(screen(m), "skill-39") || !strings.Contains(screen(m), "install/update") {
 		t.Fatalf("the list scrolls to its end inside the box:\n%s", screen(m))
 	}

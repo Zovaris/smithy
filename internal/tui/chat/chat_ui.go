@@ -3,8 +3,6 @@
 package chat
 
 import (
-	"crypto/rand"
-	hexenc "encoding/hex"
 	"encoding/json"
 	"fmt"
 	"image/color"
@@ -391,20 +389,9 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 	case "skills":
 		m.overlay, m.setupSel, m.setupNote = overlaySkills, 0, ""
 		return m, m.loadSetup(false)
-	case "welcome":
-		m.openWelcome()
-		return m, tea.Batch(m.loadSetup(false), m.loadWelcomeSettings())
 	case "setup":
 		m.openPicker(overlaySetup)
 		return m, m.loadSetup(false)
-	case "ask":
-		return m, m.askDemo(arg)
-	case "answer":
-		if arg == "" {
-			m.openAsk()
-			return m, nil
-		}
-		return m, m.answer(arg)
 	case "detach":
 		return m.detach()
 	case "board", "tasks":
@@ -417,7 +404,7 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.openWorkflows(true)
 	case "run":
 		return m.runWorkflowCmd(arg)
-	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "prompt", "channels":
+	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "channels":
 		return m.settingsCommand(name, arg)
 	case "usage":
 		return m.openUsage()
@@ -472,6 +459,11 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	}
 	const head = headRows
 	inputY := m.height - 2 - m.input.Height()
+	if m.overlay == overlayNone {
+		if n, cmd, ok := m.chipClick(msg.X, msg.Y); ok {
+			return n, cmd
+		}
+	}
 	switch {
 	case m.overlay != overlayNone:
 		return m, nil
@@ -601,9 +593,9 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc", "ctrl+k":
 		m.overlay, m.picker = overlayNone, nil
 	case "up":
-		m.pal.sel = max(m.pal.sel-1, 0)
+		m.pal.sel = wrapStep(m.pal.sel, -1, len(items))
 	case "down":
-		m.pal.sel = min(m.pal.sel+1, max(len(items)-1, 0))
+		m.pal.sel = wrapStep(m.pal.sel, 1, len(items))
 	case "left", "right":
 		if m.pal.sel < len(items) && items[m.pal.sel].cycle != nil {
 			return m, items[m.pal.sel].cycle(&m, map[string]int{"left": -1, "right": 1}[k])
@@ -645,9 +637,9 @@ func (m chatView) agentsKey(k string) (tea.Model, tea.Cmd) {
 	case "ctrl+k":
 		return m, m.openPalette("")
 	case "up", "k":
-		m.agentSel = max(m.agentSel-1, 0)
+		m.agentSel = wrapStep(m.agentSel, -1, len(m.listed()))
 	case "down", "j":
-		m.agentSel = min(m.agentSel+1, max(len(m.listed())-1, 0))
+		m.agentSel = wrapStep(m.agentSel, 1, len(m.listed()))
 	case "a":
 		m.allProj = !m.allProj
 		m.agentSel = min(m.agentSel, max(len(m.listed())-1, 0))
@@ -915,23 +907,6 @@ func (m chatView) toolRows(i, w int, open, last bool) []string {
 	return rows
 }
 
-// askDemo asks a sample question (or the one typed) on the question card through the daemon,
-// the same path an agent's ask tool takes outside warden, so it can be seen and answered.
-func (m *chatView) askDemo(q string) tea.Cmd {
-	if m.ask == nil {
-		m.system("/ask needs smithy daemon running: it carries the question and the answer")
-		return nil
-	}
-	opts := []string{"yes", "no", "later"}
-	if q == "" {
-		q, opts = "Demo: which answer should this sample question get?", []string{"approve", "reject", "later"}
-	}
-	b := make([]byte, 4)
-	_, _ = rand.Read(b)
-	m.status("asked: answer it on the question card (a number, arrows and enter, or your own words)")
-	return m.ask("ask:demo"+hexenc.EncodeToString(b), q, opts)
-}
-
 func spread(left, right string, w int) string {
 	gap := w - ansi.StringWidth(left) - ansi.StringWidth(right)
 	if gap < 1 {
@@ -975,4 +950,55 @@ func (m chatView) activityChips(tools []chatTool, thoughts int) string {
 		out = append(out, t.Fg(t.Info).Render(t.G.On)+" "+t.Fg(t.Muted).Render(p))
 	}
 	return strings.Join(out, "  ")
+}
+
+// chipClick acts on a chip that looks like a button: the header's tend and state chips, the
+// footer's mode and palette chips, and the composer's agent, model and effort chips.
+func (m chatView) chipClick(x, y int) (tea.Model, tea.Cmd, bool) {
+	lines := strings.Split(ansi.Strip(m.View().Content), "\n")
+	if y < 0 || y >= len(lines) {
+		return m, nil, false
+	}
+	l := lines[y]
+	hit := func(label string) bool {
+		i := strings.LastIndex(l, label)
+		if label == "" || i < 0 {
+			return false
+		}
+		x0 := ansi.StringWidth(l[:i])
+		return x >= x0 && x < x0+ansi.StringWidth(label)
+	}
+	run := func(line string) (tea.Model, tea.Cmd, bool) {
+		n, cmd := m.command(line)
+		return n, cmd, true
+	}
+	switch {
+	case y == len(lines)-1 && hit(" ctrl+k palette "):
+		return m, m.openPalette(""), true
+	case y == len(lines)-1 && hit(" "+m.mode.String()+" "):
+		m.setMode((m.mode + 1) % 3)
+		return m, nil, true
+	case y == 0 && hit(m.tendTag()):
+		return run("/tend")
+	case y == 0 && len(m.pending) > 0 && hit("waiting on you"):
+		m.openAsk()
+		return m, nil, true
+	case y == 0 && (hit(" idle ") || hit(" running ")):
+		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
+		return m, nil, true
+	}
+	meta := ansi.Strip(m.metaChips())
+	if meta == "" || !strings.Contains(l, meta) {
+		return m, nil, false
+	}
+	parts := strings.Split(m.agentModel(), " "+m.th.G.Dot+" ")
+	switch {
+	case hit(" effort "):
+		return run("/effort")
+	case len(parts) > 1 && hit(" "+parts[1]+" "):
+		return run("/model")
+	case parts[0] != "" && hit(" "+parts[0]+" "):
+		return run("/agent")
+	}
+	return m, nil, false
 }

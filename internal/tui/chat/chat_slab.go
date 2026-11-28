@@ -54,39 +54,6 @@ func railGlyph(uni bool) string {
 // without a visible bounce.
 var spring = harmonica.NewSpring(harmonica.FPS(kit.Fps), 9, 0.9)
 
-// motion is an overlay's entrance: pos runs from 0 (just opened) to 1 (settled).
-type motion struct {
-	shown    chatOverlay
-	pos, vel float64
-}
-
-// follow restarts the entrance when a different overlay opens; reduced motion settles at once.
-func (mo motion) follow(o chatOverlay, still bool) motion {
-	if o == mo.shown {
-		return mo
-	}
-	mo.shown, mo.pos, mo.vel = o, 0, 0
-	if still || o == overlayNone {
-		mo.pos = 1
-	}
-	return mo
-}
-
-func (mo motion) step() motion {
-	if mo.moving() {
-		mo.pos, mo.vel = spring.Update(mo.pos, mo.vel, 1)
-		if mo.pos > 0.995 && mo.vel < 0.01 {
-			mo.pos, mo.vel = 1, 0
-		}
-	}
-	return mo
-}
-
-func (mo motion) moving() bool { return mo.shown != overlayNone && mo.pos < 1 }
-
-// lift is how many rows below its resting place an opening panel draws.
-func (mo motion) lift() int { return int((1-mo.pos)*3 + 0.5) }
-
 // valueBump is a value that just changed: it slides two cells into place on the spring, so the
 // eye catches which row moved.
 type valueBump struct {

@@ -64,6 +64,9 @@ func configLabel(k string) string {
 	if k == advancedKey {
 		return "Advanced"
 	}
+	if l, ok := advLabels[k]; ok {
+		return l
+	}
 	parts := strings.Split(k, ".")
 	l := strings.ReplaceAll(parts[len(parts)-1], "_", " ")
 	if len(parts) > 2 {
@@ -104,6 +107,15 @@ func (m chatView) configRows() []api.SettingRow {
 			adv = append(adv, r)
 		}
 	}
+	advRank := func(k string) int {
+		return slices.IndexFunc(advGroups, func(g struct {
+			name     string
+			prefixes []string
+		}) bool {
+			return g.name == advGroup(k)
+		})
+	}
+	slices.SortStableFunc(adv, func(a, b api.SettingRow) int { return cmp.Compare(advRank(a.Key), advRank(b.Key)) })
 	if q != "" {
 		var rows []api.SettingRow
 		for _, r := range append(main, adv...) {
@@ -182,6 +194,18 @@ func edited(r api.SettingRow) bool { return r.Value != "" && r.Value != r.Defaul
 func (m chatView) configKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	rows := m.configRows()
 	k := msg.String()
+	if m.cfgEd != nil {
+		for _, r := range rows {
+			if r.Key == m.cfgEd.key {
+				return m.editKey(msg, r)
+			}
+		}
+		m.cfgEd = nil
+	}
+	if k == "f" && m.pal.query == "" {
+		m.cfgFull = !m.cfgFull
+		return m, nil
+	}
 	switch k {
 	case "esc":
 		if m.pal.query != "" {
@@ -191,10 +215,10 @@ func (m chatView) configKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.overlay = overlayNone
 		return m, nil
 	case "up":
-		m.pal.sel = max(m.pal.sel-1, 0)
+		m.pal.sel = wrapStep(m.pal.sel, -1, len(rows))
 		return m, nil
 	case "down", "tab":
-		m.pal.sel = min(m.pal.sel+1, max(len(rows)-1, 0))
+		m.pal.sel = wrapStep(m.pal.sel, 1, len(rows))
 		return m, nil
 	case "ctrl+u":
 		m.pal = palette{}
@@ -224,12 +248,7 @@ func (m chatView) configKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.cfgAdv = !m.cfgAdv
 				return m, nil
 			}
-			if len(r.Options) > 0 {
-				return m.cycleSetting(r, 1)
-			}
-			m.overlay = overlayNone
-			m.input.SetValue("/set " + r.Key + " ")
-			m.input.CursorEnd()
+			m.cfgEd = editorFor(r)
 		}
 		return m, nil
 	}
@@ -245,15 +264,25 @@ func (m chatView) configKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // cycleSetting steps r's value by dir through its options and saves it; ui.theme also re-themes
 // this chat at once.
 func (m chatView) cycleSetting(r api.SettingRow, dir int) (tea.Model, tea.Cmd) {
-	opts := r.Options
-	if len(opts) == 0 {
+	e := editorFor(r)
+	if e.kind != "pick" {
+		m.cfgEd = e
 		return m, nil
 	}
+	opts := e.opts
 	val := cmp.Or(r.Value, r.Default)
 	i := slices.Index(opts, val)
 	v := opts[((i+dir)%len(opts)+len(opts))%len(opts)]
 	if i < 0 && dir < 0 {
 		v = opts[len(opts)-1]
+	}
+	return m.applySetting(r, v)
+}
+
+// applySetting saves r = v; the chat's own rows (transcript, sidebar, tabs, theme) change at once.
+func (m chatView) applySetting(r api.SettingRow, v string) (tea.Model, tea.Cmd) {
+	if v == cmp.Or(r.Value, r.Default) && r.Value != "" {
+		return m, nil
 	}
 	for j := range m.palSet {
 		if m.palSet[j].Key == r.Key {
@@ -291,13 +320,21 @@ func (m chatView) cycleSetting(r api.SettingRow, dir int) (tea.Model, tea.Cmd) {
 
 // configBox draws /config: a search field, the settings grouped under accent headings with the
 // value right-aligned, the focused row on the focus tier with every option as a chip and
-// ‹ value ›, and the focused setting's meaning, default and source at the bottom.
+// ‹ value ›, an inline editor under it once enter opens one, and the focused setting's meaning,
+// default and source: at the bottom, or in a pane on the right in fullscreen (f).
 func (m chatView) configBox(screen []string, w, h int) []string {
 	t := m.th
 	bw := max(min(110, w-6), min(w, 40))
 	bh := max(min(h-4, 44), 14)
+	if m.cfgFull {
+		bw, bh = w, h-2
+	}
+	lw := bw
+	if m.cfgFull && bw >= 100 {
+		lw = bw * 3 / 5
+	}
 	bg, focus := on(t.Raised), on(t.Focus)
-	row := func(s string) string { return fill(bg, bw, s) }
+	row := func(s string) string { return fill(bg, lw, s) }
 	rows := m.configRows()
 	sel := min(m.pal.sel, max(len(rows)-1, 0))
 	all := append(m.localRows(), m.palSet...)
@@ -308,15 +345,25 @@ func (m chatView) configBox(screen []string, w, h int) []string {
 		}
 	}
 	title := t.Fg(t.Surface).Bold(true).Render(" Settings") + t.Fg(t.Surface).Render(fmt.Sprintf("   %d settings · %d changed", len(all), n))
-	out := []string{fill(on(t.Accent), bw, spread(title, t.Fg(t.Surface).Render("esc  "), bw))}
+	head := []string{fill(on(t.Accent), bw, spread(title, t.Fg(t.Surface).Render("esc  "), bw))}
 	q := t.Fg(t.Muted).Render("type to filter")
 	if m.pal.query != "" {
 		q = t.Fg(t.Strong).Bold(true).Render(m.pal.query)
 	}
-	out = append(out, fill(focus, bw, spread("  "+t.Fg(t.Accent).Bold(true).Render("/")+" "+q+t.Fg(t.Accent).Render("▏"), t.Fg(t.Dim).Render(fmt.Sprintf("%d shown  ", len(rows))), bw)), row(""))
+	head = append(head, fill(focus, bw, spread("  "+t.Fg(t.Accent).Bold(true).Render("/")+" "+q+t.Fg(t.Accent).Render("▏"), t.Fg(t.Dim).Render(fmt.Sprintf("%d shown  ", len(rows))), bw)), fill(bg, bw, ""))
 	var list []string
 	selAt, group := 0, ""
 	nameW := 24
+	if m.cfgFull {
+		nameW = 34
+	}
+	heading := func(g string) {
+		if group != "" {
+			list = append(list, row(""))
+		}
+		group = g
+		list = append(list, row("  "+t.Fg(t.Accent).Bold(true).Render(g)))
+	}
 	for i, r := range rows {
 		if r.Key == advancedKey {
 			if group != "" {
@@ -331,17 +378,15 @@ func (m chatView) configBox(screen []string, w, h int) []string {
 			if m.cfgAdv {
 				open = "‹"
 			}
-			rule := t.Fg(t.Border).Render(" " + strings.Repeat("─", max(bw-30, 1)))
-			list = append(list, fill(st, bw, spread(mark+t.Fg(t.Accent).Bold(true).Render("Advanced")+t.Fg(t.Dim).Render(" ("+r.Value+")")+rule, t.Fg(t.Muted).Render(open)+"    ", bw)))
+			list = append(list, fill(st, lw, spread(mark+t.Fg(t.Accent).Bold(true).Render("Advanced")+t.Fg(t.Dim).Render(" ("+r.Value+")"), t.Fg(t.Muted).Render(open)+"    ", lw)))
 			continue
 		}
-		if g := configGroup(r.Key); g != group && g != "Advanced" {
-			if group != "" {
-				list = append(list, row(""))
-			}
-			group = g
-			rule := t.Fg(t.Border).Render(" " + strings.Repeat("─", max(bw-8-len(g), 1)))
-			list = append(list, row("  "+t.Fg(t.Accent).Bold(true).Render(g)+rule))
+		g := configGroup(r.Key)
+		if g == "Advanced" {
+			g = "Advanced · " + advGroup(r.Key)
+		}
+		if g != group && (m.pal.query == "" || !strings.HasPrefix(g, "Advanced")) {
+			heading(g)
 		}
 		val := shownValue(cmp.Or(r.Value, r.Default, "not set"))
 		if r.Secret && r.Value != "" {
@@ -357,36 +402,73 @@ func (m chatView) configBox(screen []string, w, h int) []string {
 			if edited(r) {
 				vc = t.Text
 			}
-			list = append(list, row(spread("  "+mark+t.Fg(t.Text).Render(name), t.Fg(vc).Render(kit.Short(val, 30))+"    ", bw)))
+			list = append(list, row(spread("  "+mark+t.Fg(t.Text).Render(name), t.Fg(vc).Render(kit.Short(val, 30))+"    ", lw)))
 			continue
 		}
 		selAt = len(list)
+		e := editorFor(r)
 		left := t.Fg(t.Accent).Render(railGlyph(t.G.Unicode)) + " " + mark + t.Fg(t.Strong).Bold(true).Render(name)
 		right := t.Fg(t.Accent).Bold(true).Render("‹ ") + t.Fg(t.Strong).Bold(true).Render(kit.Short(val, 24)) + t.Fg(t.Accent).Bold(true).Render(" ›") + strings.Repeat(" ", 2+m.vb.shift(r.Key))
-		if len(r.Options) == 0 {
+		if e.kind != "pick" {
 			right = t.Fg(t.Strong).Render(kit.Short(val, 30)) + t.Fg(t.Dim).Render("  enter edits") + "  "
 		}
-		room := bw - ansi.StringWidth(left) - ansi.StringWidth(right) - 2
-		chips := m.optionChips(r, val, room)
-		list = append(list, fill(focus, bw, spread(left+chips, right, bw)))
+		room := lw - ansi.StringWidth(left) - ansi.StringWidth(right) - 2
+		chips := ""
+		if m.cfgEd == nil {
+			chips = m.optionChips(r, val, room)
+		}
+		list = append(list, fill(focus, lw, spread(left+chips, right, lw)))
+		if m.cfgEd != nil && m.cfgEd.key == r.Key {
+			ed := m.editorRows(lw)
+			list = append(list, ed...)
+			selAt += len(ed)
+		}
 	}
 	if len(rows) == 0 {
 		list = append(list, row("  "+t.Fg(t.Muted).Render("no setting matches "+m.pal.query)))
 	}
 	body := bh - 8
+	if m.cfgFull {
+		body = bh - 5
+	}
 	start := 0
 	if selAt >= body {
 		start = selAt - body + 1
 	}
+	var mid []string
 	for i := start; i < len(list) && i < start+body; i++ {
-		out = append(out, list[i])
+		mid = append(mid, list[i])
 	}
-	for len(out) < bh-4 {
-		out = append(out, row(""))
+	for len(mid) < body {
+		mid = append(mid, row(""))
 	}
-	desc, meta := "", ""
+	var cur *api.SettingRow
 	if sel < len(rows) {
-		r := rows[sel]
+		cur = &rows[sel]
+	}
+	hints := "  " + keyHints(t, "↑↓", "move", "←→", "change", "enter", "pick or edit", "f", "fullscreen", "type", "filter", "esc", "close") + "   " + t.Fg(t.Accent).Render("•") + t.Fg(t.Dim).Render(" changed")
+	if m.cfgEd != nil {
+		hints = "  " + keyHints(t, "↑↓", "move", "enter", "save", "esc", "cancel")
+		if m.cfgEd.kind == "multi" {
+			hints = "  " + keyHints(t, "↑↓", "move", "space", "check", "enter", "save", "esc", "cancel")
+		}
+		if m.cfgEd.kind == "text" {
+			hints = "  " + keyHints(t, "type", "edit", "ctrl+u", "clear", "enter", "save", "esc", "cancel")
+		}
+	}
+	out := head
+	if lw < bw {
+		pane := m.configDetail(cur, bw-lw, len(mid))
+		for i := range mid {
+			out = append(out, mid[i]+pane[i])
+		}
+		out = append(out, fill(bg, bw, ""), fill(bg, bw, hints))
+		return m.overBox(screen, out, w)
+	}
+	out = append(out, mid...)
+	desc, meta := "", ""
+	if cur != nil {
+		r := *cur
 		desc = t.Fg(t.Accent).Bold(true).Render(configLabel(r.Key)) + "  " + t.Fg(t.Text).Render(r.Meaning)
 		if r.Key != advancedKey {
 			meta = t.Fg(t.Muted).Render(r.Key) + t.Fg(t.Dim).Render("  "+t.G.Dot+" default "+shownValue(cmp.Or(r.Default, "none"))+" "+t.G.Dot+" from "+cmp.Or(r.Src, "default"))
@@ -394,8 +476,81 @@ func (m chatView) configBox(screen []string, w, h int) []string {
 	}
 	ov := on(t.Overlay)
 	out = append(out, fill(ov, bw, "  "+ansi.Truncate(desc, bw-4, "…")), fill(ov, bw, "  "+meta), row(""))
-	out = append(out, row("  "+keyHints(t, "↑↓", "move", "←→", "change", "type", "filter", "enter", "edit", "esc", "close")+"   "+t.Fg(t.Accent).Render("•")+t.Fg(t.Dim).Render(" changed")))
+	out = append(out, row(hints))
 	return m.overBox(screen, out, w)
+}
+
+// editorRows draws the open inline editor w wide: the choices with the focused one on the rail,
+// checkboxes for a comma list, or a text field.
+func (m chatView) editorRows(w int) []string {
+	t := m.th
+	e := m.cfgEd
+	focus, ov := on(t.Focus), on(t.Overlay)
+	ind := "      "
+	if e.kind == "text" {
+		field := t.Fg(t.Strong).Render(e.text) + t.Fg(t.Accent).Render("▏")
+		return []string{fill(ov, w, ind+field)}
+	}
+	var out []string
+	for i, o := range e.opts {
+		label := shownValue(o)
+		if o == "" {
+			label = "detect (none set)"
+		}
+		box := ""
+		if e.kind == "multi" {
+			box = t.Fg(t.Dim).Render(t.G.Off) + " "
+			if e.on[o] {
+				box = t.Fg(t.Accent).Render(t.G.On) + " "
+			}
+		}
+		if i == e.sel {
+			out = append(out, fill(focus, w, ind[:4]+t.Fg(t.Accent).Render(railGlyph(t.G.Unicode))+" "+box+t.Fg(t.Strong).Bold(true).Render(label)))
+			continue
+		}
+		out = append(out, fill(ov, w, ind+box+t.Fg(t.Text).Render(label)))
+	}
+	return out
+}
+
+// configDetail is the fullscreen detail pane for r, h rows of w: its label, what it does wrapped,
+// then its key, default, source and allowed values.
+func (m chatView) configDetail(r *api.SettingRow, w, h int) []string {
+	t := m.th
+	ov := on(t.Overlay)
+	iw := max(w-4, 10)
+	var lines []string
+	if r != nil {
+		lines = append(lines, t.Fg(t.Accent).Bold(true).Render(configLabel(r.Key)), "")
+		for _, l := range strings.Split(ansi.Wrap(r.Meaning, iw, ""), "\n") {
+			lines = append(lines, t.Fg(t.Text).Render(l))
+		}
+		if r.Key != advancedKey {
+			lines = append(lines, "", t.Fg(t.Muted).Render("Key      ")+t.Fg(t.Strong).Render(r.Key),
+				t.Fg(t.Muted).Render("Default  ")+t.Fg(t.Strong).Render(shownValue(cmp.Or(r.Default, "none"))),
+				t.Fg(t.Muted).Render("From     ")+t.Fg(t.Strong).Render(cmp.Or(r.Src, "default")))
+			e := editorFor(*r)
+			if e.kind != "text" {
+				vals := make([]string, 0, len(e.opts))
+				for _, o := range e.opts {
+					vals = append(vals, shownValue(cmp.Or(o, "detect")))
+				}
+				lines = append(lines, "", t.Fg(t.Muted).Render("Values"))
+				for _, l := range strings.Split(ansi.Wrap(strings.Join(vals, ", "), iw, ""), "\n") {
+					lines = append(lines, t.Fg(t.Text).Render(l))
+				}
+			}
+		}
+	}
+	out := make([]string, h)
+	for i := range out {
+		l := ""
+		if i > 0 && i-1 < len(lines) {
+			l = lines[i-1]
+		}
+		out[i] = fill(ov, w, "  "+ansi.Truncate(l, iw, "…"))
+	}
+	return out
 }
 
 // optionChips is every option of r as a flat chip, the current one in the accent, within room

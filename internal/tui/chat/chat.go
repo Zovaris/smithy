@@ -54,7 +54,7 @@ command in the session folder; ctrl+v attaches a clipboard image; esc clears the
 const WelcomeUsage = `usage: smithy welcome [url | --server <name|url>]
 Opens the chat on the first-run walk: a short animated welcome, then the agents found on this
 machine, the model new sessions start with, the stored API keys and the Telegram notifications.
-esc leaves it at any step; /welcome in the chat walks it again.`
+esc leaves it at any step; smithy welcome walks it again.`
 
 // chatWhere is where the daemon the chat talks to runs.
 type chatWhere int
@@ -108,8 +108,6 @@ type chatView struct {
 	sessions []chatSession
 	// decide posts an answer to /v1/decisions and returns a chatDecidedMsg.
 	decide func(id, answer string) tea.Cmd
-	// ask posts a question to /v1/asks (the /ask demo); nil without a daemon.
-	ask func(id, question string, options []string) tea.Cmd
 
 	setup     setupAPI            // the daemon's setup endpoints; nil: none
 	cfg       settingsAPI         // the daemon's settings endpoints; nil: none
@@ -173,10 +171,11 @@ type chatView struct {
 	tendPRs   int              // the PRs it tends
 	frame     int              // motion frame, advanced only while something runs
 	ticking   bool             // a frame tick is scheduled
-	mo        motion           // the spring that lifts an overlay in as it opens
 	vb        valueBump        // the setting value that just changed, settling
 	usage     *events.Report   // /usage's report, nil while it loads
 	cfgAdv    bool             // /config shows its Advanced settings
+	cfgEd     *cfgEditor       // /config's inline editor under the focused row; nil when closed
+	cfgFull   bool             // /config fills the screen with a detail pane
 	evAt      time.Time        // when the event being applied happened
 	dirty     int              // files changed in the folder's repo, -1 outside one
 	homeIn    valueBump        // the empty screen's entrance
@@ -494,14 +493,6 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 			return chatDecidedMsg{id: id, err: err}
 		}
 	}
-	m.ask = func(id, question string, options []string) tea.Cmd {
-		return func() tea.Msg {
-			if err := c.Ask(ctx, id, question, options); err != nil {
-				return chatDecidedMsg{id: id, err: err}
-			}
-			return nil
-		}
-	}
 	fm, err := tea.NewProgram(m).Run()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "smithy chat:", err)
@@ -561,7 +552,6 @@ func (m *chatView) push(c chatMsg) {
 func (m chatView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	n, cmd := m.update(msg)
 	m = n.(chatView)
-	m.mo = m.mo.follow(m.overlay, m.still)
 	if k, ok := msg.(tea.KeyPressMsg); ok && (k.String() == "ctrl+k" || k.String() == "ctrl+l") {
 		cmd = tea.Batch(cmd, tea.ClearScreen)
 	}
@@ -584,7 +574,7 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case chatFrameMsg:
 		m.frame++
-		m.mo, m.vb, m.homeIn = m.mo.step(), m.vb.step(), m.homeIn.step()
+		m.vb, m.homeIn = m.vb.step(), m.homeIn.step()
 		m.shimmer = max(m.shimmer-1, 0)
 		for i := max(len(m.msgs)-8, 0); i < len(m.msgs); i++ {
 			if c := m.msgs[i]; c.tool != nil && c.tool.Status == "running" {
@@ -627,10 +617,6 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case usageMsg:
 		m.usage = &msg.r
-		m.mo.pos, m.mo.vel = min(m.mo.pos, 0.3), 0
-		if m.still {
-			m.mo.pos = 1
-		}
 		return m, nil
 	case settingsDoneMsg:
 		if msg.tend != nil {
@@ -1065,8 +1051,9 @@ func (m chatView) View() tea.View {
 		body = append(body, "")
 	}
 	body = append(body, m.composer(m.tw())...)
+	band := len(body) - len(m.composerQueue(m.tw()))
 	body = append(body, "")
-	out = append(out, m.besideSide(body)...)
+	out = append(out, m.besideSide(body, band)...)
 	out = append(out, m.footer(w))
 	if m.welcome != welcomeOff {
 		out = m.welcomeView(w, m.height)
@@ -1171,8 +1158,15 @@ func (m chatView) composer(w int) []string {
 		out = append(out, row("", l))
 	}
 	out = append(out, row("", ""), row("", m.metaChips()))
+	return append(out, m.composerQueue(w)...)
+}
+
+// composerQueue is the queued messages listed under the input band.
+func (m chatView) composerQueue(w int) []string {
+	_, tx, right := m.grid(w)
+	var out []string
 	p := strings.Repeat(" ", tx-1)
-	for _, r := range m.queueRows(bw + 1) {
+	for _, r := range m.queueRows(right - tx + 1) {
 		out = append(out, p+r)
 	}
 	return out

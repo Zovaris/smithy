@@ -118,13 +118,13 @@ func TestConfigAdvancedOpensAndBooleansReadOnOff(t *testing.T) {
 	m.width, m.height = 140, 40
 	m.cfg = &fakeSettings{}
 	m = cpress(typeIn(m, "/config"), ckey("enter"))
-	if strings.Contains(screen(m), "Paused") {
+	if strings.Contains(screen(m), "Serve paused") {
 		t.Fatal("Advanced starts collapsed")
 	}
 	rows := m.configRows()
 	m.pal.sel = len(rows) - 1
 	m = cpress(m, ckey("enter"))
-	if out := screen(m); !strings.Contains(out, "Paused") || !strings.Contains(out, "off") || strings.Contains(out, "false") {
+	if out := screen(m); !strings.Contains(out, "Serve paused") || !strings.Contains(out, "off") || strings.Contains(out, "false") {
 		t.Fatalf("Advanced open, booleans on/off:\n%s", out)
 	}
 }

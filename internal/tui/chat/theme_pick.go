@@ -86,9 +86,9 @@ func (m chatView) themeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.overlay, m.setupStep = overlayNone, stepAgent
 	case "up", "k":
-		m.themeSel = max(m.themeSel-1, 0)
+		m.themeSel = wrapStep(m.themeSel, -1, len(kit.Themes))
 	case "down", "j":
-		m.themeSel = min(m.themeSel+1, len(kit.Themes)-1)
+		m.themeSel = wrapStep(m.themeSel, 1, len(kit.Themes))
 	case "left", "h":
 		m.themeSel = (m.themeSel + len(kit.Themes) - 1) % len(kit.Themes)
 	case "right", "l":

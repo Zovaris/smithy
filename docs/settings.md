@@ -103,7 +103,7 @@ Every chat agent the daemon runs gets a short system prompt about smithy: its to
 and whether code mode is on. The default ships inside the binary (`internal/daemon/prompt.md`).
 Write your own text to `~/.smithy/prompt.md` (`$SMITHY_HOME/prompt.md`) and it replaces that
 default from the next turn on; the code-mode line is still added after it. A blank file or no
-file keeps the default. `/prompt` in the TUI and the System prompt row in the web settings show
+file keeps the default. The System prompt row in the web settings shows
 the path and whether the override is active.
 
 ## GitHub access

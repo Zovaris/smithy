@@ -36,17 +36,13 @@ var slashCommands = []slashCommand{
 	{"goal", "[text|clear]", "pin a goal on the open session: the daemon continues it until met (session.goal_max_*)"},
 	{"mode", "[minimal|expandable|verbose]", "how much of each turn the transcript shows"},
 	{"log", "", "daemon events kept out of the transcript"},
-	{"welcome", "", "walk the first-run steps again: agents, model, API keys, notifications"},
 	{"setup", "", "first run: every agent ready or missing, with its fix"},
-	{"ask", "[question]", "ask a sample question on the question card, to see and try how decisions work"},
-	{"answer", "[text]", "open the question waiting on you, or answer it in your words"},
 	{"help", "", "keys and commands"},
 	{"serve", "[on|off]", "serve mode: off launches nothing new (auto.paused)"},
 	{"set", "[<key> <value>]", "save a setting in your user file (smithy config set); bare, list them"},
 	{"unset", "<key>", "put a setting back to its default"},
 	{"keys", "", "stored API keys, masked, and how to add or remove one"},
 	{"key", "rm <service>", "remove a stored API key"},
-	{"prompt", "", "the system prompt file (~/.smithy/prompt.md) and whether it replaces the default"},
 	{"doctor", "", "run smithy doctor on the daemon's machine"},
 	{"usage", "", "tokens in, out and cached, and cost: this session, today, this week, all time, per agent and model"},
 	{"channels", "[test]", "chat connectors' notifications and chat channels; test sends a test message to each"},
@@ -287,9 +283,9 @@ type fileCache struct {
 func (m chatView) popupKey(msg tea.KeyPressMsg, items []popupItem) (chatView, tea.Cmd, bool) {
 	switch msg.String() {
 	case "up":
-		m.popSel = max(m.popSel-1, 0)
+		m.popSel = wrapStep(m.popSel, -1, len(items))
 	case "down":
-		m.popSel = min(m.popSel+1, len(items)-1)
+		m.popSel = wrapStep(m.popSel, 1, len(items))
 	case "tab":
 		m.input.SetValue(items[min(m.popSel, len(items)-1)].fill)
 		m.input.CursorEnd()
@@ -358,10 +354,15 @@ func (m chatView) popupRows(items []popupItem, w int) []string {
 		}
 		out = append(out, fill(st, w, ansi.Truncate(r, w-1, "…")))
 	}
-	if t.G.Unicode && !t.Plain {
-		out = append([]string{t.Fg(t.Accent).Render(strings.Repeat("▄", w))}, out...)
-	}
 	return out
+}
+
+// wrapStep moves i by d in a list of n, wrapping past either end.
+func wrapStep(i, d, n int) int {
+	if n <= 0 {
+		return 0
+	}
+	return ((i+d)%n + n) % n
 }
 
 // needsArgs reports whether a command takes required arguments, so enter fills it in instead of running it bare.

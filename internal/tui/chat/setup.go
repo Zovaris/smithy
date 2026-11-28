@@ -131,7 +131,7 @@ func (m chatView) setupUpdate(msg tea.Msg) (chatView, tea.Cmd, bool) {
 				return m, m.loadWelcomeSettings(), true
 			}
 			m.welcome = welcomeOff
-			m.system("/welcome sets smithy up: agents, model, API keys, notifications")
+			m.system("/setup shows every agent ready or missing; /config changes any setting")
 		}
 		return m, nil, true
 	case setupSavedMsg:
@@ -406,10 +406,10 @@ func (m chatView) setupKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc", "ctrl+l":
 		m.overlay = overlayNone
 	case "up", "k":
-		m.setupSel = max(m.setupSel-1, 0)
+		m.setupSel = wrapStep(m.setupSel, -1, len(rows))
 		m.setupNote = ""
 	case "down", "j":
-		m.setupSel = min(m.setupSel+1, max(len(rows)-1, 0))
+		m.setupSel = wrapStep(m.setupSel, 1, len(rows))
 		m.setupNote = ""
 	case "m":
 		if m.setupSel < len(rows) && rows[m.setupSel].Ready {
@@ -432,9 +432,9 @@ func (m chatView) modelKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.overlay = overlayNone
 	case "up":
-		m.modelSel = max(m.modelSel-1, 0)
+		m.modelSel = wrapStep(m.modelSel, -1, len(rows))
 	case "down":
-		m.modelSel = min(m.modelSel+1, max(len(rows)-1, 0))
+		m.modelSel = wrapStep(m.modelSel, 1, len(rows))
 	case "ctrl+r":
 		m.modelList = nil
 		return m, m.loadModels(true)
@@ -488,9 +488,9 @@ func (m chatView) skillsKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.overlay = overlayNone
 	case "up", "k":
-		m.setupSel = max(m.setupSel-1, 0)
+		m.setupSel = wrapStep(m.setupSel, -1, n)
 	case "down", "j":
-		m.setupSel = min(m.setupSel+1, n-1)
+		m.setupSel = wrapStep(m.setupSel, 1, n)
 	case "space", " ", "enter":
 		k := m.setupSt.Kit
 		k.Skills = slices.Clone(k.Skills)
