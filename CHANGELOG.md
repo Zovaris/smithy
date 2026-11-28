@@ -68,7 +68,7 @@ part above `### Details`.
 - Messages sent during a turn wait in a queue under the input and go out in order when it ends; `↑` edits or drops the next one, and `esc` interrupts the turn.
 - Text can be selected and copied: `ctrl+s` hands the mouse to the terminal, or shift+drag.
 - Links take any URL (`/links add <url>`) and can be removed (`/links rm <n|url>`, `x` in `/links`, `×` in the sidebar); a PR or issue URL mentioned in a session links itself, a click opens a link, `c` copies it, and a PR going red, green, merged or closed posts one line.
-- The web `/theme` lists and accepts all seven themes, and the guide marks `/agents`, `/decisions`, `/bench` and `/settings` as web only.
+- The web `/theme` lists and accepts all seven themes, and the guide marks `/decisions` and `/bench` as web only; in the TUI `/agents` is an alias of `/sessions` and `/settings` of `/config`.
 - The agents' system prompt is shorter and direct, and no longer names the CLI underneath.
 - A settings command's usage line names only that command, and enter on a command that needs arguments fills it in instead of running it bare. A bare `/set` opens the settings list in the palette.
 - `/model ` lists the current agent's models as you type, like `/effort ` lists its levels.
