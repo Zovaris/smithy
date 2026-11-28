@@ -96,7 +96,12 @@ func (c *Client) Decide(ctx context.Context, id, answer string) (Outcome, error)
 
 // Ask records a warden decision (decide:<batch>/<item>/<key>) on the daemon (POST /v1/asks).
 func (c *Client) Ask(ctx context.Context, id, question string, options []string) error {
-	b, _ := json.Marshal(map[string]any{"id": id, "question": question, "options": options})
+	return c.AskMulti(ctx, id, question, options, false)
+}
+
+// AskMulti is Ask for a question whose options may be picked together when multi is true.
+func (c *Client) AskMulti(ctx context.Context, id, question string, options []string, multi bool) error {
+	b, _ := json.Marshal(map[string]any{"id": id, "question": question, "options": options, "multi": multi})
 	r, err := c.req(ctx, "POST", "/v1/asks", b)
 	if err != nil {
 		return err
@@ -353,6 +358,13 @@ func (c *Client) Settings(ctx context.Context) (Settings, error) {
 	var s Settings
 	err := c.call(ctx, "GET", "/v1/settings", nil, &s)
 	return s, err
+}
+
+// ConnectTest is POST /v1/connect/test: a test message on every chat connector's channels.
+func (c *Client) ConnectTest(ctx context.Context) (ConnectTestResult, error) {
+	var r ConnectTestResult
+	err := c.call(ctx, "POST", "/v1/connect/test", map[string]string{}, &r)
+	return r, err
 }
 
 // SetSetting is PUT /v1/settings/{key}: saves key in the user's file.

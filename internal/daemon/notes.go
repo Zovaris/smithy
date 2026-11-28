@@ -134,7 +134,9 @@ func (sv *Server) NotesOnce(ctx context.Context, h *connect.Hub) error {
 		return err
 	}
 	for _, e := range evs {
-		if e.Kind == KindAnswered {
+		if e.Kind == KindSessionText || e.Kind == KindSessionStatus {
+			sv.chatNote(ctx, h, e)
+		} else if e.Kind == KindAnswered {
 			var o Outcome
 			if json.Unmarshal(e.Data, &o) == nil {
 				h.Resolve(ctx, o.ID, line1(o.Answer, 200), line1(o.By, 80))
@@ -147,6 +149,44 @@ func (sv *Server) NotesOnce(ctx context.Context, h *connect.Hub) error {
 		}
 	}
 	return nil
+}
+
+// maxChatBuf caps how much of one turn's answer is kept for the chat thread (the end is kept).
+const maxChatBuf = 64 << 10
+
+// chatNote collects a chat session's text and sends it back through h once its turn ends (the
+// session stops working). Sessions not started from a chat channel are skipped.
+func (sv *Server) chatNote(ctx context.Context, h *connect.Hub, e store.Event) {
+	if e.Session == "" || !h.IsChat(e.Session) {
+		return
+	}
+	var d map[string]string
+	if json.Unmarshal(e.Data, &d) != nil {
+		return
+	}
+	if sv.chatBuf == nil {
+		sv.chatBuf = map[string]string{}
+	}
+	if e.Kind == KindSessionText {
+		b := sv.chatBuf[e.Session] + d["text"]
+		if len(b) > maxChatBuf {
+			b = b[len(b)-maxChatBuf:]
+		}
+		sv.chatBuf[e.Session] = b
+		return
+	}
+	if d["status"] == StatusWorking || sv.chatBuf[e.Session] == "" {
+		return
+	}
+	h.Reply(ctx, e.Session, strconv.FormatInt(e.Seq, 10), strings.ToValidUTF8(sv.chatBuf[e.Session], ""))
+	delete(sv.chatBuf, e.Session)
+}
+
+// ChatStart starts a session for a message in a chat channel, in the default project with the
+// default agent, and returns its id.
+func (sv *Server) ChatStart(text, by string) (string, error) {
+	s, err := sv.StartSession("", "", text, by)
+	return s.ID, err
 }
 
 // RunNotes runs NotesOnce on every new event (or every interval) until ctx ends.

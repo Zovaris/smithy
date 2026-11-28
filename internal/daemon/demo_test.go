@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/Zovaris/smithy/internal/usage"
@@ -89,5 +90,15 @@ func TestDemoReadyLooksOnlyOnPath(t *testing.T) {
 	}
 	if !slices.Equal(ready, []string{"claude"}) {
 		t.Fatalf("demo ready CLIs = %v, want only claude from PATH", ready)
+	}
+}
+
+func TestDemoRunnerRefineEndsWithARefinedBlock(t *testing.T) {
+	r, _ := DemoRunner("claude", "", t.TempDir(), t.TempDir())
+	defer r.Close()
+	e := &demoEmit{}
+	out, err := r.Turn(context.Background(), "refine: add dark mode", nil, e)
+	if err != nil || !strings.Contains(out, "```refined\n# Goal") || e.asked != "" || len(e.tools) != 0 {
+		t.Fatalf("refine turn: %q %v asked=%q tools=%v", out, err, e.asked, e.tools)
 	}
 }

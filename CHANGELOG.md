@@ -9,6 +9,14 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+- New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
+
+- An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
+
+### Details
+
+- TUI: the top decision strip is gone; the question card (`overlayAsk`) opens when a decision arrives and the composer is empty, or on enter with an empty composer or `/answer`; 1-9, arrows and enter, space on multi-select, esc for later. The pill reads "waiting on you".
+- daemon: decisions carry `multi` and `other`; `/v1/asks` takes `multi` and accepts free text for every non-guard question; the MCP `ask` tool gains a `multi` flag.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
 - The chat header shows the tend mode and how many PRs it tends.
 - `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.
@@ -24,6 +32,8 @@ part above `### Details`.
   left/right, tab through task dirs, enter opens the file, `o` opens its PR, blockers and PRs show on each row.
 - The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
 
+- Chat apps get two places each: a notifications channel for alerts and a chat channel where a new message starts a session in its own thread or topic, your replies continue it and its answers come back. `/channels test` and the web settings send a test message to both.
+- A question from the ask tool can be answered in your own words by replying to its message, besides its buttons.
 - `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).
   `/effort ` completes the levels the agent takes, `off` included, and the top level plays a short shimmer.
 - The TUI's `/` menu lists commands first, then skills with their own mark and folder, and matches descriptions too.
@@ -35,6 +45,7 @@ part above `### Details`.
 
 ### Details
 
+- `connect.<telegram|slack|discord>.notify` and `.chat` settings; the old single keys (`notify.telegram.chat`, `connect.slack.channel`, `connect.discord.channel`) still set the notifications channel. `POST /v1/connect/test` builds the connectors from the current settings and sends to each channel. Chat-mode sessions start only for users in `connect.<name>.users`.
 - `ui.theme` palettes live in `internal/tui/theme.go` (`palettes`); `web/src/theme/temper.css`
   maps the same hex onto Sephiro's tokens per `data-accent`, and a test checks they match.
   256-color terminals get each palette's nearest colors; 16-color terminals keep steel's tiers with
