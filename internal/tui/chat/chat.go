@@ -135,36 +135,37 @@ type chatView struct {
 	welcomeNote  string // the walk's last saved pick, printed once when it ends
 	welcomeSet   *api.Settings
 
-	sess     sessionAPI            // the daemon's sessions endpoints; nil: offline
-	current  string                // the open session, "" before the first message
-	convs    map[string][]*chatMsg // the other sessions' conversations
-	cost     map[string]float64    // spend per session
-	toks     map[string]int64      // input and output tokens per session
-	ctx      map[string]int64
-	sideOff  bool
-	sent     map[string]string
-	streamed map[string]int   // characters of agent text since the turn began, for tok/s
-	effort   string           // agent.effort
-	clock    func() time.Time // the header clock; nil: time.Now
-	splashOn bool             // play the entry animation at the first window size
-	shimmer  int              // motion frames left of the top-effort shimmer on the composer
-	still    bool             // reduced motion: the welcome field and anvil hold still
-	splash   []string         // the entry animation's frames left; nil once it ends
-	noise    []noise          // daemon events kept out of the transcript
-	dir      string           // the folder sessions start in and @ lists
-	root     string           // dir with symlinks resolved, as the daemon records it
-	allProj  bool             // the agents panel lists every project, not only dir
-	proj     projectPick      // the project modal a new session opens with
-	branch   string           // its git branch, for the footer
-	webURL   string           // the web UI with its token; "" when unknown
-	files    *fileCache       // the @ popup's file list
-	popSel   int              // the selected / or @ popup row
-	agentSel int              // the selected session in the agents panel
-	info     infoPanel        // the open read-only panel
-	tendMode string           // the daemon's tend mode for the header; "" until read
-	tendPRs  int              // the PRs it tends
-	frame    int              // motion frame, advanced only while something runs
-	ticking  bool             // a frame tick is scheduled
+	sess      sessionAPI            // the daemon's sessions endpoints; nil: offline
+	current   string                // the open session, "" before the first message
+	convs     map[string][]*chatMsg // the other sessions' conversations
+	cost      map[string]float64    // spend per session
+	toks      map[string]int64      // input and output tokens per session
+	ctx       map[string]int64
+	sideOff   bool
+	sent      map[string]string
+	streamed  map[string]int   // characters of agent text since the turn began, for tok/s
+	effort    string           // agent.effort
+	clock     func() time.Time // the header clock; nil: time.Now
+	splashOn  bool             // play the entry animation at the first window size
+	shimmer   int              // motion frames left of the top-effort shimmer on the composer
+	still     bool             // reduced motion: the welcome field and anvil hold still
+	splash    []string         // the entry animation's frames left; nil once it ends
+	noise     []noise          // daemon events kept out of the transcript
+	dir       string           // the folder sessions start in and @ lists
+	root      string           // dir with symlinks resolved, as the daemon records it
+	allProj   bool             // the agents panel lists every project, not only dir
+	proj      projectPick      // the project modal a new session opens with
+	branch    string           // its git branch, for the footer
+	webURL    string           // the web UI with its token; "" when unknown
+	files     *fileCache       // the @ popup's file list
+	popModels *models.List     // the /model popup's list, for popModels.Agent
+	popSel    int              // the selected / or @ popup row
+	agentSel  int              // the selected session in the agents panel
+	info      infoPanel        // the open read-only panel
+	tendMode  string           // the daemon's tend mode for the header; "" until read
+	tendPRs   int              // the PRs it tends
+	frame     int              // motion frame, advanced only while something runs
+	ticking   bool             // a frame tick is scheduled
 
 	server      string                    // the saved server name, local or URL this chat talks to
 	picker      *connectPicker            // /connect's state while its box is open
@@ -757,7 +758,7 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
-	return m, cmd
+	return m, tea.Batch(cmd, m.loadPopModels())
 }
 
 func eventText(kind, session string, data json.RawMessage) string {

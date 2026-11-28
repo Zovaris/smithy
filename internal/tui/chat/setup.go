@@ -160,6 +160,9 @@ func (m chatView) setupUpdate(msg tea.Msg) (chatView, tea.Cmd, bool) {
 		return m, nil, true
 	case themeMsg:
 		return m.themeLoaded(msg), nil, true
+	case popModelsMsg:
+		m.popModels = &msg.l
+		return m, nil, true
 	case modelsLoadedMsg:
 		if msg.agent != m.modelFor {
 			return m, nil, true

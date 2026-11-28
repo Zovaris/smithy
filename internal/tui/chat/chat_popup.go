@@ -3,6 +3,7 @@
 package chat
 
 import (
+	"context"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/tui/kit"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -137,6 +139,52 @@ func (m chatView) effortPopup(q string) []popupItem {
 	return out
 }
 
+// popupAgent is the agent /model and /effort complete for: the open session's, else the default.
+func (m chatView) popupAgent() string {
+	if s := m.openSession(); s != nil {
+		return s.agent
+	}
+	if m.setupSt != nil {
+		return m.setupSt.Default.Agent
+	}
+	return ""
+}
+
+// popModelsMsg is the /model popup's list as the agent reported it.
+type popModelsMsg struct{ l models.List }
+
+// loadPopModels fetches the agent's models once /model is typed and they are not loaded.
+func (m chatView) loadPopModels() tea.Cmd {
+	agent := m.popupAgent()
+	api, ok := m.setup.(modelsAPI)
+	if !ok || agent == "" || !strings.HasPrefix(m.input.Value(), "/model ") || m.popModels != nil && m.popModels.Agent == agent {
+		return nil
+	}
+	return func() tea.Msg {
+		l, _ := api.Models(context.Background(), agent, false)
+		l.Agent = agent
+		return popModelsMsg{l}
+	}
+}
+
+// modelPopup completes /model with the current agent's models whose id or name holds q.
+func (m chatView) modelPopup(q string) []popupItem {
+	if strings.Contains(q, " ") || m.popModels == nil || m.popModels.Agent != m.popupAgent() {
+		return nil
+	}
+	q = strings.ToLower(q)
+	var out []popupItem
+	for _, x := range m.popModels.Models {
+		if strings.Contains(strings.ToLower(x.ID), q) || strings.Contains(strings.ToLower(x.Name), q) {
+			out = append(out, popupItem{fill: "/model " + x.ID, label: "/model " + x.ID, desc: x.Name})
+		}
+	}
+	if len(out) == 1 && strings.EqualFold(out[0].fill, "/model "+q) {
+		return nil
+	}
+	return out
+}
+
 const popupMax = 8
 
 // popup is the open / or @ popup's rows for the input as typed; nil when none is open.
@@ -147,6 +195,9 @@ func (m chatView) popup() []popupItem {
 	}
 	if strings.HasPrefix(v, "/effort ") {
 		return m.effortPopup(strings.TrimPrefix(v, "/effort "))
+	}
+	if strings.HasPrefix(v, "/model ") {
+		return m.modelPopup(strings.TrimPrefix(v, "/model "))
 	}
 	if strings.HasPrefix(v, "/") && !strings.Contains(v, " ") {
 		out := m.slashPopup(strings.ToLower(v[1:]))
