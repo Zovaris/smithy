@@ -174,6 +174,8 @@ type chatView struct {
 	vb        valueBump        // the setting value that just changed, settling
 	usage     *events.Report   // /usage's report, nil while it loads
 	cfgAdv    bool             // /config shows its Advanced settings
+	cfgEd     *cfgEditor       // /config's inline editor under the focused row; nil when closed
+	cfgFull   bool             // /config fills the screen with a detail pane
 	evAt      time.Time        // when the event being applied happened
 	dirty     int              // files changed in the folder's repo, -1 outside one
 	homeIn    valueBump        // the empty screen's entrance

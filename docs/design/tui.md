@@ -67,7 +67,7 @@ rose #C2255C / #FF6B9A.
 | Raised | Header, tabs, sidebar, user band, shell band, modal body |
 | Focus | Input band, selected row, search field |
 | Overlay | Key chips, meter rest, tiles, description panel |
-| Border | Rules under headings; all foregrounds under a modal backdrop |
+| Border | All foregrounds under a modal backdrop |
 | Accent | Rail, active tab fill, prompt, headings, edited `•`, meter fill |
 | Strong / Text / Muted / Dim | Values and user text / agent body / descriptions / timestamps, model |
 | Ok / Warn / Err / Info | Done / waits on you or in progress / failed / agent, tool, link |
@@ -172,8 +172,8 @@ and a dimmed backdrop where every foreground under the modal collapses to Border
 
 ## Borders
 
-None. A 1-col `▌` Accent rail marks the user band and the input; a Warn rail marks the ask panel; a
-Border rule underlines a modal group heading. No box-drawing characters anywhere.
+None. A 1-col `▌` Accent rail marks the user band and the input; a Warn rail marks the ask panel; no
+rule under any heading. No box-drawing characters anywhere.
 
 ## Motion
 
@@ -208,8 +208,8 @@ Status vocabulary, the only one: `▪` state mark (Ok, Warn, Err, Dim), `▫` of
 | Input | Focus band, Accent rail, Accent `›`; chips: agent, model, effort (Accent), queued (Warn); tokens right | focus; disabled Dim prompt while a modal is open |
 | Footer | keys in Text, labels Dim, three spaces apart, no backgrounds; right: mode chip, Accent `ctrl+k palette` chip | default; select mode (Warn) |
 | Sidebar | 38 cols Raised; title Strong bold; headings Accent bold; meter Accent / Overlay; spend label Muted, value Strong; links `▪ PR #n title` + `ci ✓ · state`; a links error is one Muted line, e.g. `links paused: GitHub rate limit, retry 14:05`, never the raw error | default only |
-| Modal | Raised body, full-width Accent title bar (title Surface bold, `esc` right), shade, dim backdrop | open |
-| /config | `/ filter` on Focus; a curated list of about 20 settings with human labels (Theme, Transcript, Sidebar, Effort, Tend, Serve…) in Look, Agent, Tend, Serve, Notify, then `Advanced (N)` collapsed; filtering searches all of them; booleans read on/off; the config key shows only in the description footer | focus row: Focus bg, rail, every option as a chip, `‹ value ›`; changed Accent `•`; theme row as accent swatches |
+| Modal | Raised body, full-width Accent title bar (title Surface bold, `esc` right), shade, dim backdrop; lists wrap from the last row to the first and back | open |
+| /config | `/ filter` on Focus; a curated list of about 20 settings with human labels (Theme, Transcript, Sidebar, Effort, Tend, Serve…) in Look, Agent, Tend, Serve, Notify, then `Advanced (N)` collapsed, its settings under topic headings (Batches, Watch, Guard, Serve, Chat apps…) with labels that read without the key; filtering searches all of them; booleans read on/off; headings carry no rule; the config key shows only in the description footer; `f` (with an empty filter) fills the screen with a detail pane on the right | focus row: Focus bg, rail, every option as a chip, `‹ value ›`; enter opens an inline editor under it: a picker for a fixed set (enums, booleans, themes, agents), `▪`/`▫` checkboxes for a comma list with known values, a text field otherwise; nothing goes through `/set`; changed Accent `•`; theme row as accent swatches |
 | /usage | period chips; tiles spent, runs, tokens out, cache read on Overlay with coloured top tick; 30-day Accent bars (today Strong); by agent and by model with cost bars; no-agent group last, Muted italic; token bar cache Warn, in Info, out Ok | active period Accent chip |
 | Doctor | same modal frame, one row per check in the status vocabulary | ok, warn, failed |
 
