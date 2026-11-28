@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/agents/skills"
 )
 
 func TestReleaseArchiveListsEveryKnownSkill(t *testing.T) {
@@ -21,7 +23,7 @@ func TestReleaseArchiveListsEveryKnownSkill(t *testing.T) {
 		t.Fatal("release.yml has no smithy-skills.tar.gz tar line")
 	}
 	fields := strings.Fields(line)
-	for _, k := range Known {
+	for _, k := range skills.Known {
 		if !containsField(fields, k) {
 			t.Errorf("release archive misses skill %q", k)
 		}

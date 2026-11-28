@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/layout"
 )
 
@@ -93,4 +94,4 @@ func pathCmd(args []string) int {
 }
 
 // RecordPathFile notes rc in layout.PathRecord, so uninstall removes the PATH line it got.
-func RecordPathFile(rc string) { recordLine(layout.PathRecord(), rc) }
+func RecordPathFile(rc string) { skills.RecordLine(layout.PathRecord(), rc) }

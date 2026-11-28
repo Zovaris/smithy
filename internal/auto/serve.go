@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/agents/sandbox"
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/ghx"
@@ -180,7 +182,7 @@ func SessionHours() float64 {
 // Prompt is the orchestrator's fixed prompt for one task dir.
 func Prompt(dir string, hours float64) string {
 	tend := "the tend skill's SKILL.md"
-	if p, ok := agents.FindSkill("tend"); ok {
+	if p, ok := skills.FindSkill("tend"); ok {
 		tend = p
 	}
 	return fmt.Sprintf(`Read %s and follow it for `+"`tend auto once %s`"+`: start warden on that dir (its batch values are pre-answered; this run is the user's yes), launching workers with `+"`smithy agent`"+` (separate processes that outlive you). Report each issue with `+"`smithy auto report`"+` as its card moves. End when every item is ready, merged or blocked, or after %s hours; then print one line per issue and done:.
@@ -602,7 +604,7 @@ func (sv *Server) launch(dir string) error {
 	cmd := exec.Command(exe, "agent", "--bg", "--profile", "auto", "--timeout", strconv.FormatFloat(hours*60, 'f', -1, 64),
 		"--cwd", sv.Opt.Cwd, "--log", log, prompt)
 	cmd.Dir = sv.Opt.Cwd
-	env := append(agents.Scrub(os.Environ()), agents.SandboxRoleEnv+"=orchestrator")
+	env := append(agents.Scrub(os.Environ()), sandbox.SandboxRoleEnv+"=orchestrator")
 	if sv.hb.Agent != "custom" {
 		env = append(env, "AGENT_CLI="+sv.hb.Agent)
 	}
@@ -633,9 +635,9 @@ func (sv *Server) launch(dir string) error {
 var sandboxReady = defaultSandboxReady
 
 func defaultSandboxReady(agent string) error {
-	mode, err := agents.SandboxMode()
+	mode, err := sandbox.SandboxMode()
 	if err == nil {
-		err = agents.SandboxCheckAgent(mode, agent, agents.HostProbe())
+		err = sandbox.SandboxCheckAgent(mode, agent, sandbox.HostProbe())
 	}
 	if err != nil {
 		return fmt.Errorf("auto.sandbox: %v; nothing launches until it is fixed (smithy doctor)", err)

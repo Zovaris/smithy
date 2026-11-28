@@ -1,8 +1,7 @@
-package agents
+package sandbox
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,62 +11,14 @@ import (
 
 	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/Zovaris/smithy/internal/apiloop/tools"
-	"github.com/Zovaris/smithy/internal/config"
 )
 
-func mustAPITools(t *testing.T, o Options, model string) *tools.Set {
-	t.Helper()
-	s, err := apiTools(o, model, "off", HostProbe())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { s.Close() })
-	return s
-}
-
-func TestAPIReadOnlyOffersOnlyReadTools(t *testing.T) {
-	fake := &apiFake{}
-	if _, _, rc, _ := apiRun(t, fake, "--backend", "api", "--readonly", "--model", "anthropic/claude-sonnet-4"); rc != 0 {
-		t.Fatalf("rc=%d", rc)
-	}
-	var names []string
-	for _, s := range fake.got.Tools {
-		names = append(names, s.Name)
-	}
-	for _, n := range names {
-		if n != "read" && n != "glob" && n != "grep" {
-			t.Fatalf("read-only run offers %v", names)
-		}
-	}
-	set := mustAPITools(t, Options{Cwd: t.TempDir(), ReadOnly: true}, "gpt-5")
-	for _, c := range []string{"write", "edit", "shell", "apply_patch", "fetch"} {
-		if ok, _ := set.Permit(apiloop.ToolCall{Name: c, Args: []byte(`{"path":"a","command":"git status","url":"https://github.com/"}`)}); ok {
-			t.Errorf("%s permitted in a read-only run", c)
-		}
-	}
-}
-
-func TestAPIContainerSandboxRefused(t *testing.T) {
-	cfg := filepath.Join(t.TempDir(), "c.json")
-	t.Setenv("SMITHY_CONFIG", cfg)
-	if err := config.Set(cfg, "auto.sandbox", "container"); err != nil {
-		t.Fatal(err)
-	}
-	fake := &apiFake{}
-	if _, _, rc, _ := apiRun(t, fake, "--backend", "api", "--model", "anthropic/claude-sonnet-4"); rc != 1 || fake.got.Model != "" {
-		t.Fatalf("container mode: rc=%d, loop ran=%v", rc, fake.got.Model != "")
-	}
-	if _, err := apiShellSandbox("container", HostProbe(), SandboxPaths{}); !errors.Is(err, ErrContainerRemoved) {
-		t.Fatalf("err %v", err)
-	}
-}
-
 func TestAPIShellSandboxOffIsUnchanged(t *testing.T) {
-	if w, err := apiShellSandbox("off", HostProbe(), SandboxPaths{}); w != nil || err != nil {
+	if w, err := APIShell("off", HostProbe(), SandboxPaths{}); w != nil || err != nil {
 		t.Fatalf("off: wrap=%v err=%v", w != nil, err)
 	}
 	p := Probe{GOOS: "plan9", Look: exec.LookPath}
-	if _, err := apiShellSandbox("native", p, SandboxPaths{}); err == nil {
+	if _, err := APIShell("native", p, SandboxPaths{}); err == nil {
 		t.Fatal("native on an unsupported OS must fail closed")
 	}
 }
@@ -99,7 +50,7 @@ func TestAPINativeSandboxConfinesShellWrites(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	cwd, outside := t.TempDir(), home
 	t.Cleanup(func() { os.Remove(filepath.Join(home, ".smithy-sandbox-test-out")) })
-	wrap, err := apiShellSandbox("native", HostProbe(), SandboxPaths{Cwd: realPath(cwd)})
+	wrap, err := APIShell("native", HostProbe(), SandboxPaths{Cwd: RealPath(cwd)})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Zovaris/smithy/internal/agents/sandbox"
 	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/Zovaris/smithy/internal/apiloop/tools"
 	"github.com/Zovaris/smithy/internal/auth"
@@ -32,7 +33,7 @@ func NewAPIChat(target, cwd string) (*APIChat, error) {
 	if APIProvider == nil {
 		return nil, errors.New("the api backend needs the harness build")
 	}
-	mode, err := SandboxMode()
+	mode, err := sandbox.SandboxMode()
 	if err != nil {
 		return nil, fmt.Errorf("auto.sandbox: %v (fails closed)", err)
 	}
@@ -46,7 +47,7 @@ func NewAPIChat(target, cwd string) (*APIChat, error) {
 	if err != nil {
 		return nil, errors.New(proof.Redact(err.Error()))
 	}
-	set, err := apiTools(Options{Cwd: cwd}, model, mode, HostProbe())
+	set, err := apiTools(Options{Cwd: cwd}, model, mode, sandbox.HostProbe())
 	if err != nil {
 		return nil, fmt.Errorf("auto.sandbox: %v (fails closed)", err)
 	}

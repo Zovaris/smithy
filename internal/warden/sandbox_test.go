@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/agents/sandbox"
 	"github.com/Zovaris/smithy/internal/config"
 )
 
@@ -27,7 +27,7 @@ func sandboxReport(t *testing.T, mode, goos string, have ...string) (string, boo
 	if err := config.Set(config.UserFile(), "auto.agent", "claude"); err != nil {
 		t.Fatal(err)
 	}
-	p := agents.Probe{GOOS: goos, Look: func(b string) (string, error) {
+	p := sandbox.Probe{GOOS: goos, Look: func(b string) (string, error) {
 		if slices.Contains(have, b) {
 			return b, nil
 		}

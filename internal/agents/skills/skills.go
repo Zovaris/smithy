@@ -1,4 +1,4 @@
-package agents
+package skills
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 	"github.com/Zovaris/smithy/internal/layout"
 )
 
-const skillsUsage = `Finds installed skills, so a skill or a worker can read another skill's SKILL.md directly.
+const Usage = `Finds installed skills, so a skill or a worker can read another skill's SKILL.md directly.
 User-invoked skills can't be called by an agent as a slash command, but any agent in any
 harness can read the file.
   smithy skills <name>     absolute path of <name>/SKILL.md; exit 1 when not installed
@@ -113,7 +113,7 @@ func SkillsMain(args []string) int {
 		}
 		return 0
 	case "", "-h", "--help":
-		fmt.Println(skillsUsage)
+		fmt.Println(Usage)
 		return 2
 	}
 	p, ok := FindSkill(a)
@@ -184,4 +184,9 @@ func MissingInHarness(h string) (missing []string, dir string) {
 		}
 	}
 	return missing, dirs[0]
+}
+
+func isFile(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.Mode().IsRegular()
 }

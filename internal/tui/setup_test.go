@@ -11,6 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/api"
 )
 
@@ -49,7 +50,7 @@ func firstRunSetup() *fakeSetup {
 		Default: api.AgentChoice{Agent: "claude"},
 		Kit:     api.KitChoice{MCP: true, Skills: []string{}},
 		Skills:  []string{"smelt", "hush"},
-		Harnesses: []agents.HarnessInventory{
+		Harnesses: []skills.HarnessInventory{
 			{Harness: "claude", Present: true, SkillsDir: "~/.claude/skills", Smithy: []string{"smelt", "hush"}, Missing: []string{"use-smithy", "warden", "ledger", "scout", "tend", "simple"}, MCP: []string{"linear"}},
 			{Harness: "pi", Present: false},
 		},

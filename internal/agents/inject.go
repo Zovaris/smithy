@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/layout"
 )
@@ -359,17 +360,17 @@ func RunKit(cli string, o Options, getenv func(string) string) (*Injection, erro
 		return nil, nil
 	}
 	useMCP, skillNames := KitChoice()
-	var skills []string
+	var dirs []string
 	for _, n := range skillNames {
-		if p, ok := FindSkill(n); ok {
-			skills = append(skills, filepath.Dir(p))
+		if p, ok := skills.FindSkill(n); ok {
+			dirs = append(dirs, filepath.Dir(p))
 		}
 	}
 	guard := ""
 	if KitGuard != nil && Kind(cli) == "claude" {
 		guard = KitGuard(KitMCP[0])
 	}
-	if !useMCP && len(skills) == 0 && guard == "" {
+	if !useMCP && len(dirs) == 0 && guard == "" {
 		return nil, nil
 	}
 	args := slices.Clone(KitMCP[1:])
@@ -397,7 +398,7 @@ func RunKit(cli string, o Options, getenv func(string) string) (*Injection, erro
 		}
 		dir = d
 	}
-	k := Kit{Skills: skills}
+	k := Kit{Skills: dirs}
 	if useMCP {
 		k.MCP = map[string]MCPServer{"smithy": {Command: KitMCP[0], Args: args, Env: env}}
 	}

@@ -1,4 +1,4 @@
-package agents
+package sandbox
 
 import (
 	"context"
@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/agents/catalog"
 	"github.com/Zovaris/smithy/internal/config"
-	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/layout"
 	"github.com/Zovaris/smithy/internal/pool"
 )
@@ -113,7 +113,7 @@ func SandboxCheck(mode, cli string, p Probe) error {
 	default:
 		return fmt.Errorf("unknown sandbox mode %q", mode)
 	}
-	switch Kind(cli) {
+	switch catalog.Kind(cli) {
 	case "codex":
 		if p.GOOS != "darwin" && p.GOOS != "linux" {
 			return fmt.Errorf("codex's sandbox needs macOS or Linux, not %s", p.GOOS)
@@ -264,54 +264,6 @@ func GoCacheDir(warden, cwd string) string {
 	return filepath.Join(warden, "gocache", filepath.Base(cwd))
 }
 
-// nativeSettings fills SandboxPaths from this machine for a worker in cwd, narrows its --add-dir
-// list (NativeDirs) and returns the settings JSON and the worker's GOCACHE.
-func nativeSettings(o *Options, gitDir string) (settings, gocache string, err error) {
-	extra, err := SandboxSetting("auto.sandbox_domains", "")
-	if err != nil {
-		return "", "", err
-	}
-	weak, err := SandboxSetting("auto.sandbox_weaker_net", "true")
-	if err != nil {
-		return "", "", err
-	}
-	cwd := o.Cwd
-	parent := ""
-	if top, err := ghx.Run("git", "-C", cwd, "rev-parse", "--show-toplevel"); err == nil {
-		parent = filepath.Dir(top)
-	}
-	sm := layout.Home()
-	var ro []string
-	o.AddDirs, ro = NativeDirs(o.AddDirs, sm, filepath.Join(sm, "plans"), layout.WardenHome(), parent)
-	home := layout.UserHome()
-	gocache = GoCacheDir(realPath(layout.WardenHome()), cwd)
-	if err := os.MkdirAll(gocache, 0o700); err != nil {
-		return "", "", err
-	}
-	for i, d := range ro {
-		ro[i] = realPath(d)
-	}
-	key, sock := "", ""
-	if f, _ := ghx.Run("git", "-C", cwd, "config", "--get", "gpg.format"); f == "ssh" {
-		if k, _ := ghx.Run("git", "-C", cwd, "config", "--get", "user.signingkey"); strings.HasPrefix(k, "~/") {
-			key = filepath.Join(home, k[2:])
-		} else {
-			key = k
-		}
-		sock = os.Getenv("SSH_AUTH_SOCK")
-	}
-	secret, err := PoolDirs()
-	if err != nil {
-		return "", "", err
-	}
-	p := SandboxPaths{Cwd: realPath(cwd), Home: home, SmithyHome: sm, Warden: layout.WardenHome(), GoCache: gocache, ReadOnly: ro,
-		SigningKey: key, AgentSocket: sock, Secret: secret}
-	if gitDir != "" {
-		p.GitDir = realPath(gitDir)
-	}
-	return NativeSettings(p, SandboxDomains(extra), runtime.GOOS, weak != "false"), gocache, nil
-}
-
 // PoolDirs are the smithy pool account dirs (each a harness login) and their default root: a
 // sandboxed worker's shell never reads or writes them.
 func PoolDirs() ([]string, error) {
@@ -326,7 +278,7 @@ func PoolDirs() ([]string, error) {
 		}
 	}
 	for i, d := range out {
-		out[i] = realPath(d)
+		out[i] = RealPath(d)
 	}
 	return out, nil
 }

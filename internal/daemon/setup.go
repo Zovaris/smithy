@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/apiloop"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/layout"
@@ -35,12 +36,12 @@ func (sv *Server) ready() []agents.Ready {
 // and ~/.smithy/skills: the ones the kit may link in or chat may invoke, with their SKILL.md.
 func installedSkills() ([]string, map[string]string) {
 	out, paths := []string{}, map[string]string{}
-	for _, s := range agents.Known {
-		if p, ok := agents.FindSkill(s); ok {
+	for _, s := range skills.Known {
+		if p, ok := skills.FindSkill(s); ok {
 			out, paths[s] = append(out, s), p
 		}
 	}
-	user := agents.UserSkills(layout.UserHome())
+	user := skills.UserSkills(layout.UserHome())
 	for _, s := range slices.Sorted(maps.Keys(user)) {
 		if _, ok := paths[s]; !ok {
 			out, paths[s] = append(out, s), user[s]
@@ -68,8 +69,8 @@ func (sv *Server) agentModels(w http.ResponseWriter, r *http.Request) {
 }
 
 func (sv *Server) setup(w http.ResponseWriter, r *http.Request) {
-	skills, paths := installedSkills()
-	s := Setup{Agents: sv.ready(), Skills: skills, Paths: paths, Harnesses: agents.Inventory(layout.UserHome(), os.Getenv), Effort: agents.Effort()}
+	names, paths := installedSkills()
+	s := Setup{Agents: sv.ready(), Skills: names, Paths: paths, Harnesses: skills.Inventory(layout.UserHome(), os.Getenv), Effort: agents.Effort()}
 	s.Default.Agent, s.Default.Model = sv.Defaults()
 	s.Chosen = s.Default.Agent != ""
 	if s.Default.Agent == "" {
