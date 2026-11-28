@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"sync"
@@ -475,6 +476,20 @@ func (n *Notifier) Final(now time.Time) {
 	}
 }
 
+// reportPanic recovers a panic in Flush, which runs in the background, and reports it with its
+// stack on stderr and through log, so a bug is seen without taking serve down.
+func (n *Notifier) reportPanic() {
+	v := recover()
+	if v == nil {
+		return
+	}
+	msg := fmt.Sprintf("notify: flush panicked: %v\n%s", v, debug.Stack())
+	fmt.Fprintln(os.Stderr, msg)
+	if n.log != nil {
+		n.log(msg)
+	}
+}
+
 // Flush sends what happened since the last flush. It never panics or returns an error: a failed
 // send is logged once (until a send succeeds or the error changes) and shown by status.
 func (n *Notifier) Flush(now time.Time) {
@@ -482,7 +497,7 @@ func (n *Notifier) Flush(now time.Time) {
 		return
 	}
 	defer n.mu.Unlock()
-	defer func() { _ = recover() }()
+	defer n.reportPanic()
 	st, ok := load()
 	tok, chat, cerr := creds()
 	if !ok || cerr != nil {

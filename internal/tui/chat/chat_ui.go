@@ -3,7 +3,6 @@
 package chat
 
 import (
-	"context"
 	"crypto/rand"
 	hexenc "encoding/hex"
 	"encoding/json"
@@ -641,7 +640,9 @@ func (m chatView) agentsKey(k string) (tea.Model, tea.Cmd) {
 		if l := m.listed(); m.agentSel < len(l) && m.sess != nil {
 			api, id := m.sess, l[m.agentSel].id
 			return m, func() tea.Msg {
-				if err := api.StopSession(context.Background(), id); err != nil {
+				ctx, cancel := daemonCtx()
+				defer cancel()
+				if err := api.StopSession(ctx, id); err != nil {
 					return sessionErrMsg{what: "stop", err: err}
 				}
 				return nil

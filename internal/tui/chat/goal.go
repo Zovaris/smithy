@@ -46,7 +46,9 @@ func (m chatView) goalCommand(arg string) (tea.Model, tea.Cmd) {
 	}
 	id := s.id
 	return m, func() tea.Msg {
-		s, err := api.SetSessionGoal(context.Background(), id, arg)
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		s, err := api.SetSessionGoal(ctx, id, arg)
 		return sessionGoalSetMsg{s: s, err: err}
 	}
 }

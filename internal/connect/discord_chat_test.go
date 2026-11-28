@@ -13,14 +13,14 @@ func TestDiscordChatChannel(t *testing.T) {
 	d := dc(t, a)
 	d.ChatChan = "600"
 	d.guild = "42"
-	in, ok := d.event(dEv("MESSAGE_CREATE", `{"id":"801","channel_id":"600","guild_id":"42","author":{"id":"5"},"content":"start this"}`))
+	in, ok := d.event(dEv("MESSAGE_CREATE", `{"id":"801","channel_id":"600","guild_id":"42","author":{"id":"5"},"content":"start this"}`), nil)
 	if !ok || !in.Chat || in.Thread != "" || in.Ref != "801" {
 		t.Fatalf("top-level %+v", in)
 	}
-	if _, ok := d.event(dEv("MESSAGE_CREATE", `{"id":"802","channel_id":"600","guild_id":"42","author":{"id":"6"},"content":"stranger"}`)); ok {
+	if _, ok := d.event(dEv("MESSAGE_CREATE", `{"id":"802","channel_id":"600","guild_id":"42","author":{"id":"6"},"content":"stranger"}`), nil); ok {
 		t.Fatal("stranger counted")
 	}
-	r, ok := d.event(dEv("MESSAGE_CREATE", `{"id":"803","channel_id":"500","guild_id":"42","author":{"id":"5"},"content":"mine","message_reference":{"message_id":"900","channel_id":"500"}}`))
+	r, ok := d.event(dEv("MESSAGE_CREATE", `{"id":"803","channel_id":"500","guild_id":"42","author":{"id":"5"},"content":"mine","message_reference":{"message_id":"900","channel_id":"500"}}`), nil)
 	if !ok || r.ReplyTo != "500/900" || r.Chat {
 		t.Fatalf("reply %+v", r)
 	}

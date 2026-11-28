@@ -370,3 +370,15 @@ func TestClassifyExported(t *testing.T) {
 		t.Fatal("usage is no alert")
 	}
 }
+
+func TestFlushPanicIsReportedNotHidden(t *testing.T) {
+	var got []string
+	n := New(func(l string) { got = append(got, l) })
+	func() {
+		defer n.reportPanic()
+		panic("boom")
+	}()
+	if len(got) != 1 || !strings.Contains(got[0], "notify: flush panicked: boom") || !strings.Contains(got[0], "goroutine") {
+		t.Fatalf("logged %q", got)
+	}
+}

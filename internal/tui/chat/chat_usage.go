@@ -37,7 +37,9 @@ func (m chatView) openUsage() (tea.Model, tea.Cmd) {
 	}
 	id := m.current
 	return m, func() tea.Msg {
-		r, err := a.Usage(context.Background(), id)
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		r, err := a.Usage(ctx, id)
 		if err != nil {
 			return sessionErrMsg{what: "/usage", err: err}
 		}

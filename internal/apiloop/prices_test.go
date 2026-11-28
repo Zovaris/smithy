@@ -105,3 +105,24 @@ func TestBadFeedKeepsCache(t *testing.T) {
 		t.Fatal("cache overwritten by a bad feed")
 	}
 }
+
+func TestCostDoesNotWaitOnAnotherCallersFetch(t *testing.T) {
+	started, release := make(chan struct{}), make(chan struct{})
+	useFeed(t, func() ([]byte, error) { close(started); <-release; return []byte(feed), nil })
+	u := usage.Usage{Input: 1_000_000}
+	first := make(chan *float64)
+	go func() { first <- Cost("anthropic", "claude-sonnet-4-5", u) }()
+	<-started
+	second := make(chan *float64)
+	go func() { second <- Cost("anthropic", "claude-sonnet-4-5", u) }()
+	select {
+	case <-second:
+	case <-time.After(time.Second):
+		close(release)
+		t.Fatal("a second caller waited for the first one's fetch")
+	}
+	close(release)
+	if c := <-first; !near(c, 3) {
+		t.Fatalf("fetching caller got %v", c)
+	}
+}

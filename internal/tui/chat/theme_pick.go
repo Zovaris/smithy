@@ -3,7 +3,6 @@
 package chat
 
 import (
-	"context"
 	"slices"
 
 	tea "charm.land/bubbletea/v2"
@@ -24,7 +23,9 @@ func (m chatView) loadTheme() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		s, err := api.Settings(context.Background())
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		s, err := api.Settings(ctx)
 		if err != nil {
 			return nil
 		}
@@ -43,7 +44,9 @@ func (m chatView) saveTheme(n string) tea.Cmd {
 		return func() tea.Msg { return themeMsg{name: n, note: "theme " + n + " for this chat; no daemon to save it"} }
 	}
 	return func() tea.Msg {
-		err := api.SetSetting(context.Background(), "ui.theme", n)
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		err := api.SetSetting(ctx, "ui.theme", n)
 		return themeMsg{name: n, note: "theme " + n + ": saved as ui.theme, the web uses it too", err: err}
 	}
 }

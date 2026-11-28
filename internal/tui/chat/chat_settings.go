@@ -45,7 +45,9 @@ func (m chatView) loadTend() tea.Cmd {
 	}
 	api := m.cfg
 	return func() tea.Msg {
-		l, err := api.Tend(context.Background())
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		l, err := api.Tend(ctx)
 		if err != nil {
 			return nil
 		}
@@ -91,16 +93,22 @@ func (m chatView) saveSetting(p panelSetting) tea.Cmd {
 	return func() tea.Msg {
 		var err error
 		if p.key == "serve" {
-			err = api.SetServe(context.Background(), v == "on")
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			err = api.SetServe(ctx, v == "on")
 		} else {
-			err = api.SetSetting(context.Background(), p.key, v)
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			err = api.SetSetting(ctx, p.key, v)
 		}
 		if err != nil {
 			return sessionErrMsg{what: "saving " + p.key, err: err}
 		}
 		out := settingsDoneMsg{lines: []string{"saved " + p.key + " = " + v}}
 		if p.key == "tend.daemon" {
-			if l, err := api.Tend(context.Background()); err == nil {
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			if l, err := api.Tend(ctx); err == nil {
 				out.tend = &l
 			}
 		}
@@ -209,7 +217,9 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 		}
 	case name == "keys":
 		return m, func() tea.Msg {
-			s, err := api.Settings(context.Background())
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			s, err := api.Settings(ctx)
 			if err != nil {
 				return sessionErrMsg{what: "/keys", err: err}
 			}
@@ -217,7 +227,9 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 		}
 	case name == "serve" && arg == "":
 		return m, func() tea.Msg {
-			st, err := api.Settings(context.Background())
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			st, err := api.Settings(ctx)
 			if err != nil {
 				return sessionErrMsg{what: "/serve", err: err}
 			}
@@ -234,7 +246,9 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 		}
 	case name == "tend":
 		return m, func() tea.Msg {
-			l, err := api.Tend(context.Background())
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			l, err := api.Tend(ctx)
 			if err != nil {
 				return sessionErrMsg{what: "/tend", err: err}
 			}
@@ -251,7 +265,9 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 		}
 	case name == "channels":
 		return m, func() tea.Msg {
-			s, err := api.Settings(context.Background())
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			s, err := api.Settings(ctx)
 			if err != nil {
 				return sessionErrMsg{what: "/channels", err: err}
 			}
@@ -260,7 +276,9 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 	case name == "doctor":
 		m.info, m.overlay, m.pal = infoPanel{title: "Doctor", lines: []string{"running smithy doctor…"}}, overlayInfo, palette{}
 		return m, func() tea.Msg {
-			lines, err := api.Doctor(context.Background())
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			lines, err := api.Doctor(ctx)
 			if err != nil {
 				return sessionErrMsg{what: "/doctor", err: err}
 			}
@@ -271,7 +289,9 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	return m, func() tea.Msg {
-		lines, err := run(context.Background())
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		lines, err := run(ctx)
 		if err != nil {
 			return sessionErrMsg{what: "/" + name, err: err}
 		}
@@ -355,7 +375,9 @@ func (m *chatView) openPalette(query string) tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		s, err := api.Settings(context.Background())
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		s, err := api.Settings(ctx)
 		if err != nil {
 			return nil
 		}

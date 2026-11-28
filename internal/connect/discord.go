@@ -458,7 +458,7 @@ func (d *Discord) connect(ctx context.Context) (*dgw, error) {
 					seq.n = ev.S
 					seq.Unlock()
 				}
-				if in, ok := d.event(ev); ok {
+				if in, ok := d.event(ev, g.done); ok {
 					d.deliver(g, in)
 				}
 			case 1:
@@ -479,7 +479,7 @@ func (d *Discord) connect(ctx context.Context) (*dgw, error) {
 
 // event turns a dispatch into an Inbound: a thread reply or a button press. A press is
 // acknowledged (deferred update) whether it counts or not, so the client stops its spinner.
-func (d *Discord) event(ev dEvent) (Inbound, bool) {
+func (d *Discord) event(ev dEvent, done <-chan struct{}) (Inbound, bool) {
 	switch ev.T {
 	case "MESSAGE_CREATE":
 		var m struct {
@@ -530,8 +530,20 @@ func (d *Discord) event(ev dEvent) (Inbound, bool) {
 		if snowflakeRe.MatchString(it.ID) && itokenRe.MatchString(it.Token) {
 			go func(path string) {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				defer cancel()
+				select {
+				case <-done:
+					return
+				default:
+				}
+				go func() {
+					select {
+					case <-done:
+						cancel()
+					case <-ctx.Done():
+					}
+				}()
 				_ = d.call(ctx, "POST", path, map[string]int{"type": 6}, nil)
-				cancel()
 			}("/interactions/" + it.ID + "/" + it.Token + "/callback")
 		}
 		if it.Member == nil || it.Message == nil || len(it.Data.Custom) > 100 || !d.allowed(it.Guild, it.Member.User) {

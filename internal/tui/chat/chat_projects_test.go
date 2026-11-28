@@ -142,3 +142,23 @@ func TestAddProjectWithFolderPicker(t *testing.T) {
 		t.Errorf("starts in the new project: %v", f.dirs)
 	}
 }
+
+func TestProjectPickerWithoutADaemonDoesNotPanic(t *testing.T) {
+	m := chatView{}
+	m.proj.browse = &api.DirList{Dir: "/home", Parent: "/"}
+	got, _ := m.projectKey("a")
+	if e := got.(chatView).proj.err; !strings.Contains(e, "daemon") {
+		t.Fatalf("err = %q", e)
+	}
+	if msg := m.listDirs("/home")(); msg.(dirsMsg).err == nil {
+		t.Fatal("listing folders without a daemon gave no error")
+	}
+}
+
+func TestDaemonCallsFromTheTUIHaveADeadline(t *testing.T) {
+	ctx, cancel := daemonCtx()
+	defer cancel()
+	if _, ok := ctx.Deadline(); !ok {
+		t.Fatal("a daemon call from the TUI can hang forever")
+	}
+}
