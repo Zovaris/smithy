@@ -64,6 +64,7 @@ type chatSession struct {
 	title, agent, model, now string
 	effort                   string
 	dir                      string // the folder it started in; "" for batch events
+	parent                   string
 	prs                      []string
 	since, turn              time.Time
 }

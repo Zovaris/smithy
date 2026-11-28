@@ -144,8 +144,15 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 			}
 		}
 	case daemon.KindSessionMessage:
-		var d struct{ Role, Text string }
+		var d struct{ Role, Text, By string }
 		if json.Unmarshal(data, &d) != nil || strings.TrimSpace(d.Text) == "" {
+			return true
+		}
+		if d.Role == "user" && strings.HasPrefix(d.By, "session:") {
+			if !strings.HasPrefix(d.Text, "Message from session ") {
+				m.into(id, chatMsg{who: "daemon", kind: "system", text: m.th.g.dot + " started by " + strings.TrimPrefix(d.By, "session:") + ": " + clean(d.Text)})
+			}
+			m.now(id, "")
 			return true
 		}
 		if d.Role == "user" {
@@ -156,6 +163,12 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 		if m.lastText(id) != strings.TrimSpace(d.Text) {
 			m.into(id, chatMsg{who: "agent", text: strings.TrimSpace(d.Text)})
 			m.addStreamed(id, len(d.Text))
+		}
+	case daemon.KindSessionMail:
+		var ml daemon.Mail
+		if json.Unmarshal(data, &ml) == nil && ml.From != "" && ml.To != "" {
+			m.into(ml.To, chatMsg{who: "daemon", kind: "system", text: "← " + ml.From + ": " + clean(ml.Text)})
+			m.into(ml.From, chatMsg{who: "daemon", kind: "system", text: "→ " + ml.To + ": " + clean(ml.Text)})
 		}
 	case daemon.KindSessionText:
 		var d struct{ Text string }
@@ -225,6 +238,9 @@ func (m *chatView) meta(id string, s daemon.Session) {
 				m.sessions[i].dir = s.Dir
 			}
 			m.sessions[i].prs = s.PRs
+			if s.Parent != "" {
+				m.sessions[i].parent = s.Parent
+			}
 			if !s.Created.IsZero() {
 				m.sessions[i].since = s.Created
 			}
@@ -249,9 +265,60 @@ func (m chatView) listed() []chatSession {
 		}
 	}
 	if m.allProj {
-		return append(in, out...)
+		return append(tree(in), tree(out)...)
 	}
-	return in
+	return tree(in)
+}
+
+func tree(ss []chatSession) []chatSession {
+	has := map[string]bool{}
+	for _, s := range ss {
+		has[s.id] = true
+	}
+	kids := map[string][]chatSession{}
+	var tops []chatSession
+	for _, s := range ss {
+		if s.parent != "" && has[s.parent] && s.parent != s.id {
+			kids[s.parent] = append(kids[s.parent], s)
+		} else {
+			tops = append(tops, s)
+		}
+	}
+	out := make([]chatSession, 0, len(ss))
+	seen := map[string]bool{}
+	var walk func(s chatSession)
+	walk = func(s chatSession) {
+		if seen[s.id] {
+			return
+		}
+		seen[s.id] = true
+		out = append(out, s)
+		for _, k := range kids[s.id] {
+			walk(k)
+		}
+	}
+	for _, s := range tops {
+		walk(s)
+	}
+	for _, s := range ss {
+		walk(s)
+	}
+	return out
+}
+
+func (m chatView) depth(id string) int {
+	parent := map[string]string{}
+	for _, s := range m.sessions {
+		parent[s.id] = s.parent
+	}
+	n := 0
+	for p := parent[id]; p != "" && n < 8; p = parent[p] {
+		if _, ok := parent[p]; !ok {
+			break
+		}
+		n++
+	}
+	return n
 }
 
 func projHint(all bool) string {
