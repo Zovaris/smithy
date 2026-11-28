@@ -4,13 +4,13 @@ go 1.27
 
 require (
 	charm.land/bubbles/v2 v2.2.2
-	charm.land/bubbletea/v2 v2.1.2
+	charm.land/bubbletea/v2 v2.2.0
 	charm.land/glamour/v2 v2.0.1
 	charm.land/lipgloss/v2 v2.1.1
 	github.com/anthropics/anthropic-sdk-go v1.84.0
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/harmonica v0.2.0
-	github.com/charmbracelet/x/ansi v0.11.9
+	github.com/charmbracelet/x/ansi v0.12.0
 	github.com/fastschema/qjs v0.0.6
 	github.com/openai/openai-go/v3 v3.107.0
 	github.com/tetratelabs/wazero v1.9.0
