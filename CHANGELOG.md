@@ -48,7 +48,7 @@ part above `### Details`.
 - A secret request the daemon cannot record is denied at once instead of leaving the agent waiting until it times out.
 - The TUI no longer crashes when you browse or add a project without a running daemon.
 - A daemon that stops answering no longer freezes the TUI: each call gives up after two minutes, and requests from smithy's API client after five.
-- `smithy serve` waits for its last cycle and notification sends before it stops, and a Discord button ack stops when the gateway closes.
+- `smithy serve` waits for its last cycle (up to about 2.5 minutes) and notification sends before it stops, and a Discord button ack stops when the gateway closes.
 - A crash while sending notifications is now reported with its stack instead of hidden.
 - `smithy doctor --fix` reads its answers from one reader per run.
 - `smithy wait` stops on ctrl+c, even during a timer, with exit code 130.
