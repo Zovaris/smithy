@@ -1,9 +1,11 @@
 package workflow
 
-// Example is the shipped example: every day at 17:00 it lists open Dependabot alerts with gh;
-// when there are any, an agent judges whether to merge the fixes and the user gets its yes or no
-// and why. Set dir to a repo checkout before enabling it.
-const Example = `{
+import "sort"
+
+// Examples are the shipped example workflows by name. Set dir to a repo checkout before
+// enabling the GitHub ones.
+var Examples = map[string]string{
+	"dependabot-daily": `{
   "name": "dependabot-daily",
   "description": "Daily 17:00: open Dependabot alerts; if any, an agent judges whether to merge and you get its yes/no and why.",
   "schedule": "0 17 * * *",
@@ -12,13 +14,64 @@ const Example = `{
   "max_agents": 1,
   "max_cost_usd": 0.5,
   "steps": [
-    {"id": "alerts", "kind": "run",
+    {"id": "alerts", "kind": "run", "retry": {"count": 2, "backoff": "30s"},
      "run": "gh api 'repos/{owner}/{repo}/dependabot/alerts?state=open' --jq '.[] | \"\\(.security_advisory.severity) \\(.dependency.package.name): \\(.security_advisory.summary)\"'"},
-    {"id": "any", "kind": "if", "step": "alerts", "match": "\\S", "else": "stop"},
-    {"id": "judge", "kind": "agent", "answer": "yesno", "timeout_minutes": 10,
-     "prompt": "These Dependabot alerts are open in this repo:\n\n{{alerts.output}}\n\nLook at the open Dependabot PRs (gh pr list --author app/dependabot) and their CI. Should the user merge them now? Do not merge, push or change anything."},
-    {"id": "tell", "kind": "notify", "title": "Dependabot: merge? {{judge.answer}}",
-     "message": "{{judge.why}}\n\nOpen alerts:\n{{alerts.output}}"}
+    {"id": "any", "kind": "if", "if": {"step": "alerts", "match": "\\S"}, "else": "stop"},
+    {"id": "judge", "kind": "agent", "answer": "yesno", "timeout": "10m",
+     "prompt": "These Dependabot alerts are open in this repo:\n\n{{steps.alerts.output}}\n\nLook at the open Dependabot PRs (gh pr list --author app/dependabot) and their CI. Should the user merge them now? Do not merge, push or change anything."},
+    {"id": "tell", "kind": "notify", "title": "Dependabot: merge? {{steps.judge.answer}}",
+     "message": "{{steps.judge.why}}\n\nOpen alerts:\n{{steps.alerts.output}}"}
   ]
 }
-`
+`,
+	"repo-health": `{
+  "name": "repo-health",
+  "description": "Weekdays 09:00: failed CI runs and open PRs, summarised by an agent, sent to you.",
+  "schedule": "0 9 * * 1-5",
+  "dir": "",
+  "max_minutes": 15,
+  "max_agents": 1,
+  "max_cost_usd": 0.3,
+  "steps": [
+    {"id": "ci", "kind": "run", "retry": {"count": 1, "backoff": "20s"},
+     "run": "gh run list --status failure --limit 10 --json workflowName,headBranch,createdAt,url"},
+    {"id": "prs", "kind": "run", "retry": {"count": 1, "backoff": "20s"},
+     "run": "gh pr list --state open --limit 30 --json number,title,isDraft,reviewDecision,updatedAt"},
+    {"id": "failed", "kind": "json", "from": "{{steps.ci.output}}", "path": ""},
+    {"id": "count", "kind": "set", "vars": {"failures": "{{steps.failed.output}}"}},
+    {"id": "summary", "kind": "agent", "timeout": "5m",
+     "prompt": "Write this repo's health report for its maintainer: at most 6 short bullets, the most urgent first (red CI on main, PRs waiting on review longest).\n\nFailed CI runs:\n{{vars.failures}}\n\nOpen PRs:\n{{steps.prs.output}}"},
+    {"id": "tell", "kind": "notify", "title": "Repo health", "message": "{{steps.summary.output}}"}
+  ]
+}
+`,
+	"webhook-reply": `{
+  "name": "webhook-reply",
+  "description": "A POST to its webhook with {\"message\": \"...\"} gets an agent's short reply back in the response.",
+  "webhook": true,
+  "inputs": {"message": ""},
+  "outputs": {"reply": "{{steps.reply.output}}"},
+  "max_minutes": 5,
+  "max_agents": 1,
+  "max_cost_usd": 0.1,
+  "steps": [
+    {"id": "given", "kind": "if", "if": {"value": "{{inputs.message}}", "match": "\\S"}, "else": "stop"},
+    {"id": "reply", "kind": "agent", "timeout": "3m",
+     "prompt": "Reply in two or three sentences to this message. Change nothing on this machine.\n\n{{inputs.message}}"}
+  ]
+}
+`,
+}
+
+// Example is the Dependabot example.
+var Example = Examples["dependabot-daily"]
+
+// ExampleNames are the examples' names, sorted.
+func ExampleNames() []string {
+	var n []string
+	for k := range Examples {
+		n = append(n, k)
+	}
+	sort.Strings(n)
+	return n
+}

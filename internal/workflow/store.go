@@ -1,7 +1,9 @@
 package workflow
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -44,6 +46,7 @@ type Info struct {
 type state struct {
 	Enabled map[string]string    `json:"enabled"`
 	Since   map[string]time.Time `json:"since"`
+	Hooks   map[string]string    `json:"hooks,omitempty"`
 }
 
 var mu sync.Mutex
@@ -65,6 +68,9 @@ func (s Store) load() state {
 	}
 	if st.Since == nil {
 		st.Since = map[string]time.Time{}
+	}
+	if st.Hooks == nil {
+		st.Hooks = map[string]string{}
 	}
 	return st
 }
@@ -151,6 +157,9 @@ func (s Store) List() ([]Info, error) {
 
 // next is the scheduled time due after since, skipping runs missed by more than CatchUp.
 func (s Store) next(w Workflow, since, now time.Time) time.Time {
+	if w.Schedule == "" {
+		return time.Time{}
+	}
 	c, err := ParseCron(w.Schedule)
 	if err != nil {
 		return time.Time{}
@@ -202,6 +211,9 @@ func (s Store) Enable(name string, now time.Time) error {
 	defer mu.Unlock()
 	st := s.load()
 	st.Enabled[name], st.Since[name] = hash(b), now
+	if st.Hooks[name] == "" {
+		st.Hooks[name] = newToken()
+	}
 	return s.save(st)
 }
 
@@ -216,6 +228,43 @@ func (s Store) Disable(name string) error {
 	delete(st.Enabled, name)
 	delete(st.Since, name)
 	return s.save(st)
+}
+
+// Load reads name for a call step and says whether it is enabled as it is now.
+func (s Store) Load(name string) (Workflow, bool, error) {
+	w, b, err := s.Get(name)
+	if err != nil {
+		return w, false, err
+	}
+	mu.Lock()
+	st := s.load()
+	mu.Unlock()
+	h, ok := st.Enabled[name]
+	return w, ok && h == hash(b), nil
+}
+
+// HookToken is name's webhook token (made on its first enable; "" before).
+func (s Store) HookToken(name string) string {
+	mu.Lock()
+	defer mu.Unlock()
+	return s.load().Hooks[name]
+}
+
+// CheckHook reports whether token opens name's webhook: the workflow takes webhooks, is enabled
+// as it is now, and the token matches (constant time).
+func (s Store) CheckHook(name, token string) (Workflow, bool) {
+	w, on, err := s.Load(name)
+	if err != nil || !on || !w.Webhook || token == "" {
+		return w, false
+	}
+	want := s.HookToken(name)
+	return w, want != "" && subtle.ConstantTimeCompare([]byte(want), []byte(token)) == 1
+}
+
+func newToken() string {
+	b := make([]byte, 24)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 // Save writes w (validated). A save that changes the file turns its schedule off: the new

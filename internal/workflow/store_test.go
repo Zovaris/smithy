@@ -103,3 +103,34 @@ func TestStoreRejectsBadName(t *testing.T) {
 		}
 	}
 }
+
+func TestStoreHookToken(t *testing.T) {
+	s := Store{Dir: t.TempDir()}
+	w := parse(t, Examples["webhook-reply"])
+	s.Save(w)
+	if _, ok := s.CheckHook("webhook-reply", "x"); ok {
+		t.Fatal("disabled workflow opened")
+	}
+	s.Enable("webhook-reply", time.Now())
+	tok := s.HookToken("webhook-reply")
+	if len(tok) < 32 {
+		t.Fatalf("token %q", tok)
+	}
+	if _, ok := s.CheckHook("webhook-reply", tok); !ok {
+		t.Fatal("right token refused")
+	}
+	if _, ok := s.CheckHook("webhook-reply", tok+"x"); ok {
+		t.Fatal("wrong token opened")
+	}
+	h := parse(t, simple)
+	s.Save(h)
+	s.Enable("hello", time.Now())
+	if _, ok := s.CheckHook("hello", s.HookToken("hello")); ok {
+		t.Fatal("a workflow without webhook: true opened")
+	}
+	s.Disable("webhook-reply")
+	s.Enable("webhook-reply", time.Now())
+	if s.HookToken("webhook-reply") != tok {
+		t.Fatal("the token should survive a re-enable")
+	}
+}

@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// Scheduler runs due workflows (Tick) and runs by hand (RunNow), one run per workflow at a time.
-// OnRun, when set, sees each finished run.
+// Scheduler runs due workflows (Tick), runs by hand (RunNow) and webhook runs, one run per
+// workflow at a time, and keeps each running workflow's live record. OnRun sees each finished run.
 type Scheduler struct {
 	Store Store
 	Env   Env
@@ -16,6 +16,7 @@ type Scheduler struct {
 
 	mu      sync.Mutex
 	running map[string]bool
+	live    map[string]Record
 	wg      sync.WaitGroup
 }
 
@@ -23,7 +24,7 @@ func (sc *Scheduler) claim(name string) bool {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 	if sc.running == nil {
-		sc.running = map[string]bool{}
+		sc.running, sc.live = map[string]bool{}, map[string]Record{}
 	}
 	if sc.running[name] {
 		return false
@@ -35,6 +36,7 @@ func (sc *Scheduler) claim(name string) bool {
 func (sc *Scheduler) free(name string) {
 	sc.mu.Lock()
 	delete(sc.running, name)
+	delete(sc.live, name)
 	sc.mu.Unlock()
 }
 
@@ -49,10 +51,26 @@ func (sc *Scheduler) Running() map[string]bool {
 	return out
 }
 
-func (sc *Scheduler) run(ctx context.Context, w Workflow, trigger string) Record {
+// Live is name's run so far, while it runs.
+func (sc *Scheduler) Live(name string) (Record, bool) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+	r, ok := sc.live[name]
+	return r, ok
+}
+
+func (sc *Scheduler) run(ctx context.Context, w Workflow, in Invocation) Record {
 	defer sc.free(w.Name)
-	r := Run(ctx, w, sc.Env)
-	r.Trigger = trigger
+	env := sc.Env
+	if env.Load == nil {
+		env.Load = sc.Store.Load
+	}
+	env.Progress = func(r Record) {
+		sc.mu.Lock()
+		sc.live[w.Name] = r
+		sc.mu.Unlock()
+	}
+	r := RunWith(ctx, w, env, in)
 	if err := sc.Store.Record(r); err != nil && r.Error == "" {
 		r.Error = "history: " + err.Error()
 	}
@@ -75,7 +93,7 @@ func (sc *Scheduler) Tick(ctx context.Context, now time.Time) {
 		sc.wg.Add(1)
 		go func(w Workflow) {
 			defer sc.wg.Done()
-			sc.run(ctx, w, "schedule")
+			sc.run(ctx, w, Invocation{Trigger: TriggerSchedule})
 		}(w)
 	}
 }
@@ -97,6 +115,11 @@ func (sc *Scheduler) Loop(ctx context.Context) {
 
 // RunNow runs name once, enabled or not (the user asked for it), and waits for it.
 func (sc *Scheduler) RunNow(ctx context.Context, name, trigger string) (Record, error) {
+	return sc.Start(ctx, name, Invocation{Trigger: trigger})
+}
+
+// Start runs name with in and waits for it; it fails when name is already running.
+func (sc *Scheduler) Start(ctx context.Context, name string, in Invocation) (Record, error) {
 	w, _, err := sc.Store.Get(name)
 	if err != nil {
 		return Record{}, err
@@ -104,5 +127,5 @@ func (sc *Scheduler) RunNow(ctx context.Context, name, trigger string) (Record, 
 	if !sc.claim(name) {
 		return Record{}, fmt.Errorf("workflow %s is already running", name)
 	}
-	return sc.run(ctx, w, trigger), nil
+	return sc.run(ctx, w, in), nil
 }
