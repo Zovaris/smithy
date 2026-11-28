@@ -182,9 +182,9 @@ from your phone.
 
 | First run | Working session |
 |---|---|
-| ![Welcome screen](demo/review/welcome-anvil-steel.png) | ![Chat with a pending decision](demo/review/header-steel-1280-running.png) |
+| ![Welcome screen](docs/demo/welcome-anvil-steel.png) | ![Chat with a pending decision](docs/demo/header-steel-1280-running.png) |
 | **Palette (`ctrl+k`)** | **Same session on the web** |
-| ![Command palette](demo/review/modal-steel-palette.png) | ![Web view](docs/demo/web-session-1440.png) |
+| ![Command palette](docs/demo/modal-steel-palette.png) | ![Web view](docs/demo/web-session-1440.png) |
 
 The web does everything the TUI does: sessions, a board of your task files, agents with cost and
 speed charts, bench, decisions and every setting. `smithy web open` opens it; install it as an
@@ -192,7 +192,7 @@ app from Chrome, or with Add to Home Screen on iOS.
 
 | Board | Agents | New session |
 |---|---|---|
-| ![Web board](demo/review/web-board-1440.png) | ![Web agents with charts](demo/review/web-agents-1440.png) | ![Web new session with folder picker](demo/review/web-picker-1440.png) |
+| ![Web board](docs/demo/web-board-1440.png) | ![Web agents with charts](docs/demo/web-agents-1440.png) | ![Web new session with folder picker](docs/demo/web-picker-1440.png) |
 
 Every key and command: [docs/harness-guide.md](docs/harness-guide.md).
 
