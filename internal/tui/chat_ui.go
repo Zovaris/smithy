@@ -269,6 +269,13 @@ func (m chatView) inRun(c *chatMsg) bool {
 
 // toggle opens or closes tool message i: the whole run in minimal, one block in expandable.
 func (m chatView) toggle(i int) chatView {
+	if i >= 0 && i < len(m.msgs) && m.msgs[i].sh != nil {
+		m.msgs[i].open = !m.msgs[i].open
+		m.msgs[i].lines = nil
+		*m.at = anchor{}
+		m.scroll(0)
+		return m
+	}
 	if i < 0 || i >= len(m.msgs) || !m.inRun(m.msgs[i]) || m.mode == modeVerbose {
 		return m
 	}
@@ -382,6 +389,8 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.runWorkflowCmd(arg)
 	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "prompt", "channels":
 		return m.settingsCommand(name, arg)
+	case "usage":
+		return m.openUsage()
 	case "quit":
 		return m.quit()
 	case "help":
@@ -672,6 +681,8 @@ func (m chatView) render(i, w int) []string {
 		return m.qaRows(c, w)
 	case "foot":
 		return m.footRows(c)
+	case "shell":
+		return m.shellRows(i, w)
 	}
 	if c.tool == nil && c.kind == "thinking" && m.mode == modeMinimal {
 		a, _ := m.runOf(i)
