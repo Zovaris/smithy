@@ -392,7 +392,7 @@ func (m chatView) sidebar(h int) []string {
 		if i > 0 && i-1 < len(rows) {
 			r = rows[i-1]
 		}
-		if k := len(note) - (h - 1 - i); k >= 0 && k < len(note) && i > len(rows) {
+		if k := len(note) - (h - i); k >= 0 && k < len(note) && i > len(rows) {
 			r = t.Fg(t.Dim).Render(note[k])
 		}
 		out[i] = fill(side, m.sideW(), "  "+ansi.Truncate(r, iw, "…"))
@@ -411,14 +411,16 @@ func (m chatView) meter(w int, frac float64) string {
 	return on(t.Accent).Render(strings.Repeat(" ", n)) + on(t.Overlay).Render(strings.Repeat(" ", w-n))
 }
 
-// besideSide pads each transcript row to tw and puts the sidebar to its right.
-func (m chatView) besideSide(body []string) []string {
+// besideSide pads each transcript row to tw and puts the sidebar to the right of the first n
+// rows, so it ends on the input band's last row.
+func (m chatView) besideSide(body []string, n int) []string {
 	if !m.sideOn() {
 		return body
 	}
-	x, side := m.sideX(), m.sidebar(len(body))
+	n = min(n, len(body))
+	x, side := m.sideX(), m.sidebar(n)
 	p := strings.Repeat(" ", m.pad())
-	for i, r := range body {
+	for i, r := range body[:n] {
 		r = ansi.Truncate(r, x, "")
 		body[i] = r + strings.Repeat(" ", max(x-ansi.StringWidth(r), 0)) + side[i] + p
 	}

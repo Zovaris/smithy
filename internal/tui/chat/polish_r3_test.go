@@ -6,9 +6,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/Zovaris/smithy/internal/api"
+	"github.com/Zovaris/smithy/internal/tui/kit"
 )
 
 func TestSlashPopupHasNoAccentBarOnTop(t *testing.T) {
@@ -95,5 +97,27 @@ func TestDemoCommandsAreGone(t *testing.T) {
 		if m.overlay != overlayNone || !strings.Contains(screen(m), "unknown command /"+c) {
 			t.Errorf("/%s still does something:\n%s", c, screen(m))
 		}
+	}
+}
+
+func TestSidebarEndsWithTheInputBand(t *testing.T) {
+	m := gridScene(140)
+	m.th = kit.NamedTheme("steel", true, colorprofile.TrueColor, true)
+	m.where = whereBackground
+	if !m.sideOn() {
+		t.Fatal("scene shows no sidebar")
+	}
+	raw := strings.Split(m.View().Content, "\n")
+	lines := strings.Split(ansi.Strip(m.View().Content), "\n")
+	foot := len(lines) - 1
+	raised, _, _ := strings.Cut(on(m.th.Raised).Render("x"), "x")
+	if strings.Contains(raw[foot-1], raised) {
+		t.Fatalf("the row under the input band carries no sidebar: %q", raw[foot-1])
+	}
+	if !strings.Contains(raw[foot-2], raised) {
+		t.Fatal("the sidebar reaches the input band's last row")
+	}
+	if !strings.Contains(lines[foot-2], "smithy stop ends it") {
+		t.Fatalf("the sidebar's last row sits beside the input band's last row:\n%s", strings.Join(lines[foot-4:], "\n"))
 	}
 }

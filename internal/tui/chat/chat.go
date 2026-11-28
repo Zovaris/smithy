@@ -1049,8 +1049,9 @@ func (m chatView) View() tea.View {
 		body = append(body, "")
 	}
 	body = append(body, m.composer(m.tw())...)
+	band := len(body) - len(m.composerQueue(m.tw()))
 	body = append(body, "")
-	out = append(out, m.besideSide(body)...)
+	out = append(out, m.besideSide(body, band)...)
 	out = append(out, m.footer(w))
 	if m.welcome != welcomeOff {
 		out = m.welcomeView(w, m.height)
@@ -1155,8 +1156,15 @@ func (m chatView) composer(w int) []string {
 		out = append(out, row("", l))
 	}
 	out = append(out, row("", ""), row("", m.metaChips()))
+	return append(out, m.composerQueue(w)...)
+}
+
+// composerQueue is the queued messages listed under the input band.
+func (m chatView) composerQueue(w int) []string {
+	_, tx, right := m.grid(w)
+	var out []string
 	p := strings.Repeat(" ", tx-1)
-	for _, r := range m.queueRows(bw + 1) {
+	for _, r := range m.queueRows(right - tx + 1) {
 		out = append(out, p+r)
 	}
 	return out
