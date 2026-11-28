@@ -30,7 +30,7 @@ func init() {
 		return daemon.Stop(os.Stdout, 10*time.Second)
 	})
 	register("attach", harnessSummary["attach"], tui.AttachUsage, "--", tui.Attach)
-	register("chat", harnessSummary["chat"], tui.ChatUsage, "--standalone --server= --", tui.Chat)
+	register("chat", harnessSummary["chat"], tui.ChatUsage, "--standalone --server= --session= --", tui.Chat)
 	register("welcome", harnessSummary["welcome"], tui.WelcomeUsage, "--server= --", func(args []string) int {
 		return tui.Chat(append([]string{"--welcome"}, args...))
 	})
