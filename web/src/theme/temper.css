@@ -80,7 +80,7 @@
   color-scheme: dark;
 }
 
-/* ui.theme palettes, shared with the TUI (internal/tui/theme.go palettes): data-accent swaps the whole
+/* ui.theme palettes, shared with the TUI (internal/tui/kit/theme.go palettes): data-accent swaps the whole
    palette onto Sephiro's tokens through the --t-* layer; steel sets none. */
 [data-sephiro-theme="temper"][data-accent="frost"] { --t-bg: #f2f7f8; --t-side: #e8f1f3; --t-card: color-mix(in srgb, #f2f7f8 40%, #ffffff); --t-raised: #dce9ec; --t-line: #b8ced4; --t-line-strong: color-mix(in srgb, #b8ced4 70%, #24404a); --t-text: #0a171b; --t-text-2: #24404a; --t-text-3: #557680; --t-ember: #0e7c86; --t-ember-ink: color-mix(in srgb, #0e7c86 80%, #0a171b); --t-wait: #956a00; --t-ok: #1a8a58; --t-fail: #c23a3a; --t-primary: #0a171b; --t-on-primary: #f2f7f8; --sph-accent-pressed: color-mix(in srgb, #0e7c86 65%, #0a171b); }
 @media (prefers-color-scheme: dark) {
