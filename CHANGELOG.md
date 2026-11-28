@@ -21,6 +21,8 @@ part above `### Details`.
 
 ### New
 
+- /config: enter on a setting with fixed values (enums, booleans, themes, agents) opens an inline picker, comma lists such as notify.kinds open checkboxes and free text gets an inline field; nothing goes through `/set` any more. Advanced settings sit under topic headings with labels that read on their own, and `f` fills the screen with a detail pane.
+- TUI: every list wraps from the last row to the first and back; the footer's `ctrl+k palette` and mode chips, the header's tend and state chips and the composer's agent, model and effort chips act on a click.
 - `/config` opens every setting in one modal: grouped, filtered as you type, ←→ changes a value, with what the focused setting does and its default.
 - `/usage` is a dashboard: headline numbers, spend (or tokens) per day for 30 days, the split by agent and model with bars, and the token mix. Runs from before agents were recorded read "earlier runs, agent not recorded" instead of "unknown", in the web too.
 - opencode sessions show one answer with their tool calls as tool rows, instead of the reply twice with its raw banner lines.
@@ -54,6 +56,7 @@ part above `### Details`.
 
 - opencode sessions work again with agent.effort set: an agent without an effort flag ignores the setting quietly, a failed turn shows the agent's own error (such as a usage limit) instead of the first stderr line, and the error no longer reads "smithy agent: smithy agent:".
 
+- TUI: the sidebar ends on the input band's last row instead of running to the footer.
 - Images pasted in the web chat are kept under `~/.smithy/pastes` and removed when the daemon stops; folders left by a crash are cleared after a day.
 - The daemon waits for its background loops before it closes its store on shutdown.
 - A secret request the daemon cannot record is denied at once instead of leaving the agent waiting until it times out.
@@ -86,6 +89,8 @@ part above `### Details`.
 
 ### Details
 
+- TUI: the / popup loses its accent bar; modals open and close without the entrance spring (the web keeps its motion); headings carry no rules.
+- TUI: the demo commands `/ask`, `/answer` and `/welcome` are gone (`smithy welcome` still walks the first run), and so is `/prompt` (the web settings show the prompt file); `notify.style` is an enum of emoji and plain.
 - The daemon runs opencode with `--format json` (`AGENT_ARGS`) and reads it like claude's stream (`opencode_stream.go`): text parts, finished tool calls as `session_tool` events, step tokens and cost as usage; the reply is the text parts. The TUI adopts streamed parts as the agent's answer when the final message matches them.
 - Links: a GitHub rate-limit error pauses GitHub calls for 15 minutes (`Linker.limited`), keeps the last PRs and GitHub issues, and reports `links paused: GitHub rate limit, retry HH:MM`.
 - TUI "Slab" design (docs/design/tui.md, docs/design/web.md): flat surfaces, square corners, no box frames; header as an accent block, tabs as chips with a braille spinner on running sessions, user messages on the raised tier behind a `▌` rail, tool rows `▪ Name arg … ✓ stat`, shell blocks on the raised tier with a `$` chip, the composer on the focus tier with agent/model/effort chips, key chips in the footer, a raised sidebar with a flat context meter and `ci ✓/✗/⠹` badges. Status glyphs are squares (`▪ ▫`) everywhere; circles are gone (kit glyphs `On/Half/Off`, `Theme.Spinner`).
