@@ -34,7 +34,9 @@ func (m chatView) linksCommand(arg string) (tea.Model, tea.Cmd) {
 		if n, err := strconv.Atoi(rest); err == nil {
 			cl, id := m.cfg, m.current
 			return m, func() tea.Msg {
-				l, err := cl.SessionLinks(context.Background(), id)
+				ctx, cancel := daemonCtx()
+				defer cancel()
+				l, err := cl.SessionLinks(ctx, id)
 				if err != nil {
 					return sessionErrMsg{what: "/links", err: err}
 				}
@@ -42,7 +44,7 @@ func (m chatView) linksCommand(arg string) (tea.Model, tea.Cmd) {
 				if n < 1 || n > len(all) {
 					return settingsDoneMsg{lines: []string{"no link " + rest + "; /links numbers them"}}
 				}
-				if l, err = cl.RemoveLink(context.Background(), id, all[n-1]); err != nil {
+				if l, err = cl.RemoveLink(ctx, id, all[n-1]); err != nil {
 					return sessionErrMsg{what: "/links rm", err: err}
 				}
 				return settingsDoneMsg{panel: linksPanel(l)}
@@ -81,7 +83,9 @@ func (m chatView) removeLink(u string) (tea.Model, tea.Cmd) {
 	}
 	cl, id := m.cfg, m.current
 	return m, func() tea.Msg {
-		l, err := cl.RemoveLink(context.Background(), id, u)
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		l, err := cl.RemoveLink(ctx, id, u)
 		if err != nil {
 			return sessionErrMsg{what: "/links rm", err: err}
 		}
