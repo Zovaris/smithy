@@ -374,6 +374,7 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("GET /v1/workflows", sv.listWorkflows)
 	mux.HandleFunc("GET /v1/workflows/{name}", sv.getWorkflow)
 	mux.HandleFunc("PUT /v1/workflows/{name}", sv.saveWorkflow)
+	mux.HandleFunc("POST /v1/workflows/validate", sv.validateWorkflow)
 	mux.HandleFunc("POST /v1/workflows/{name}/run", sv.runWorkflow)
 	mux.HandleFunc("POST /v1/workflows/{name}/{op}", sv.enableWorkflow)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
@@ -391,6 +392,8 @@ func (sv *Server) public(w http.ResponseWriter, r *http.Request) bool {
 		writeJSON(w, 200, map[string]any{"smithy": true, "version": sv.Version})
 	case r.Method == "POST" && r.URL.Path == "/v1/pair":
 		sv.redeem(w, r)
+	case r.Method == "POST" && strings.HasPrefix(r.URL.Path, "/v1/hooks/workflows/"):
+		sv.workflowHook(w, r, strings.TrimPrefix(r.URL.Path, "/v1/hooks/workflows/"))
 	default:
 		return false
 	}

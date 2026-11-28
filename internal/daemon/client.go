@@ -426,8 +426,8 @@ func (c *Client) Workflow(ctx context.Context, name string) (WorkflowDetail, err
 }
 
 // RunWorkflow is POST /v1/workflows/{name}/run; via names the client (tui, cli).
-func (c *Client) RunWorkflow(ctx context.Context, name, via string) error {
-	return c.call(ctx, "POST", "/v1/workflows/"+url.PathEscape(name)+"/run?via="+url.QueryEscape(via), map[string]string{}, nil)
+func (c *Client) RunWorkflow(ctx context.Context, name, via string, inputs map[string]string) error {
+	return c.call(ctx, "POST", "/v1/workflows/"+url.PathEscape(name)+"/run?via="+url.QueryEscape(via), map[string]any{"inputs": inputs}, nil)
 }
 
 // SetWorkflow is POST /v1/workflows/{name}/enable or /disable.
