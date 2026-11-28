@@ -3,7 +3,6 @@
 package chat
 
 import (
-	"context"
 	"strconv"
 	"strings"
 
@@ -24,12 +23,14 @@ func (m chatView) linksCommand(arg string) (tea.Model, tea.Cmd) {
 	}
 	cl, id, ref := m.cfg, m.current, strings.TrimSpace(arg)
 	return m, func() tea.Msg {
+		ctx, cancel := daemonCtx()
+		defer cancel()
 		var l api.SessionLinks
 		var err error
 		if ref != "" {
-			l, err = cl.AddLink(context.Background(), id, ref)
+			l, err = cl.AddLink(ctx, id, ref)
 		} else {
-			l, err = cl.SessionLinks(context.Background(), id)
+			l, err = cl.SessionLinks(ctx, id)
 		}
 		if err != nil {
 			return sessionErrMsg{what: "/links", err: err}

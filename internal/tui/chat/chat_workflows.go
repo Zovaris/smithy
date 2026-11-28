@@ -77,18 +77,22 @@ func (m chatView) runWorkflowCmd(arg string) (tea.Model, tea.Cmd) {
 	api, name := m.flows, f[0]
 	m.status("running " + name)
 	return m, func() tea.Msg {
-		return workflowDoneMsg{what: "started: /workflows shows it live", name: name, err: api.RunWorkflow(context.Background(), name, "tui", in)}
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		return workflowDoneMsg{what: "started: /workflows shows it live", name: name, err: api.RunWorkflow(ctx, name, "tui", in)}
 	}
 }
 
 func (m chatView) loadWorkflows() tea.Cmd {
 	api := m.flows
 	return func() tea.Msg {
-		wl, err := api.Workflows(context.Background())
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		wl, err := api.Workflows(ctx)
 		if err != nil {
 			return workflowsMsg{err: err}
 		}
-		sl, err := api.Schedules(context.Background())
+		sl, err := api.Schedules(ctx)
 		return workflowsMsg{wl: wl, sl: sl, err: err}
 	}
 }
@@ -248,7 +252,9 @@ func (m chatView) workflowsKey(k string) (tea.Model, tea.Cmd) {
 		case "left", "right", "h", "l", "space":
 			on := !in.Enabled
 			return m, func() tea.Msg {
-				_, err := api.SetSchedule(context.Background(), name, on)
+				ctx, cancel := daemonCtx()
+				defer cancel()
+				_, err := api.SetSchedule(ctx, name, on)
 				what := "disabled"
 				if on {
 					what = "enabled"
@@ -257,7 +263,9 @@ func (m chatView) workflowsKey(k string) (tea.Model, tea.Cmd) {
 			}
 		case "enter":
 			return m, func() tea.Msg {
-				d, err := api.Schedule(context.Background(), name)
+				ctx, cancel := daemonCtx()
+				defer cancel()
+				d, err := api.Schedule(ctx, name)
 				return workflowDetailMsg{sd: &d, err: err}
 			}
 		}
@@ -275,11 +283,15 @@ func (m chatView) workflowsKey(k string) (tea.Model, tea.Cmd) {
 		}
 		m.status("running " + name)
 		return m, func() tea.Msg {
-			return workflowDoneMsg{what: "started", name: name, err: api.RunWorkflow(context.Background(), name, "tui", nil)}
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			return workflowDoneMsg{what: "started", name: name, err: api.RunWorkflow(ctx, name, "tui", nil)}
 		}
 	case "enter":
 		return m, func() tea.Msg {
-			d, err := api.Workflow(context.Background(), name)
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			d, err := api.Workflow(ctx, name)
 			return workflowDetailMsg{d: d, err: err}
 		}
 	case "e":

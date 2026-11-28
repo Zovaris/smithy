@@ -77,7 +77,9 @@ func (m chatView) bang(line string) (chatView, tea.Cmd) {
 		id := m.current
 		c.sh.dir = ""
 		return m, func() tea.Msg {
-			r, err := sa.Shell(context.Background(), id, line)
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			r, err := sa.Shell(ctx, id, line)
 			return shellDoneMsg{c: c, run: r, err: err}
 		}
 	}

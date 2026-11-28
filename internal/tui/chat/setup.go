@@ -65,7 +65,9 @@ func (m chatView) loadSetup(first bool) tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		s, err := api.Setup(context.Background())
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		s, err := api.Setup(ctx)
 		return setupLoadedMsg{s: s, first: first, err: err}
 	}
 }
@@ -80,7 +82,9 @@ func (m chatView) saveDefault(agent, model string) tea.Cmd {
 		note += " " + m.th.G.Dot + " model " + model
 	}
 	return func() tea.Msg {
-		return setupSavedMsg{note: note, err: api.SetDefault(context.Background(), agent, model)}
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		return setupSavedMsg{note: note, err: api.SetDefault(ctx, agent, model)}
 	}
 }
 
@@ -89,7 +93,11 @@ func (m chatView) saveKit(k api.KitChoice) tea.Cmd {
 	if api == nil {
 		return nil
 	}
-	return func() tea.Msg { return setupSavedMsg{err: api.SetKit(context.Background(), k)} }
+	return func() tea.Msg {
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		return setupSavedMsg{err: api.SetKit(ctx, k)}
+	}
 }
 
 func (m chatView) installSkills() tea.Cmd {
@@ -98,7 +106,9 @@ func (m chatView) installSkills() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		out, err := api.InstallSkills(context.Background(), "")
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		out, err := api.InstallSkills(ctx, "")
 		return skillsInstalledMsg{out: out, err: err}
 	}
 }
@@ -222,7 +232,9 @@ func (m chatView) loadModels(refresh bool) tea.Cmd {
 	}
 	agent := m.modelFor
 	return func() tea.Msg {
-		l, err := api.Models(context.Background(), agent, refresh)
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		l, err := api.Models(ctx, agent, refresh)
 		return modelsLoadedMsg{agent: agent, l: l, err: err}
 	}
 }

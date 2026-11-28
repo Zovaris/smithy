@@ -1116,3 +1116,12 @@ func gitBranch(dir string) string {
 	}
 	return strings.TrimSpace(string(out))
 }
+
+// daemonCallTimeout bounds one daemon call made from a command, so a hung daemon cannot leave
+// the TUI waiting forever.
+const daemonCallTimeout = 2 * time.Minute
+
+// daemonCtx is the context for one daemon call made from a command.
+func daemonCtx() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), daemonCallTimeout)
+}

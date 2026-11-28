@@ -52,7 +52,9 @@ func (m chatView) askProject(pa projectAPI, text string) (chatView, tea.Cmd) {
 	m.proj = projectPick{pending: text}
 	m.overlay = overlayProject
 	return m, func() tea.Msg {
-		l, err := pa.Projects(context.Background())
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		l, err := pa.Projects(ctx)
 		return projectsMsg{l: l, err: err}
 	}
 }
@@ -133,7 +135,9 @@ func (m chatView) listDirs(dir string) tea.Cmd {
 		if !ok {
 			return dirsMsg{err: errNoProjects}
 		}
-		l, err := pa.ListDirs(context.Background(), dir)
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		l, err := pa.ListDirs(ctx, dir)
 		return dirsMsg{l: l, err: err}
 	}
 }
@@ -175,7 +179,9 @@ func (m chatView) projectKey(k string) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			dir := b.Dir
-			l, err := pa.AddProject(context.Background(), dir, false)
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			l, err := pa.AddProject(ctx, dir, false)
 			if err != nil {
 				m.proj.err = err.Error()
 				return m, nil

@@ -3,7 +3,6 @@
 package chat
 
 import (
-	"context"
 	"image/color"
 	"math"
 	"strings"
@@ -52,7 +51,9 @@ func (m chatView) loadWelcomeSettings() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		s, err := api.Settings(context.Background())
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		s, err := api.Settings(ctx)
 		return welcomeSettingsMsg{s, err}
 	}
 }

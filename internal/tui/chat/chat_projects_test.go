@@ -153,3 +153,11 @@ func TestProjectPickerWithoutADaemonDoesNotPanic(t *testing.T) {
 		t.Fatal("listing folders without a daemon gave no error")
 	}
 }
+
+func TestDaemonCallsFromTheTUIHaveADeadline(t *testing.T) {
+	ctx, cancel := daemonCtx()
+	defer cancel()
+	if _, ok := ctx.Deadline(); !ok {
+		t.Fatal("a daemon call from the TUI can hang forever")
+	}
+}
