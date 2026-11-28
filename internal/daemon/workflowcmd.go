@@ -223,7 +223,7 @@ func workflowLine(in workflow.Info) string {
 		state = "on"
 	}
 	line := fmt.Sprintf("%-24s %-7s %-14s", in.Name, state, in.Schedule)
-	if !in.Next.IsZero() {
+	if in.Next != nil {
 		line += " next " + in.Next.Format("Mon 15:04")
 	}
 	if in.Last != nil {

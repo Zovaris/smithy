@@ -24,7 +24,10 @@ func TestStoreEnablePinsHash(t *testing.T) {
 	if err := s.Enable("hello", now); err != nil {
 		t.Fatal(err)
 	}
-	if l, _ = s.List(); !l[0].Enabled {
+	if l[0].Next != nil {
+		t.Fatal("a disabled workflow has no next run")
+	}
+	if l, _ = s.List(); !l[0].Enabled || l[0].Next == nil {
 		t.Fatal("not enabled")
 	}
 	if got := s.Due(at("2026-11-27 16:59")); len(got) != 0 {

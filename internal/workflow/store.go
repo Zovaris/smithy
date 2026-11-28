@@ -33,12 +33,12 @@ type Store struct {
 // doesn't run until enabled again. Err: the file doesn't parse.
 type Info struct {
 	Workflow
-	File    string    `json:"file"`
-	Enabled bool      `json:"enabled"`
-	Changed bool      `json:"changed,omitempty"`
-	Next    time.Time `json:"next,omitempty"`
-	Last    *Record   `json:"last,omitempty"`
-	Err     string    `json:"error,omitempty"`
+	File    string     `json:"file"`
+	Enabled bool       `json:"enabled"`
+	Changed bool       `json:"changed,omitempty"`
+	Next    *time.Time `json:"next,omitempty"`
+	Last    *Record    `json:"last,omitempty"`
+	Err     string     `json:"error,omitempty"`
 }
 
 type state struct {
@@ -136,7 +136,9 @@ func (s Store) List() ([]Info, error) {
 			in.Changed = !in.Enabled
 		}
 		if in.Enabled {
-			in.Next = s.next(w, st.Since[name], time.Now())
+			if n := s.next(w, st.Since[name], time.Now()); !n.IsZero() {
+				in.Next = &n
+			}
 		}
 		if h, _ := s.History(name, 1); len(h) > 0 {
 			in.Last = &h[0]

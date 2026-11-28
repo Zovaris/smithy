@@ -124,7 +124,7 @@ func (m chatView) workflowsBox(screen []string, w, h int) []string {
 				g, col, key = t.g.on, t.ok, "on"
 			}
 			hint := []string{in.Schedule}
-			if !in.Next.IsZero() {
+			if in.Next != nil {
 				hint = append(hint, "next "+in.Next.Local().Format("Mon 15:04"))
 			}
 			if in.Last != nil {
