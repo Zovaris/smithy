@@ -21,6 +21,7 @@ part above `### Details`.
 - New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 - An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
 - A question that takes several picks asks for them in Slack (a multi-select menu), Discord (a select menu) and Telegram (☐/☑ toggles and Done); single-pick questions keep one button per option.
+- Dependabot keeps Go modules, the web packages and the GitHub Actions current: one weekly PR per ecosystem for minor and patch updates, a separate PR for each major.
 
 ### Fixed
 
