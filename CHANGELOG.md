@@ -9,6 +9,7 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+- The chat takes a few layout ideas from OpenCode in its own flat style: a tab strip of this folder's sessions with `+` for a new one, a right sidebar on wide terminals (`/sidebar` toggles it) with the title, context used and its share of the model's window, spend and linked PRs, tool calls and thoughts folded into one line such as "+ 2 commands, 1 thought" that opens on enter or a click, a dim agent · model · time · tok/s line under each answer, answered questions kept as a compact Q → A, and the composer with an accent bar and agent · model inside while the footer shows the context and the palette key.
 - `/goal <text>` pins a goal on the open session, in the TUI and the web composer: each turn carries it, and the daemon keeps the session going until the agent reports it met with evidence, asks you, or hits `session.goal_max_turns` / `session.goal_max_cost`. `/goal` shows it, `/goal clear` drops it; only you set it.
 - New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 
