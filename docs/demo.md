@@ -5,8 +5,8 @@ message, see the tool calls, answer the decision, then the web at phone width. `
 records it on a throwaway `SMITHY_HOME` with `smithy daemon --demo`, whose sessions run a scripted
 agent (a read, an edit, a test run, one decision), so it needs no agent CLI, key or network.
 
-Every CI run of the `demo` job records it again and keeps the result as the `demo` artifact: the
-TUI tape (`tui.gif`) and screenshots of each step, the first-run screens included.
+The `demo` job records it again on every push to main and every pull request into main, and keeps
+the result as the `demo` artifact: the TUI tape (`tui.gif`) and screenshots of each step, the first-run screens included.
 
 ## TUI
 

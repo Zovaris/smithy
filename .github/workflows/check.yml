@@ -150,7 +150,7 @@ jobs:
             echo "::endgroup::"
           done
   demo:
-    # Records the v0.23 demo (demo/run.sh): the TUI tape and the web screenshots, kept as an artifact.
+    # Records the demo (demo/run.sh): the TUI tape and the web screenshots, kept as an artifact.
     if: github.event_name == 'push' || (github.base_ref == 'main' && github.event.pull_request.draft != true)
     runs-on: blacksmith-2vcpu-ubuntu-2604
     steps:
