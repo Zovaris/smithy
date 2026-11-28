@@ -737,21 +737,6 @@ func (m chatView) summary(a, b, w int) []string {
 	return []string{m.blockRow(a, w, ansi.Truncate(line, w, "…")), ""}
 }
 
-func lastPart(p string) string {
-	if i := strings.LastIndexByte(p, '/'); i >= 0 {
-		return p[i+1:]
-	}
-	return p
-}
-
-func firstWords(s string, n int) string {
-	f := strings.Fields(s)
-	if len(f) > n {
-		f = f[:n]
-	}
-	return strings.Join(f, " ")
-}
-
 // toolLine colors one line of a tool's output: added lines ok, removed lines failed, hunk
 // headers and notes dim.
 func (m chatView) toolLine(l string) string {

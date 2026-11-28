@@ -1,6 +1,5 @@
 //go:build harness
 
-
 package tui
 
 import (
