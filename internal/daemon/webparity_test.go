@@ -63,8 +63,25 @@ func TestSessionShellLandsInTheTranscriptCapped(t *testing.T) {
 	code, m := post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"seq 800; echo oops >&2"}`)
 	ls := m["lines"].([]any)
 	text := func(i int) any { return ls[i].(map[string]any)["text"] }
-	if code != 200 || m["id"] == "" || m["cut"] != true || len(ls) != api.ShellMaxLines+1 || text(0) != "1" || text(249) != "250" || text(250) != "… 301 lines cut …" || text(251) != "552" || text(500) != "oops" || ls[500].(map[string]any)["err"] != true {
+	// stdout and stderr are separate pipes, so where "oops" lands among the last stdout lines
+	// is up to the scheduler: check the tail as stdout in order plus one stderr line.
+	if code != 200 || m["id"] == "" || m["cut"] != true || len(ls) != api.ShellMaxLines+1 || text(0) != "1" || text(249) != "250" || text(250) != "… 301 lines cut …" {
 		t.Fatalf("shell: %d cut=%v lines=%d", code, m["cut"], len(m["lines"].([]any)))
+	}
+	var outs []any
+	errs := 0
+	for _, l := range ls[251:] {
+		if l.(map[string]any)["err"] == true {
+			errs++
+			if l.(map[string]any)["text"] != "oops" {
+				t.Fatalf("stderr line %v", l)
+			}
+			continue
+		}
+		outs = append(outs, l.(map[string]any)["text"])
+	}
+	if errs != 1 || len(outs) != 249 || outs[0] != "552" || outs[248] != "800" {
+		t.Fatalf("tail: %d stderr lines, stdout %v…%v (%d)", errs, outs[0], outs[len(outs)-1], len(outs))
 	}
 	evs, _ := sv.st.Since(0)
 	var got []ShellRun
