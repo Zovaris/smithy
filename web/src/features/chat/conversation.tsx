@@ -2,6 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useLayoutEffect, useRef } from "preact/hooks";
 import { I, toolIcon } from "../../components/icons";
 import { prose, agentName, argLine, initials, type Dec, type Item, type Sess, type Tool } from "../../lib/store";
+import { href } from "../../lib/router";
 import { Md } from "../../components/md";
 import { Decision, St } from "../../components/ui";
 import type { Detail } from "../../lib/detail";
@@ -62,7 +63,11 @@ export function Conversation({ s, items, decisions, loose, extra, detail = "expa
         {!items.length && <p class="t3">The session is ready. Send the first message below.</p>}
         {items.map((it, k) =>
           it.kind === "you" ? (
-            <div class="you">{it.text}</div>
+            <div class="you">{it.by && <span class="t3 mono">from {it.by} · </span>}{it.text}</div>
+          ) : it.kind === "mail" ? (
+            <div class="mail t3" role="note">
+              <span class="mono">{it.dir === "in" ? "← " : "→ "}<a href={href({ name: "session", id: it.peer })}>{it.peer}</a></span> {it.text}
+            </div>
           ) : (
             <div class="agent">
               <div class="av" aria-hidden="true">{initials(s.agent)}</div>

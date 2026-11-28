@@ -7,11 +7,14 @@ export type Status = "working" | "needs_you" | "done" | "failed";
 export type Usage = { input_tokens?: number; output_tokens?: number; cost_usd?: number };
 export type Sess = {
   id: string; agent: string; model?: string; effort?: string; dir: string; title: string;
-  status: Status; detail?: string; created: string; updated: string; usage?: Usage;
+  status: Status; detail?: string; created: string; updated: string; usage?: Usage; parent?: string;
 };
 export type Tool = { id?: string; name: string; args?: unknown; output?: string; is_error?: boolean };
 export type Part = { kind: "text"; text: string } | { kind: "tools"; tools: Tool[] } | { kind: "decision"; id: string };
-export type Item = { kind: "you"; text: string; at: string } | { kind: "agent"; parts: Part[]; at: string };
+export type Item =
+  | { kind: "you"; text: string; at: string; by?: string }
+  | { kind: "agent"; parts: Part[]; at: string }
+  | { kind: "mail"; dir: "in" | "out"; peer: string; text: string; at: string };
 export type Diff = { stat: string; patch: string; truncated: boolean; at: string };
 export type Dec = { id: string; session: string; question: string; options: string[]; asked: string; answer?: string; by?: string };
 export type Store = {
@@ -104,7 +107,9 @@ export function fold(s: Store, e: Ev): Store {
     case "session_message": {
       if (!sess) return next;
       const text = str(d.text);
-      if (d.role === "user") next.convo = { ...s.convo, [id]: [...convo, { kind: "you", text, at }] };
+      const by = str(d.by).startsWith("session:") ? str(d.by).slice(8) : "";
+      if (d.role === "user" && by && text.startsWith("Message from session ")) return next;
+      if (d.role === "user") next.convo = { ...s.convo, [id]: [...convo, by ? { kind: "you", text, at, by } : { kind: "you", text, at }] };
       else {
         const { items, turn } = agentTurn(convo, at);
         // The reply streams as session_text first. When the final message says something else (a
@@ -118,6 +123,14 @@ export function fold(s: Store, e: Ev): Store {
       }
       next.sessions = { ...s.sessions, [id]: { ...sess, updated: at } };
       next.order = touch(s, id);
+      return next;
+    }
+    case "session_mail": {
+      const from = str(d.from), to = str(d.to), text = str(d.text);
+      if (!from || !to) return next;
+      next.convo = { ...s.convo };
+      if (s.sessions[to]) next.convo[to] = [...(s.convo[to] ?? []), { kind: "mail", dir: "in", peer: from, text, at }];
+      if (s.sessions[from]) next.convo[from] = [...(s.convo[from] ?? []), { kind: "mail", dir: "out", peer: to, text, at }];
       return next;
     }
     case "session_text": {
@@ -177,6 +190,23 @@ export function seed(s: Store, pending: { id: string; question: string; options?
 }
 
 export const open = (s: Store) => s.decisions.filter((d) => d.answer == null);
+export function tree(list: Sess[]): { s: Sess; depth: number }[] {
+  const has = new Set(list.map((s) => s.id));
+  const kids: Record<string, Sess[]> = {};
+  for (const s of list) if (s.parent && has.has(s.parent) && s.parent !== s.id) (kids[s.parent] ??= []).push(s);
+  const out: { s: Sess; depth: number }[] = [];
+  const seen = new Set<string>();
+  const walk = (s: Sess, depth: number) => {
+    if (seen.has(s.id)) return;
+    seen.add(s.id);
+    out.push({ s, depth });
+    for (const k of kids[s.id] ?? []) walk(k, depth + 1);
+  };
+  for (const s of list) if (!s.parent || !has.has(s.parent)) walk(s, 0);
+  for (const s of list) walk(s, 0);
+  return out;
+}
+
 export const sessions = (s: Store) => s.order.map((id) => s.sessions[id]).filter(Boolean);
 
 export const STATUS_WORD: Record<Status, string> = { working: "working", needs_you: "needs you", done: "done", failed: "failed" };
