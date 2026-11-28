@@ -3,15 +3,7 @@
 One version for the whole repo, tagged `vX.Y.Z` (semver). Every change to a skill lands under
 **Unreleased** first and moves into a version when it is tagged. Each version opens with short,
 plain notes for people (`### Highlights`, `### New`, `### Fixed`): what changed for them, in a
-sentence each. The technical bullets go under `### Details`
-- The daemon runs opencode with `--format json` (`AGENT_ARGS`) and reads it like claude's stream (`opencode_stream.go`): text parts, finished tool calls as `session_tool` events, step tokens and cost as usage; the reply is the text parts. The TUI adopts streamed parts as the agent's answer when the final message matches them.
-- Links: a GitHub rate-limit error pauses GitHub calls for 15 minutes (`Linker.limited`), keeps the last PRs and GitHub issues, and reports `links paused: GitHub rate limit, retry HH:MM`.
-
-- TUI "Slab" design (docs/design/tui.md, docs/design/web.md): flat surfaces, square corners, no box frames; header as an accent block, tabs as chips with a braille spinner on running sessions, user messages on the raised tier behind a `▌` rail, tool rows `▪ Name arg … ✓ stat`, shell blocks on the raised tier with a `$` chip, the composer on the focus tier with agent/model/effort chips, key chips in the footer, a raised sidebar with a flat context meter and `ci ✓/✗/⠹` badges. Status glyphs are squares (`▪ ▫`) everywhere; circles are gone (kit glyphs `On/Half/Off`, `Theme.Spinner`).
-- Modals (`floatBox`, `/config`, `/usage`) lose the border: accent edge or title bar, rows on the raised tier, the selection on the focus tier behind an accent rail, the footer on the overlay tier, a one-cell offset shade (`Theme.Shade`) and a dimmer backdrop. Group headings render in sentence case.
-- Motion uses one harmonica spring: a modal rises into place as it opens, a changed `/config` value settles, `/usage` bars grow in; `ui.reduce_motion` turns it off.
-- `events.Report` adds `month` and `days` (the last 30 local days: runs, tokens, cost) for the `/usage` chart.
-. The GitHub release shows only the
+sentence each. The technical bullets go under `### Details`. The GitHub release shows only the
 part above `### Details`.
 
 ## Unreleased
@@ -92,6 +84,12 @@ part above `### Details`.
 
 ### Details
 
+- The daemon runs opencode with `--format json` (`AGENT_ARGS`) and reads it like claude's stream (`opencode_stream.go`): text parts, finished tool calls as `session_tool` events, step tokens and cost as usage; the reply is the text parts. The TUI adopts streamed parts as the agent's answer when the final message matches them.
+- Links: a GitHub rate-limit error pauses GitHub calls for 15 minutes (`Linker.limited`), keeps the last PRs and GitHub issues, and reports `links paused: GitHub rate limit, retry HH:MM`.
+- TUI "Slab" design (docs/design/tui.md, docs/design/web.md): flat surfaces, square corners, no box frames; header as an accent block, tabs as chips with a braille spinner on running sessions, user messages on the raised tier behind a `▌` rail, tool rows `▪ Name arg … ✓ stat`, shell blocks on the raised tier with a `$` chip, the composer on the focus tier with agent/model/effort chips, key chips in the footer, a raised sidebar with a flat context meter and `ci ✓/✗/⠹` badges. Status glyphs are squares (`▪ ▫`) everywhere; circles are gone (kit glyphs `On/Half/Off`, `Theme.Spinner`).
+- Modals (`floatBox`, `/config`, `/usage`) lose the border: accent edge or title bar, rows on the raised tier, the selection on the focus tier behind an accent rail, the footer on the overlay tier, a one-cell offset shade (`Theme.Shade`) and a dimmer backdrop. Group headings render in sentence case.
+- Motion uses one harmonica spring: a modal rises into place as it opens, a changed `/config` value settles, `/usage` bars grow in; `ui.reduce_motion` turns it off.
+- `events.Report` adds `month` and `days` (the last 30 local days: runs, tokens, cost) for the `/usage` chart.
 - daemon: a decision carries the `session` that asked (`POST /v1/asks` takes `session`; smithy mcp's ask tool sends `SMITHY_SESSION`) and its `decision_asked` event is that session's. Links: `POST /v1/sessions/{id}/links` takes any http(s) URL (generic ones land in `urls` with host and title), `DELETE /v1/sessions/{id}/links?ref=` removes one (a `session_unlink` event; a found link stays hidden), and PR, GitHub issue and Linear issue URLs in a session's messages link themselves.
 - workflow: `internal/workflow` with its own cron parser; steps run, agent, if, switch, set, json, foreach, ask, notify, call, judge, loop, session, smelt, warden, http, parallel, wait, github, file and agent `items` fan-out; per-step when, timeout, retry, on_error; templates `{{steps.x.output}}`, `{{vars.y}}`, `{{inputs.z}}`, `{{env.Z}}` and `{{secret.name}}` (redacted, none in run commands); http only to `guard.fetch_allow` hosts; github runs gh by argv; pr, merge and warden validated to need a `when` on an earlier ask's yes. Workflows in `~/.smithy/workflows`, schedules in `schedules/` with the enable pinned (sha256) to the schedule file plus its workflow's call tree, runs in `runs/<name>/`, 50 kept; older files with `schedule`/`webhook` are migrated to a schedule.
 - daemon: ticks schedules every minute (cron, `gh`-polled GitHub events every 5 min, file watches); `/v1/workflows` (list, detail with the live run, PUT, validate, run with inputs), `/v1/schedules` (list, add, detail, enable, disable, delete; writes local-only) and the token-checked, loopback-only `POST /v1/hooks/schedules/{name}`; notify steps are `workflow_note` events sent to connectors as kind `workflow`. Docs in `docs/workflows.md`.
