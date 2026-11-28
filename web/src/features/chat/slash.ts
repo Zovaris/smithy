@@ -1,6 +1,6 @@
 // The smithy commands the composer and the palette run here, loaded on first use: the TUI's
 // /model, /effort, /goal, /theme, /mode, /ask, /answer, /serve, /set, /unset, /key rm, the panels (/help,
-// /log, /remote, /tend, /links) and the ones that open Settings.
+// /log, /remote, /tend, /links, /sidebar) and the ones that open Settings.
 import { addLink, removeKey, runShell, sampleAsk, setServe, setSessionGoal, setSessionModel, setSetting, unsetSetting } from "../../lib/actions";
 import { ACTIONS } from "../../lib/commands";
 import { nextDetail, type Detail } from "../../lib/detail";
@@ -103,7 +103,10 @@ export function run(a: string, arg: string, ctx: Ctx): void {
   else if (a === "remote") setInfo(remote());
   else if (a === "log") setInfo({ title: "Log", lines: ["#DAEMON LOG · " + log.length + " EVENTS", ...(log.length ? log : ["nothing yet"])] });
   else if (a === "links" && arg && s) say(addLink(s.id, arg.trim()), "linked " + arg.trim());
-  else if (a === "tend" || a === "links") {
+  else if (a === "sidebar") {
+    if (document.querySelector<HTMLElement>(".rail:not(.sheet)")?.offsetParent) setNote("the side panel is beside the chat");
+    else showTend();
+  } else if (a === "tend" || a === "links") {
     const side = document.querySelector<HTMLElement>(".rail:not(.sheet) #" + a);
     if (side?.offsetParent) side.scrollIntoView({ block: "start" });
     else {
