@@ -118,7 +118,7 @@ export function run(a: string, arg: string, ctx: Ctx): void {
   else if (a === "welcome") go({ name: "setup" });
   else if (a === "sessions") go({ name: "agents" });
   else if (a === "settings") go({ name: "setup" });
-  else if (a === "agents" || a === "board" || a === "decisions" || a === "bench") go({ name: a });
+  else if (a === "agents" || a === "board" || a === "decisions" || a === "bench" || a === "workflows") go({ name: a });
 }
 
 // shell is `!cmd`: the last 200 lines, like the TUI.

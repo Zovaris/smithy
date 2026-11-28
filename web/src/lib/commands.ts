@@ -20,6 +20,7 @@ const HINTS: Record<string, string> = {
   board: "board",
   decisions: "decisions",
   bench: "bench",
+  workflows: "workflows",
   log: "daemon log",
   welcome: "first-run steps",
   setup: "agents ready or missing",
