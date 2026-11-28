@@ -203,6 +203,14 @@ func wrapLine(l string) []string {
 	}
 	in := len(l) - len(strings.TrimLeft(l, " "))
 	t := strings.TrimSpace(l)
+	if name, desc, ok := strings.Cut(t, "  "); ok && in > 0 && !strings.Contains(name, " ") {
+		col := len(l) - len(strings.TrimLeft(desc, " "))
+		if col < width/2 {
+			lines := wrapText(desc, col)
+			lines[0] = l[:col] + strings.TrimLeft(lines[0], " ")
+			return lines
+		}
+	}
 	hang := 0
 	if strings.HasPrefix(t, "usage:") || strings.HasPrefix(t, "smithy ") {
 		hang = 4

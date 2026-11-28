@@ -26,11 +26,11 @@ call, each with when, timeout, retry and on_error. Files are JSON in ~/.smithy/w
 (docs/workflows.md). Schedules start workflows on their own: smithy schedule.
   list      every workflow, its schedules and last run
   show      one workflow's inputs and steps
-  run       run it now (through the daemon when one runs, else here; ask steps need the daemon);
-            --input sets one of its inputs
+  run       run it now (through the daemon when one runs, else here; ask steps
+            need the daemon); --input sets one of its inputs
   history   its newest runs with each step's input, output, duration and status
-  add       copy a workflow or schedule file (a repo's, say) into ~/.smithy/workflows; a schedule
-            lands disabled
+  add       copy a workflow or schedule file (a repo's, say) into
+            ~/.smithy/workflows; a schedule lands disabled
   validate  check a file, or a stored workflow, without running it
   example   add the examples and their schedules, disabled (or one by name)
 Steps run with nobody watching: shell commands go through the guard (a blocked command fails the
