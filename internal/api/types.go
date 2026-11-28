@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/usage"
 	"github.com/Zovaris/smithy/internal/workflow"
@@ -191,7 +192,7 @@ type Setup struct {
 	Kit       KitChoice                 `json:"kit"`
 	Skills    []string                  `json:"skills"` // installed skills the kit can link in
 	Paths     map[string]string         `json:"paths"`  // skill name to its SKILL.md, to invoke it from chat
-	Harnesses []agents.HarnessInventory `json:"harnesses"`
+	Harnesses []skills.HarnessInventory `json:"harnesses"`
 	Effort    agents.EffortRules        `json:"effort"` // the CLIs that take effort and the levels a session may set
 }
 

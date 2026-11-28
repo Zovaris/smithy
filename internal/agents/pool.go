@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/agents/sandbox"
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
@@ -186,7 +187,7 @@ func cardOf(log, cwd string) (string, string) {
 		log = filepath.Join(cwd, log)
 	}
 	dir := filepath.Dir(log)
-	if realPath(filepath.Dir(dir)) != realPath(layout.WardenHome()) {
+	if sandbox.RealPath(filepath.Dir(dir)) != sandbox.RealPath(layout.WardenHome()) {
 		return "", ""
 	}
 	return filepath.Base(dir), strings.TrimSuffix(filepath.Base(log), ".log")

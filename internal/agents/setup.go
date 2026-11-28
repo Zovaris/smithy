@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/ghx"
 	"github.com/Zovaris/smithy/internal/harness"
@@ -112,7 +113,7 @@ func blockFile() (string, error) {
 			return f, nil
 		}
 	}
-	if p, ok := FindSkill("use-smithy"); ok {
+	if p, ok := skills.FindSkill("use-smithy"); ok {
 		if f := filepath.Join(filepath.Dir(p), "references", "SETUP.md"); isFile(f) {
 			return f, nil
 		}
@@ -199,8 +200,8 @@ func status() int {
 	h, _ := harness.Detect()
 	fmt.Println("harness:", h)
 	fmt.Println("installed:")
-	for _, s := range Known {
-		if p, ok := FindSkill(s); ok {
+	for _, s := range skills.Known {
+		if p, ok := skills.FindSkill(s); ok {
 			fmt.Printf("  %-9s %s\n", s, p)
 		}
 	}
@@ -243,4 +244,11 @@ func SetupMain(args []string) int {
 	}
 	fmt.Println(setupUsage)
 	return 2
+}
+
+func envOr(getenv func(string) string, key, def string) string {
+	if v := getenv(key); v != "" {
+		return v
+	}
+	return def
 }

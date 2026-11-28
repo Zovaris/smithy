@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/config"
 )
 
@@ -58,7 +59,7 @@ func TestSetupReportsAgentsSkillsAndKit(t *testing.T) {
 	if !s.Kit.MCP || len(s.Kit.Skills) != 0 {
 		t.Fatalf("default kit: %+v", s.Kit)
 	}
-	var claude *agents.HarnessInventory
+	var claude *skills.HarnessInventory
 	for i := range s.Harnesses {
 		if s.Harnesses[i].Harness == "claude" {
 			claude = &s.Harnesses[i]

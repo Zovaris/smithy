@@ -114,7 +114,7 @@ var Known = []Setting{
 	{"kit.skills", "", "smithy agent", "comma list of installed skills linked into every driven CLI that takes skills (claude, codex, opencode, pi); /skills toggles them"},
 	{"ui.theme", "steel", "smithy, smithy stats, web", "color theme the TUI and web share: steel (graphite, ember accent), frost, plum, moss, dune, dusk or rose, each a full palette; /theme and the web palette pick it"},
 	{"ui.splash", "true", "smithy", "false skips the short dither-and-anvil animation when smithy opens; it never plays without a terminal, color or motion, or under 80×24"},
-	{"tui.reduce_motion", "false", "smithy, smithy stats", "true draws every frame still: no sparks, shimmer or sliding bars (like --no-anim or SMITHY_REDUCE_MOTION)"},
+	{"ui.reduce_motion", "false", "smithy, smithy stats", "true draws every frame still: no sparks, shimmer or sliding bars (like --no-anim or SMITHY_REDUCE_MOTION)"},
 }
 
 // ErrUnset means the key has no value and no default: ask the user once, then save it.
@@ -351,6 +351,9 @@ func defaultOf(key string) string {
 	return ""
 }
 
+// renamed maps a setting to its old name, still read when only the old one is saved.
+var renamed = map[string]string{"ui.reduce_motion": "tui.reduce_motion"}
+
 // Effective returns a key's value and where it came from (repo, user or default); a settings
 // file that isn't a JSON object is an error, not ErrUnset.
 func Effective(key string) (string, string, error) { return Snapshot()(key) }
@@ -375,6 +378,11 @@ func Snapshot() func(key string) (string, string, error) {
 			}
 			if v, ok := lookup(l.m, key); ok {
 				return str(v), l.src, nil
+			}
+			if old, ok := renamed[key]; ok {
+				if v, ok := lookup(l.m, old); ok {
+					return str(v), l.src, nil
+				}
 			}
 		}
 		if d := defaultOf(key); d != "" && d != "ask" {

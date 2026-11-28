@@ -31,10 +31,12 @@ part above `### Details`.
 
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
 - ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
+- `smithy tui` is gone: it was the old name of `smithy stats`; run `smithy stats`. The `tui.reduce_motion` setting is now `ui.reduce_motion` under the ui group; a saved `tui.reduce_motion` still works.
 
 ### Details
 - Charm libraries: bubbletea v2.2.0; the chat view sets `ProgramResume` (exe, `chat`, its url, `--server` or `--standalone`, `--session <id>`, cwd) and drops it when quitting.
 - `internal/api` holds the daemon's wire types (state, sessions, settings, setup, projects, tasks, workflows, tend, bus) and its `Client`; the TUI, `smithy mcp` and warden use them from there, and the daemon keeps type aliases (ADR 0016). No behaviour change.
+- `internal/agents` split in three (ADR 0016): `agents` runs the CLIs, `agents/sandbox` holds the native and API sandboxes and the secret guard, `agents/skills` finds, installs and inventories skills. `catalog.Kind` names a CLI for both. No behaviour change.
 - `internal/tui` is split into `kit` (themes, dither ramp, charts, header, text helpers), `stats` (the `smithy stats` dashboard and `smithy serve` view) and `chat` (the chat, first-run walk, modals and attach; harness build only) (ADR 0016). No behaviour change.
 
 - ci: actions/checkout v7, setup-go v7, setup-node v7, cache v6, upload-artifact v7, attest-build-provenance v4, golangci-lint-action v9 (useblacksmith/checkout v1, setup-bun v2 and golangci-lint v2.15.0 were already latest).

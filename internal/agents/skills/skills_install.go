@@ -1,4 +1,4 @@
-package agents
+package skills
 
 import (
 	"archive/tar"
@@ -74,7 +74,8 @@ type SkillsInstall struct {
 	Manifest string
 }
 
-func recordLine(file, line string) {
+// RecordLine appends line to file unless it is there already.
+func RecordLine(file, line string) {
 	b, _ := os.ReadFile(file)
 	for _, l := range strings.Split(string(b), "\n") {
 		if l == line {
@@ -140,7 +141,7 @@ func InstallSkills(o SkillsInstall) error {
 				return err
 			}
 			if o.Manifest != "" {
-				recordLine(o.Manifest, dst)
+				RecordLine(o.Manifest, dst)
 			}
 		}
 		fmt.Fprintf(o.Out, "installed skills into %s\n", d)

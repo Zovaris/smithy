@@ -1,4 +1,4 @@
-package agents
+package skills
 
 import (
 	"bufio"

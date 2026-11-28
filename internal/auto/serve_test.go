@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/agents/sandbox"
 	"github.com/Zovaris/smithy/internal/config"
 	"github.com/Zovaris/smithy/internal/events"
 	"github.com/Zovaris/smithy/internal/pool"
@@ -397,6 +397,6 @@ func TestServeMarksOrchestratorRole(t *testing.T) {
 	var logs []string
 	newTestServer(t, &logs).Cycle()
 	if b, _ := os.ReadFile(filepath.Join(dir, "role")); strings.TrimSpace(string(b)) != "orchestrator" {
-		t.Errorf("orchestrator env lacks %s=orchestrator: %q (logs %q)", agents.SandboxRoleEnv, b, logs)
+		t.Errorf("orchestrator env lacks %s=orchestrator: %q (logs %q)", sandbox.SandboxRoleEnv, b, logs)
 	}
 }

@@ -19,6 +19,8 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/agents/sandbox"
+	"github.com/Zovaris/smithy/internal/agents/skills"
 	"github.com/Zovaris/smithy/internal/auto"
 	"github.com/Zovaris/smithy/internal/cards"
 	"github.com/Zovaris/smithy/internal/config"
@@ -328,7 +330,7 @@ func fetchPRState(r TendRef) (gitx.PRState, error) {
 // TendPrompt is the one tend session's task for action on r.
 func TendPrompt(r TendRef, action string) string {
 	skill := "the tend skill's SKILL.md"
-	if p, ok := agents.FindSkill("tend"); ok {
+	if p, ok := skills.FindSkill("tend"); ok {
 		skill = p
 	}
 	return fmt.Sprintf("Read %s and follow it for `tend %s`, once: its next step is %s. Work in this worktree on the PR's branch, push the fix and end when the step is done. Never merge, never force-push someone else's branch and never close the PR; anything that needs the user ends in one line starting with `needs-you:`.\n", skill, r.URL, action)
@@ -341,9 +343,9 @@ func launchTend(r TendRef, action string) (int, string, error) {
 		return 0, "", err
 	}
 	agent := auto.DefaultAgent()
-	mode, err := agents.SandboxMode()
+	mode, err := sandbox.SandboxMode()
 	if err == nil {
-		err = agents.SandboxCheckAgent(mode, agent, agents.HostProbe())
+		err = sandbox.SandboxCheckAgent(mode, agent, sandbox.HostProbe())
 	}
 	if err != nil {
 		return 0, "", fmt.Errorf("auto.sandbox: %v; no tend session starts until it is fixed (smithy doctor)", err)

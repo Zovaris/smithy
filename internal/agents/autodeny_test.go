@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/Zovaris/smithy/internal/agents/sandbox"
 )
 
 func TestAutoDeniedGuardsCardsAndDaemonToken(t *testing.T) {
@@ -61,7 +63,7 @@ func TestEnvMarksWardenWorkers(t *testing.T) {
 }
 
 func TestNativeSettingsDenyDaemonToken(t *testing.T) {
-	s := NativeSettings(SandboxPaths{Cwd: "/w/r", Home: "/h", SmithyHome: "/h/.smithy", Warden: "/h/.smithy/warden"}, nil, "linux", false)
+	s := sandbox.NativeSettings(sandbox.SandboxPaths{Cwd: "/w/r", Home: "/h", SmithyHome: "/h/.smithy", Warden: "/h/.smithy/warden"}, nil, "linux", false)
 	if !strings.Contains(s, `"denyRead":["/h/.smithy/auth.json","/h/.smithy/auth.key","/h/.smithy/daemon.token"`) {
 		t.Fatalf("daemon token readable: %s", s)
 	}

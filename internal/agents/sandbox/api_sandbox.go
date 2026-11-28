@@ -1,4 +1,4 @@
-package agents
+package sandbox
 
 import (
 	"fmt"
@@ -11,10 +11,10 @@ import (
 	"github.com/Zovaris/smithy/internal/layout"
 )
 
-// apiShellSandbox is the auto.sandbox wrapper for an API run's shell commands: nil when the
+// APIShell is the auto.sandbox wrapper for an API run's shell commands: nil when the
 // sandbox is off, the native OS sandbox (Seatbelt on macOS, bubblewrap on Linux) for native, and
 // an error when the native sandbox can't start here (callers fail closed).
-func apiShellSandbox(mode string, p Probe, paths SandboxPaths) (func([]string) []string, error) {
+func APIShell(mode string, p Probe, paths SandboxPaths) (func([]string) []string, error) {
 	switch mode {
 	case "off", "":
 		return nil, nil
@@ -57,21 +57,21 @@ func apiShellSandbox(mode string, p Probe, paths SandboxPaths) (func([]string) [
 	return nil, fmt.Errorf("the native sandbox needs macOS or Linux, not %s", p.GOOS)
 }
 
-// apiSandboxPaths are the native sandbox's paths for an API run in cwd: the same writable and
+// APIPaths are the native sandbox's paths for an API run in cwd: the same writable and
 // secret dirs a claude worker's sandbox gets.
-func apiSandboxPaths(cwd string) (SandboxPaths, error) {
+func APIPaths(cwd string) (SandboxPaths, error) {
 	home := layout.UserHome()
 	secret, err := PoolDirs()
 	if err != nil {
 		return SandboxPaths{}, err
 	}
-	gocache := GoCacheDir(realPath(layout.WardenHome()), cwd)
+	gocache := GoCacheDir(RealPath(layout.WardenHome()), cwd)
 	if err := os.MkdirAll(gocache, 0o700); err != nil {
 		return SandboxPaths{}, err
 	}
-	p := SandboxPaths{Cwd: realPath(cwd), Home: home, SmithyHome: layout.Home(), Warden: layout.WardenHome(), GoCache: gocache, Secret: secret}
+	p := SandboxPaths{Cwd: RealPath(cwd), Home: home, SmithyHome: layout.Home(), Warden: layout.WardenHome(), GoCache: gocache, Secret: secret}
 	if g, err := ghx.Run("git", "-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"); err == nil && g != "" {
-		p.GitDir = realPath(g)
+		p.GitDir = RealPath(g)
 	}
 	return p, nil
 }
@@ -83,7 +83,7 @@ func SeatbeltProfile(fs map[string][]string) string {
 	b.WriteString("(version 1)\n(allow default)\n(deny network*)\n(deny file-write*)\n")
 	sub := func(verb string, ps []string) {
 		for _, p := range ps {
-			fmt.Fprintf(&b, "(%s (subpath %s))\n", verb, strconv.Quote(realPath(p)))
+			fmt.Fprintf(&b, "(%s (subpath %s))\n", verb, strconv.Quote(RealPath(p)))
 		}
 	}
 	tmp := []string{"/dev", "/private/tmp", "/private/var/folders"}
