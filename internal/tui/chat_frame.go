@@ -104,7 +104,8 @@ func (m chatView) clockNow() time.Time {
 	return time.Now()
 }
 
-// pill is "idle", "● waiting" while a decision waits on you and nothing runs, or "● N running"
+// pill is "● waiting on you" (with "· N running" when sessions run) while a decision waits on
+// you, else "idle" or "● N running"
 // with the dot breathing between dim and the accent.
 func (m chatView) pill(bar lipgloss.Style) string {
 	t := m.th
@@ -114,8 +115,12 @@ func (m chatView) pill(bar lipgloss.Style) string {
 			n++
 		}
 	}
-	if n == 0 && len(m.pending) > 0 {
-		return bar.Foreground(t.warn).Render(t.g.on) + bar.Foreground(t.text).Render(" waiting")
+	if len(m.pending) > 0 {
+		w := bar.Foreground(t.warn).Render(t.g.on) + bar.Foreground(t.text).Render(" waiting on you")
+		if n > 0 {
+			w += bar.Foreground(t.dim).Render(fmt.Sprintf(" · %d running", n))
+		}
+		return w
 	}
 	if n == 0 {
 		return bar.Foreground(t.dim).Render("idle")
@@ -423,7 +428,7 @@ func (m chatView) helpBox(screen []string, w, h int) []string {
 		{"enter", "send; shift+enter or alt+enter for a new line"}, {"/", "commands"}, {"@", "a file from this folder"},
 		{"tab", "agents and sessions"}, {"ctrl+k", "palette"}, {"ctrl+l", "agent and model"},
 		{"ctrl+o", "minimal · expandable · verbose"}, {"? enter", "this help (or /help)"}, {"pgup pgdn", "scroll; wheel too, home and end"}, {"click", "open a tool block or answer a decision"},
-		{"letter, enter", "an option's first letter alone answers the decision; typing is a message"},
+		{"enter", "on an empty composer opens the question waiting on you"},
 		{"/name or $name", "run an installed skill on the rest of the line"}, {"ctrl+c", "quit"},
 	} {
 		items = append(items, boxItem{glyph: t.g.dot, color: t.muted, label: k[0], hint: k[1]})

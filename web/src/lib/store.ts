@@ -15,7 +15,8 @@ export type Part = { kind: "text"; text: string } | { kind: "tools"; tools: Tool
 export type Item = { kind: "you"; text: string; at: string } | { kind: "agent"; parts: Part[]; at: string };
 
 export type Diff = { stat: string; patch: string; truncated: boolean; at: string };
-export type Dec = { id: string; session: string; question: string; options: string[]; asked: string; answer?: string; by?: string };
+// multi: several options may be picked (the answer joins them with ", "); other: free text is taken.
+export type Dec = { id: string; session: string; question: string; options: string[]; asked: string; multi?: boolean; other?: boolean; answer?: string; by?: string };
 export type Store = {
   last: number;
   order: string[];
@@ -159,7 +160,7 @@ export function fold(s: Store, e: Ev): Store {
       const did = str(d.id);
       if (!did || s.decisions.some((x) => x.id === did)) return next;
       const sid = sessionOf(did, id);
-      next.decisions = [...s.decisions, { id: did, session: sid, question: str(d.question), options: Array.isArray(d.options) && d.options.length ? d.options : ["yes", "no"], asked: str(d.asked) || at }];
+      next.decisions = [...s.decisions, { id: did, session: sid, question: str(d.question), options: Array.isArray(d.options) && d.options.length ? d.options : ["yes", "no"], asked: str(d.asked) || at, multi: d.multi === true, other: d.other === true }];
       if (sid && s.sessions[sid]) {
         const { items, turn } = agentTurn(s.convo[sid] ?? [], at);
         turn.parts.push({ kind: "decision", id: did });
@@ -181,10 +182,10 @@ export function fold(s: Store, e: Ev): Store {
 }
 
 // seed adds the pending decisions /v1/state lists that the stream has not shown yet.
-export function seed(s: Store, pending: { id: string; question: string; options?: string[]; asked?: string }[]): Store {
+export function seed(s: Store, pending: { id: string; question: string; options?: string[]; asked?: string; multi?: boolean; other?: boolean }[]): Store {
   const add = pending.filter((p) => !s.decisions.some((d) => d.id === p.id));
   if (!add.length) return s;
-  return { ...s, decisions: [...s.decisions, ...add.map((p) => ({ id: p.id, session: sessionOf(p.id), question: p.question, options: p.options?.length ? p.options : ["yes", "no"], asked: p.asked ?? "" }))] };
+  return { ...s, decisions: [...s.decisions, ...add.map((p) => ({ id: p.id, session: sessionOf(p.id), question: p.question, options: p.options?.length ? p.options : ["yes", "no"], asked: p.asked ?? "", multi: p.multi === true, other: p.other === true }))] };
 }
 
 export const open = (s: Store) => s.decisions.filter((d) => d.answer == null);
@@ -201,6 +202,9 @@ export function kindOf(d: Dec): string {
 }
 
 // primary is the option the ↵ key answers: deny for the guard (the safe one), else the first.
+// picks is a multi-select answer: the picked options in their listed order, joined as the daemon checks them.
+export const picks = (options: string[], picked: Set<number>) => options.filter((_, i) => picked.has(i)).join(", ");
+
 export const primary = (d: Dec) => (d.options.includes("deny") ? "deny" : d.options[0]);
 
 let names: Record<string, string> = {};

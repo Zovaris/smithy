@@ -37,5 +37,6 @@ export const setKey = (svc: string, key: string) => call("PUT", "/v1/keys/" + en
 export const removeKey = (svc: string) => call("DELETE", "/v1/keys/" + encodeURIComponent(svc));
 export const setServe = (on: boolean) => call("PUT", "/v1/serve", { on });
 export const runDoctor = (): Promise<{ lines: string[] }> => call("GET", "/v1/doctor");
+export const connectTest = (): Promise<{ results: string[]; error?: string }> => call("POST", "/v1/connect/test", {});
 export const addServer = (name: string, url: string, code: string) => call("POST", "/v1/servers", { name, url, code });
 export const removeServer = (name: string) => call("DELETE", "/v1/servers/" + encodeURIComponent(name));

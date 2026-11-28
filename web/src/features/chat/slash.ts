@@ -125,7 +125,7 @@ export function run(a: string, arg: string, ctx: Ctx): void {
     say(setSetting(k, v.join(" ")), "saved " + k);
   } else if (a === "unset" && arg) say(unsetSetting(arg), arg + " is back to its default");
   else if (a === "set" || a === "unset") toSettings("settings");
-  else if (a === "skills" || a === "keys" || a === "doctor" || a === "serve" || a === "prompt") toSettings(a);
+  else if (a === "skills" || a === "keys" || a === "doctor" || a === "serve" || a === "prompt" || a === "channels") toSettings(a);
   else if (a === "connect") toSettings("servers");
   else if (a === "agent" || a === "setup") toSettings("agents");
   else if (a === "welcome") go({ name: "setup" });

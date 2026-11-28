@@ -27,20 +27,6 @@ func TestTypingAMessageNeverAnswersTheDecision(t *testing.T) {
 	}
 }
 
-func TestOptionLetterAloneThenEnterAnswers(t *testing.T) {
-	var got []string
-	m := newChatScene()
-	m.decide = func(id, answer string) tea.Cmd { got = append(got, id+"="+answer); return nil }
-	m = typeIn(m, "m")
-	if len(got) != 0 || m.input.Value() != "m" {
-		t.Fatalf("a letter goes to the composer first: %q %v", m.input.Value(), got)
-	}
-	m = chatStep(m, ckey("enter"))
-	if len(got) != 1 || got[0] != "d1=merge" || m.input.Value() != "" {
-		t.Fatalf("letter then enter answers: %v", got)
-	}
-}
-
 func TestSkillsModalFitsTheScreenWithManySkills(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 140, 35
