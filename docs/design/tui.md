@@ -83,6 +83,8 @@ a UTF-8 locale the ASCII set applies.
 ## Layout
 
 Rhythm: 2-col gutter, 3-col indent, 1 blank row between blocks, tool rows tight, 1-col chip gaps.
+An agent answer opens with its name (Info, bold) and the model (Dim) and runs beside a thin Border
+gutter `▏`; text streamed in parts becomes that one answer, never repeated.
 Sidebar (38 cols, Raised) shows only at 120 cols and wider.
 
 80x24:
@@ -175,18 +177,18 @@ Status vocabulary, the only one: `▪` state mark (Ok, Warn, Err, Dim), `▫` of
 
 | Component | Anatomy | States |
 |---|---|---|
-| Header | Raised row; Accent ` ◆ smithy ` block, version and project Dim; right: tend, spinner, clock | default; running (spinner) |
-| Tab chip | ` name ` on Raised | default Muted; focus Strong; active Accent bg, Surface fg, bold; running spinner; waiting Warn `?`; failed `▪` Err |
+| Header | Raised row; Accent ` ◆ smithy ` block, version and project Muted; right: chips on Overlay for tend, state (`idle`, spinner `N running`, Warn `? waiting on you`) and the clock | default; running (spinner); waiting (Warn chip) |
+| Tab chip | ` title ` on Raised; title is the session title without polite openings, cut at a word near 24 cells or middle-ellipsed; `«` `»` when tabs overflow, the active one kept in view | default Muted; active Accent bg, Surface fg, bold; running spinner |
 | User turn | Raised band, `▌` Accent, Strong bold, time Dim right | default |
 | Agent turn | name Info bold, model and effort Dim, body Text | default; running spinner after name |
 | Tool row | `▪ Tool  args` Info, result right | running spinner; done `✓` Ok; failed `✗` Err; disabled Dim |
 | Shell band | Raised, Warn `$` chip, command Strong bold, output Muted, `exit n · t` right | running spinner; ok Ok; failed Err |
 | Ask panel | "Questions", Warn rail, question bold, numbered options with Muted line, "Type your own answer", hints | default; focus row Focus bg + `›`; answered collapses to transcript line |
 | Input | Focus band, Accent rail, Accent `›`; chips: agent, model, effort (Accent), queued (Warn); tokens right | focus; disabled Dim prompt while a modal is open |
-| Footer | key chip (Overlay, Strong) + Muted label; right: mode chip, Accent `ctrl+k palette` | default |
-| Sidebar | 38 cols Raised; title Strong bold; headings Accent bold; meter Accent / Overlay; spend label Muted, value Strong; links `▪ #n title` + checks line; queue numbered in Accent | default only |
+| Footer | keys in Text, labels Dim, three spaces apart, no backgrounds; right: mode chip, Accent `ctrl+k palette` chip | default; select mode (Warn) |
+| Sidebar | 38 cols Raised; title Strong bold; headings Accent bold; meter Accent / Overlay; spend label Muted, value Strong; links `▪ PR #n title` + `ci ✓ · state`; a links error is one Muted line, e.g. `links paused: GitHub rate limit, retry 14:05`, never the raw error | default only |
 | Modal | Raised body, full-width Accent title bar (title Surface bold, `esc` right), shade, dim backdrop | open, closing (spring) |
-| /config | `/ filter settings` on Focus; groups Look, Agent, Tend, Serve, Notify, Accent heading + Border rule; name left, value right | focus row: Focus bg, rail, all options as chips, `‹ value ›`; edited Accent `•`; disabled Dim; theme row as accent swatches; description on Overlay |
+| /config | `/ filter` on Focus; a curated list of about 20 settings with human labels (Theme, Transcript, Sidebar, Effort, Tend, Serve…) in Look, Agent, Tend, Serve, Notify, then `Advanced (N)` collapsed; filtering searches all of them; booleans read on/off; the config key shows only in the description footer | focus row: Focus bg, rail, every option as a chip, `‹ value ›`; changed Accent `•`; theme row as accent swatches |
 | /usage | period chips; tiles spent, runs, tokens out, cache read on Overlay with coloured top tick; 30-day Accent bars (today Strong); by agent and by model with cost bars; no-agent group last, Muted italic; token bar cache Warn, in Info, out Ok | active period Accent chip |
 | Doctor | same modal frame, one row per check in the status vocabulary | ok, warn, failed |
 
