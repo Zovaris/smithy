@@ -263,6 +263,7 @@ func foreground(o runOpts) int {
 	}
 	if len(conns) > 0 {
 		hub := &connect.Hub{Conns: conns, File: connect.File(), Kinds: connect.Kinds, Input: api.Input, Intake: api.Intake,
+			Start: api.ChatStart, Free: FreeAnswer,
 			Answer: func(id, answer, by string) error { _, err := api.Answer(id, answer, by); return err },
 			Log:    func(l string) { _, _ = api.Append("log", "", map[string]string{"line": l}) }}
 		go api.RunNotes(tctx, hub, 30*time.Second)

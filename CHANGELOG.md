@@ -10,8 +10,14 @@ part above `### Details`.
 
 ### New
 
+- New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 - An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
 - A question that takes several picks asks for them in Slack (a multi-select menu), Discord (a select menu) and Telegram (☐/☑ toggles and Done); single-pick questions keep one button per option.
+
+### Fixed
+
+- A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
+- ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
 
 ### Details
 
@@ -21,17 +27,12 @@ part above `### Details`.
 - The chat header shows the tend mode and how many PRs it tends.
 - `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.
 - A vague product idea ("make me a landing page") now starts with a brainstorm, grilling, spec and tasks before any build, and smithy offers the design or frontend skills you have installed.
-
-### Fixed
-- A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
-
-### Details
 - TUI: `infoPanel.set` holds one setting row cycled with left/right; `doctorPanel` groups `smithy doctor` output; the header reads `GET /v1/tend` once a minute.
-
 - `/board` in the TUI chat shows your task files by status, like the web Board: move a task with
   left/right, tab through task dirs, enter opens the file, `o` opens its PR, blockers and PRs show on each row.
 - The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
-
+- Chat apps get two places each: a notifications channel for alerts and a chat channel where a new message starts a session in its own thread or topic, your replies continue it and its answers come back. `/channels test` and the web settings send a test message to both.
+- A question from the ask tool can be answered in your own words by replying to its message, besides its buttons.
 - `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).
   `/effort ` completes the levels the agent takes, `off` included, and the top level plays a short shimmer.
 - The TUI's `/` menu lists commands first, then skills with their own mark and folder, and matches descriptions too.
@@ -40,17 +41,11 @@ part above `### Details`.
   `/theme` in the TUI or the web's command palette.
 - The web composer does the same: `/effort` works without a session, `/effort ` completes the levels,
   the top level shimmers, and the `/` menu lists commands, then marked skills.
-
-### Details
-
+- `connect.<telegram|slack|discord>.notify` and `.chat` settings; the old single keys (`notify.telegram.chat`, `connect.slack.channel`, `connect.discord.channel`) still set the notifications channel. `POST /v1/connect/test` builds the connectors from the current settings and sends to each channel. Chat-mode sessions start only for users in `connect.<name>.users`.
 - `ui.theme` palettes live in `internal/tui/theme.go` (`palettes`); `web/src/theme/temper.css`
   maps the same hex onto Sephiro's tokens per `data-accent`, and a test checks they match.
   256-color terminals get each palette's nearest colors; 16-color terminals keep steel's tiers with
   the theme's accent.
-### Fixed
-
-- ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
-
 ## v0.25.0 — 2026-11-26
 
 ### Highlights
