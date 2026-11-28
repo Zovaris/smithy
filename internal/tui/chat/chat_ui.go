@@ -91,6 +91,7 @@ type palItem struct {
 	color            color.Color
 	label, hint, key string
 	run              func(m *chatView) tea.Cmd
+	cycle            func(m *chatView, dir int) tea.Cmd // a setting row: left/right step its value
 }
 
 // event routes one daemon event: session events to their conversation, decisions to the
@@ -307,8 +308,7 @@ func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
 		return true, nil
 	case "ctrl+k":
-		m.overlay, m.pal = overlayPalette, palette{}
-		return true, nil
+		return true, m.openPalette("")
 	case "ctrl+l":
 		m.openPicker(overlayPicker)
 		return true, m.loadSetup(false)
@@ -349,7 +349,7 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 	case "log":
 		m.showLog()
 	case "palette":
-		m.overlay, m.pal = overlayPalette, palette{}
+		return m, m.openPalette("")
 	case "agent":
 		return m.agentCommand(arg)
 	case "model":
@@ -533,6 +533,10 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.pal.sel = max(m.pal.sel-1, 0)
 	case "down":
 		m.pal.sel = min(m.pal.sel+1, max(len(items)-1, 0))
+	case "left", "right":
+		if m.pal.sel < len(items) && items[m.pal.sel].cycle != nil {
+			return m, items[m.pal.sel].cycle(&m, map[string]int{"left": -1, "right": 1}[k])
+		}
 	case "tab":
 		for i := m.pal.sel + 1; i < len(items); i++ {
 			if items[i].group != items[m.pal.sel].group {
@@ -568,7 +572,7 @@ func (m chatView) agentsKey(k string) (tea.Model, tea.Cmd) {
 	case "tab", "esc":
 		m.overlay = overlayNone
 	case "ctrl+k":
-		m.overlay, m.pal = overlayPalette, palette{}
+		return m, m.openPalette("")
 	case "up", "k":
 		m.agentSel = max(m.agentSel-1, 0)
 	case "down", "j":
@@ -613,6 +617,7 @@ func (m chatView) palItems() []palItem {
 			}})
 	}
 	cycle := func(m *chatView) tea.Cmd { m.setMode((m.mode + 1) % 3); return nil }
+	step := func(m *chatView, dir int) tea.Cmd { m.setMode((m.mode + chatMode(3+dir)) % 3); return nil }
 	agents := func(m *chatView) tea.Cmd { m.overlay = overlayAgents; return nil }
 	all = append(all,
 		palItem{group: "ACTIONS", glyph: "+", color: t.Muted, label: "New session", hint: "your next message starts it", key: "/new", run: func(m *chatView) tea.Cmd { m.newSession(); return nil }},
@@ -639,13 +644,16 @@ func (m chatView) palItems() []palItem {
 		all = append(all, palItem{group: "SESSIONS", glyph: g, color: c, label: label, hint: strings.Trim(s.agent+" "+t.G.Dot+" "+s.state, " "+t.G.Dot), run: func(m *chatView) tea.Cmd { m.open(id); return nil }})
 	}
 	all = append(all,
-		palItem{group: "SETTINGS", glyph: t.G.Dot, color: t.Muted, label: "chat.mode", hint: m.mode.String(), run: cycle},
+		palItem{group: "SETTINGS", glyph: t.G.Dot, color: t.Muted, label: "chat.mode", hint: "‹ " + m.mode.String() + " ›  how much of each turn the transcript shows", run: cycle, cycle: step},
 		palItem{group: "SETTINGS", glyph: t.G.Dot, color: t.Muted, label: "daemon", hint: m.url, run: func(*chatView) tea.Cmd { return nil }},
 	)
+	for _, r := range m.palSet {
+		all = append(all, m.settingItem(r))
+	}
 	q := strings.ToLower(m.pal.query)
 	var out []palItem
 	for _, it := range all {
-		if q == "" || strings.Contains(strings.ToLower(it.label+" "+it.hint), q) {
+		if q == "" || strings.Contains(strings.ToLower(it.group+" "+it.label+" "+it.hint), q) {
 			out = append(out, it)
 		}
 	}

@@ -159,6 +159,7 @@ type chatView struct {
 	webURL    string           // the web UI with its token; "" when unknown
 	files     *fileCache       // the @ popup's file list
 	popModels *models.List     // the /model popup's list, for popModels.Agent
+	palSet    []api.SettingRow // the daemon settings the palette lists
 	popSel    int              // the selected / or @ popup row
 	agentSel  int              // the selected session in the agents panel
 	info      infoPanel        // the open read-only panel
@@ -604,6 +605,9 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.workflowDetail(msg)
 	case effortDefaultMsg:
 		m.effortDefaultSet(msg)
+		return m, nil
+	case paletteSettingsMsg:
+		m.palSet = msg.rows
 		return m, nil
 	case settingsDoneMsg:
 		if msg.tend != nil {

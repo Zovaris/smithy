@@ -43,7 +43,7 @@ var slashCommands = []slashCommand{
 	{"answer", "[text]", "open the question waiting on you, or answer it in your words"},
 	{"help", "", "keys and commands"},
 	{"serve", "[on|off]", "serve mode: off launches nothing new (auto.paused)"},
-	{"set", "<key> <value>", "save a setting in your user file (smithy config set)"},
+	{"set", "[<key> <value>]", "save a setting in your user file (smithy config set); bare, list them"},
 	{"unset", "<key>", "put a setting back to its default"},
 	{"keys", "", "stored API keys, masked, and how to add or remove one"},
 	{"key", "rm <service>", "remove a stored API key"},
