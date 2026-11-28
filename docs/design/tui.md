@@ -44,12 +44,13 @@ surface from flat bands of background colour: no borders, no radius. Principles:
 - Few concepts: one chip, one rail, one status vocabulary everywhere.
 
 What makes it smithy's, not another agent TUI: the transcript hangs off one forge timeline, a
-rail with a one-cell mark gutter (`✓ ✗ $ ?` and the spinner sit on the first line of their block);
+rail whose first cell of a block carries its mark (`✓ ✗ $ ?` or the spinner);
 your prompt is a bold heading on a heavy accent rail with the turn's result and time on its right,
 not a boxed message; tool runs fold into small tallies; the sidebar is a live session panel (pulse
 sparkline of steps per turn, heat, work, queue, links) that hides when there is nothing to show;
-an empty session opens on the anvil with recent sessions and keys, left-aligned, never a centered
-logo and input.
+an empty session opens a third of the way down on one wordmark line, one context line (folder,
+branch, agent, model) and up to five recent sessions that 1-5 opens: no art, never a centered logo
+and input.
 
 ## Colors
 
@@ -87,9 +88,11 @@ a UTF-8 locale the ASCII set applies.
 
 ## Layout
 
-Grid: page gutter `pad` (3 cols from 100 wide, else 1); mark column at `pad`, rail at `pad+2`, text
-column at `pad+4`; under 80 columns the mark replaces the rail. Bands (shell output, open tools, the
-input) run from one cell before the text column to `width - pad`. The sidebar ends on that same right
+Grid: page gutter `pad` (3 cols from 100 wide, else 1); the rail sits at `pad` and a block's mark
+takes its place on the block's first line; text starts at `pad+2`. Bands (shell output, open tools,
+the ask panel, the input) start on the rail and end on `width - pad`; the footer starts on `pad` too.
+Notices (agent picked, serve paused) are one muted status line above the input, never stacked lines
+on the empty screen; a repeated notice is dropped. The sidebar ends on that same right
 edge, after a fixed 2-col gap; header and footer right chips end there too. `TestBlocksShareOneGrid`
 checks it at 120 and 200 columns. A short session starts at the top under a 2-line intro (title;
 agent, model, branch, started) and grows down; once it fills the screen it stays anchored to the input.

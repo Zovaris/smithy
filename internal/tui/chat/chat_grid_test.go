@@ -115,7 +115,7 @@ func TestBlocksShareOneGrid(t *testing.T) {
 		if len(edges) != 2 {
 			t.Fatalf("%d cols: blocks found %v:\n%s", w, edges, strings.Join(plain, "\n"))
 		}
-		if edges["shell"] != edges["input"] || edges["shell"][0] != want-1 {
+		if edges["shell"] != edges["input"] || edges["shell"][0] != want-2 {
 			t.Fatalf("%d cols: edges differ (lo, hi): %v", w, edges)
 		}
 		for k, c := range textCol {

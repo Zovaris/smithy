@@ -31,7 +31,7 @@ func TestChannelsPanelAndTestSend(t *testing.T) {
 	m.width, m.height = 160, 48
 	m.cfg = f
 	m = cpress(typeIn(m, "/channels test"), ckey("enter"))
-	out = screen(m)
+	out = screen(m) + notes(m)
 	if f.tested != 1 || !strings.Contains(out, "slack notifications: sent") || !strings.Contains(out, "not_in_channel") {
 		t.Fatalf("tested %d:\n%s", f.tested, out)
 	}

@@ -47,7 +47,7 @@ func TestUsageNamesOnlyTheCommandAndPrintsOnce(t *testing.T) {
 	m.cfg = &fakeSettings{}
 	m = cpress(typeIn(m, "/set x"), ckey("enter"))
 	m = cpress(typeIn(m, "/unset"), ckey("enter"))
-	out := screen(m)
+	out := notes(m)
 	if strings.Count(out, "usage: /set [<key> <value>]") != 1 || strings.Count(out, "usage: /unset <key>") != 1 || strings.Contains(out, "/doctor") {
 		t.Fatalf("each usage once, naming only its command:\n%s", out)
 	}

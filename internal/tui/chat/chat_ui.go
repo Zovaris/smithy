@@ -224,6 +224,9 @@ func (m *chatView) decided(d chatDecidedMsg) {
 
 func (m *chatView) system(text string) {
 	m.offset = 0
+	if n := len(m.msgs); n > 0 && m.msgs[n-1].kind == "system" && m.msgs[n-1].text == text {
+		return
+	}
 	m.push(chatMsg{who: "daemon", kind: "system", text: text})
 }
 
@@ -318,6 +321,11 @@ func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	case "tab":
 		m.overlay, m.agentSel = overlayAgents, max(m.listedAt(m.current), 0)
 		return true, nil
+	case "1", "2", "3", "4", "5":
+		if r := m.recent(); m.fresh() && m.input.Value() == "" && m.overlay == overlayNone && int(msg.String()[0]-'1') < len(r) {
+			m.open(r[msg.String()[0]-'1'].id)
+			return true, nil
+		}
 	case "ctrl+n", "ctrl+p":
 		m.switchTab(map[string]int{"ctrl+n": 1, "ctrl+p": -1}[msg.String()])
 		return true, nil

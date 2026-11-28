@@ -144,3 +144,15 @@ func TestStreamedPartsBecomeTheAnswerOnce(t *testing.T) {
 		t.Fatal("parts become the agent's; a different reply is not adopted")
 	}
 }
+
+// notes is every system note the open session holds, one per line: the empty screen shows only
+// the latest on the status line.
+func notes(m chatView) string {
+	var out []string
+	for _, c := range m.msgs {
+		if c.kind == "system" || c.who == "daemon" && c.tool == nil && c.sh == nil {
+			out = append(out, c.text)
+		}
+	}
+	return strings.Join(out, "\n")
+}

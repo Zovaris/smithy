@@ -199,6 +199,14 @@ func (m chatView) statusLine(w int) string {
 			break
 		}
 	}
+	if m.fresh() {
+		for i := len(m.msgs) - 1; i >= 0; i-- {
+			if m.msgs[i].kind == "system" {
+				left = dim.Render(m.msgs[i].text)
+				break
+			}
+		}
+	}
 	if m.offset > 0 {
 		left = t.Fg(t.Info).Render(fmt.Sprintf("→ %d rows up · end jumps back", m.offset))
 	}

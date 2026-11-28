@@ -133,9 +133,9 @@ func (m chatView) askBox(screen []string, w, h int) []string {
 	row := func(st lipgloss.Style, s string) string { return gut + fill(st, bw, rail+s) + gut }
 	title := t.Fg(t.Warn).Bold(true).Render("Questions")
 	count := t.Fg(t.Dim).Render(fmt.Sprintf("1 of %d  ", len(m.pending)))
-	rows := []string{row(bg, ""), row(bg, spread("  "+title, count, bw-1)), row(bg, "")}
+	rows := []string{row(bg, ""), row(bg, spread(" "+title, count, bw-1)), row(bg, "")}
 	for _, l := range strings.Split(ansi.Wrap(d.Question, max(bw-8, 10), ""), "\n") {
-		rows = append(rows, row(bg, "  "+t.Fg(t.Strong).Bold(true).Render(l)))
+		rows = append(rows, row(bg, " "+t.Fg(t.Strong).Bold(true).Render(l)))
 	}
 	rows = append(rows, row(bg, ""))
 	opt := func(i int, label, desc string) {
@@ -150,9 +150,9 @@ func (m chatView) askBox(screen []string, w, h int) []string {
 				mark = t.Fg(t.Accent).Render("[x] ")
 			}
 		}
-		rows = append(rows, row(st, "  "+num+"  "+mark+lab))
+		rows = append(rows, row(st, " "+num+"  "+mark+lab))
 		if desc != "" {
-			rows = append(rows, row(st, "       "+t.Fg(t.Muted).Render(kit.Short(desc, bw-10))))
+			rows = append(rows, row(st, "      "+t.Fg(t.Muted).Render(kit.Short(desc, bw-10))))
 		}
 	}
 	for i, o := range d.Options {
@@ -168,7 +168,7 @@ func (m chatView) askBox(screen []string, w, h int) []string {
 	if d.Multi {
 		hint = t.Fg(t.Dim).Render("↑↓ select " + t.G.Dot + " space pick " + t.G.Dot + " enter submit " + t.G.Dot + " esc dismiss")
 	}
-	rows = append(rows, row(bg, ""), row(bg, "  "+hint), row(bg, ""))
+	rows = append(rows, row(bg, ""), row(bg, " "+hint), row(bg, ""))
 	bottom := len(screen) - 1 - len(m.composer(tw))
 	top := max(bottom-len(rows), headRows)
 	rows = rows[len(rows)-(bottom-top):]

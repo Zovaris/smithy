@@ -1024,8 +1024,7 @@ func (m chatView) View() tea.View {
 	vis, _ := m.visible()
 	body := make([]string, 0, m.rows()+2)
 	if m.fresh() && !m.working() && m.offset == 0 {
-		body = append(body, m.home(m.tw(), m.rows()-len(vis))...)
-		body = append(body, vis...)
+		body = append(body, m.home(m.tw(), m.rows())...)
 	} else if intro := m.intro(m.tw()); m.lead(len(vis)) == len(intro) {
 		body = append(body, intro...)
 		body = append(body, vis...)
@@ -1161,11 +1160,8 @@ func (m chatView) composer(w int) []string {
 		if m.shimmer > 0 {
 			l = t.Shimmer(ansi.Strip(l), float64(bw)*float64(shimmerFrames-m.shimmer)/shimmerFrames)
 		}
-		mark := ""
-		if n == 0 {
-			mark = t.Fg(t.Accent).Bold(true).Render(t.G.Prompt)
-		}
-		out = append(out, row(mark, l))
+		_ = n
+		out = append(out, row("", l))
 	}
 	out = append(out, row("", ""), row("", m.metaChips()))
 	p := strings.Repeat(" ", tx-1)
@@ -1193,16 +1189,6 @@ func (m chatView) metaChips() string {
 		out = append(out, m.chip(" effort ", t.Muted, t.Overlay, false)+m.chip(s.effort+" ", t.Accent, t.Overlay, true))
 	}
 	return strings.Join(out, on(t.Focus).Render(" "))
-}
-
-// metaText is the agent, model, effort and mode the next turn runs with, for the input's rule.
-func (m chatView) metaText() string {
-	parts := nonEmpty(strings.Split(m.agentModel(), " "+m.th.G.Dot+" ")...)
-	if s, ok := m.session(); ok && s.effort != "" {
-		parts = append(parts, "effort "+s.effort)
-	}
-	parts = append(parts, m.mode.String())
-	return strings.Join(parts, " "+m.th.G.Dot+" ")
 }
 
 // gitBranch is dir's current branch, "" outside a repo.
