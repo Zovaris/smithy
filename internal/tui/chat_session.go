@@ -12,19 +12,20 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
 // sessionAPI is the part of the daemon client the chat drives sessions with.
 type sessionAPI interface {
-	StartSession(ctx context.Context, agent, dir, msg string) (daemon.Session, error)
+	StartSession(ctx context.Context, agent, dir, msg string) (api.Session, error)
 	SendSession(ctx context.Context, id, text string) error
 	StopSession(ctx context.Context, id string) error
 }
 
 type sessionStartedMsg struct {
-	s   daemon.Session
+	s   api.Session
 	err error
 }
 
@@ -131,12 +132,12 @@ func (m *chatView) into(id string, c chatMsg) {
 func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 	switch kind {
 	case daemon.KindSessionStarted:
-		var s daemon.Session
+		var s api.Session
 		if json.Unmarshal(data, &s) == nil {
 			m.meta(id, s)
 		}
 	case daemon.KindSessionLinks:
-		var l daemon.SessionLinks
+		var l api.SessionLinks
 		if json.Unmarshal(data, &l) == nil {
 			for i := range m.sessions {
 				if m.sessions[i].id == id {
@@ -179,7 +180,7 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 			m.addStreamed(id, len(d.Text))
 		}
 	case daemon.KindSessionMail:
-		var ml daemon.Mail
+		var ml api.Mail
 		if json.Unmarshal(data, &ml) == nil && ml.From != "" && ml.To != "" {
 			m.into(ml.To, chatMsg{who: "daemon", kind: "system", text: "← " + ml.From + ": " + clean(ml.Text)})
 			m.into(ml.From, chatMsg{who: "daemon", kind: "system", text: "→ " + ml.To + ": " + clean(ml.Text)})
@@ -247,7 +248,7 @@ func (m chatView) lastText(id string) string {
 	return ""
 }
 
-func (m *chatView) meta(id string, s daemon.Session) {
+func (m *chatView) meta(id string, s api.Session) {
 	m.track(id, s.Status)
 	for i := range m.sessions {
 		if m.sessions[i].id == id {

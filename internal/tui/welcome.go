@@ -10,7 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 )
 
 // welcomeStep is where the first-run walk is: a dithered splash, then agents, model, API keys
@@ -27,7 +27,7 @@ const (
 )
 
 type welcomeSettingsMsg struct {
-	s   daemon.Settings
+	s   api.Settings
 	err error
 }
 

@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 )
 
@@ -21,16 +22,16 @@ func TestDaemonDoctor(t *testing.T) {
 	if o, failed := run(); o != "" || failed {
 		t.Fatalf("no daemon ever: %q", o)
 	}
-	daemon.WriteInfo(daemon.Info{PID: os.Getpid(), Addr: "127.0.0.1:7477", Started: time.Now()})
+	daemon.WriteInfo(api.Info{PID: os.Getpid(), Addr: "127.0.0.1:7477", Started: time.Now()})
 	os.WriteFile(filepath.Join(home, "daemon.token"), []byte("x\n"), 0o600)
 	if o, failed := run(); failed || !strings.Contains(o, "ok    daemon: running") {
 		t.Fatalf("running: %q", o)
 	}
-	daemon.WriteInfo(daemon.Info{PID: 999999, Addr: "127.0.0.1:7477"})
+	daemon.WriteInfo(api.Info{PID: 999999, Addr: "127.0.0.1:7477"})
 	if o, _ := run(); !strings.Contains(o, "warn  daemon: stale") {
 		t.Fatalf("stale: %q", o)
 	}
-	daemon.WriteInfo(daemon.Info{PID: os.Getpid(), Addr: "0.0.0.0:7477"})
+	daemon.WriteInfo(api.Info{PID: os.Getpid(), Addr: "0.0.0.0:7477"})
 	if o, failed := run(); !failed || !strings.Contains(o, "beyond loopback") {
 		t.Fatalf("non-loopback: %q", o)
 	}

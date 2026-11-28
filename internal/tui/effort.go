@@ -8,15 +8,16 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 )
 
 type sessionModelAPI interface {
-	SetSessionModel(ctx context.Context, id, model, effort string) (daemon.Session, error)
+	SetSessionModel(ctx context.Context, id, model, effort string) (api.Session, error)
 }
 
 type sessionModelSetMsg struct {
-	s   daemon.Session
+	s   api.Session
 	err error
 }
 

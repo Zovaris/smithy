@@ -11,26 +11,26 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/tasks"
 )
 
 // boardAPI is the part of the daemon client /board uses: the task files the web Board shows.
 type boardAPI interface {
-	Tasks(ctx context.Context, project string) (daemon.TaskBoard, error)
-	MoveTask(ctx context.Context, file, status string) (daemon.TaskCard, error)
+	Tasks(ctx context.Context, project string) (api.TaskBoard, error)
+	MoveTask(ctx context.Context, file, status string) (api.TaskCard, error)
 }
 
 // boardView is the open /board: the project's task lists, the picked one, and the selected task.
 type boardView struct {
-	b    *daemon.TaskBoard // nil while it loads
+	b    *api.TaskBoard // nil while it loads
 	list int
 	file string // the selected task, kept across moves and reloads
 	err  string
 }
 
 type boardMsg struct {
-	b    daemon.TaskBoard
+	b    api.TaskBoard
 	want string // the task dir /board named
 	err  error
 }
@@ -78,7 +78,7 @@ func (m chatView) boardLoaded(msg boardMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m chatView) boardList() *daemon.TaskList {
+func (m chatView) boardList() *api.TaskList {
 	b := m.boardSt.b
 	if b == nil || m.boardSt.list >= len(b.Lists) {
 		return nil
@@ -87,12 +87,12 @@ func (m chatView) boardList() *daemon.TaskList {
 }
 
 // boardCards is the picked list in board order: by status column, then NN.
-func (m chatView) boardCards() []daemon.TaskCard {
+func (m chatView) boardCards() []api.TaskCard {
 	l := m.boardList()
 	if l == nil {
 		return nil
 	}
-	var out []daemon.TaskCard
+	var out []api.TaskCard
 	for _, s := range tasks.Statuses {
 		for _, t := range l.Tasks {
 			if t.Status == s {
@@ -114,7 +114,7 @@ func (m chatView) boardSel() int {
 }
 
 // cardBlocked reports a todo task still waiting on a blocker that is not done or dropped.
-func cardBlocked(l *daemon.TaskList, t daemon.TaskCard) bool {
+func cardBlocked(l *api.TaskList, t api.TaskCard) bool {
 	if t.Status != "todo" {
 		return false
 	}
@@ -298,7 +298,7 @@ func (m chatView) boardMoved(msg boardMovedMsg) (tea.Model, tea.Cmd) {
 
 // openTaskFile shows the task file read-only; esc goes back to the board. A daemon on another
 // machine keeps its files there, so the panel then names the path.
-func (m chatView) openTaskFile(c daemon.TaskCard) (tea.Model, tea.Cmd) {
+func (m chatView) openTaskFile(c api.TaskCard) (tea.Model, tea.Cmd) {
 	b, err := os.ReadFile(c.File)
 	if err != nil {
 		lines := []string{"the file is on the daemon's machine\t" + c.File}

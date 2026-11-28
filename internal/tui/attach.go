@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/charmbracelet/colorprofile"
 )
@@ -30,24 +31,24 @@ const attachLines = 12
 type attachView struct {
 	th      theme
 	url     string
-	msgs    <-chan daemon.ClientMsg
-	decide  func(id, answer string) (daemon.Outcome, error)
+	msgs    <-chan api.ClientMsg
+	decide  func(id, answer string) (api.Outcome, error)
 	conn    string // connecting, connected, reconnecting
 	connErr string
 	last    int64
 	recent  []string
-	pending []daemon.Decision
+	pending []api.Decision
 	sel     int
 	note    string
 	width   int
 }
 
 type attachDecided struct {
-	o   daemon.Outcome
+	o   api.Outcome
 	err error
 }
 
-func newAttachView(msgs <-chan daemon.ClientMsg, url string, th theme) attachView {
+func newAttachView(msgs <-chan api.ClientMsg, url string, th theme) attachView {
 	return attachView{th: th, url: url, msgs: msgs, conn: "connecting", width: 80}
 }
 
@@ -84,7 +85,7 @@ func Attach(args []string) int {
 	} else if !loopbackURL(url) {
 		tok = "" // the token stays on this machine; remote access goes by daemon.allow
 	}
-	c := &daemon.Client{Base: url, Token: tok}
+	c := &api.Client{Base: url, Token: tok}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	st, err := c.State(ctx)
@@ -92,7 +93,7 @@ func Attach(args []string) int {
 		fmt.Fprintln(os.Stderr, "smithy attach:", err)
 		return 1
 	}
-	ch := make(chan daemon.ClientMsg, 64)
+	ch := make(chan api.ClientMsg, 64)
 	go c.Follow(ctx, max(st.LastSeq-attachLines, 0), ch)
 
 	p := colorprofile.TrueColor
@@ -101,7 +102,7 @@ func Attach(args []string) int {
 	}
 	m := newAttachView(ch, url, newTheme(true, p, utf8Locale()))
 	m.pending = st.Pending
-	m.decide = func(id, answer string) (daemon.Outcome, error) { return c.Decide(ctx, id, answer) }
+	m.decide = func(id, answer string) (api.Outcome, error) { return c.Decide(ctx, id, answer) }
 	if _, err := tea.NewProgram(m).Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "smithy attach:", err)
 		return 1
@@ -133,7 +134,7 @@ func (m attachView) wait() tea.Cmd {
 
 func (m attachView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case daemon.ClientMsg:
+	case api.ClientMsg:
 		switch {
 		case msg.Connected:
 			m.conn, m.connErr = "connected", ""
@@ -190,7 +191,7 @@ func by(who string) string {
 }
 
 // choices are a decision's buttons; a question without options is yes or no.
-func choices(d daemon.Decision) []string {
+func choices(d api.Decision) []string {
 	if len(d.Options) == 0 {
 		return []string{"yes", "no"}
 	}
@@ -211,7 +212,7 @@ func (m *attachView) apply(kind, session, at string, data json.RawMessage) {
 	line := kind
 	switch kind {
 	case daemon.KindAsked:
-		var d daemon.Decision
+		var d api.Decision
 		if json.Unmarshal(data, &d) != nil || d.ID == "" {
 			return
 		}
@@ -223,7 +224,7 @@ func (m *attachView) apply(kind, session, at string, data json.RawMessage) {
 		m.pending = append(m.pending, d)
 		line = "asked: " + d.Question
 	case daemon.KindAnswered:
-		var o daemon.Outcome
+		var o api.Outcome
 		if json.Unmarshal(data, &o) != nil {
 			return
 		}

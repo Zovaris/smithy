@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -21,9 +22,9 @@ type fakeSessions struct {
 	stopped []string
 }
 
-func (f *fakeSessions) StartSession(_ context.Context, agent, dir, msg string) (daemon.Session, error) {
+func (f *fakeSessions) StartSession(_ context.Context, agent, dir, msg string) (api.Session, error) {
 	f.started = append(f.started, msg)
-	return daemon.Session{ID: "s-1", Agent: "claude", Status: daemon.StatusWorking}, nil
+	return api.Session{ID: "s-1", Agent: "claude", Status: daemon.StatusWorking}, nil
 }
 
 func (f *fakeSessions) SendSession(_ context.Context, id, text string) error {

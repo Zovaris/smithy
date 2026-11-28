@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 )
 
@@ -22,9 +23,9 @@ func TestAgentsTreeAndBusMessages(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 100, 32
 	m.dir, m.root = "/w/p", "/w/p"
-	busEv(t, &m, daemon.KindSessionStarted, "s-a", daemon.Session{ID: "s-a", Title: "parent work", Dir: "/w/p"})
-	busEv(t, &m, daemon.KindSessionStarted, "s-z", daemon.Session{ID: "s-z", Title: "other top", Dir: "/w/p"})
-	busEv(t, &m, daemon.KindSessionStarted, "s-b", daemon.Session{ID: "s-b", Title: "child work", Dir: "/w/p", Parent: "s-a"})
+	busEv(t, &m, daemon.KindSessionStarted, "s-a", api.Session{ID: "s-a", Title: "parent work", Dir: "/w/p"})
+	busEv(t, &m, daemon.KindSessionStarted, "s-z", api.Session{ID: "s-z", Title: "other top", Dir: "/w/p"})
+	busEv(t, &m, daemon.KindSessionStarted, "s-b", api.Session{ID: "s-b", Title: "child work", Dir: "/w/p", Parent: "s-a"})
 	var order []string
 	for _, s := range m.listed() {
 		order = append(order, s.id)
@@ -35,7 +36,7 @@ func TestAgentsTreeAndBusMessages(t *testing.T) {
 	if m.depth("s-b") != 1 || m.depth("s-a") != 0 {
 		t.Fatal("depth")
 	}
-	busEv(t, &m, daemon.KindSessionMail, "s-a", daemon.Mail{From: "s-b", To: "s-a", Text: "done: PR 7"})
+	busEv(t, &m, daemon.KindSessionMail, "s-a", api.Mail{From: "s-b", To: "s-a", Text: "done: PR 7"})
 	busEv(t, &m, daemon.KindSessionMessage, "s-a", map[string]string{"role": "user", "by": "session:s-b", "text": "Message from session s-b (framed) …"})
 	m.current = ""
 	got := m.convs["s-a"]

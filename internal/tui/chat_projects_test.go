@@ -8,38 +8,38 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 )
 
 // fakeProjects is a daemon with saved projects and a folder tree to browse.
 type fakeProjects struct {
 	fakeSessions
-	list  daemon.ProjectList
+	list  api.ProjectList
 	tree  map[string][]string
 	dirs  []string
 	added []string
 }
 
-func (f *fakeProjects) StartSession(ctx context.Context, agent, dir, msg string) (daemon.Session, error) {
+func (f *fakeProjects) StartSession(ctx context.Context, agent, dir, msg string) (api.Session, error) {
 	f.dirs = append(f.dirs, dir)
 	s, err := f.fakeSessions.StartSession(ctx, agent, dir, msg)
 	s.Dir = dir
 	return s, err
 }
 
-func (f *fakeProjects) Projects(context.Context) (daemon.ProjectList, error) { return f.list, nil }
+func (f *fakeProjects) Projects(context.Context) (api.ProjectList, error) { return f.list, nil }
 
-func (f *fakeProjects) AddProject(_ context.Context, dir string, def bool) (daemon.ProjectList, error) {
+func (f *fakeProjects) AddProject(_ context.Context, dir string, def bool) (api.ProjectList, error) {
 	f.added = append(f.added, dir)
-	f.list.Projects = append(f.list.Projects, daemon.Project{Dir: dir, Name: filepath.Base(dir)})
+	f.list.Projects = append(f.list.Projects, api.Project{Dir: dir, Name: filepath.Base(dir)})
 	return f.list, nil
 }
 
-func (f *fakeProjects) ListDirs(_ context.Context, dir string) (daemon.DirList, error) {
+func (f *fakeProjects) ListDirs(_ context.Context, dir string) (api.DirList, error) {
 	if dir == "" {
 		dir = "/home"
 	}
-	l := daemon.DirList{Dir: dir, Dirs: f.tree[dir]}
+	l := api.DirList{Dir: dir, Dirs: f.tree[dir]}
 	if dir != "/" {
 		l.Parent = filepath.Dir(dir)
 	}
@@ -47,8 +47,8 @@ func (f *fakeProjects) ListDirs(_ context.Context, dir string) (daemon.DirList, 
 }
 
 func projectsTest() (*fakeProjects, chatView) {
-	f := &fakeProjects{list: daemon.ProjectList{
-		Projects: []daemon.Project{{Dir: "/w/alpha", Name: "alpha"}, {Dir: "/w/beta", Name: "beta"}},
+	f := &fakeProjects{list: api.ProjectList{
+		Projects: []api.Project{{Dir: "/w/alpha", Name: "alpha"}, {Dir: "/w/beta", Name: "beta"}},
 		Default:  "/w/alpha",
 	}, tree: map[string][]string{"/home": {"code", "notes"}}}
 	m := newChatTest(0)
@@ -104,7 +104,7 @@ func TestProjectModalEscKeepsTheMessage(t *testing.T) {
 
 func TestNoSavedProjectsStartsHere(t *testing.T) {
 	f, m := projectsTest()
-	f.list = daemon.ProjectList{}
+	f.list = api.ProjectList{}
 	m = typeIn(m, "hello")
 	m = cpress(m, ckey("enter"))
 	if len(f.dirs) != 1 || f.dirs[0] != "/w/here" || m.overlay != overlayNone {

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -45,7 +45,7 @@ func TestParseChatArgs(t *testing.T) {
 }
 
 func TestStartedNoteExplainsBackground(t *testing.T) {
-	n := startedNote(&daemon.Info{PID: 42, Addr: "127.0.0.1:7477"}, 30*time.Minute)
+	n := startedNote(&api.Info{PID: 42, Addr: "127.0.0.1:7477"}, 30*time.Minute)
 	for _, want := range []string{"pid 42", "background", "smithy stop", "30m"} {
 		if !strings.Contains(n, want) {
 			t.Fatalf("started note %q lacks %q", n, want)
@@ -75,7 +75,7 @@ func TestNotesShowAfterHistoryReplay(t *testing.T) {
 	m := newChatTest(0)
 	m.hold([]string{"the daemon runs v0.22.0"}, 2)
 	for seq := int64(1); seq <= 2; seq++ {
-		m = chatStep(m, daemon.ClientMsg{Event: &store.Event{Seq: seq, Kind: "log", Data: []byte(`{"line":"old"}`)}})
+		m = chatStep(m, api.ClientMsg{Event: &store.Event{Seq: seq, Kind: "log", Data: []byte(`{"line":"old"}`)}})
 	}
 	last := m.msgs[len(m.msgs)-1]
 	if !strings.Contains(last.text, "v0.22.0") {

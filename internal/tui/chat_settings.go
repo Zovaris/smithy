@@ -9,32 +9,32 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 )
 
-// settingsAPI is the daemon's settings endpoints; *daemon.Client is one.
+// settingsAPI is the daemon's settings endpoints; *api.Client is one.
 type settingsAPI interface {
-	Settings(ctx context.Context) (daemon.Settings, error)
+	Settings(ctx context.Context) (api.Settings, error)
 	SetSetting(ctx context.Context, key, value string) error
 	UnsetSetting(ctx context.Context, key string) error
 	RemoveKey(ctx context.Context, service string) error
 	SetServe(ctx context.Context, on bool) error
 	Doctor(ctx context.Context) ([]string, error)
-	Tend(ctx context.Context) (daemon.TendList, error)
-	ConnectTest(ctx context.Context) (daemon.ConnectTestResult, error)
-	SessionLinks(ctx context.Context, id string) (daemon.SessionLinks, error)
-	AddLink(ctx context.Context, id, ref string) (daemon.SessionLinks, error)
+	Tend(ctx context.Context) (api.TendList, error)
+	ConnectTest(ctx context.Context) (api.ConnectTestResult, error)
+	SessionLinks(ctx context.Context, id string) (api.SessionLinks, error)
+	AddLink(ctx context.Context, id, ref string) (api.SessionLinks, error)
 }
 
 // settingsDoneMsg is a settings command's result: lines for the transcript, or a panel to open.
 type settingsDoneMsg struct {
 	lines []string
 	panel *infoPanel
-	tend  *daemon.TendList // a fresh tend state for the header
+	tend  *api.TendList // a fresh tend state for the header
 }
 
 // tendStateMsg is the tend mode and PR count the header shows.
-type tendStateMsg struct{ l daemon.TendList }
+type tendStateMsg struct{ l api.TendList }
 
 // loadTend reads the tend state for the header; nil without a daemon.
 func (m chatView) loadTend() tea.Cmd {
@@ -277,7 +277,7 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 
 // keysPanel is /keys: the stored keys masked, each with the command that removes it, and how
 // to add one (a secret is typed in a terminal, never into the chat).
-func keysPanel(s daemon.Settings) *infoPanel {
+func keysPanel(s api.Settings) *infoPanel {
 	lines := []string{"#STORED API KEYS"}
 	for _, k := range s.Keys {
 		lines = append(lines, "ok "+k.Service+" "+k.Masked+"\t/key rm "+k.Service+" removes it")
@@ -292,7 +292,7 @@ func keysPanel(s daemon.Settings) *infoPanel {
 
 // channelsPanel is /channels: each chat connector's notifications and chat channel, how to set
 // them, and the test-send.
-func channelsPanel(s daemon.Settings) *infoPanel {
+func channelsPanel(s api.Settings) *infoPanel {
 	val := map[string]string{}
 	for _, r := range s.Settings {
 		val[r.Key] = r.Value
@@ -315,7 +315,7 @@ func channelsPanel(s daemon.Settings) *infoPanel {
 
 // tendPanel is /tend: the warden batch and chat session PRs the daemon tends, each with its status, tend's next
 // action and the CI state; a PR being fixed names its tend session.
-func tendPanel(l daemon.TendList) *infoPanel {
+func tendPanel(l api.TendList) *infoPanel {
 	modes := []string{"off", "watch", "fix"}
 	sel := max(slices.Index(modes, l.Mode), 0)
 	lines := []string{"#PULL REQUESTS"}

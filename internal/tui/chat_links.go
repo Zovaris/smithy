@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/ghx"
 )
 
@@ -22,14 +22,14 @@ func (m chatView) linksCommand(arg string) (tea.Model, tea.Cmd) {
 		m.system("open a session first: /links shows the open session's PRs and issues")
 		return m, nil
 	}
-	api, id, ref := m.cfg, m.current, strings.TrimSpace(arg)
+	cl, id, ref := m.cfg, m.current, strings.TrimSpace(arg)
 	return m, func() tea.Msg {
-		var l daemon.SessionLinks
+		var l api.SessionLinks
 		var err error
 		if ref != "" {
-			l, err = api.AddLink(context.Background(), id, ref)
+			l, err = cl.AddLink(context.Background(), id, ref)
 		} else {
-			l, err = api.SessionLinks(context.Background(), id)
+			l, err = cl.SessionLinks(context.Background(), id)
 		}
 		if err != nil {
 			return sessionErrMsg{what: "/links", err: err}
@@ -57,7 +57,7 @@ func prLine(p ghx.PRLink) string {
 
 // linksPanel is the /links modal: each PR with state, checks, review, mergeable and lines;
 // each issue with status, assignee and milestone; every row ends in its link.
-func linksPanel(l daemon.SessionLinks) *infoPanel {
+func linksPanel(l api.SessionLinks) *infoPanel {
 	lines := []string{"#PULL REQUESTS"}
 	for _, p := range l.PRs {
 		mark := map[string]string{"green": "ok ", "red": "!! "}[p.Checks]
@@ -91,7 +91,7 @@ func linksPanel(l daemon.SessionLinks) *infoPanel {
 }
 
 // linksHint is the agents panel's one-line summary of a session's links.
-func linksHint(l daemon.SessionLinks, sep string) string {
+func linksHint(l api.SessionLinks, sep string) string {
 	var parts []string
 	for _, p := range l.PRs {
 		s := "PR #" + strconv.Itoa(p.Number)

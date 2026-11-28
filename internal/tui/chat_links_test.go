@@ -9,20 +9,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/ghx"
 )
 
-var demoLinks = daemon.SessionLinks{Session: "s-1",
+var demoLinks = api.SessionLinks{Session: "s-1",
 	PRs:    []ghx.PRLink{{URL: "https://github.com/o/r/pull/7", Number: 7, Title: "Live links", State: "OPEN", Checks: "green", Review: "APPROVED", Mergeable: "MERGEABLE", Additions: 120, Deletions: 8}},
-	Issues: []daemon.LinkIssue{{Kind: "linear", ID: "TK-112", Title: "Live PR links", Status: "In Progress", Assignee: "Ana", Milestone: "v0.26", URL: "https://linear.app/i/TK-112"}, {Kind: "github", ID: "#12", Title: "Bug", Status: "OPEN", URL: "https://github.com/o/r/issues/12"}},
+	Issues: []api.LinkIssue{{Kind: "linear", ID: "TK-112", Title: "Live PR links", Status: "In Progress", Assignee: "Ana", Milestone: "v0.26", URL: "https://linear.app/i/TK-112"}, {Kind: "github", ID: "#12", Title: "Bug", Status: "OPEN", URL: "https://github.com/o/r/issues/12"}},
 }
 
-func (f *fakeSettings) SessionLinks(_ context.Context, id string) (daemon.SessionLinks, error) {
+func (f *fakeSettings) SessionLinks(_ context.Context, id string) (api.SessionLinks, error) {
 	return demoLinks, nil
 }
 
-func (f *fakeSettings) AddLink(_ context.Context, id, ref string) (daemon.SessionLinks, error) {
+func (f *fakeSettings) AddLink(_ context.Context, id, ref string) (api.SessionLinks, error) {
 	f.set = append(f.set, [2]string{"link:" + id, ref})
 	return demoLinks, nil
 }
@@ -59,7 +60,7 @@ func TestLinksNeedAnOpenSession(t *testing.T) {
 func TestAgentsPanelShowsLiveLinks(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 160, 48
-	s, _ := json.Marshal(daemon.Session{ID: "s-1", Title: "build links", Dir: m.dir, Status: daemon.StatusDone})
+	s, _ := json.Marshal(api.Session{ID: "s-1", Title: "build links", Dir: m.dir, Status: daemon.StatusDone})
 	m.event(daemon.KindSessionStarted, "s-1", time.Now(), s)
 	b, _ := json.Marshal(demoLinks)
 	m.event(daemon.KindSessionLinks, "s-1", time.Now(), b)

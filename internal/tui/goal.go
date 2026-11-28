@@ -7,15 +7,16 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 )
 
 type sessionGoalAPI interface {
-	SetSessionGoal(ctx context.Context, id, goal string) (daemon.Session, error)
+	SetSessionGoal(ctx context.Context, id, goal string) (api.Session, error)
 }
 
 type sessionGoalSetMsg struct {
-	s   daemon.Session
+	s   api.Session
 	err error
 }
 

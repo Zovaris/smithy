@@ -10,32 +10,32 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/Zovaris/smithy/internal/daemon"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/workflow"
 )
 
 // workflowAPI is the part of the daemon client /workflows and /schedules use.
 type workflowAPI interface {
-	Workflows(ctx context.Context) (daemon.WorkflowList, error)
-	Workflow(ctx context.Context, name string) (daemon.WorkflowDetail, error)
+	Workflows(ctx context.Context) (api.WorkflowList, error)
+	Workflow(ctx context.Context, name string) (api.WorkflowDetail, error)
 	RunWorkflow(ctx context.Context, name, via string, inputs map[string]string) error
-	Schedules(ctx context.Context) (daemon.ScheduleList, error)
-	Schedule(ctx context.Context, name string) (daemon.ScheduleDetail, error)
+	Schedules(ctx context.Context) (api.ScheduleList, error)
+	Schedule(ctx context.Context, name string) (api.ScheduleDetail, error)
 	SetSchedule(ctx context.Context, name string, on bool) (workflow.SchedInfo, error)
 }
 
 // workflowsView is the open /workflows or /schedules (tab switches): the lists and the selection.
 type workflowsView struct {
 	sched bool
-	wl    *daemon.WorkflowList
-	sl    *daemon.ScheduleList
+	wl    *api.WorkflowList
+	sl    *api.ScheduleList
 	name  string
 	err   string
 }
 
 type workflowsMsg struct {
-	wl  daemon.WorkflowList
-	sl  daemon.ScheduleList
+	wl  api.WorkflowList
+	sl  api.ScheduleList
 	err error
 }
 
@@ -45,8 +45,8 @@ type workflowDoneMsg struct {
 }
 
 type workflowDetailMsg struct {
-	d   daemon.WorkflowDetail
-	sd  *daemon.ScheduleDetail
+	d   api.WorkflowDetail
+	sd  *api.ScheduleDetail
 	err error
 }
 

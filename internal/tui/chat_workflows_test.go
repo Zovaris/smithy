@@ -8,22 +8,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 	"github.com/Zovaris/smithy/internal/workflow"
 )
 
 type fakeFlows struct {
-	l    daemon.WorkflowList
-	sl   daemon.ScheduleList
+	l    api.WorkflowList
+	sl   api.ScheduleList
 	runs []string
 	sets []string
 }
 
-func (f *fakeFlows) Workflows(context.Context) (daemon.WorkflowList, error) { return f.l, nil }
+func (f *fakeFlows) Workflows(context.Context) (api.WorkflowList, error) { return f.l, nil }
 
-func (f *fakeFlows) Workflow(_ context.Context, name string) (daemon.WorkflowDetail, error) {
+func (f *fakeFlows) Workflow(_ context.Context, name string) (api.WorkflowDetail, error) {
 	st := time.Date(2026, 11, 27, 17, 0, 0, 0, time.Local)
-	return daemon.WorkflowDetail{Info: f.l.Workflows[0], History: []workflow.Record{{Workflow: name, Trigger: "schedule", Status: "ok", Started: st, Ended: st.Add(time.Minute),
+	return api.WorkflowDetail{Info: f.l.Workflows[0], History: []workflow.Record{{Workflow: name, Trigger: "schedule", Status: "ok", Started: st, Ended: st.Add(time.Minute),
 		Steps: []workflow.StepResult{{ID: "judge", Kind: "agent", Answer: "yes", Why: "patch bump"}}}}}, nil
 }
 
@@ -32,10 +33,10 @@ func (f *fakeFlows) RunWorkflow(_ context.Context, name, via string, _ map[strin
 	return nil
 }
 
-func (f *fakeFlows) Schedules(context.Context) (daemon.ScheduleList, error) { return f.sl, nil }
+func (f *fakeFlows) Schedules(context.Context) (api.ScheduleList, error) { return f.sl, nil }
 
-func (f *fakeFlows) Schedule(_ context.Context, name string) (daemon.ScheduleDetail, error) {
-	return daemon.ScheduleDetail{Info: f.sl.Schedules[0]}, nil
+func (f *fakeFlows) Schedule(_ context.Context, name string) (api.ScheduleDetail, error) {
+	return api.ScheduleDetail{Info: f.sl.Schedules[0]}, nil
 }
 
 func (f *fakeFlows) SetSchedule(_ context.Context, name string, on bool) (workflow.SchedInfo, error) {
@@ -58,8 +59,8 @@ func TestWorkflowNoteShowsInChat(t *testing.T) {
 func TestWorkflowsModal(t *testing.T) {
 	w, _ := workflow.Parse([]byte(workflow.Example))
 	sch, _ := workflow.ParseSchedule([]byte(workflow.ExampleSchedules["dependabot-daily"]))
-	f := &fakeFlows{l: daemon.WorkflowList{Workflows: []workflow.Info{{Workflow: w, File: "/nowhere/dependabot-daily.json", Schedules: []string{"dependabot-daily"}}}},
-		sl: daemon.ScheduleList{Schedules: []workflow.SchedInfo{{Schedule: sch}}}}
+	f := &fakeFlows{l: api.WorkflowList{Workflows: []workflow.Info{{Workflow: w, File: "/nowhere/dependabot-daily.json", Schedules: []string{"dependabot-daily"}}}},
+		sl: api.ScheduleList{Schedules: []workflow.SchedInfo{{Schedule: sch}}}}
 	m := newChatTest(0)
 	m.width, m.height = 160, 48
 	m.flows = f

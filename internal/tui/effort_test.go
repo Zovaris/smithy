@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 )
 
@@ -16,9 +17,9 @@ type fakeSessModel struct {
 	set []string
 }
 
-func (f *fakeSessModel) SetSessionModel(_ context.Context, id, model, effort string) (daemon.Session, error) {
+func (f *fakeSessModel) SetSessionModel(_ context.Context, id, model, effort string) (api.Session, error) {
 	f.set = append(f.set, id+"|"+model+"|"+effort)
-	return daemon.Session{ID: id, Agent: "claude", Model: model, Effort: effort, Status: daemon.StatusDone}, nil
+	return api.Session{ID: id, Agent: "claude", Model: model, Effort: effort, Status: daemon.StatusDone}, nil
 }
 
 func sessionScene() (*fakeModels, *fakeSessModel, chatView) {
@@ -28,7 +29,7 @@ func sessionScene() (*fakeModels, *fakeSessModel, chatView) {
 	fs := &fakeSessModel{}
 	m.sess = fs
 	m.current = "s-1"
-	m.meta("s-1", daemon.Session{ID: "s-1", Agent: "claude", Model: "sonnet", Status: daemon.StatusDone})
+	m.meta("s-1", api.Session{ID: "s-1", Agent: "claude", Model: "sonnet", Status: daemon.StatusDone})
 	return f, fs, m
 }
 
@@ -103,7 +104,7 @@ func TestEffortModal(t *testing.T) {
 
 func TestEffortRefusedWhereItDoesNotApply(t *testing.T) {
 	_, fs, m := sessionScene()
-	m.meta("s-1", daemon.Session{ID: "s-1", Agent: "opencode", Status: daemon.StatusDone})
+	m.meta("s-1", api.Session{ID: "s-1", Agent: "opencode", Status: daemon.StatusDone})
 	m2, _ := m.command("/effort low")
 	m = m2.(chatView)
 	if len(fs.set) != 0 || !strings.Contains(screen(m), "opencode keeps its own effort") {

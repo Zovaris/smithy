@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Zovaris/smithy/internal/api"
 	"github.com/Zovaris/smithy/internal/daemon"
 )
 
@@ -16,9 +17,9 @@ type fakeSessGoal struct {
 	goals []string
 }
 
-func (f *fakeSessGoal) SetSessionGoal(_ context.Context, id, goal string) (daemon.Session, error) {
+func (f *fakeSessGoal) SetSessionGoal(_ context.Context, id, goal string) (api.Session, error) {
 	f.goals = append(f.goals, id+"|"+goal)
-	return daemon.Session{ID: id, Agent: "claude", Goal: goal, Status: daemon.StatusDone}, nil
+	return api.Session{ID: id, Agent: "claude", Goal: goal, Status: daemon.StatusDone}, nil
 }
 
 func goalScene() (*fakeSessGoal, chatView) {
