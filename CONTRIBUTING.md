@@ -13,8 +13,9 @@
   placeholder page. The CI `web` job runs tests, typecheck, `bun check` (type check), Oxlint
   (`npm run lint`, warnings fail) and the size budget; run `bun check` and `npm run lint` in `web/`
   to check locally.
-- Pull requests run `check` (gofmt, vet, golangci-lint, `bun check` and Oxlint on `web/`, `go test`, every offline test through the binary, a
-  build per release target). A `v*` tag runs `release`: it checks the tag matches
+- Pull requests run `check` (gofmt, vet, golangci-lint, `bun check` and Oxlint on `web/`, `go test`, every offline test through the binary; a
+  Markdown- or `docs/`-only change skips the Go tests, and the build per release target, the demo and the
+  Windows launcher run only for pull requests into `main`). A `v*` tag runs `release`: it checks the tag matches
   `shared/VERSION`, builds darwin, linux (arm64, amd64) and windows binaries, skills and harness builds each, gzips them,
   writes `checksums.txt`, attests the build and publishes the GitHub release with the
   CHANGELOG section's plain notes (everything above `### Details`) as notes.
