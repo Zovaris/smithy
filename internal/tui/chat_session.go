@@ -196,6 +196,10 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 				m.toks = map[string]int64{}
 			}
 			m.toks[id] += u.Input + u.Output
+			if m.ctx == nil {
+				m.ctx = map[string]int64{}
+			}
+			m.ctx[id] = u.Input + u.CacheRead + u.CacheWrite + u.Output
 		}
 		if u.CostUSD != nil {
 			if m.cost == nil {

@@ -51,8 +51,9 @@ func TestEachFactShowsOnceAcrossHeaderStatusAndFooter(t *testing.T) {
 	c := 0.12
 	m = chatStep(m, sev(1, daemon.KindSessionUsage, "s-1", usage.Usage{Input: 1000, Output: 234, CostUSD: &c}))
 	m.noise = append(m.noise, noise{at: time.Now(), text: "session s-1 started with claude"})
+	m.sideOff = true
 	all := ansi.Strip(strings.Join(m.header(160), "\n") + "\n" + m.statusLine(160) + "\n" + m.footer(160))
-	for _, fact := range []string{"09:07", "proj", "main", "$0.12", "1.2k tok"} {
+	for _, fact := range []string{"09:07", "proj", "main", "$0.12", "1.2K (1%)"} {
 		if n := strings.Count(all, fact); n != 1 {
 			t.Errorf("%q shows %d times:\n%s", fact, n, all)
 		}

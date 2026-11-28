@@ -1,5 +1,5 @@
    ◆ smithy dev                                               ● waiting on you · 1 running  09:07   
-
+    TK-6   TK-29   TES-9   + 
       ┌──────────────────────────────────────────────────────────────────────────────────────┐
       │ › Search actions, sessions, settings                                             esc │
       ├──────────────────────────────────────────────────────────────────────────────────────┤
@@ -10,23 +10,23 @@
       │   ACTIONS                                                                            │
       │   +  New session  your next message starts it                                  /new  │
       │   ▸  Agent and model                                                         ctrl+l  │
-      │   ≡  Skills and MCP  what goes into every session                           /skills  │
+     ›│   ≡  Skills and MCP  what goes into every session                           /skills  │      
       │   ≡  Verbosity: minimal  minimal · expandable · verbose                      ctrl+o  │
-      │   ●  Agents panel  sessions and waiting items                                   tab  │
+     ✓│   ●  Agents panel  sessions and waiting items                                   tab  │      
       │   ≡  Board  the task files by status                                         /board  │
-      │   →  Open the web UI  same sessions in the browser                             /web  │
-     ›│   →  Connect  http://127.0.0.1:7477                                        /connect  │      
+     P│   →  Open the web UI  same sessions in the browser                             /web  │
+     o│   →  Connect  http://127.0.0.1:7477                                        /connect  │
       │   ·  Daemon log  0 events                                                      /log  │
-     P│   ↓  Jump to latest                                                             end  │
-     o│   ✗  Quit                                                                    ctrl+c  │
+     ✓│   ↓  Jump to latest                                                             end  │s     
+      │   ✗  Quit                                                                    ctrl+c  │
+     D│                                                                                      │
+      │   SESSIONS                                                                           │
+     0│   ✓  TK-6  done                                                                      │
+      │   ●  TK-29  running                                                                  │
+      │   ✗  TES-9  failed                                                                   │477   
       │                                                                                      │
-     ✓│   SESSIONS                                                                           │s     
-      │   ✓  TK-6  done                                                                      │
-     D│   ●  TK-29  running                                                                  │
-      │   ✗  TES-9  failed                                                                   │
-      │                                                                                      │477   
-      │   SETTINGS                                                                           │
-     ›│                                                                                      │      
-      ├──────────────────────────────────────────────────────────────────────────────────────┤      
-      │  ↑↓ move   enter run   tab next group                                    17 results  │      
-   ent└──────────────────────────────────────────────────────────────────────────────────────┘      
+   ▎ ›│   SETTINGS                                                                           │      
+   ▎  │                                                                                      │      
+   ▎  ├──────────────────────────────────────────────────────────────────────────────────────┤      
+   ▎  │  ↑↓ move   enter run   tab next group                                    17 results  │      
+   ent└──────────────────────────────────────────────────────────────────────────────────────┘tte   
