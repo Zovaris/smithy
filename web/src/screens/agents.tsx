@@ -7,6 +7,7 @@ import { agentName, ago, sessions } from "../lib/store";
 import { StatsCharts } from "../components/charts";
 import { stats } from "../lib/stats";
 import { St } from "../components/ui";
+import { Work } from "../components/work";
 
 function Copy({ text }: { text: string }) {
   const [ok, setOk] = useState(false);
@@ -55,6 +56,8 @@ export default function Agents() {
           ))}
         </div>
       </div>
+
+      <Work />
 
       <div class="cols2">
         <div>
