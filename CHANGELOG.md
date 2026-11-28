@@ -21,6 +21,8 @@ part above `### Details`.
 - New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 - An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
 - The chat survives a terminal restart where the terminal supports it (OSC 7577): it reopens on the same server and session. `smithy chat --session <id>` opens a session directly.
+- `/usage` in the TUI chat and the web: tokens in, out and cached, and cost when the agent reports it, for this session, today, the last 7 days and all time, split per agent and per model.
+- A shell command typed as `!cmd` shows as its own block in the TUI and the web: the command with ok or exit N in color and how long it took, the output muted under a rule with stderr tinted, folded after 20 lines until you click it or press enter.
 - A question that takes several picks asks for them in Slack (a multi-select menu), Discord (a select menu) and Telegram (☐/☑ toggles and Done); single-pick questions keep one button per option.
 
 ### Fixed
@@ -38,6 +40,8 @@ part above `### Details`.
 - workflow: new `internal/workflow` (own cron parser, `run`/`agent`/`if`/`notify` steps, store in `~/.smithy/workflows` with the enable pinned to the file's sha256, runs in `runs/<name>/`, 50 kept); daemon ticks it every minute and serves `GET /v1/workflows[/{name}]`, `PUT /v1/workflows/{name}`, `POST /v1/workflows/{name}/run|enable|disable` (writes local-only); notify steps are `workflow_note` store events sent to connectors as kind `workflow`; docs in `docs/workflows.md`.
 - TUI: the top decision strip is gone; the question card (`overlayAsk`) opens when a decision arrives and the composer is empty, or on enter with an empty composer or `/answer`; 1-9, arrows and enter, space on multi-select, esc for later. The pill reads "waiting on you".
 - daemon: decisions carry `multi` and `other`; `/v1/asks` takes `multi` and accepts free text for every non-guard question; the MCP `ask` tool gains a `multi` flag.
+- usage: "usage" events carry `agent`, `model` and `session`; daemon sessions append one per reported usage (their `smithy agent` turns run with `SMITHY_EVENTS=off`, so nothing is counted twice); `events.Tally` sums them by period, agent and model; daemon `GET /v1/usage?session=`; TUI `/usage` opens the info modal, web `/usage` lazy-loads `features/chat/usage.ts` into the info panel.
+- shell: `daemon.RunShell` keeps stdout and stderr apart line by line and times the run; `POST /v1/sessions/{id}/shell` adds `lines` and `took_ms`; the TUI reuses it for `!cmd` (a `shell` transcript block, toggled like tool blocks) and the web draws `features/chat/shellblock.tsx`, lazy, its CSS out of the first load.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
 - The chat header shows the tend mode and how many PRs it tends.
 - `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.
