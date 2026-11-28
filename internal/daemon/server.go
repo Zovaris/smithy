@@ -381,7 +381,11 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("PUT /v1/workflows/{name}", sv.saveWorkflow)
 	mux.HandleFunc("POST /v1/workflows/validate", sv.validateWorkflow)
 	mux.HandleFunc("POST /v1/workflows/{name}/run", sv.runWorkflow)
-	mux.HandleFunc("POST /v1/workflows/{name}/{op}", sv.enableWorkflow)
+	mux.HandleFunc("GET /v1/schedules", sv.listSchedules)
+	mux.HandleFunc("POST /v1/schedules", sv.addSchedule)
+	mux.HandleFunc("GET /v1/schedules/{name}", sv.getSchedule)
+	mux.HandleFunc("DELETE /v1/schedules/{name}", sv.removeSchedule)
+	mux.HandleFunc("POST /v1/schedules/{name}/{op}", sv.setSchedule)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
 	mux.HandleFunc("POST /v1/bench/run", sv.benchStart)
 	mux.HandleFunc("GET /v1/bench/status", sv.benchStatus)
@@ -397,8 +401,8 @@ func (sv *Server) public(w http.ResponseWriter, r *http.Request) bool {
 		writeJSON(w, 200, map[string]any{"smithy": true, "version": sv.Version})
 	case r.Method == "POST" && r.URL.Path == "/v1/pair":
 		sv.redeem(w, r)
-	case r.Method == "POST" && strings.HasPrefix(r.URL.Path, "/v1/hooks/workflows/"):
-		sv.workflowHook(w, r, strings.TrimPrefix(r.URL.Path, "/v1/hooks/workflows/"))
+	case r.Method == "POST" && strings.HasPrefix(r.URL.Path, "/v1/hooks/schedules/"):
+		sv.scheduleHook(w, r, strings.TrimPrefix(r.URL.Path, "/v1/hooks/schedules/"))
 	default:
 		return false
 	}

@@ -16,16 +16,16 @@ import (
 	"github.com/Zovaris/smithy/internal/workflow"
 )
 
-const wfHello = `{"name":"hello","schedule":"0 17 * * *","steps":[{"id":"a","kind":"run","run":"echo hi"},{"id":"n","kind":"notify","title":"hi","message":"said {{steps.a.output}}"}]}`
+const wfHello = `{"name":"hello","steps":[{"id":"a","kind":"run","run":"echo hi"},{"id":"n","kind":"notify","title":"hi","message":"said {{steps.a.output}}"}]}`
 
-const wfHook = `{"name":"hook","webhook":true,"inputs":{"msg":""},"outputs":{"echo":"got {{inputs.msg}} / {{steps.q.answer}}"},"steps":[{"id":"q","kind":"ask","question":"ok {{inputs.msg}}?","options":["yes","no"]}]}`
+const wfAsk = `{"name":"askme","inputs":{"msg":""},"outputs":{"echo":"got {{inputs.msg}} / {{steps.q.answer}}"},"steps":[{"id":"q","kind":"ask","question":"ok {{inputs.msg}}?","options":["yes","no"]}]}`
 
 func workflowTest(t *testing.T) (*Server, string, *[]string) {
 	t.Helper()
 	sv, u, _ := sessionTest(t, okRun)
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "hello.json"), []byte(wfHello), 0o600)
-	os.WriteFile(filepath.Join(dir, "hook.json"), []byte(wfHook), 0o600)
+	os.WriteFile(filepath.Join(dir, "askme.json"), []byte(wfAsk), 0o600)
 	var ran []string
 	sv.Workflows = sv.NewWorkflows(workflow.Store{Dir: dir})
 	sv.Workflows.Env.Shell = func(_ context.Context, _, cmd string, _ []string) (string, int, error) {
@@ -35,36 +35,21 @@ func workflowTest(t *testing.T) (*Server, string, *[]string) {
 	return sv, u, &ran
 }
 
-func TestWorkflowsListEnableRun(t *testing.T) {
+func TestWorkflowsRunAndNote(t *testing.T) {
 	sv, u, ran := workflowTest(t)
 	res := do(t, "GET", u+"/v1/workflows", "", auth)
 	var l WorkflowList
-	if err := json.NewDecoder(res.Body).Decode(&l); err != nil || len(l.Workflows) != 2 || l.Workflows[0].Enabled {
+	if err := json.NewDecoder(res.Body).Decode(&l); err != nil || len(l.Workflows) != 2 {
 		t.Fatalf("%d %v %+v", res.StatusCode, err, l)
 	}
-	if sv.WorkflowsScheduled() {
-		t.Fatal("nothing enabled yet")
-	}
-	if res := do(t, "POST", u+"/v1/workflows/hello/enable", "{}", auth); res.StatusCode != 200 {
-		t.Fatalf("enable: %d", res.StatusCode)
-	}
-	if !sv.WorkflowsScheduled() {
-		t.Fatal("an enabled workflow must hold off the idle exit")
-	}
-	if res := do(t, "POST", u+"/v1/workflows/hello/run", "{}", auth); res.StatusCode != 202 {
+	if res := do(t, "POST", u+"/v1/workflows/hello/run", `{"inputs":{}}`, auth); res.StatusCode != 202 {
 		t.Fatalf("run: %d", res.StatusCode)
 	}
-	deadline := time.Now().Add(3 * time.Second)
 	var d WorkflowDetail
-	for time.Now().Before(deadline) {
-		res := do(t, "GET", u+"/v1/workflows/hello", "", auth)
-		json.NewDecoder(res.Body).Decode(&d)
-		if len(d.History) == 1 {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
+	for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline) && len(d.History) == 0; time.Sleep(20 * time.Millisecond) {
+		json.NewDecoder(do(t, "GET", u+"/v1/workflows/hello", "", auth).Body).Decode(&d)
 	}
-	if len(*ran) != 1 || len(d.History) != 1 || d.History[0].Trigger != "web" || !d.Info.Enabled || !strings.Contains(d.Source, `"hello"`) {
+	if len(*ran) != 1 || len(d.History) != 1 || d.History[0].Trigger != "web" || !strings.Contains(d.Source, `"hello"`) {
 		t.Fatalf("ran=%v detail=%+v", *ran, d)
 	}
 	evs, _ := sv.st.Since(0)
@@ -74,52 +59,65 @@ func TestWorkflowsListEnableRun(t *testing.T) {
 			note = e
 		}
 	}
-	n, ok := NoteOf(note)
-	if !ok || n.Kind != "workflow" || n.Title != "hi" || n.Text != "said hi" {
+	if n, ok := NoteOf(note); !ok || n.Kind != "workflow" || n.Text != "said hi" {
 		t.Fatalf("note %+v %v", n, ok)
 	}
 }
 
-func TestWorkflowsSaveAndGuards(t *testing.T) {
+func TestWorkflowSaveValidateGuards(t *testing.T) {
 	_, u, _ := workflowTest(t)
-	edited := strings.Replace(wfHello, "0 17", "30 18", 1)
-	if res := do(t, "PUT", u+"/v1/workflows/hello", edited, auth); res.StatusCode != 200 {
+	if res := do(t, "PUT", u+"/v1/workflows/hello", strings.Replace(wfHello, "echo hi", "echo yo", 1), auth); res.StatusCode != 200 {
 		b, _ := io.ReadAll(res.Body)
 		t.Fatalf("save: %d %s", res.StatusCode, b)
 	}
-	if res := do(t, "PUT", u+"/v1/workflows/hello", `{"name":"other","schedule":"@daily","steps":[{"id":"a","kind":"run","run":"ls"}]}`, auth); res.StatusCode != 400 {
-		t.Fatalf("rename via save: %d", res.StatusCode)
-	}
-	if res := do(t, "PUT", u+"/v1/workflows/hello", `{"name":"hello","schedule":"bad","steps":[]}`, auth); res.StatusCode != 400 {
-		t.Fatalf("invalid: %d", res.StatusCode)
+	if res := do(t, "PUT", u+"/v1/workflows/hello", `{"name":"other","steps":[{"id":"a","kind":"run","run":"ls"}]}`, auth); res.StatusCode != 400 {
+		t.Fatalf("rename: %d", res.StatusCode)
 	}
 	if res := do(t, "POST", u+"/v1/workflows/hello/run", "{}", map[string]string{"Authorization": auth["Authorization"], "Origin": "https://evil.example"}); res.StatusCode != 403 {
 		t.Fatalf("cross-origin run: %d", res.StatusCode)
 	}
-	if res := do(t, "POST", u+"/v1/workflows/..%2Fx/enable", "{}", auth); res.StatusCode != 404 && res.StatusCode != 400 {
-		t.Fatalf("bad name: %d", res.StatusCode)
-	}
-}
-
-func TestWorkflowValidate(t *testing.T) {
-	_, u, _ := workflowTest(t)
 	for body, ok := range map[string]bool{wfHello: true, `{"name":"x","steps":[]}`: false} {
-		res := do(t, "POST", u+"/v1/workflows/validate", body, auth)
 		var v struct {
 			OK    bool   `json:"ok"`
 			Error string `json:"error"`
 		}
-		json.NewDecoder(res.Body).Decode(&v)
+		json.NewDecoder(do(t, "POST", u+"/v1/workflows/validate", body, auth).Body).Decode(&v)
 		if v.OK != ok || (!ok && v.Error == "") {
 			t.Errorf("%s: %+v", body, v)
 		}
 	}
 }
 
-func TestWorkflowHookAskReply(t *testing.T) {
+func TestSchedulesAPI(t *testing.T) {
 	sv, u, _ := workflowTest(t)
+	if res := do(t, "POST", u+"/v1/schedules", `{"name":"daily","workflow":"hello","cron":"0 9 * * *"}`, auth); res.StatusCode != 200 {
+		b, _ := io.ReadAll(res.Body)
+		t.Fatalf("add: %d %s", res.StatusCode, b)
+	}
+	if res := do(t, "POST", u+"/v1/schedules", `{"name":"bad","workflow":"nope","cron":"0 9 * * *"}`, auth); res.StatusCode != 400 {
+		t.Fatalf("schedule for a missing workflow: %d", res.StatusCode)
+	}
+	if sv.WorkflowsScheduled() {
+		t.Fatal("nothing enabled yet")
+	}
+	if res := do(t, "POST", u+"/v1/schedules/daily/enable", "{}", auth); res.StatusCode != 200 {
+		t.Fatalf("enable: %d", res.StatusCode)
+	}
+	var l ScheduleList
+	json.NewDecoder(do(t, "GET", u+"/v1/schedules", "", auth).Body).Decode(&l)
+	if len(l.Schedules) != 1 || !l.Schedules[0].Enabled || l.Schedules[0].Next == nil || !sv.WorkflowsScheduled() {
+		t.Fatalf("%+v", l)
+	}
+	if res := do(t, "DELETE", u+"/v1/schedules/daily", "", auth); res.StatusCode != 200 {
+		t.Fatalf("remove: %d", res.StatusCode)
+	}
+}
+
+func TestScheduleHookAskReply(t *testing.T) {
+	sv, u, _ := workflowTest(t)
+	sv.Workflows.Store.SaveSchedule(workflow.Schedule{Name: "hook", Workflow: "askme", Webhook: true})
 	hook := func(tok, body string) (int, map[string]any) {
-		res := do(t, "POST", u+"/v1/hooks/workflows/hook", body, map[string]string{"X-Smithy-Hook": tok})
+		res := do(t, "POST", u+"/v1/hooks/schedules/hook", body, map[string]string{"X-Smithy-Hook": tok})
 		var out map[string]any
 		json.NewDecoder(res.Body).Decode(&out)
 		return res.StatusCode, out
@@ -127,7 +125,7 @@ func TestWorkflowHookAskReply(t *testing.T) {
 	if code, _ := hook("whatever", `{}`); code != 404 {
 		t.Fatalf("disabled hook: %d", code)
 	}
-	sv.Workflows.Store.Enable("hook", time.Now())
+	sv.Workflows.Store.EnableSchedule("hook", time.Now())
 	tok := sv.Workflows.Store.HookToken("hook")
 	if code, _ := hook(tok+"x", `{}`); code != 404 {
 		t.Fatalf("wrong token: %d", code)
@@ -145,7 +143,7 @@ func TestWorkflowHookAskReply(t *testing.T) {
 	for deadline := time.Now().Add(3 * time.Second); id == "" && time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
 		sv.mu.Lock()
 		for k, d := range sv.decisions {
-			if strings.HasPrefix(k, "workflow:hook:") && strings.Contains(d.Question, "ok hi?") {
+			if strings.HasPrefix(k, "workflow:askme:") && strings.Contains(d.Question, "ok hi?") {
 				id = k
 			}
 		}

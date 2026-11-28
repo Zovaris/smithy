@@ -444,14 +444,28 @@ func (c *Client) RunWorkflow(ctx context.Context, name, via string, inputs map[s
 	return c.call(ctx, "POST", "/v1/workflows/"+url.PathEscape(name)+"/run?via="+url.QueryEscape(via), map[string]any{"inputs": inputs}, nil)
 }
 
-// SetWorkflow is POST /v1/workflows/{name}/enable or /disable.
-func (c *Client) SetWorkflow(ctx context.Context, name string, on bool) (workflow.Info, error) {
+// Schedules is GET /v1/schedules.
+func (c *Client) Schedules(ctx context.Context) (ScheduleList, error) {
+	var l ScheduleList
+	err := c.call(ctx, "GET", "/v1/schedules", nil, &l)
+	return l, err
+}
+
+// Schedule is GET /v1/schedules/{name}.
+func (c *Client) Schedule(ctx context.Context, name string) (ScheduleDetail, error) {
+	var d ScheduleDetail
+	err := c.call(ctx, "GET", "/v1/schedules/"+url.PathEscape(name), nil, &d)
+	return d, err
+}
+
+// SetSchedule is POST /v1/schedules/{name}/enable or /disable.
+func (c *Client) SetSchedule(ctx context.Context, name string, on bool) (workflow.SchedInfo, error) {
 	op := "disable"
 	if on {
 		op = "enable"
 	}
-	var in workflow.Info
-	err := c.call(ctx, "POST", "/v1/workflows/"+url.PathEscape(name)+"/"+op, map[string]string{}, &in)
+	var in workflow.SchedInfo
+	err := c.call(ctx, "POST", "/v1/schedules/"+url.PathEscape(name)+"/"+op, map[string]string{}, &in)
 	return in, err
 }
 
