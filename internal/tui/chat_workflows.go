@@ -252,14 +252,6 @@ func (m chatView) workflowDetail(msg workflowDetailMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func clipLine(s string, n int) string {
-	s = strings.Join(strings.Fields(s), " ")
-	if r := []rune(s); len(r) > n {
-		return string(r[:n]) + "…"
-	}
-	return s
-}
-
 func stepLines(steps []workflow.Step, indent string) []string {
 	var out []string
 	for i, s := range steps {
