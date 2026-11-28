@@ -725,3 +725,27 @@ func TestResolveTier(t *testing.T) {
 		t.Fatalf("unset tier must fall back to the default, got %q", got)
 	}
 }
+
+func TestAgentWithoutEffortFlagIgnoresEffortSilently(t *testing.T) {
+	d := t.TempDir()
+	bin := filepath.Join(d, "opencode")
+	os.WriteFile(bin, []byte("#!/bin/sh\necho done\n"), 0o755)
+	t.Setenv("AGENT_CLI", bin)
+	t.Setenv("SMITHY_HOME", d)
+	t.Setenv("AGENT_EFFORT", "medium")
+	p := filepath.Join(d, "p.md")
+	os.WriteFile(p, []byte("x"), 0o644)
+	r, w, _ := os.Pipe()
+	old := os.Stderr
+	os.Stderr = w
+	rc := AgentMain([]string{"--timeout", "0", "--log", filepath.Join(d, "w.log"), p})
+	w.Close()
+	os.Stderr = old
+	errOut, _ := io.ReadAll(r)
+	if rc != 0 {
+		t.Fatalf("rc = %d: %s", rc, errOut)
+	}
+	if strings.Contains(string(errOut), "effort") {
+		t.Fatalf("an agent without an effort flag must ignore the effort quietly, stderr: %s", errOut)
+	}
+}

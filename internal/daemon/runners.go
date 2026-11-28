@@ -282,13 +282,27 @@ loop:
 		return reply, ctx.Err()
 	}
 	if werr != nil {
-		msg := strings.TrimSpace(text.Clean(errOut.b.String()))
-		if msg == "" {
-			msg = werr.Error()
+		streamErr := ""
+		if oc != nil {
+			streamErr = oc.err
 		}
-		return reply, errors.New("smithy agent: " + line1(msg, 300))
+		return reply, turnError(errOut.b.String(), streamErr, werr)
 	}
 	return reply, nil
+}
+
+// turnError is a failed turn's one-line cause: the agent's own error event, else the last line
+// smithy agent wrote to stderr, else the exit status.
+func turnError(stderr, streamErr string, werr error) error {
+	msg := strings.TrimSpace(streamErr)
+	if msg == "" {
+		lines := strings.Split(strings.TrimSpace(text.Clean(stderr)), "\n")
+		msg = strings.TrimSpace(lines[len(lines)-1])
+	}
+	if msg == "" {
+		msg = werr.Error()
+	}
+	return errors.New("smithy agent: " + line1(strings.TrimPrefix(msg, "smithy agent: "), 300))
 }
 
 var diffMu sync.Mutex

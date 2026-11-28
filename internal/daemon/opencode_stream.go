@@ -18,6 +18,7 @@ import (
 type opencodeStream struct {
 	texts []string
 	usage *usage.Usage
+	err   string
 }
 
 type opencodePart struct {
@@ -63,14 +64,19 @@ func (o *opencodeStream) line(l []byte, e Emit) bool {
 		return false
 	}
 	var ev struct {
-		Type string       `json:"type"`
-		Part opencodePart `json:"part"`
+		Type  string       `json:"type"`
+		Part  opencodePart `json:"part"`
+		Error struct {
+			Message string `json:"message"`
+		} `json:"error"`
 	}
 	if json.Unmarshal(l, &ev) != nil || ev.Type == "" {
 		return false
 	}
 	p := ev.Part
 	switch ev.Type {
+	case "error":
+		o.err = strings.TrimSpace(ev.Error.Message)
 	case "text":
 		if strings.TrimSpace(p.Text) != "" {
 			o.texts = append(o.texts, p.Text)
