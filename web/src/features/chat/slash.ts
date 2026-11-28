@@ -5,6 +5,7 @@ import { addLink, removeKey, runShell, sampleAsk, setServe, setSessionGoal, setS
 import { ACTIONS } from "../../lib/commands";
 import { nextDetail, type Detail } from "../../lib/detail";
 import type { Info } from "../../components/info";
+import type { Shell } from "./shellblock";
 import { api } from "../../lib/auth";
 import { decide, stopSession } from "../../lib/live";
 import { effortLevels, effortMax, effortOptions } from "../../lib/parity";
@@ -129,6 +130,7 @@ export function run(a: string, arg: string, ctx: Ctx): void {
     say(setSetting(k, v.join(" ")), "saved " + k);
   } else if (a === "unset" && arg) say(unsetSetting(arg), arg + " is back to its default");
   else if (a === "set" || a === "unset") toSettings("settings");
+  else if (a === "usage") import("./usage").then((u) => u.loadUsage(s?.id)).then(setInfo, (e) => setNote("error: " + String((e as Error).message ?? e)));
   else if (a === "skills" || a === "keys" || a === "doctor" || a === "serve" || a === "prompt" || a === "channels") toSettings(a);
   else if (a === "connect") toSettings("servers");
   else if (a === "agent" || a === "setup") toSettings("agents");
@@ -140,9 +142,9 @@ export function run(a: string, arg: string, ctx: Ctx): void {
 }
 
 // shell is `!cmd`: the last 200 lines, like the TUI.
-export async function shell(id: string, cmd: string): Promise<{ cmd: string; output: string; code: number }> {
+export async function shell(id: string, cmd: string): Promise<Shell> {
   const r = await runShell(id, cmd);
-  const out = r.output.split("\n");
-  const output = (out.length > 200 ? `… ${out.length - 200} lines cut\n` + out.slice(-200).join("\n") : r.output) + (r.error ? "\n" + r.error : "");
-  return { cmd, output, code: r.code };
+  const all = r.lines ?? r.output.split("\n").map((text) => ({ text }));
+  const lines = all.length > 200 ? [{ text: `… ${all.length - 200} lines cut` }, ...all.slice(-200)] : all;
+  return { cmd, lines, code: r.code, error: r.error, took_ms: r.took_ms };
 }

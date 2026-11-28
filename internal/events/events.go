@@ -32,6 +32,10 @@ type Event struct {
 	Account string `json:"account,omitempty"`
 	// Usage is set on kind "usage": what one finished agent run reported (tokens, cost when known).
 	Usage *usage.Usage `json:"usage,omitempty"`
+	// Agent, Model and Session name what reported a "usage" event, when known.
+	Agent   string `json:"agent,omitempty"`
+	Model   string `json:"model,omitempty"`
+	Session string `json:"session,omitempty"`
 }
 
 // Spend is the known cost per local day of the "usage" events, the last days days (today last).

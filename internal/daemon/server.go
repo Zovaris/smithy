@@ -375,6 +375,7 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("DELETE /v1/keys/{service}", sv.deleteKey)
 	mux.HandleFunc("PUT /v1/serve", sv.putServe)
 	mux.HandleFunc("GET /v1/doctor", sv.doctor)
+	mux.HandleFunc("GET /v1/usage", sv.tokenUsage)
 	mux.HandleFunc("GET /v1/tend", sv.tendView)
 	mux.HandleFunc("GET /v1/workflows", sv.listWorkflows)
 	mux.HandleFunc("GET /v1/workflows/{name}", sv.getWorkflow)

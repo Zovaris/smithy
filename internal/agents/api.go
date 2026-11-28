@@ -172,7 +172,7 @@ func runAPI(o Options, cli string) int {
 			_ = usage.Write(out.Name(), u)
 		}
 		e := item
-		e.Kind, e.Usage = "usage", &u
+		e.Kind, e.Usage, e.Agent, e.Model = "usage", &u, "api", o.Model
 		if o.Log != "" {
 			e.Detail = filepath.Base(o.Log)
 		}

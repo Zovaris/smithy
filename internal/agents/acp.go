@@ -136,7 +136,8 @@ func runACP(cmd *exec.Cmd, o Options, prompt string, out *os.File) int {
 			_ = usage.Write(out.Name(), u)
 		}
 		e := item
-		e.Kind, e.Usage, e.Account = "usage", &u, o.Account
+		e.Kind, e.Usage, e.Account, e.Model = "usage", &u, o.Account, o.Model
+		e.Agent = Kind(filepath.Base(cmd.Path))
 		if o.Log != "" {
 			e.Detail = filepath.Base(o.Log)
 		}

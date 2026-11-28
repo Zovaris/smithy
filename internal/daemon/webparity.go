@@ -3,13 +3,10 @@
 package daemon
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -35,20 +32,6 @@ func writeGuard(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	return true
-}
-
-type cappedBuf struct {
-	b   []byte
-	cut bool
-}
-
-func (c *cappedBuf) Write(p []byte) (int, error) {
-	if n := shellMaxBytes - len(c.b); n < len(p) {
-		c.b, c.cut = append(c.b, p[:max(n, 0)]...), true
-		return len(p), nil
-	}
-	c.b = append(c.b, p...)
-	return len(p), nil
 }
 
 // sessionShell is POST /v1/sessions/{id}/shell {cmd}: the TUI's `!cmd`, run with the user's
@@ -78,26 +61,10 @@ func (sv *Server) sessionShell(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "cmd is empty"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), shellTimeout)
-	defer cancel()
-	sh := os.Getenv("SHELL")
-	if sh == "" {
-		sh = "/bin/sh"
-	}
-	cmd := exec.CommandContext(ctx, sh, "-c", req.Cmd)
-	cmd.Dir = dir
-	var out cappedBuf
-	cmd.Stdout, cmd.Stderr = &out, &out
-	err := cmd.Run()
-	res := map[string]any{"output": string(out.b), "code": 0}
-	if out.cut {
-		res["output"] = string(out.b) + "\n… output cut at 256 KiB"
-	}
-	var ee *exec.ExitError
-	if errors.As(err, &ee) {
-		res["code"] = ee.ExitCode()
-	} else if err != nil {
-		res["code"], res["error"] = -1, text.Clean(err.Error())
+	run := RunShell(r.Context(), dir, req.Cmd)
+	res := map[string]any{"output": run.Output(), "code": run.Code, "lines": run.Lines, "took_ms": run.Took.Milliseconds()}
+	if run.Err != "" {
+		res["error"] = run.Err
 	}
 	writeJSON(w, 200, res)
 }

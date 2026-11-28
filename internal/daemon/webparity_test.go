@@ -29,6 +29,17 @@ func TestSessionShellRunsInTheSessionFolder(t *testing.T) {
 	if code != 200 || !strings.Contains(m["output"].(string), "marker.txt") || m["code"].(float64) != 3 {
 		t.Fatalf("shell: %d %v", code, m)
 	}
+	code, m = post(t, url+"/v1/sessions/"+id+"/shell", `{"cmd":"echo out; echo bad >&2"}`)
+	ls, _ := m["lines"].([]any)
+	marked := 0
+	for _, l := range ls {
+		if x := l.(map[string]any); (x["err"] == true) == (x["text"] == "bad") {
+			marked++
+		}
+	}
+	if code != 200 || len(ls) != 2 || marked != 2 || m["took_ms"] == nil {
+		t.Fatalf("stderr lines not marked: %d %v", code, m)
+	}
 	if code, _ := post(t, url+"/v1/sessions/nope/shell", `{"cmd":"ls"}`); code != 404 {
 		t.Fatalf("unknown session: %d", code)
 	}

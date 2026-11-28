@@ -4,13 +4,15 @@ package tui
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/Zovaris/smithy/internal/daemon"
 )
 
 func TestBangRunsShellInSessionFolderAndShowsOutput(t *testing.T) {
@@ -19,9 +21,9 @@ func TestBangRunsShellInSessionFolderAndShowsOutput(t *testing.T) {
 	m.sess = f
 	m.dir = "/work/proj"
 	var gotDir, gotLine string
-	m.shell = func(_ context.Context, dir, line string) (string, error) {
+	m.shell = func(_ context.Context, dir, line string) daemon.ShellRun {
 		gotDir, gotLine = dir, line
-		return "a.go\nb.go\n", nil
+		return daemon.ShellRun{Lines: []daemon.ShellLine{{Text: "a.go"}, {Text: "b.go"}}, Took: 40 * time.Millisecond}
 	}
 	m = typeIn(m, "!ls -1")
 	m = cpress(m, ckey("enter"))
@@ -32,7 +34,7 @@ func TestBangRunsShellInSessionFolderAndShowsOutput(t *testing.T) {
 		t.Fatalf("shell line went to the agent: %v %v", f.started, f.sent)
 	}
 	out := screen(m)
-	for _, s := range []string{"$ ls -1", "a.go", "b.go"} {
+	for _, s := range []string{"$ ls -1", "ok", "40ms", "a.go", "b.go"} {
 		if !strings.Contains(out, s) {
 			t.Fatalf("%q missing:\n%s", s, out)
 		}
@@ -41,13 +43,13 @@ func TestBangRunsShellInSessionFolderAndShowsOutput(t *testing.T) {
 
 func TestBangShowsFailure(t *testing.T) {
 	m := newChatTest(0)
-	m.shell = func(context.Context, string, string) (string, error) {
-		return "nope\n", errors.New("exit status 2")
+	m.shell = func(context.Context, string, string) daemon.ShellRun {
+		return daemon.ShellRun{Lines: []daemon.ShellLine{{Text: "nope", Err: true}}, Code: 2}
 	}
 	m = typeIn(m, "!false")
 	m = cpress(m, ckey("enter"))
 	out := screen(m)
-	if !strings.Contains(out, "nope") || !strings.Contains(out, "exit status 2") {
+	if !strings.Contains(out, "nope") || !strings.Contains(out, "exit 2") {
 		t.Fatalf("failure not shown:\n%s", out)
 	}
 }
@@ -55,11 +57,54 @@ func TestBangShowsFailure(t *testing.T) {
 func TestBangAloneRunsNothing(t *testing.T) {
 	m := newChatTest(0)
 	ran := false
-	m.shell = func(context.Context, string, string) (string, error) { ran = true; return "", nil }
+	m.shell = func(context.Context, string, string) daemon.ShellRun { ran = true; return daemon.ShellRun{} }
 	m = typeIn(m, "!")
 	m = cpress(m, ckey("enter"))
 	if ran {
 		t.Fatal("empty command ran")
+	}
+}
+
+func TestShellBlockFoldsLongOutputAndExpandsOnClick(t *testing.T) {
+	m := newChatTest(0)
+	m.height = 60
+	var ls []daemon.ShellLine
+	for i := range 30 {
+		ls = append(ls, daemon.ShellLine{Text: fmt.Sprintf("line-%02d", i)})
+	}
+	m.shell = func(context.Context, string, string) daemon.ShellRun { return daemon.ShellRun{Lines: ls} }
+	m = typeIn(m, "!seq 30")
+	m = cpress(m, ckey("enter"))
+	out := screen(m)
+	if !strings.Contains(out, "line-19") || strings.Contains(out, "line-20") || !strings.Contains(out, "10 more lines") {
+		t.Fatalf("not folded after 20 lines:\n%s", out)
+	}
+	m = chatStep(m, tea.MouseClickMsg{X: 5, Y: rowOf(t, m, "$ seq 30"), Button: tea.MouseLeft})
+	if out := screen(m); !strings.Contains(out, "line-29") {
+		t.Fatalf("a click did not expand:\n%s", out)
+	}
+	m = cpress(m, ckey("enter"))
+	if out := screen(m); strings.Contains(out, "line-29") {
+		t.Fatalf("enter on the focused block did not fold it:\n%s", out)
+	}
+}
+
+func TestShellBlockShowsFolderOnlyWhenNotTheSessions(t *testing.T) {
+	m := newChatTest(0)
+	m.height = 30
+	m.dir = "/work/other"
+	m.current = "s1"
+	m.sessions = []chatSession{{id: "s1", dir: "/work/proj"}}
+	m.shell = func(context.Context, string, string) daemon.ShellRun { return daemon.ShellRun{} }
+	m = typeIn(m, "!true")
+	m = cpress(m, ckey("enter"))
+	if out := screen(m); !strings.Contains(out, "/work/other") {
+		t.Fatalf("other folder not shown:\n%s", out)
+	}
+	m.sessions[0].dir = "/work/other"
+	m.ver++
+	if out := screen(m); strings.Contains(out, "/work/other") {
+		t.Fatalf("session folder shown:\n%s", out)
 	}
 }
 
@@ -68,9 +113,9 @@ func TestRunShellUsesFolder(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(d, "here.txt"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	out, err := runShell(context.Background(), d, "ls")
-	if err != nil || !strings.Contains(out, "here.txt") {
-		t.Fatalf("out %q err %v", out, err)
+	r := daemon.RunShell(context.Background(), d, "ls")
+	if r.Code != 0 || !strings.Contains(r.Output(), "here.txt") {
+		t.Fatalf("run %+v", r)
 	}
 }
 
@@ -131,20 +176,20 @@ func TestParseOsascriptPNG(t *testing.T) {
 
 func TestShellOutputStripsTerminalEscapes(t *testing.T) {
 	m := newChatTest(0)
-	m.shell = func(context.Context, string, string) (string, error) {
-		return "ok\x1b]52;c;ZXZpbA==\x07\x1b[2Jdone\r\x08\n", nil
+	m.shell = func(context.Context, string, string) daemon.ShellRun {
+		return daemon.ShellRun{Lines: []daemon.ShellLine{{Text: "ok\x1b]52;c;ZXZpbA==\x07\x1b[2Jdone\r\x08"}}}
 	}
 	m = typeIn(m, "!x")
 	m = cpress(m, ckey("enter"))
-	last := m.msgs[len(m.msgs)-1].text
+	last := m.msgs[len(m.msgs)-1].sh.run.Lines[0].Text
 	if strings.ContainsAny(last, "\x1b\x07\x08\r") || !strings.Contains(last, "okdone") {
 		t.Fatalf("got %q", last)
 	}
 }
 
 func TestRunShellCapsOutput(t *testing.T) {
-	out, _ := runShell(context.Background(), t.TempDir(), "head -c 5000000 /dev/zero | tr '\\0' a")
-	if len(out) > shellMaxBytes+100 {
+	r := daemon.RunShell(context.Background(), t.TempDir(), "head -c 5000000 /dev/zero | tr '\\0' a")
+	if out := r.Output(); len(out) > 256<<10+100 || !r.Cut {
 		t.Fatalf("output %d bytes", len(out))
 	}
 }

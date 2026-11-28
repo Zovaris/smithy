@@ -16,7 +16,7 @@ const sid = (id: string) => "/v1/sessions/" + encodeURIComponent(id);
 export const setSessionModel = (id: string, model: string, effort: string): Promise<Sess> => call("PUT", sid(id) + "/model", { model, effort });
 export const addLink = (id: string, ref: string) => call("POST", sid(id) + "/links", { ref });
 export const setSessionGoal = (id: string, goal: string): Promise<Sess> => call("PUT", sid(id) + "/goal", { goal });
-export const runShell = (id: string, cmd: string): Promise<{ output: string; code: number; error?: string }> => call("POST", sid(id) + "/shell", { cmd });
+export const runShell = (id: string, cmd: string): Promise<{ output: string; code: number; error?: string; lines?: { text: string; err?: boolean }[]; took_ms?: number }> => call("POST", sid(id) + "/shell", { cmd });
 
 export async function uploadImage(f: Blob): Promise<string> {
   if (f.size > 32 << 20) throw new Error("image over 32 MiB");
@@ -38,6 +38,7 @@ export const setKey = (svc: string, key: string) => call("PUT", "/v1/keys/" + en
 export const removeKey = (svc: string) => call("DELETE", "/v1/keys/" + encodeURIComponent(svc));
 export const setServe = (on: boolean) => call("PUT", "/v1/serve", { on });
 export const runDoctor = (): Promise<{ lines: string[] }> => call("GET", "/v1/doctor");
+export const tokenUsage = <R,>(session: string): Promise<R> => call("GET", "/v1/usage?session=" + encodeURIComponent(session));
 export const connectTest = (): Promise<{ results: string[]; error?: string }> => call("POST", "/v1/connect/test", {});
 export const addServer = (name: string, url: string, code: string) => call("POST", "/v1/servers", { name, url, code });
 export const removeServer = (name: string) => call("DELETE", "/v1/servers/" + encodeURIComponent(name));

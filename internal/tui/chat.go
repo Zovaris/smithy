@@ -65,6 +65,7 @@ const (
 type chatMsg struct {
 	who, at, text, kind string
 	tool                *chatTool
+	sh                  *shellBlock
 	open                bool
 	ans                 string
 	width, ver          int
@@ -169,7 +170,7 @@ type chatView struct {
 	connectAdd  func(remote.Server) error // saves a discovered server
 	switchTo    *chatSwitch               // set when /connect picked another server
 
-	shell    func(ctx context.Context, dir, line string) (string, error) // runs !cmd; nil: runShell
+	shell    func(ctx context.Context, dir, line string) daemon.ShellRun // runs !cmd; nil: daemon.RunShell
 	clip     func() ([]byte, error)                                      // reads a clipboard image; nil: readClipImage
 	pasteDir string                                                      // where pasted images are saved; "": temp dir
 	images   []string                                                    // pasted images waiting for the next message

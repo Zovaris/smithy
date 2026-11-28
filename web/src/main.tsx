@@ -36,10 +36,11 @@ const AgentsPanel = lazy(() => import("./components/panel"));
 const Splash = lazy(() => import("./components/splash"));
 const SideServers = lazy(() => import("./components/servers").then((m) => ({ default: () => <m.Servers rows={m.useServers()} /> })));
 const Refined = lazy(() => import("./features/chat/refined"));
+const ShellBlock = lazy(() => import("./features/chat/shellblock"));
 const SessionPick = lazy(() => import("./features/chat/sessionpick"));
 const InfoPanel = lazy(() => import("./components/info"));
 const NewSession = lazy(() => import("./features/chat/newsession").then((m) => ({ default: m.NewSession })));
-type Shell = { cmd: string; output: string; code: number };
+type Shell = import("./features/chat/shellblock").Shell;
 
 const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", workflows: "layers", schedules: "clock", setup: "gear" };
 
@@ -230,12 +231,7 @@ function App() {
     center = s ? (
       <>
         <Conversation s={s} detail={detail} items={l.store.convo[s.id] ?? []} decisions={decs} loose={s.status === "working" || s.status === "needs_you" ? pend.filter((d) => !d.session) : []}
-          extra={[<Suspense fallback={null}><Refined s={s} items={l.store.convo[s.id]} /></Suspense>, (shells[s.id] ?? []).map((x) => (
-            <div class="shell" role="group" aria-label={"Shell: " + x.cmd}>
-              <div class="mono"><span class="t3">$</span> {x.cmd}{x.code !== 0 && <span class="st fail">exit {x.code}</span>}</div>
-              <pre>{x.output.trimEnd() || "(no output)"}</pre>
-            </div>
-          ))]} />
+          extra={[<Suspense fallback={null}><Refined s={s} items={l.store.convo[s.id]} /></Suspense>, (shells[s.id] ?? []).map((x) => <Suspense fallback={null}><ShellBlock x={x} /></Suspense>)]} />
         <Composer
           placeholder={`Reply to ${agentName(s.agent)}`}
           skills={skills}
