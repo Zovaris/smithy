@@ -24,6 +24,7 @@ part above `### Details`.
 - A question that takes several picks asks for them in Slack (a multi-select menu), Discord (a select menu) and Telegram (☐/☑ toggles and Done); single-pick questions keep one button per option.
 
 ### Fixed
+- The agents' system prompt is shorter and direct: answer first, short replies, the user's language, and it no longer names the CLI underneath (agents kept bringing up Claude Code).
 
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
 - ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
