@@ -66,6 +66,7 @@ type chatSession struct {
 	effort                   string
 	goal, goalState          string
 	dir                      string // the folder it started in; "" for batch events
+	parent                   string
 	prs                      []string
 	since, turn              time.Time
 }
