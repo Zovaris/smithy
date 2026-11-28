@@ -36,11 +36,9 @@ const AgentsPanel = lazy(() => import("./components/panel"));
 const Splash = lazy(() => import("./components/splash"));
 const SideServers = lazy(() => import("./components/servers").then((m) => ({ default: () => <m.Servers rows={m.useServers()} /> })));
 const Refined = lazy(() => import("./features/chat/refined"));
-const ShellBlock = lazy(() => import("./features/chat/shellblock"));
 const SessionPick = lazy(() => import("./features/chat/sessionpick"));
 const InfoPanel = lazy(() => import("./components/info"));
 const NewSession = lazy(() => import("./features/chat/newsession").then((m) => ({ default: m.NewSession })));
-type Shell = import("./features/chat/shellblock").Shell;
 
 const ICON: Record<Page, string> = { decisions: "msg", agents: "bolt", board: "grid", bench: "chart", workflows: "layers", schedules: "clock", setup: "gear" };
 
@@ -131,7 +129,6 @@ function App() {
   const [pick, setPick] = useState(false);
   const [note, setNote] = useState("");
   const [shim, setShim] = useState(0);
-  const [shells, setShells] = useState<Record<string, Shell[]>>({});
   const v = useView();
   const auth = useAuth();
   const l = useLive();
@@ -231,7 +228,7 @@ function App() {
     center = s ? (
       <>
         <Conversation s={s} detail={detail} items={l.store.convo[s.id] ?? []} decisions={decs} loose={s.status === "working" || s.status === "needs_you" ? pend.filter((d) => !d.session) : []}
-          extra={[<Suspense fallback={null}><Refined s={s} items={l.store.convo[s.id]} /></Suspense>, (shells[s.id] ?? []).map((x) => <Suspense fallback={null}><ShellBlock x={x} /></Suspense>)]} />
+          extra={[<Suspense fallback={null}><Refined s={s} items={l.store.convo[s.id]} /></Suspense>]} />
         <Composer
           placeholder={`Reply to ${agentName(s.agent)}`}
           skills={skills}
@@ -242,8 +239,7 @@ function App() {
           onStop={() => stopSession(s.id).catch(() => {})}
           onAction={onAction}
           onShell={currentServer() ? undefined : async (cmd) => {
-            const x = await (await import("./features/chat/slash")).shell(s.id, cmd);
-            setShells((m) => ({ ...m, [s.id]: [...(m[s.id] ?? []), x] }));
+            await (await import("./lib/actions")).runShell(s.id, cmd);
           }}
           onImage={currentServer() ? undefined : async (f) => (await import("./lib/actions")).uploadImage(f)}
           above={!!mine.length && <div class="cmts"><span class="tag"><I n="pen" />{mine.length} diff comment{mine.length > 1 ? "s" : ""} go with this message</span></div>}

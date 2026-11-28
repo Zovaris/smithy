@@ -1,11 +1,10 @@
 // The smithy commands the composer and the palette run here, loaded on first use: the TUI's
 // /model, /effort, /goal, /theme, /mode, /ask, /answer, /serve, /set, /unset, /key rm, the panels (/help,
 // /log, /remote, /tend, /links, /sidebar) and the ones that open Settings.
-import { addLink, removeKey, runShell, sampleAsk, setServe, setSessionGoal, setSessionModel, setSetting, unsetSetting } from "../../lib/actions";
+import { addLink, removeKey, sampleAsk, setServe, setSessionGoal, setSessionModel, setSetting, unsetSetting } from "../../lib/actions";
 import { ACTIONS } from "../../lib/commands";
 import { nextDetail, type Detail } from "../../lib/detail";
 import type { Info } from "../../components/info";
-import type { Shell } from "./shellblock";
 import { api } from "../../lib/auth";
 import { decide, stopSession } from "../../lib/live";
 import { effortLevels, effortMax, effortOptions } from "../../lib/parity";
@@ -142,10 +141,3 @@ export function run(a: string, arg: string, ctx: Ctx): void {
   else if (a === "run") go({ name: "workflows" });
 }
 
-// shell is `!cmd`: the last 200 lines, like the TUI.
-export async function shell(id: string, cmd: string): Promise<Shell> {
-  const r = await runShell(id, cmd);
-  const all = r.lines ?? r.output.split("\n").map((text) => ({ text }));
-  const lines = all.length > 200 ? [{ text: `… ${all.length - 200} lines cut` }, ...all.slice(-200)] : all;
-  return { cmd, lines, code: r.code, error: r.error, took_ms: r.took_ms };
-}

@@ -277,3 +277,30 @@ type WorkflowList struct {
 	Workflows []workflow.Info `json:"workflows"`
 	Running   []string        `json:"running"`
 }
+
+// ShellLine is one line a `!cmd` printed; Err marks a stderr line.
+type ShellLine struct {
+	Text string `json:"text"`
+	Err  bool   `json:"err,omitempty"`
+}
+
+// ShellRun is a finished `!cmd` as a session_shell event keeps it: its lines in the order printed
+// (the first and last half of ShellMaxLines and ShellMaxBytes; when there was more, Cut is set
+// and one "… N lines cut …" line sits between them), the exit code (-1 when it
+// never ran or was killed, with Err set) and how long it took.
+type ShellRun struct {
+	ID     string      `json:"id"`
+	Cmd    string      `json:"cmd"`
+	Dir    string      `json:"dir,omitempty"`
+	Code   int         `json:"code"`
+	Err    string      `json:"error,omitempty"`
+	TookMS int64       `json:"took_ms"`
+	Lines  []ShellLine `json:"lines"`
+	Cut    bool        `json:"cut,omitempty"`
+}
+
+// ShellMaxLines and ShellMaxBytes cap what a `!cmd` keeps, half from the start, half from the end.
+const (
+	ShellMaxLines = 500
+	ShellMaxBytes = 64 << 10
+)

@@ -13,7 +13,11 @@ export type Sess = {
 };
 export type Tool = { id?: string; name: string; args?: unknown; output?: string; is_error?: boolean };
 export type Part = { kind: "text"; text: string } | { kind: "tools"; tools: Tool[] } | { kind: "decision"; id: string };
-export type Item = { kind: "you"; text: string; at: string } | { kind: "agent"; parts: Part[]; at: string };
+// Shell is a `!cmd` run (session_shell): the first and last 250 lines, cut set when a "… N lines
+// cut …" line sits between them.
+export type ShellLine = { text: string; err?: boolean };
+export type Shell = { id?: string; cmd: string; dir?: string; lines: ShellLine[]; code: number; error?: string; took_ms?: number; cut?: boolean };
+export type Item = { kind: "you"; text: string; at: string } | { kind: "agent"; parts: Part[]; at: string } | { kind: "shell"; x: Shell; at: string };
 
 export type Diff = { stat: string; patch: string; truncated: boolean; at: string };
 // multi: several options may be picked (the answer joins them with ", "); other: free text is taken.
@@ -160,6 +164,12 @@ export function fold(s: Store, e: Ev): Store {
       if (p?.kind === "tools") turn.parts[turn.parts.length - 1] = { kind: "tools", tools: [...p.tools, d as Tool] };
       else turn.parts.push({ kind: "tools", tools: [d as Tool] });
       next.convo = { ...s.convo, [id]: items };
+      return next;
+    }
+    case "session_shell": {
+      if (!sess || !str(d.cmd) || (d.id && convo.some((i) => i.kind === "shell" && i.x.id === d.id))) return next;
+      const x: Shell = { id: str(d.id), cmd: str(d.cmd), dir: str(d.dir), lines: Array.isArray(d.lines) ? d.lines : [], code: Number(d.code) || 0, error: str(d.error) || undefined, took_ms: Number(d.took_ms) || 0, cut: d.cut === true };
+      next.convo = { ...s.convo, [id]: [...convo, { kind: "shell", x, at }] };
       return next;
     }
     case "session_diff": {

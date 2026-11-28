@@ -55,6 +55,7 @@ part above `### Details`.
 - `smithy workflow --help` and other help tables keep their description column when a line wraps.
 - The `/` popup lifts the transcript instead of drawing over its latest lines.
 - ctrl+k and ctrl+l redraw the whole TUI, so clearing the terminal no longer leaves a dimmed screen.
+- A `!cmd` run is part of the session: the TUI, the web and a reopened `smithy chat --session` all show it. A run keeps its first and last 250 lines (64 KiB in all) with one `… N lines cut …` line between them, so errors printed last still show, and folds to 20 lines with "N more lines".
 - `smithy tui` is gone: run `smithy stats`. The `tui.reduce_motion` setting is now `ui.reduce_motion`; a saved `tui.reduce_motion` still works.
 
 ### Details

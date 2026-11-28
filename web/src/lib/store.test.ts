@@ -201,4 +201,11 @@ describe("md blocks", () => {
   it("splits paragraphs, lists and fences", () => {
     expect(blocks("Done.\n\n- one\n- two\n1. a\n```\nx := 1\n```\nend").map((b) => [b.t, b.lines.length])).toEqual([["p", 1], ["ul", 2], ["ol", 1], ["pre", 1], ["p", 1]]);
   });
+  it("keeps a !cmd run from session_shell once, in transcript order", () => {
+    const sh = { id: "sh-1", cmd: "ls", dir: "/p", lines: [{ text: "a" }, { text: "b", err: true }], code: 2, took_ms: 40, cut: true };
+    const s = run(started(), ev("session_message", { role: "user", text: "hi" }), ev("session_shell", sh), ev("session_shell", sh));
+    const c = s.convo[Object.keys(s.convo)[0]];
+    expect(c.map((i) => i.kind)).toEqual(["you", "shell"]);
+    expect(c[1]).toMatchObject({ kind: "shell", x: { id: "sh-1", cmd: "ls", code: 2, cut: true, lines: sh.lines } });
+  });
 });
