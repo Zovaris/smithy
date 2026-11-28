@@ -135,6 +135,15 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 		if json.Unmarshal(data, &s) == nil {
 			m.meta(id, s)
 		}
+	case daemon.KindSessionLinks:
+		var l daemon.SessionLinks
+		if json.Unmarshal(data, &l) == nil {
+			for i := range m.sessions {
+				if m.sessions[i].id == id {
+					m.sessions[i].links = &l
+				}
+			}
+		}
 	case daemon.KindSessionGoal:
 		var g struct{ Goal, State string }
 		if json.Unmarshal(data, &g) == nil {

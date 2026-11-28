@@ -22,6 +22,8 @@ type settingsAPI interface {
 	Doctor(ctx context.Context) ([]string, error)
 	Tend(ctx context.Context) (daemon.TendList, error)
 	ConnectTest(ctx context.Context) (daemon.ConnectTestResult, error)
+	SessionLinks(ctx context.Context, id string) (daemon.SessionLinks, error)
+	AddLink(ctx context.Context, id, ref string) (daemon.SessionLinks, error)
 }
 
 // settingsDoneMsg is a settings command's result: lines for the transcript, or a panel to open.
