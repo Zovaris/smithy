@@ -44,7 +44,7 @@ func TestGoalCommandSetsShowsAndClears(t *testing.T) {
 		t.Fatalf("/goal alone shows it, sets nothing: %v\n%s", fg.goals, screen(m))
 	}
 	m2, cmd = m.command("/goal clear")
-	m = run(m2.(chatView), cmd)
+	run(m2.(chatView), cmd)
 	if fg.goals[len(fg.goals)-1] != "s-1|" {
 		t.Fatalf("/goal clear drops it: %v", fg.goals)
 	}
