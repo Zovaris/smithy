@@ -53,7 +53,7 @@ func keyRows(stored []string) []Setting {
 	return out
 }
 
-var groupOrder = []string{"auto", "linear", "warden", "notify", "key", "decide", "agent", "ask", "tasks", "git", "watch", "tend", "route", "stack", "tui", "models"}
+var groupOrder = []string{"auto", "linear", "warden", "notify", "key", "decide", "agent", "ask", "tasks", "git", "watch", "tend", "route", "stack", "models"}
 
 // settingRows lists every known key plus the current harness's models, grouped, with value and source from eff.
 func settingRows(h string, eff func(string) (string, string, error)) []Setting {

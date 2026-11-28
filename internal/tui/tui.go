@@ -272,7 +272,7 @@ func New(noAnim, demo bool) Model {
 		events.Off = true
 		load = Demo
 	}
-	motion := motionOn(noAnim, os.Getenv("SMITHY_REDUCE_MOTION"), config.Get("tui.reduce_motion", "false"), p)
+	motion := motionOn(noAnim, os.Getenv("SMITHY_REDUCE_MOTION"), config.Get("ui.reduce_motion", "false"), p)
 	m := newModel(options{profile: p, dark: true, unicode: utf8Locale(), motion: motion, toast: first || demo, theme: config.Get("ui.theme", "steel"),
 		seed: uint64(time.Now().UnixNano()), now: time.Now, load: load})
 	if demo {

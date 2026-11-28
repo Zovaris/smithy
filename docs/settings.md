@@ -86,7 +86,7 @@ checkout's, so one setting holds for every worktree. You never edit them by hand
 | `kit.skills` | (empty) | Comma list of installed skills (smithy's, then `~/.agents/skills` and `~/.smithy/skills`) linked into every driven CLI that takes skills (claude, codex, opencode, pi). Toggled by `/skills`. |
 | `ui.splash` | `true` | `false` skips the short dither-and-anvil animation when `smithy` opens; it never plays without a terminal, color or motion, or under 80×24, and any key skips it. |
 | `ui.theme` | `steel` | Color theme the TUI and web share: `steel`, `frost` or `plum`. `/theme` in the TUI and the web palette set it. |
-| `tui.reduce_motion` | `false` | `true` draws every `smithy` and `smithy stats` frame still: no sparks, shimmer or sliding bars (like `--no-anim` or `SMITHY_REDUCE_MOTION`). |
+| `ui.reduce_motion` | `false` | `true` draws every `smithy` and `smithy stats` frame still: no sparks, shimmer or sliding bars (like `--no-anim` or `SMITHY_REDUCE_MOTION`). |
 | `git.branch` | `{type}/{key}-{slug}` | Branch names (`smithy names`); e.g. `agent/{key}-{slug}`. |
 | `git.worktree` | `{parent}/worktrees/{repo}-{branch}` | Where worktrees go. |
 | `watch.events` / `watch.every` / `watch.max` | `checks,merged,closed,conflict,review,comment,push,new,updated` / `30` / `50` | What wakes a waiting agent on `pr:` and list targets (`actions`, `base` and `alerts` always report), seconds between polls, minutes before a heartbeat. |

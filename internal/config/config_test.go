@@ -597,3 +597,18 @@ func TestSnapshotMatchesEffective(t *testing.T) {
 		t.Error("a broken user file must be an error")
 	}
 }
+
+func TestRenamedKeyKeepsOldValue(t *testing.T) {
+	e := setup(t)
+	if v, src, _ := Effective("ui.reduce_motion"); v != "false" || src != "default" {
+		t.Fatalf("default: %q %q", v, src)
+	}
+	write(t, e.user, `{"tui":{"reduce_motion":true}}`)
+	if v, src, _ := Effective("ui.reduce_motion"); v != "true" || src != "user" {
+		t.Fatalf("old key: %q %q", v, src)
+	}
+	write(t, e.user, `{"tui":{"reduce_motion":true},"ui":{"reduce_motion":false}}`)
+	if v, _, _ := Effective("ui.reduce_motion"); v != "false" {
+		t.Fatalf("new key wins: %q", v)
+	}
+}

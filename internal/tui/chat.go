@@ -430,8 +430,8 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 		p = colorprofile.Ascii
 	}
 	m := newChatView(ch, url, newTheme(true, p, utf8Locale()))
-	m.splashOn = splashWanted(isTTY(os.Stdout), os.Getenv("NO_COLOR"), os.Getenv("SMITHY_REDUCE_MOTION"), config.Get("ui.splash", "true"), config.Get("tui.reduce_motion", "false"))
-	m.still = os.Getenv("SMITHY_REDUCE_MOTION") != "" || config.Get("tui.reduce_motion", "false") == "true"
+	m.splashOn = splashWanted(isTTY(os.Stdout), os.Getenv("NO_COLOR"), os.Getenv("SMITHY_REDUCE_MOTION"), config.Get("ui.splash", "true"), config.Get("ui.reduce_motion", "false"))
+	m.still = os.Getenv("SMITHY_REDUCE_MOTION") != "" || config.Get("ui.reduce_motion", "false") == "true"
 	m.where = where
 	m.server = serverName
 	m.connectLoad = defaultConnectLoad(func() (string, string) {
