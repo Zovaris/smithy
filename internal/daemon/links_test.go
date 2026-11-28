@@ -200,6 +200,12 @@ func TestProjectWorkListsOpenPRsAndIssuesOnce(t *testing.T) {
 	if len(w.PRs) != 1 || len(w.Issues) != 1 || len(w.PRs[0].Sessions) != 2 {
 		t.Fatalf("work %s", b)
 	}
+	res = do(t, "GET", url+"/v1/links", "", auth)
+	b, _ = io.ReadAll(res.Body)
+	res.Body.Close()
+	if !strings.Contains(string(b), "pull/8") {
+		t.Fatalf("no dir lists every project's work: %s", b)
+	}
 	res = do(t, "GET", url+"/v1/links?dir="+t.TempDir(), "", auth)
 	b, _ = io.ReadAll(res.Body)
 	res.Body.Close()

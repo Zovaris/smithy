@@ -67,6 +67,7 @@ type Linker struct {
 	Linear   func(id string) (linear.Issue, error)
 	BranchPR func(repo, branch string) (string, error)
 	Branch   func(dir string) string
+	Repo     func(dir string) string
 	Base     time.Duration
 	Max      time.Duration
 	Now      func() time.Time
@@ -267,6 +268,14 @@ func (sv *Server) refreshLinks(id string) (SessionLinks, bool) {
 }
 
 func (k *Linker) collect(id, dir string, prs, refs, texts []string) SessionLinks {
+	repo := gitRepoName
+	if k.Repo != nil {
+		repo = k.Repo
+	}
+	return k.collectIn(id, repo(dir), k.Branch(dir), prs, refs, texts)
+}
+
+func (k *Linker) collectIn(id, repo, branch string, prs, refs, texts []string) SessionLinks {
 	out := SessionLinks{Session: id, PRs: []ghx.PRLink{}, Issues: []LinkIssue{}, Checked: k.now().UTC()}
 	var errs []string
 	note := func(err error) {
@@ -276,8 +285,6 @@ func (k *Linker) collect(id, dir string, prs, refs, texts []string) SessionLinks
 			}
 		}
 	}
-	repo := gitRepoName(dir)
-	branch := k.Branch(dir)
 	urls := slices.Clone(prs)
 	for _, r := range refs {
 		if tendPRURL(r) {
@@ -467,7 +474,7 @@ type ProjectWork struct {
 
 func (sv *Server) projectWork(w http.ResponseWriter, r *http.Request) {
 	root := r.URL.Query().Get("dir")
-	if real, err := filepath.EvalSymlinks(root); err == nil {
+	if real, err := filepath.EvalSymlinks(root); root != "" && err == nil {
 		root = real
 	}
 	out := ProjectWork{PRs: []WorkPR{}, Issues: []WorkIssue{}}

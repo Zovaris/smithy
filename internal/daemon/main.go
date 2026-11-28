@@ -245,6 +245,7 @@ func foreground(o runOpts) int {
 	if o.demo {
 		api.Runners = DemoRunner
 		api.Ready = DemoReady
+		api.Links = DemoLinker()
 	}
 	api.Pair = &Pairing{File: DevicesFile()}
 	api.ServersFile = remote.File()
@@ -257,7 +258,9 @@ func foreground(o runOpts) int {
 	api.Tend = NewTender()
 	api.Tend.Sources = func() []TendRef { return mergeRefs(TendSources(), api.SessionTendRefs()) }
 	go api.Tend.Run(tctx, 2*time.Minute)
-	api.Links = NewLinker()
+	if api.Links == nil {
+		api.Links = NewLinker()
+	}
 	go api.Links.Run(tctx, api, 15*time.Second)
 	conns, cerr := connect.FromConfig()
 	if cerr != nil {

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/Zovaris/smithy/internal/agents"
+	"github.com/Zovaris/smithy/internal/ghx"
+	"github.com/Zovaris/smithy/internal/linear"
 	"github.com/Zovaris/smithy/internal/usage"
 )
 
@@ -91,4 +93,41 @@ func (r demoRunner) Turn(ctx context.Context, msg string, _ []Exchange, e Emit) 
 		return "", err
 	}
 	return fmt.Sprintf("Done: %q is handled, tests pass, you answered %q.", msg, a), nil
+}
+
+// DemoLinker links every demo session to one PR, one Linear issue and one GitHub issue, with
+// the PR's checks going green a minute after the daemon starts: live links with no network.
+func DemoLinker() *Linker {
+	start := time.Now()
+	const pr = "https://github.com/acme/app/pull/42"
+	return &Linker{
+		Repo:   func(string) string { return "acme/app" },
+		Branch: func(string) string { return "feat/tk-112-health" },
+		BranchPR: func(string, string) (string, error) {
+			return pr, nil
+		},
+		PR: func(string) (ghx.PRLink, error) {
+			checks := "pending"
+			if time.Since(start) > time.Minute {
+				checks = "green"
+			}
+			return ghx.PRLink{URL: pr, Number: 42, Title: "Add a health check endpoint", Body: "Closes #12", State: "OPEN",
+				Mergeable: "MERGEABLE", Review: "REVIEW_REQUIRED", Checks: checks, Additions: 48, Deletions: 3, Head: "feat/tk-112-health"}, nil
+		},
+		Linear: func(id string) (linear.Issue, error) {
+			if id != "TK-112" {
+				return linear.Issue{}, linear.ErrNotFound
+			}
+			return linear.Issue{ID: id, Title: "Health check for the load balancer", URL: "https://linear.app/acme/issue/TK-112",
+				Status: "In Progress", StateType: "started", Assignee: "Ana", Milestone: "v0.26"}, nil
+		},
+		GHIssue: func(_ string, n int) (ghx.IssueLink, error) {
+			if n != 12 {
+				return ghx.IssueLink{}, ghx.ErrNotFound
+			}
+			return ghx.IssueLink{Number: 12, Title: "Load balancer marks the app down", URL: "https://github.com/acme/app/issues/12", State: "OPEN", Assignee: "ana"}, nil
+		},
+		Base: 20 * time.Second,
+		Max:  time.Minute,
+	}
 }
