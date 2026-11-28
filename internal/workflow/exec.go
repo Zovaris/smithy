@@ -27,8 +27,8 @@ func Shell(ctx context.Context, dir, cmd string) (string, int, error) {
 	}
 	c.Dir = dirOr(dir)
 	c.WaitDelay = 5 * time.Second
-	var out bytes.Buffer
-	c.Stdout, c.Stderr = &out, &out
+	out := &capped{}
+	c.Stdout, c.Stderr = out, out
 	err := c.Run()
 	if ctx.Err() != nil {
 		return out.String(), -1, fmt.Errorf("timed out")
@@ -96,4 +96,28 @@ func Agent(ctx context.Context, dir, prompt string, timeout time.Duration) (stri
 func Guard(cmd string) string {
 	r, _ := guard.Load()
 	return r.Match(cmd)
+}
+
+// capped keeps the first MaxOutput bytes written and drops the rest, so a flooding command
+// can't grow the daemon's memory.
+type capped struct {
+	b   bytes.Buffer
+	cut bool
+}
+
+func (c *capped) Write(p []byte) (int, error) {
+	if room := MaxOutput - c.b.Len(); room > 0 {
+		c.b.Write(p[:min(room, len(p))])
+	}
+	if c.b.Len() >= MaxOutput && len(p) > 0 {
+		c.cut = true
+	}
+	return len(p), nil
+}
+
+func (c *capped) String() string {
+	if c.cut {
+		return c.b.String() + "\n… (output cut at 64 KiB)"
+	}
+	return c.b.String()
 }

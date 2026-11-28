@@ -216,7 +216,8 @@ func (s Store) Disable(name string) error {
 	return s.save(st)
 }
 
-// Save writes w (validated). An enabled workflow saved through smithy stays enabled.
+// Save writes w (validated). A save that changes the file turns its schedule off: the new
+// steps run unattended only after a new enable.
 func (s Store) Save(w Workflow) error {
 	if err := w.Validate(); err != nil {
 		return err
@@ -230,10 +231,9 @@ func (s Store) Save(w Workflow) error {
 	mu.Lock()
 	defer mu.Unlock()
 	st := s.load()
-	if old, err := os.ReadFile(f); err == nil {
-		if h, ok := st.Enabled[w.Name]; ok && h == hash(old) {
-			st.Enabled[w.Name] = hash(b)
-		}
+	if h, ok := st.Enabled[w.Name]; ok && h != hash(b) {
+		delete(st.Enabled, w.Name)
+		delete(st.Since, w.Name)
 	}
 	if err := writeAtomic(f, b); err != nil {
 		return err
@@ -251,7 +251,10 @@ func (s Store) Add(src string) (Workflow, error) {
 	if err != nil {
 		return w, err
 	}
-	f, _ := s.file(w.Name)
+	f, err := s.file(w.Name)
+	if err != nil {
+		return w, err
+	}
 	if _, err := os.Stat(f); err == nil {
 		return w, fmt.Errorf("workflow: %s already exists; disable and remove %s first", w.Name, f)
 	}

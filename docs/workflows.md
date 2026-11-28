@@ -43,13 +43,17 @@ with each step's output, and edit (the web saves the file; the TUI opens it in y
 - `notify`: `title` and `message` go to the TUI and web feed and the chat connectors'
   notifications channel (connector kind `workflow`).
 - Templates `{{<id>.output}}`, `{{<id>.answer}}`, `{{<id>.why}}`, `{{<id>.exit}}` work in agent
-  prompts and notify text only. Run commands take none, so no step output ever reaches a shell.
+  prompts and notify text only. Run commands take none, so no step output ever reaches a shell. In a
+  prompt each value sits inside `<data>` tags the agent is told to treat as data; still, an agent
+  judging untrusted output (PR text, web pages) can be steered, so keep it read-only and its
+  answer advisory.
 
 ## Safety
 
 - Nothing runs until you enable it. Enabling pins the file's hash: a change made outside smithy
-  (a script, a pulled repo file) stops the schedule until you enable it again. Saving from the web
-  page keeps it on. `smithy workflow add <file>` copies a repo's file in, disabled.
+  (a script, a pulled repo file) stops the schedule until you enable it again, and so does saving an
+  edit from the web page. `smithy workflow add <file>` copies a repo's file in, disabled. Run now
+  works on a disabled workflow: you asked for that one run.
 - Shell steps go through the guard (`guard.block`, `guard.allow`). Nobody is there to answer, so a
   blocked command fails the step.
 - Agent steps run read-only through `smithy agent` with the auto profile: the unattended allow-list

@@ -90,7 +90,7 @@ export default function Workflows() {
                   <div style="display:flex;flex-direction:column;gap:6px">
                     <textarea aria-label={`Edit ${w.name}`} rows={16} spellcheck={false} style="font-family:var(--mono, monospace);width:100%" value={edit} onInput={(e) => setEdit(e.currentTarget.value)} />
                     <span class="btns">
-                      <button class="btn sm primary" onClick={() => act(async () => { await saveWorkflow(w.name, edit); setEdit(null); })}>Save</button>
+                      <button class="btn sm primary" onClick={() => act(async () => { await saveWorkflow(w.name, edit); setEdit(null); })}>{w.enabled ? "Save (turns it off)" : "Save"}</button>
                       <button class="btn sm" onClick={() => setEdit(null)}>Cancel</button>
                     </span>
                   </div>

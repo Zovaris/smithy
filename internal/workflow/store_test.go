@@ -47,7 +47,7 @@ func TestStoreEnablePinsHash(t *testing.T) {
 	}
 }
 
-func TestStoreSaveKeepsEnable(t *testing.T) {
+func TestStoreSaveTurnsOff(t *testing.T) {
 	s := Store{Dir: t.TempDir()}
 	w, _ := Parse([]byte(simple))
 	if err := s.Save(w); err != nil {
@@ -58,8 +58,8 @@ func TestStoreSaveKeepsEnable(t *testing.T) {
 	if err := s.Save(w); err != nil {
 		t.Fatal(err)
 	}
-	if l, _ := s.List(); !l[0].Enabled {
-		t.Fatal("saving through smithy should keep it enabled")
+	if l, _ := s.List(); l[0].Enabled || l[0].Changed {
+		t.Fatalf("an edit needs a new enable: %+v", l[0])
 	}
 }
 

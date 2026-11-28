@@ -20,6 +20,13 @@ func TestShell(t *testing.T) {
 	}
 }
 
+func TestShellCapsOutputWhileRunning(t *testing.T) {
+	out, _, err := Shell(context.Background(), "", "head -c 300000 /dev/zero | tr '\\0' x")
+	if err != nil || len(out) > MaxOutput+100 {
+		t.Fatalf("%d bytes, %v", len(out), err)
+	}
+}
+
 func TestGuardDefaults(t *testing.T) {
 	t.Setenv("SMITHY_HOME", t.TempDir())
 	if Guard("git reset --hard HEAD~1") == "" {
