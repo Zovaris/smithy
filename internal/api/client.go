@@ -38,8 +38,21 @@ type ClientMsg struct {
 	Err       error
 }
 
-// HTTPClient is the client's HTTP client, http.DefaultClient when unset.
+// DefaultTimeout bounds one request when Client.HTTP is unset; the event stream has no bound.
+const DefaultTimeout = 5 * time.Minute
+
+var boundedHTTP = &http.Client{Timeout: DefaultTimeout}
+
+// HTTPClient is the client's HTTP client, one with DefaultTimeout when unset.
 func (c *Client) HTTPClient() *http.Client {
+	if c.HTTP != nil {
+		return c.HTTP
+	}
+	return boundedHTTP
+}
+
+// streamClient is HTTPClient without the default timeout, for the long-lived event stream.
+func (c *Client) streamClient() *http.Client {
 	if c.HTTP != nil {
 		return c.HTTP
 	}
@@ -185,7 +198,7 @@ func (c *Client) stream(ctx context.Context, last *int64, out chan<- ClientMsg) 
 	}
 	r.Header.Set("Accept", "text/event-stream")
 	r.Header.Set("Last-Event-ID", strconv.FormatInt(*last, 10))
-	res, err := c.HTTPClient().Do(r)
+	res, err := c.streamClient().Do(r)
 	if err != nil {
 		return false, err
 	}
