@@ -25,7 +25,7 @@ func frameTick() tea.Cmd {
 
 // animating reports whether anything on screen moves: a session working or a tool running.
 func (m chatView) animating() bool {
-	if m.welcome != welcomeOff || m.shimmer > 0 || m.mo.moving() || m.vb.moving() || m.homeIn.moving() && m.fresh() {
+	if m.welcome != welcomeOff || m.shimmer > 0 || m.vb.moving() || m.homeIn.moving() && m.fresh() {
 		return true
 	}
 	for _, s := range m.sessions {
@@ -420,9 +420,6 @@ func (m chatView) overBox(screen []string, box []string, w int) []string {
 		bw = ansi.StringWidth(box[0])
 	}
 	x, y := (w-bw)/2, max(min(len(screen)*120/800, len(screen)-len(box)-1), 1)
-	if m.mo.shown == m.overlay {
-		y = max(min(y+m.mo.lift(), len(screen)-len(box)), y)
-	}
 	sh := t.Shade()
 	for i, b := range box {
 		if y+i >= len(out) {

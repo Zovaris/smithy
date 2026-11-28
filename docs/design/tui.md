@@ -26,7 +26,7 @@ glyphs:
   nerd: optional, never required
 spacing: {gutter: 2, indent: 3, pad-x: 1, turn-gap: 1, chip-gap: 1, sidebar: 38}   # cells
 rounded: 0
-motion: {spinner: 80ms, spring: {model: harmonica, damping: "near critical"}, modal: ~180ms, value: ~180ms}
+motion: {spinner: 80ms, spring: {model: harmonica, damping: "near critical"}, modal: none, value: ~180ms}
 ---
 
 # smithy TUI design: Slab
@@ -180,7 +180,7 @@ Border rule underlines a modal group heading. No box-drawing characters anywhere
 | Where | Timing | What moves |
 |---|---|---|
 | Spinner | 80ms per frame, `Theme.Spinner(frame)` | braille, ASCII `\|/-\` |
-| Modal open / close | ~180ms harmonica spring, near critical damping | panel rises and reveals |
+| Modal open / close | none | the panel appears and goes at once (the web keeps its own) |
 | `‹ value ›`, meters | ~180ms spring | value eases to target |
 
 Motion never delays input. `ui.reduce_motion`, `--no-anim` or `SMITHY_REDUCE_MOTION`: no springs,
@@ -208,7 +208,7 @@ Status vocabulary, the only one: `▪` state mark (Ok, Warn, Err, Dim), `▫` of
 | Input | Focus band, Accent rail, Accent `›`; chips: agent, model, effort (Accent), queued (Warn); tokens right | focus; disabled Dim prompt while a modal is open |
 | Footer | keys in Text, labels Dim, three spaces apart, no backgrounds; right: mode chip, Accent `ctrl+k palette` chip | default; select mode (Warn) |
 | Sidebar | 38 cols Raised; title Strong bold; headings Accent bold; meter Accent / Overlay; spend label Muted, value Strong; links `▪ PR #n title` + `ci ✓ · state`; a links error is one Muted line, e.g. `links paused: GitHub rate limit, retry 14:05`, never the raw error | default only |
-| Modal | Raised body, full-width Accent title bar (title Surface bold, `esc` right), shade, dim backdrop | open, closing (spring) |
+| Modal | Raised body, full-width Accent title bar (title Surface bold, `esc` right), shade, dim backdrop | open |
 | /config | `/ filter` on Focus; a curated list of about 20 settings with human labels (Theme, Transcript, Sidebar, Effort, Tend, Serve…) in Look, Agent, Tend, Serve, Notify, then `Advanced (N)` collapsed; filtering searches all of them; booleans read on/off; the config key shows only in the description footer | focus row: Focus bg, rail, every option as a chip, `‹ value ›`; changed Accent `•`; theme row as accent swatches |
 | /usage | period chips; tiles spent, runs, tokens out, cache read on Overlay with coloured top tick; 30-day Accent bars (today Strong); by agent and by model with cost bars; no-agent group last, Muted italic; token bar cache Warn, in Info, out Ok | active period Accent chip |
 | Doctor | same modal frame, one row per check in the status vocabulary | ok, warn, failed |

@@ -2,21 +2,21 @@
 
      
      new session
-     
-     
-   ┃ Add usage-limit detection for Pi (TK-6).                                              ✓ 0.0s
-   │                                                                                          
-   ✓ ▪  › Agents · 1 running · 3 sessions                                                esc     
-   │                                                                                          
-   │ P   This project                                                                         of
-   │ a▌  ✓  › TK-6  TK-6 · turn                                                         done  
-   │     ▪  TK-29  TK-29 · running                                                       now  
-   ✓ ▪   ✗  TES-9  TES-9 · failed                                                     failed  .5s
-   │                                                                                          
-   │ D   Waiting on you  1                                                                    
-   │     ?  Merge #142 into release/v0.17?  merge · later                                     
                                                                                               
-        ↑↓ move   enter open   s stop   n new session   a all   tab close                     
+        › Agents · 1 running · 3 sessions                                                esc  
+   ┃ A                                                                                        .0s
+   │     This project                                                                         
+   ✓ ▪▌  ✓  › TK-6  TK-6 · turn                                                         done     
+   │     ▪  TK-29  TK-29 · running                                                       now  
+   │ P   ✗  TES-9  TES-9 · failed                                                     failed  of
+   │ a                                                                                        
+   │     Waiting on you  1                                                                    
+   ✓ ▪   ?  Merge #142 into release/v0.17?  merge · later                                     .5s
+   │                                                                                          
+   │ D  ↑↓ move   enter open   s stop   n new session   a all   tab close                     
+   │ 
+
+
 
 
 

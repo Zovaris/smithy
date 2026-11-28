@@ -100,10 +100,7 @@ func (m chatView) usageBox(screen []string, w, h int) []string {
 	}
 	r := *m.usage
 	p := usagePeriod(r, m.pal.sel)
-	grow := m.mo.pos
-	if m.mo.shown != overlayUsage {
-		grow = 1
-	}
+	grow := 1.0
 	out = append(out, m.usageTiles(r, p, bw)...)
 	out = append(out, row(""))
 	out = append(out, m.usageDays(r, bw, grow)...)

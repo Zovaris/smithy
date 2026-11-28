@@ -173,7 +173,6 @@ type chatView struct {
 	tendPRs   int              // the PRs it tends
 	frame     int              // motion frame, advanced only while something runs
 	ticking   bool             // a frame tick is scheduled
-	mo        motion           // the spring that lifts an overlay in as it opens
 	vb        valueBump        // the setting value that just changed, settling
 	usage     *events.Report   // /usage's report, nil while it loads
 	cfgAdv    bool             // /config shows its Advanced settings
@@ -561,7 +560,6 @@ func (m *chatView) push(c chatMsg) {
 func (m chatView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	n, cmd := m.update(msg)
 	m = n.(chatView)
-	m.mo = m.mo.follow(m.overlay, m.still)
 	if k, ok := msg.(tea.KeyPressMsg); ok && (k.String() == "ctrl+k" || k.String() == "ctrl+l") {
 		cmd = tea.Batch(cmd, tea.ClearScreen)
 	}
@@ -584,7 +582,7 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case chatFrameMsg:
 		m.frame++
-		m.mo, m.vb, m.homeIn = m.mo.step(), m.vb.step(), m.homeIn.step()
+		m.vb, m.homeIn = m.vb.step(), m.homeIn.step()
 		m.shimmer = max(m.shimmer-1, 0)
 		for i := max(len(m.msgs)-8, 0); i < len(m.msgs); i++ {
 			if c := m.msgs[i]; c.tool != nil && c.tool.Status == "running" {
@@ -627,10 +625,6 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case usageMsg:
 		m.usage = &msg.r
-		m.mo.pos, m.mo.vel = min(m.mo.pos, 0.3), 0
-		if m.still {
-			m.mo.pos = 1
-		}
 		return m, nil
 	case settingsDoneMsg:
 		if msg.tend != nil {

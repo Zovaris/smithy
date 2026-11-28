@@ -66,3 +66,21 @@ func TestEveryListWrapsAround(t *testing.T) {
 		}
 	}
 }
+
+func TestModalsOpenAndCloseWithoutMotion(t *testing.T) {
+	m := framedChat("steel", 100)
+	m.still = false
+	m = sendKey(typeIn(m, "/theme"), ckey("enter"))
+	if m.animating() {
+		t.Fatal("a modal opens at rest: no entrance frames")
+	}
+	at := screen(m)
+	m = chatStep(m, chatFrameMsg{})
+	if screen(m) != at {
+		t.Fatal("the modal does not move after it opens")
+	}
+	m = sendKey(m, ckey("esc"))
+	if m.animating() {
+		t.Fatal("a modal closes at once")
+	}
+}
