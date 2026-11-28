@@ -16,7 +16,9 @@ const sid = (id: string) => "/v1/sessions/" + encodeURIComponent(id);
 export const setSessionModel = (id: string, model: string, effort: string): Promise<Sess> => call("PUT", sid(id) + "/model", { model, effort });
 export const addLink = (id: string, ref: string) => call("POST", sid(id) + "/links", { ref });
 export const setSessionGoal = (id: string, goal: string): Promise<Sess> => call("PUT", sid(id) + "/goal", { goal });
-export const runShell = (id: string, cmd: string): Promise<{ output: string; code: number; error?: string; lines?: { text: string; err?: boolean }[]; took_ms?: number }> => call("POST", sid(id) + "/shell", { cmd });
+// runShell runs `!cmd` in the session folder; the run comes back and reaches every client as a
+// session_shell event.
+export const runShell = (id: string, cmd: string): Promise<import("./store").Shell> => call("POST", sid(id) + "/shell", { cmd });
 
 export async function uploadImage(f: Blob): Promise<string> {
   if (f.size > 32 << 20) throw new Error("image over 32 MiB");

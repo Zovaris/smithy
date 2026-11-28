@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../lib/actions", () => ({
   tokenUsage: async () => ({ session: none, today: one, week: one, all: one }),
-  runShell: async () => ({ output: "a\nb", code: 2, took_ms: 1500, lines: [{ text: "a" }, { text: "b", err: true }] }),
 }));
 
 const u = { input_tokens: 12000, output_tokens: 3400, cache_read_tokens: 56000, cache_write_tokens: 0, cost_usd: 1.25 };
@@ -11,7 +10,6 @@ const one = { total: u, agents: { claude: u, codex: { ...u, input_tokens: 1, cos
 
 const { loadUsage, usageInfo } = await import("./usage");
 const { took } = await import("./shellblock");
-const { shell } = await import("./slash");
 
 describe("/usage", () => {
   it("lays out each period with its agents and models, skipping empty ones", async () => {
@@ -30,9 +28,7 @@ describe("/usage", () => {
 });
 
 describe("!cmd", () => {
-  it("keeps stderr lines, exit code and time", async () => {
-    const x = await shell("s1", "false");
-    expect(x).toEqual({ cmd: "false", lines: [{ text: "a" }, { text: "b", err: true }], code: 2, error: undefined, took_ms: 1500 });
+  it("formats the run time", () => {
     expect(took(40)).toBe("40ms");
     expect(took(1500)).toBe("1.5s");
   });

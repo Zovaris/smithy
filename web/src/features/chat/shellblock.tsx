@@ -1,10 +1,11 @@
 // ShellBlock is a `!cmd` run in the chat, as the TUI draws it: the command, exit status and time on
-// one row, the output under a rule, muted, stderr tinted, folded after FOLD lines until opened.
+// one row, the output under a rule, muted, stderr tinted, folded after FOLD lines until opened; a
+// cut run ends, open, with one line saying the rest was cut.
 import { useState } from "preact/hooks";
+import type { Shell } from "../../lib/store";
 import "./shellblock.css";
 
-export type ShellLine = { text: string; err?: boolean };
-export type Shell = { cmd: string; lines: ShellLine[]; code: number; error?: string; took_ms?: number };
+export const CUT = "… the rest was cut (a run keeps 500 lines, 64 KiB)";
 
 export const FOLD = 20;
 
@@ -13,8 +14,10 @@ export const took = (ms = 0) => (ms < 1000 ? ms + "ms" : ms < 60000 ? (ms / 1000
 export default function ShellBlock({ x }: { x: Shell }) {
   const [open, setOpen] = useState(false);
   const all = x.lines.length ? x.lines : [{ text: "(no output)" }];
-  const folded = !open && all.length > FOLD + 2;
-  const shown = folded ? all.slice(0, FOLD) : all;
+  const folds = all.length > FOLD;
+  const folded = !open && folds;
+  const shown = folded ? all.slice(0, FOLD) : x.cut ? [...all, { text: CUT }] : all;
+  const more = all.length - FOLD;
   const status = x.error ? x.error : x.code ? "exit " + x.code : "ok";
   return (
     <div class="shell" role="group" aria-label={"Shell: " + x.cmd}>
@@ -25,9 +28,9 @@ export default function ShellBlock({ x }: { x: Shell }) {
         <span class={"m " + (x.error || x.code ? "fail" : "ok")}>{status}</span>
       </header>
       <pre class="out">{shown.map((l, i) => <span key={i} class={l.err ? "e" : undefined}>{l.text + "\n"}</span>)}</pre>
-      {all.length > FOLD + 2 && (
+      {folds && (
         <button type="button" class="more" aria-expanded={open} onClick={() => setOpen(!open)}>
-          {open ? "fold the output" : `… ${all.length - FOLD} more lines`}
+          {open ? "fold the output" : `… ${more} more line${more === 1 ? "" : "s"}`}
         </button>
       )}
     </div>
