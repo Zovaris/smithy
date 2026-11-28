@@ -588,7 +588,6 @@ func (m chatView) palItems() []palItem {
 		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Verbosity: " + m.mode.String(), hint: "minimal · expandable · verbose", key: "ctrl+o", run: cycle},
 		palItem{group: "ACTIONS", glyph: t.g.on, color: t.muted, label: "Agents panel", hint: "sessions and waiting items", key: "tab", run: agents},
 		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Board", hint: "the task files by status", key: "/board", run: func(m *chatView) tea.Cmd { n, c := m.openBoard(""); *m = n.(chatView); return c }},
-		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Workflows", hint: "scheduled runs: run now, on/off, history", key: "/workflows", run: func(m *chatView) tea.Cmd { n, c := m.openWorkflows(); *m = n.(chatView); return c }},
 		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Open the web UI", hint: "same sessions in the browser", key: "/web", run: func(m *chatView) tea.Cmd { _, c := m.openWeb(); return c }},
 		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Connect", hint: strings.TrimPrefix(m.server+" "+t.g.dot+" "+m.url, " "+t.g.dot+" "), key: "/connect", run: func(m *chatView) tea.Cmd { return m.showConnect() }},
 		palItem{group: "ACTIONS", glyph: t.g.dot, color: t.muted, label: "Daemon log", hint: fmt.Sprintf("%d events", len(m.noise)), key: "/log", run: func(m *chatView) tea.Cmd { m.showLog(); return nil }},
