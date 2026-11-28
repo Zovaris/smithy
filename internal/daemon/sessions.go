@@ -37,6 +37,7 @@ const (
 	KindSessionUsage   = "session_usage"
 	KindSessionStatus  = "session_status"
 	KindSessionModel   = "session_model"
+	KindSessionMail    = "session_mail"
 )
 
 const (
@@ -71,6 +72,7 @@ type Session struct {
 	Updated time.Time    `json:"updated"`
 	Usage   *usage.Usage `json:"usage,omitempty"`
 	PRs     []string     `json:"prs,omitempty"`
+	Parent  string       `json:"parent,omitempty"`
 }
 
 // ToolEvent is one finished tool call of a session.
@@ -113,6 +115,8 @@ type live struct {
 	asks     int
 	stopped  bool
 	lastDiff string
+	mail     []Mail
+	sent     []time.Time
 }
 
 var (
@@ -196,6 +200,8 @@ func (sv *Server) applySession(e store.Event) {
 		if json.Unmarshal(e.Data, &t) == nil {
 			sv.notePRsLocked(e.Session, t)
 		}
+	case KindSessionMail:
+		sv.applyMailLocked(e)
 	case KindSessionUsage:
 		var u usage.Usage
 		if l := sv.sessions[e.Session]; l != nil && json.Unmarshal(e.Data, &u) == nil {
@@ -270,6 +276,10 @@ func (sv *Server) StartSessionWith(agent, model, dir, msg, by string) (Session, 
 
 // StartSessionEffort is StartSessionWith with an effort for a CLI that takes one ("": agent.effort).
 func (sv *Server) StartSessionEffort(agent, model, effort, dir, msg, by string) (Session, error) {
+	return sv.newSession("", agent, model, effort, dir, msg, by)
+}
+
+func (sv *Server) newSession(parent, agent, model, effort, dir, msg, by string) (Session, error) {
 	if len(msg) > MaxMessage {
 		return Session{}, fmt.Errorf("%w: message over %d bytes", errBadRequest, MaxMessage)
 	}
@@ -327,8 +337,9 @@ func (sv *Server) StartSessionEffort(agent, model, effort, dir, msg, by string) 
 	if es, ok := r.(effortSetter); ok && effort != "" {
 		es.SetEffort(effort)
 	}
+	sv.setBus(r, id)
 	now := time.Now().UTC()
-	s := Session{ID: id, Agent: agent, Model: model, Effort: effort, Dir: d, Title: titleOf(msg), Status: StatusDone, Created: now, Updated: now}
+	s := Session{ID: id, Agent: agent, Model: model, Effort: effort, Dir: d, Title: titleOf(msg), Status: StatusDone, Created: now, Updated: now, Parent: parent}
 	ctx, cancel := context.WithCancel(sv.ctx())
 	l := &live{s: s, runner: r, inbox: make(chan string, MaxQueued), cancel: cancel, done: make(chan struct{})}
 	sv.mu.Lock()
@@ -396,6 +407,7 @@ func (sv *Server) SendSession(id, msg, by string) error {
 		if es, ok := r.(effortSetter); ok && effort != "" {
 			es.SetEffort(effort)
 		}
+		sv.setBus(r, id)
 		sv.mu.Lock()
 		if l.runner == nil || l.stopped {
 			ctx, cancel := context.WithCancel(sv.ctx())
@@ -779,6 +791,17 @@ func (sv *Server) listSessions(w http.ResponseWriter, r *http.Request) {
 	}
 	l.LastAgent, l.LastModel = sv.Defaults()
 	writeJSON(w, 200, l)
+}
+
+func (sv *Server) sessionMail(w http.ResponseWriter, r *http.Request) {
+	sv.mu.Lock()
+	ok := sv.sessions[r.PathValue("id")] != nil
+	sv.mu.Unlock()
+	if !ok {
+		sessionErr(w, errNoSession)
+		return
+	}
+	writeJSON(w, 200, sv.Mail(r.PathValue("id")))
 }
 
 func (sv *Server) getSession(w http.ResponseWriter, r *http.Request) {

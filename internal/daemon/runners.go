@@ -108,8 +108,13 @@ func (s *apiSink) Usage(u usage.Usage) { s.e.Usage(u) }
 type cliRunner struct {
 	exe, agent, model, dir, sdir string
 	effort                       string
+	busID, busKey                string
 	n                            int
 }
+
+// SetBus gives the turns the session's id and bus key (SMITHY_SESSION, SMITHY_SESSION_KEY) for
+// the smithy MCP server's send, inbox and start tools.
+func (r *cliRunner) SetBus(id, key string) { r.busID, r.busKey = id, key }
 
 func (r *cliRunner) Close() {}
 
@@ -161,6 +166,9 @@ func (r *cliRunner) env() []string {
 	}
 	if r.effort != "" {
 		env = append(env, "AGENT_EFFORT="+r.effort)
+	}
+	if r.busKey != "" {
+		env = append(env, "SMITHY_SESSION="+r.busID, "SMITHY_SESSION_KEY="+r.busKey)
 	}
 	if r.agent == "claude" {
 		env = append(env, "AGENT_ARGS=--output-format stream-json --verbose --append-system-prompt "+quoteArg(SystemPrompt(r.agent, false)))

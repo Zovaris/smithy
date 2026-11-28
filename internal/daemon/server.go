@@ -111,6 +111,7 @@ type Server struct {
 	lastSeq    int64
 	wake       chan struct{}
 	sessions   map[string]*live
+	busKeys    map[string]string
 	lastAgent  string
 	lastModel  string
 	starting   int
@@ -160,7 +161,7 @@ func (sv *Server) apply(e store.Event) {
 		}
 	case KindIntake:
 		sv.applyIntake(e.Data)
-	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool:
+	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool, KindSessionMail:
 		sv.applySession(e)
 	case KindRouted:
 		var r struct{ ID string }
@@ -324,6 +325,10 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("POST /v1/sessions/{id}/messages", sv.sendSession)
 	mux.HandleFunc("POST /v1/sessions/{id}/stop", sv.stopSession)
 	mux.HandleFunc("PUT /v1/sessions/{id}/model", sv.setSessionModel)
+	mux.HandleFunc("GET /v1/sessions/{id}/mail", sv.sessionMail)
+	mux.HandleFunc("POST /v1/bus/send", sv.busSend)
+	mux.HandleFunc("GET /v1/bus/inbox", sv.busInbox)
+	mux.HandleFunc("POST /v1/bus/start", sv.busStart)
 	mux.HandleFunc("GET /v1/projects", sv.listProjects)
 	mux.HandleFunc("POST /v1/projects", sv.addProject)
 	mux.HandleFunc("DELETE /v1/projects", sv.removeProject)
