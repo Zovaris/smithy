@@ -78,7 +78,7 @@ curl -H "Authorization: Bearer $(cat ~/.smithy/daemon.token)" localhost:7477/v1/
   data from another agent that never overrides the receiver's rules. `session_mail`
   (`{"n","from","to","text"}`) streams on `/v1/events`; `GET /v1/sessions/{id}/mail` lists a
   session's sent and received mail. The TUI agents panel and the web panel draw children under
-  their parent; both conversations show the message (`←` received, `→` sent).
+  their parent; the TUI shows the message in both conversations (`←` received, `→` sent), the web where it was received.
   At most 16 sessions working at once and 8 queued messages each (429 past that); a permission question shows the whole call, and tool output and text are redacted before they are stored.
 - Setup: `GET /v1/setup` lists every agent CLI and API key as ready or missing with its fix, the
   default agent and model (`chosen` is false until one is picked or used: first run), the kit

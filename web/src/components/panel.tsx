@@ -45,11 +45,11 @@ function Tend({ store }: { store: Store }) {
 
 const live = (s: Sess) => s.status === "working" || s.status === "needs_you";
 
-function Row({ s, here, depth = 0 }: { s: Sess; here: boolean; depth?: number }) {
+function Row({ s, here }: { s: Sess; here: boolean }) {
   return (
     <a class="row2" href={href({ name: "session", id: s.id })} aria-current={here ? "page" : undefined}>
       <div class="top2">
-        <span class="tt1">{depth > 0 && <span class="t3 mono" aria-label={"child of " + s.parent}>{"\u00a0\u00a0".repeat(depth - 1) + "└ "}</span>}{s.title}</span>
+        <span class="tt1">{s.parent ? "└ " : ""}{s.title}</span>
         <span class="sp" />
         <St s={s.status} />
       </div>
@@ -76,9 +76,9 @@ export default function AgentsPanel({ store, project, cur, host }: { store: Stor
         <div class="card">
           {!running.length && <p class="hint">No agent is working right now. <a href="#/new">Start one</a>.</p>}
           {!!mine.length && <div class="sub">{pname}</div>}
-          {tree(mine).map(({ s, depth }) => <Row s={s} here={s.id === cur} depth={depth} />)}
+          {tree(mine).map((s) => <Row s={s} here={s.id === cur} />)}
           {!!other.length && !!mine.length && <div class="sub">Elsewhere</div>}
-          {tree(other).map(({ s, depth }) => <Row s={s} here={s.id === cur} depth={depth} />)}
+          {tree(other).map((s) => <Row s={s} here={s.id === cur} />)}
         </div>
       </section>
       {!!waiting.length && (
