@@ -3,8 +3,11 @@ package workflow
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 )
+
+var labelRe = regexp.MustCompile(`^[A-Za-z0-9 ._:/-]{1,50}$`)
 
 // GitHub events a schedule can start on, polled with gh in the schedule's dir.
 const (
@@ -89,8 +92,8 @@ func (s Schedule) Validate() error {
 		switch g.Event {
 		case EventDependabot, EventPRRed:
 		case EventIssue:
-			if g.Label == "" {
-				return fmt.Errorf("schedule %s: %s needs a label", s.Name, EventIssue)
+			if !labelRe.MatchString(g.Label) {
+				return fmt.Errorf("schedule %s: %s needs a label of letters, digits, spaces and . _ : / -", s.Name, EventIssue)
 			}
 		default:
 			return fmt.Errorf("schedule %s: github event is %s, %s or %s", s.Name, EventDependabot, EventPRRed, EventIssue)

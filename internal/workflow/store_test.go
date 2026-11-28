@@ -72,6 +72,7 @@ func TestScheduleValidate(t *testing.T) {
 		`{"name":"x","workflow":"../y","cron":"@daily"}`,
 		`{"name":"x","workflow":"hello","github":{"event":"push"}}`,
 		`{"name":"x","workflow":"hello","github":{"event":"issue_labeled"}}`,
+		`{"name":"x","workflow":"hello","github":{"event":"issue_labeled","label":"bug'; rm -rf ~"}}`,
 		`{"name":"x","workflow":"hello","cron":"bad"}`,
 	}
 	for _, b := range bad {
@@ -159,7 +160,22 @@ func TestMigrate(t *testing.T) {
 	if s.HookToken("dep") != "tok-old-123456" {
 		t.Fatal("token lost")
 	}
+	s2 := Store{Dir: t.TempDir()}
+	old2 := []byte(`{"name":"z","schedule":"@daily","webhook":true,"steps":[{"id":"a","kind":"run","run":"ls"}]}`)
+	os.WriteFile(filepath.Join(s2.Dir, "z.json"), old2, 0o600)
+	os.MkdirAll(filepath.Join(s2.Dir, "schedules"), 0o700)
+	os.WriteFile(filepath.Join(s2.Dir, "schedules", "z-webhook.json"), []byte(`{"name":"z-webhook","workflow":"z","webhook":true}`), 0o600)
+	b2, _ := json.Marshal(state{Enabled: map[string]string{"z": hash(old2)}})
+	os.WriteFile(filepath.Join(s2.Dir, "state.json"), b2, 0o600)
+	s2.Migrate(time.Now())
+	for _, in := range must(s2.Schedules()) {
+		if in.Name == "z-webhook" && in.Enabled {
+			t.Fatal("migrate enabled a schedule file it did not write")
+		}
+	}
 	if again := s.Migrate(time.Now()); len(again) != 0 {
 		t.Fatal("migrate twice")
 	}
 }
+
+func must[T any](v T, _ error) T { return v }

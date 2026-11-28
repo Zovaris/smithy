@@ -568,11 +568,12 @@ func (s Store) Migrate(now time.Time) []string {
 		sc := Schedule{Name: n, Workflow: n}
 		_ = json.Unmarshal(cronRaw, &sc.Cron)
 		_ = json.Unmarshal(hookRaw, &sc.Webhook)
+		wroteHook := false
 		if sc.Cron != "" && sc.Webhook {
 			sc.Webhook = false
 			hook := Schedule{Name: n + "-webhook", Workflow: n, Webhook: true}
 			if _, _, err := s.GetSchedule(hook.Name); err != nil && hook.Validate() == nil {
-				_ = s.SaveSchedule(hook)
+				wroteHook = s.SaveSchedule(hook) == nil
 			}
 		}
 		delete(raw, "schedule")
@@ -604,7 +605,7 @@ func (s Store) Migrate(now time.Time) []string {
 		}
 		if wasOn {
 			_ = s.EnableSchedule(n, now)
-			if _, _, err := s.GetSchedule(n + "-webhook"); err == nil {
+			if wroteHook {
 				_ = s.EnableSchedule(n+"-webhook", now)
 			}
 		}
