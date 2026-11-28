@@ -4,6 +4,7 @@ package daemon
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -33,5 +34,29 @@ func TestOpencodeStreamReportsToolsOnceAndOneReply(t *testing.T) {
 	}
 	if o.line([]byte("> build · hy4-flash-free\n"), r) {
 		t.Fatal("plain lines are left to the caller")
+	}
+}
+
+func TestOpencodeStreamKeepsTheErrorEvent(t *testing.T) {
+	o, r := &opencodeStream{}, &streamEmit{}
+	l := `{"type":"error","error":{"type":"provider.free-limit","message":"Free usage limit reached. Connect a provider or subscribe to OpenCode Go to keep going, or switch models.","status":429}}`
+	if !o.line([]byte(l), r) {
+		t.Fatal("error event not taken")
+	}
+	if !strings.HasPrefix(o.err, "Free usage limit reached.") {
+		t.Fatalf("err = %q", o.err)
+	}
+}
+
+func TestTurnErrorNamesTheRealCauseOnce(t *testing.T) {
+	stderr := "smithy agent: opencode has no effort flag; it runs at its own default (AGENT_EFFORT=medium is set)\nsmithy agent: pool: none\n"
+	if got := turnError(stderr, "Free usage limit reached.", errors.New("exit status 1")).Error(); got != "smithy agent: Free usage limit reached." {
+		t.Errorf("stream error first: %q", got)
+	}
+	if got := turnError("smithy agent: boom\n", "", errors.New("exit status 1")).Error(); got != "smithy agent: boom" {
+		t.Errorf("no double prefix: %q", got)
+	}
+	if got := turnError("", "", errors.New("exit status 1")).Error(); got != "smithy agent: exit status 1" {
+		t.Errorf("fallback: %q", got)
 	}
 }

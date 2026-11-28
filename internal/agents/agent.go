@@ -764,9 +764,6 @@ func Run(o Options) int {
 		}
 		prompt = strings.TrimRight(string(b), "\n")
 	}
-	if cli != "custom" && !EffortFlags[Kind(cli)] {
-		fmt.Fprintf(os.Stderr, "smithy agent: %s has no effort flag; it runs at its own default (AGENT_EFFORT=%s is set)\n", cli, o.Effort)
-	}
 	if o.Inject == nil {
 		in, err := RunKit(cli, o, os.Getenv)
 		if err != nil {
