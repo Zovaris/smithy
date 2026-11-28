@@ -997,10 +997,10 @@ func (m chatView) View() tea.View {
 	if items := m.popup(); len(items) > 0 {
 		pw := min(w-2*m.pad(), 72)
 		pr := m.popupRows(items, pw)
-		for i, r := range pr {
-			if j := len(body) - len(pr) + i; j >= 0 {
-				body[j] = splice(body[j], r, m.pad(), w)
-			}
+		n := min(len(pr), len(body))
+		body = body[n:]
+		for _, r := range pr[len(pr)-n:] {
+			body = append(body, splice("", r, m.pad(), w))
 		}
 	}
 	out = append(out, m.besideSide(body)...)
