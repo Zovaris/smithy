@@ -60,6 +60,38 @@ var Examples = map[string]string{
 `,
 }
 
+// ExampleShipFix is the "ship a fix" example: an agent fixes, the tests loop until green, a
+// judge reviews the diff, you approve, and the PR opens.
+const exampleShipFix = `{
+  "name": "ship-a-fix",
+  "description": "An agent fixes the bug you describe, tests loop until green (3 tries), a judge reviews the diff, you approve, then the PR opens.",
+  "dir": "",
+  "allow_write": true,
+  "inputs": {"bug": ""},
+  "vars": {"test": "go test ./..."},
+  "max_minutes": 45,
+  "max_agents": 5,
+  "max_cost_usd": 3,
+  "steps": [
+    {"id": "given", "kind": "if", "if": {"value": "{{inputs.bug}}", "match": "\\S"}, "else": "stop"},
+    {"id": "branch", "kind": "run", "run": "git switch -c \"fix/workflow-$(date +%Y%m%d%H%M%S)\""},
+    {"id": "green", "kind": "loop", "max": 3, "until": {"step": "test", "exit": 0}, "do": [
+      {"id": "fix", "kind": "agent", "write": true, "timeout": "15m",
+       "prompt": "Fix this bug in the repo, with a regression test, and commit it: {{inputs.bug}}\n\nThe last test run said:\n{{steps.test.output}}"},
+      {"id": "test", "kind": "run", "run": "sh -c \"$SMITHY_VAR_test\"", "timeout": "10m"}
+    ]},
+    {"id": "diff", "kind": "run", "run": "git diff HEAD~1 --stat && git diff HEAD~1"},
+    {"id": "review", "kind": "judge", "subject": "{{steps.diff.output}}", "pass": 0.7,
+     "criteria": ["fixes the bug described: {{inputs.bug}}", "adds a test that fails without the fix", "changes nothing unrelated"]},
+    {"id": "ok", "kind": "ask", "question": "Open a PR for the fix? Review: {{steps.review.answer}}. {{steps.review.why}}", "options": ["yes", "no"], "timeout": "24h"},
+    {"id": "open", "kind": "github", "action": "pr", "when": {"step": "ok", "equals": "yes"},
+     "title": "fix: {{inputs.bug}}", "body": "Opened by the ship-a-fix workflow.\n\nReview: {{steps.review.why}}"}
+  ]
+}
+`
+
+func init() { Examples["ship-a-fix"] = exampleShipFix }
+
 // ExampleSchedules attach the examples to their triggers; they are added disabled.
 var ExampleSchedules = map[string]string{
 	"dependabot-daily": `{"name": "dependabot-daily", "workflow": "dependabot-daily", "description": "Every day at 17:00.", "cron": "0 17 * * *"}`,
