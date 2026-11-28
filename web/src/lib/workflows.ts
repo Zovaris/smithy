@@ -23,6 +23,19 @@ export type Step = {
   title?: string;
   message?: string;
   workflow?: string;
+  subject?: string;
+  criteria?: string[];
+  until?: Cond;
+  max?: number;
+  task?: string;
+  method?: string;
+  url?: string;
+  branches?: Step[][];
+  for?: string;
+  check?: string;
+  action?: string;
+  pr?: string;
+  op?: string;
 };
 export type StepResult = {
   id: string;
@@ -119,7 +132,18 @@ export function summary(s: Step): string {
     ask: s.question ?? "",
     notify: `${s.title ?? ""}: ${s.message ?? ""}`,
     call: s.workflow ?? "",
+    judge: `${s.subject} against ${s.criteria?.length ?? 0} criteria`,
+    loop: `${s.do?.length ?? 0} steps until ${c(s.until)}`,
+    session: s.prompt ?? "",
+    smelt: s.task ?? "",
+    warden: s.task ?? "",
+    http: `${(s.method || "GET").toUpperCase()} ${s.url}`,
+    parallel: `${s.branches?.length ?? 0} branches`,
+    wait: s.for || s.check || "",
+    github: `${s.action} ${s.pr ?? ""}`.trim(),
+    file: `${s.op} ${s.path}`,
   };
+  if (s.kind === "agent" && s.items) by.agent = `each of ${s.items}: ${by.agent}`;
   return one((by[s.kind] ?? "") + (s.when ? ` (when ${c(s.when)})` : ""), 100);
 }
 
@@ -132,6 +156,9 @@ export function result(s: StepResult): string {
   if (s.kind === "run") return `exit ${s.exit} · ${one(s.output)}`;
   return one(s.output);
 }
+
+// opensSession says whether a step's output is the id of the chat session it started.
+export const opensSession = (s: StepResult) => ["session", "smelt", "warden"].includes(s.kind) && !!s.output && !s.error;
 
 // ms is a step's duration, short.
 export const ms = (n: number) => (n < 1000 ? `${n}ms` : n < 60000 ? `${(n / 1000).toFixed(1)}s` : `${Math.round(n / 60000)}m`);
