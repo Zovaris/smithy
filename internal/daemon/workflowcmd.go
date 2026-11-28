@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -18,22 +19,26 @@ import (
 )
 
 // WorkflowUsage is the text for `smithy workflow --help`.
-const WorkflowUsage = `usage: smithy workflow list [--json] | show <name> | run <name> | history <name> [--json] [--limit <n>]
-                      | enable <name> | disable <name> | add <file> | example
-Scheduled workflows the daemon runs: a cron schedule plus ordered steps (run a shell command, ask
-an agent, branch on a result, notify you). Files are JSON in ~/.smithy/workflows.
-  list      every workflow: enabled, schedule, next and last run
+const WorkflowUsage = `usage: smithy workflow list [--json] | show <name> | run <name> [--input k=v]... | history <name> [--json] [--limit <n>]
+                      | enable <name> | disable <name> | add <file> | validate <file|name> | example [<name>] | hook <name>
+Workflows the daemon runs: triggers (a cron schedule, by hand, a webhook) and steps that compose:
+run, agent, if, switch, set, json, foreach, ask, notify, call. Every step takes when, timeout,
+retry and on_error. Files are JSON in ~/.smithy/workflows (docs/workflows.md has the format).
+  list      every workflow: enabled, triggers, next and last run
   show      one workflow's steps
-  run       run it now, enabled or not (through the daemon when one runs, else here)
-  history   its newest runs with each step's output
-  enable    let it run on its schedule; pins the file as it is now, so a later change made
-            outside smithy stops it until you enable it again
-  disable   stop its schedule
+  run       run it now, enabled or not (through the daemon when one runs, else here; ask steps
+            need the daemon); --input sets one of its inputs
+  history   its newest runs with each step's input, output, duration and status
+  enable    let it run on its schedule and webhook; pins the file as it is now, so a later change
+            outside smithy (or a save from the web editor) stops it until you enable it again
+  disable   stop its schedule and webhook
   add       copy a workflow file (a repo's, say) into ~/.smithy/workflows, disabled
-  example   add the example: daily 17:00 Dependabot alerts, an agent's merge yes/no and why
+  validate  check a file, or a stored workflow, without running it
+  example   add the examples, disabled: dependabot-daily, repo-health, webhook-reply (or one)
+  hook      print an enabled webhook workflow's URL and token
 Steps run unattended: shell commands go through the guard (a blocked command fails the step),
-agents run read-only under smithy agent's auto profile (auto.sandbox, failing closed). Each
-run stops at max_minutes (30), max_agents (3) and max_cost_usd (1.00) unless the file sets them.`
+agents run read-only under smithy agent's auto profile (auto.sandbox, failing closed). Each run
+stops at max_minutes (30), max_agents (3) and max_cost_usd (1.00) unless the file sets them.`
 
 // WorkflowMain runs `smithy workflow`.
 func WorkflowMain(args []string, stdout, stderr io.Writer) int {
@@ -46,6 +51,7 @@ func workflowMain(st workflow.Store, args []string, stdout, stderr io.Writer) in
 		return 0
 	}
 	asJSON, limit := false, 10
+	inputs := map[string]string{}
 	var rest []string
 	for i := 1; i < len(args); i++ {
 		switch a := args[i]; {
@@ -59,6 +65,14 @@ func workflowMain(st workflow.Store, args []string, stdout, stderr io.Writer) in
 				return 2
 			}
 			limit = n
+		case a == "--input" && i+1 < len(args):
+			i++
+			k, v, ok := strings.Cut(args[i], "=")
+			if !ok || k == "" {
+				fmt.Fprintln(stderr, "smithy workflow: --input takes name=value")
+				return 2
+			}
+			inputs[k] = v
 		default:
 			rest = append(rest, a)
 		}
@@ -84,7 +98,7 @@ func workflowMain(st workflow.Store, args []string, stdout, stderr io.Writer) in
 			return printJSON(stdout, l)
 		}
 		if len(l) == 0 {
-			fmt.Fprintln(stdout, "no workflows in "+st.Dir+" (smithy workflow example adds one)")
+			fmt.Fprintln(stdout, "no workflows in "+st.Dir+" (smithy workflow example adds three)")
 		}
 		for _, in := range l {
 			fmt.Fprintln(stdout, workflowLine(in))
@@ -99,13 +113,11 @@ func workflowMain(st workflow.Store, args []string, stdout, stderr io.Writer) in
 		if err != nil {
 			return fail(err)
 		}
-		fmt.Fprintf(stdout, "%s · %s\n", w.Name, w.Schedule)
+		fmt.Fprintf(stdout, "%s · %s\n", w.Name, triggers(w))
 		if w.Description != "" {
 			fmt.Fprintln(stdout, w.Description)
 		}
-		for i, s := range w.Steps {
-			fmt.Fprintf(stdout, "%2d. %-6s %-10s %s\n", i+1, s.Kind, s.ID, stepSummary(s))
-		}
+		printSteps(stdout, w.Steps, "")
 		return 0
 	case "history":
 		name, ok := needName()
@@ -124,9 +136,7 @@ func workflowMain(st workflow.Store, args []string, stdout, stderr io.Writer) in
 		}
 		for _, r := range h {
 			fmt.Fprintln(stdout, runLine(r))
-			for _, s := range r.Steps {
-				fmt.Fprintf(stdout, "  %-10s %s\n", s.ID, stepResultLine(s))
-			}
+			printResults(stdout, r.Steps, "  ")
 		}
 		return 0
 	case "enable", "disable":
@@ -156,18 +166,67 @@ func workflowMain(st workflow.Store, args []string, stdout, stderr io.Writer) in
 		}
 		fmt.Fprintf(stdout, "added %s (disabled; smithy workflow enable %s)\n", w.Name, w.Name)
 		return 0
-	case "example":
-		tmp := filepath.Join(os.TempDir(), fmt.Sprintf("smithy-workflow-example-%d.json", os.Getpid()))
-		if err := os.WriteFile(tmp, []byte(workflow.Example), 0o600); err != nil {
-			return fail(err)
+	case "validate":
+		if len(rest) != 1 {
+			fmt.Fprintln(stderr, "smithy workflow validate: needs a file or a workflow name")
+			return 2
 		}
-		defer os.Remove(tmp)
-		w, err := st.Add(tmp)
+		var err error
+		if b, rerr := os.ReadFile(rest[0]); rerr == nil {
+			_, err = workflow.Parse(b)
+		} else {
+			_, _, err = st.Get(rest[0])
+		}
 		if err != nil {
 			return fail(err)
 		}
-		fmt.Fprintf(stdout, "added %s, disabled: set \"dir\" to a repo checkout in %s, then smithy workflow enable %s\n",
-			w.Name, filepath.Join(st.Dir, w.Name+".json"), w.Name)
+		fmt.Fprintln(stdout, "valid")
+		return 0
+	case "example":
+		names := workflow.ExampleNames()
+		if len(rest) == 1 {
+			if _, ok := workflow.Examples[rest[0]]; !ok {
+				return fail(fmt.Errorf("no example %q (%s)", rest[0], strings.Join(names, ", ")))
+			}
+			names = rest
+		}
+		code := 0
+		for _, n := range names {
+			tmp := filepath.Join(os.TempDir(), fmt.Sprintf("smithy-workflow-%s-%d.json", n, os.Getpid()))
+			if err := os.WriteFile(tmp, []byte(workflow.Examples[n]), 0o600); err != nil {
+				return fail(err)
+			}
+			w, err := st.Add(tmp)
+			os.Remove(tmp)
+			if err != nil {
+				fmt.Fprintln(stderr, "smithy workflow:", text.Clean(err.Error()))
+				code = 1
+				continue
+			}
+			hint := "then smithy workflow enable " + w.Name
+			if w.Dir == "" && w.Schedule != "" {
+				hint = `set "dir" to a repo checkout in ` + filepath.Join(st.Dir, w.Name+".json") + ", " + hint
+			}
+			fmt.Fprintf(stdout, "added %s, disabled: %s\n", w.Name, hint)
+		}
+		return code
+	case "hook":
+		name, ok := needName()
+		if !ok {
+			return 2
+		}
+		w, on, err := st.Load(name)
+		if err != nil {
+			return fail(err)
+		}
+		if !w.Webhook || !on {
+			return fail(fmt.Errorf("%s needs \"webhook\": true and an enable first", name))
+		}
+		base := "http://127.0.0.1:<daemon port>"
+		if i := Running(); i != nil {
+			base = i.URL()
+		}
+		fmt.Fprintf(stdout, "POST %s/v1/hooks/workflows/%s\nX-Smithy-Hook: %s\nbody: a JSON object of inputs; the response holds the run's status and outputs\n", strings.TrimRight(base, "/"), name, st.HookToken(name))
 		return 0
 	case "run":
 		name, ok := needName()
@@ -175,7 +234,7 @@ func workflowMain(st workflow.Store, args []string, stdout, stderr io.Writer) in
 			return 2
 		}
 		if c, err := localClient(); err == nil {
-			if err := c.RunWorkflow(context.Background(), name, "cli"); err != nil {
+			if err := c.RunWorkflow(context.Background(), name, "cli", inputs); err != nil {
 				return fail(err)
 			}
 			fmt.Fprintf(stdout, "started %s on the daemon; smithy workflow history %s shows it\n", name, name)
@@ -183,11 +242,15 @@ func workflowMain(st workflow.Store, args []string, stdout, stderr io.Writer) in
 		}
 		sc := &workflow.Scheduler{Store: st, Env: workflow.Env{Shell: workflow.Shell, Agent: workflow.Agent, Guard: workflow.Guard,
 			Notify: func(_, title, msg string) error { fmt.Fprintf(stdout, "notify: %s\n%s\n", title, msg); return nil }}}
-		r, err := sc.RunNow(context.Background(), name, "cli")
+		r, err := sc.Start(context.Background(), name, workflow.Invocation{Trigger: "cli", Inputs: inputs})
 		if err != nil {
 			return fail(err)
 		}
 		fmt.Fprintln(stdout, runLine(r))
+		printResults(stdout, r.Steps, "  ")
+		for _, k := range sortedOut(r.Outputs) {
+			fmt.Fprintf(stdout, "output %s: %s\n", k, r.Outputs[k])
+		}
 		if r.Status != workflow.StatusOK {
 			return 1
 		}
@@ -195,6 +258,29 @@ func workflowMain(st workflow.Store, args []string, stdout, stderr io.Writer) in
 	}
 	fmt.Fprintf(stderr, "smithy workflow: unknown subcommand %q\n%s\n", args[0], WorkflowUsage)
 	return 2
+}
+
+func sortedOut(m map[string]string) []string {
+	k := make([]string, 0, len(m))
+	for x := range m {
+		k = append(k, x)
+	}
+	sort.Strings(k)
+	return k
+}
+
+func printSteps(w io.Writer, steps []workflow.Step, indent string) {
+	for i, s := range steps {
+		fmt.Fprintf(w, "%s%2d. %-7s %-10s %s\n", indent, i+1, s.Kind, s.ID, s.Summary())
+		printSteps(w, s.Do, indent+"    ")
+	}
+}
+
+func printResults(w io.Writer, rs []workflow.StepResult, indent string) {
+	for _, s := range rs {
+		fmt.Fprintf(w, "%s%-12s %-7s %6s  %s\n", indent, s.ID, s.Status, (time.Duration(s.DurationMS) * time.Millisecond).Round(time.Millisecond), s.Line())
+		printResults(w, s.Steps, indent+"  ")
+	}
 }
 
 func localClient() (*Client, error) {
@@ -212,6 +298,17 @@ func printJSON(w io.Writer, v any) int {
 	return 0
 }
 
+func triggers(w workflow.Workflow) string {
+	t := []string{"manual"}
+	if w.Schedule != "" {
+		t = append(t, w.Schedule)
+	}
+	if w.Webhook {
+		t = append(t, "webhook")
+	}
+	return strings.Join(t, " · ")
+}
+
 func workflowLine(in workflow.Info) string {
 	state := "off"
 	switch {
@@ -222,7 +319,7 @@ func workflowLine(in workflow.Info) string {
 	case in.Enabled:
 		state = "on"
 	}
-	line := fmt.Sprintf("%-24s %-7s %-14s", in.Name, state, in.Schedule)
+	line := fmt.Sprintf("%-24s %-7s %-22s", in.Name, state, triggers(in.Workflow))
 	if in.Next != nil {
 		line += " next " + in.Next.Format("Mon 15:04")
 	}
@@ -238,67 +335,13 @@ func workflowLine(in workflow.Info) string {
 	return line
 }
 
-func stepSummary(s workflow.Step) string {
-	switch s.Kind {
-	case workflow.KindRun:
-		return oneLineOf(s.Run, 70)
-	case workflow.KindAgent:
-		a := ""
-		if s.Answer != "" {
-			a = " (" + s.Answer + ")"
-		}
-		return oneLineOf(s.Prompt, 60) + a
-	case workflow.KindIf:
-		test := ""
-		switch {
-		case s.Exit != nil:
-			test = fmt.Sprintf("exit == %d", *s.Exit)
-		case s.Match != "":
-			test = "output ~ /" + s.Match + "/"
-		default:
-			test = "answer == " + s.Equals
-		}
-		return fmt.Sprintf("%s %s → %s, else %s", s.Step, test, orNext(s.Then), orNext(s.Else))
-	}
-	return oneLineOf(s.Title+": "+s.Message, 70)
-}
-
-func orNext(s string) string {
-	if s == "" {
-		return "next"
-	}
-	return s
-}
-
-func oneLineOf(s string, n int) string {
-	s = strings.Join(strings.Fields(s), " ")
-	if r := []rune(s); len(r) > n {
-		s = string(r[:n]) + "…"
-	}
-	return s
-}
-
 func runLine(r workflow.Record) string {
 	line := fmt.Sprintf("%s  %-7s %s %s", r.Started.Local().Format("2006-01-02 15:04"), r.Status, r.Trigger, r.Ended.Sub(r.Started).Round(time.Second))
 	if r.CostUSD > 0 {
 		line += fmt.Sprintf(" $%.2f", r.CostUSD)
 	}
 	if r.Error != "" {
-		line += " · " + oneLineOf(r.Error, 120)
+		line += " · " + text.Clean(r.Error)
 	}
 	return line
-}
-
-func stepResultLine(s workflow.StepResult) string {
-	switch {
-	case s.Error != "":
-		return "error: " + oneLineOf(s.Error, 100)
-	case s.Kind == workflow.KindIf:
-		return "→ " + s.Branch
-	case s.Answer != "":
-		return s.Answer + " " + oneLineOf(s.Why, 90)
-	case s.Kind == workflow.KindRun:
-		return fmt.Sprintf("exit %d · %s", s.Exit, oneLineOf(s.Output, 90))
-	}
-	return oneLineOf(s.Output, 100)
 }
