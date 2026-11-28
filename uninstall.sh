@@ -13,7 +13,7 @@ set -eu
 home=${SMITHY_HOME:-$HOME/.smithy}
 case ${XDG_DATA_HOME:-} in /*) data=$XDG_DATA_HOME/smithy ;; *) data=$HOME/.local/share/smithy ;; esac
 case ${XDG_BIN_HOME:-} in /*) bindir=$XDG_BIN_HOME ;; *) bindir=$HOME/.local/bin ;; esac
-known=" use-smithy smelt warden ledger scout tend hush simple "
+known=" use-smithy smelt warden ledger scout tend hush simple refine "
 marker='# smithy: run `smithy` from any terminal'
 yes=; purge=; confirm=
 for a in "$@"; do
