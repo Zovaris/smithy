@@ -3,9 +3,7 @@
 package daemon
 
 import (
-	"context"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/events"
@@ -20,11 +18,4 @@ func (sv *Server) tokenUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, events.Tally(es, time.Now(), r.URL.Query().Get("session")))
-}
-
-// Usage is GET /v1/usage: the token report for session ("" for none).
-func (c *Client) Usage(ctx context.Context, session string) (events.Report, error) {
-	var out events.Report
-	err := c.call(ctx, "GET", "/v1/usage?session="+url.QueryEscape(session), nil, &out)
-	return out, err
 }

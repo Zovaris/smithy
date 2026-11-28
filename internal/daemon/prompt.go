@@ -16,13 +16,6 @@ import (
 //go:embed prompt.md
 var systemBase string
 
-// PromptState says which file the system prompt's base text comes from: the user file at Path
-// when Active, else the default built into smithy.
-type PromptState struct {
-	Path   string `json:"path"`
-	Active bool   `json:"active"`
-}
-
 // PromptStatus is where the user's prompt file lives and whether it replaces the default.
 func PromptStatus() PromptState {
 	_, st := promptBase()

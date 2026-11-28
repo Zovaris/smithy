@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Zovaris/smithy/internal/api"
 	"net/http"
 	"strconv"
 	"strings"
@@ -31,24 +32,6 @@ var (
 	errBusKey    = errors.New("unknown session key")
 	errBusDenied = errors.New("not allowed")
 )
-
-// Mail is one message between two sessions of this daemon; N orders it (the store sequence).
-type Mail struct {
-	N    int64     `json:"n"`
-	From string    `json:"from"`
-	To   string    `json:"to"`
-	Text string    `json:"text"`
-	Time time.Time `json:"time"`
-}
-
-// BusStartReq is what a session asks for when it starts a child session.
-type BusStartReq struct {
-	Agent   string `json:"agent"`
-	Model   string `json:"model"`
-	Effort  string `json:"effort"`
-	Dir     string `json:"dir"`
-	Message string `json:"message"`
-}
 
 type busSetter interface{ SetBus(id, key string) }
 
@@ -283,15 +266,13 @@ func busErr(w http.ResponseWriter, err error) {
 	}
 }
 
-const busKeyHeader = "X-Smithy-Session-Key"
-
 func (sv *Server) busSend(w http.ResponseWriter, r *http.Request) {
 	var req struct{ To, Text string }
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, MaxMail+4<<10)).Decode(&req); err != nil {
 		writeJSON(w, 400, map[string]string{"error": "body must be {\"to\":…,\"text\":…}"})
 		return
 	}
-	m, err := sv.BusSend(r.Header.Get(busKeyHeader), req.To, req.Text)
+	m, err := sv.BusSend(r.Header.Get(api.BusKeyHeader), req.To, req.Text)
 	if err != nil {
 		busErr(w, err)
 		return
@@ -301,7 +282,7 @@ func (sv *Server) busSend(w http.ResponseWriter, r *http.Request) {
 
 func (sv *Server) busInbox(w http.ResponseWriter, r *http.Request) {
 	since, _ := strconv.ParseInt(r.URL.Query().Get("since"), 10, 64)
-	ms, err := sv.BusInbox(r.Header.Get(busKeyHeader), since)
+	ms, err := sv.BusInbox(r.Header.Get(api.BusKeyHeader), since)
 	if err != nil {
 		busErr(w, err)
 		return
@@ -315,7 +296,7 @@ func (sv *Server) busStart(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]string{"error": "body must be {\"agent\":…,\"dir\":…,\"message\":…}"})
 		return
 	}
-	s, err := sv.BusStart(r.Header.Get(busKeyHeader), req)
+	s, err := sv.BusStart(r.Header.Get(api.BusKeyHeader), req)
 	if err != nil && s.ID == "" {
 		busErr(w, err)
 		return

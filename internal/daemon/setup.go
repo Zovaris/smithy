@@ -22,30 +22,6 @@ import (
 	"github.com/Zovaris/smithy/internal/text"
 )
 
-// Setup is GET /v1/setup: what first run and the pickers show.
-type Setup struct {
-	Agents    []agents.Ready            `json:"agents"`
-	Default   AgentChoice               `json:"default"`
-	Chosen    bool                      `json:"chosen"` // false on first run: no agent picked or used yet
-	Kit       KitChoice                 `json:"kit"`
-	Skills    []string                  `json:"skills"` // installed skills the kit can link in
-	Paths     map[string]string         `json:"paths"`  // skill name to its SKILL.md, to invoke it from chat
-	Harnesses []agents.HarnessInventory `json:"harnesses"`
-	Effort    agents.EffortRules        `json:"effort"` // the CLIs that take effort and the levels a session may set
-}
-
-// AgentChoice is the agent (and model, for a CLI) new sessions start with.
-type AgentChoice struct {
-	Agent string `json:"agent"`
-	Model string `json:"model,omitempty"`
-}
-
-// KitChoice is what goes into every driven CLI (kit.mcp, kit.skills).
-type KitChoice struct {
-	MCP    bool     `json:"mcp"`
-	Skills []string `json:"skills"`
-}
-
 const skillsInstallTimeout = 3 * time.Minute
 
 func (sv *Server) ready() []agents.Ready {

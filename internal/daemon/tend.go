@@ -27,38 +27,6 @@ import (
 	"github.com/Zovaris/smithy/internal/text"
 )
 
-// TendRef is one PR to tend: a warden batch's (its card names the PR, its plan item the
-// worktree) or a chat session's (a pr create it ran printed the PR; Dir is the session's folder).
-type TendRef struct {
-	URL     string `json:"url"`
-	Batch   string `json:"batch"`
-	Item    string `json:"item"`
-	Session string `json:"session,omitempty"`
-	Dir     string `json:"dir"`
-}
-
-// TendPR is what the daemon knows of one watched PR. Status: green, waiting, fixing (a tend
-// session is working on it), needs-fix (watch mode: a fix is due), needs-you (tend's needs-you,
-// or two tend sessions ended with the same action left), closed, error.
-type TendPR struct {
-	TendRef
-	Action  string    `json:"action"`
-	Checks  string    `json:"checks"`
-	Status  string    `json:"status"`
-	PID     int       `json:"pid,omitempty"`
-	Log     string    `json:"log,omitempty"`
-	Tries   int       `json:"tries,omitempty"`
-	Total   int       `json:"total,omitempty"`
-	Error   string    `json:"error,omitempty"`
-	Checked time.Time `json:"checked"`
-}
-
-// TendList is GET /v1/tend.
-type TendList struct {
-	Mode string   `json:"mode"`
-	PRs  []TendPR `json:"prs"`
-}
-
 // tendTries is how many tend sessions one PR gets for the same action before it is the user's;
 // tendMaxPerPR caps them across actions, so a PR flapping between two fixes stops too.
 const (
@@ -424,11 +392,4 @@ func (sv *Server) tendView(w http.ResponseWriter, r *http.Request) {
 		out.Mode, out.PRs = sv.Tend.Mode(), sv.Tend.List()
 	}
 	writeJSON(w, 200, out)
-}
-
-// Tend is GET /v1/tend: the PRs the daemon tends and what it is doing on each.
-func (c *Client) Tend(ctx context.Context) (TendList, error) {
-	var out TendList
-	err := c.call(ctx, "GET", "/v1/tend", nil, &out)
-	return out, err
 }

@@ -16,25 +16,6 @@ import (
 	"github.com/Zovaris/smithy/internal/layout"
 )
 
-// Project is one folder new sessions on this daemon can start in.
-type Project struct {
-	Dir  string `json:"dir"`
-	Name string `json:"name"`
-}
-
-// ProjectList is GET /v1/projects: this daemon's projects in the order added, and the default.
-type ProjectList struct {
-	Projects []Project `json:"projects"`
-	Default  string    `json:"default,omitempty"`
-}
-
-// DirList is GET /v1/fs: the folders inside Dir, hidden ones left out.
-type DirList struct {
-	Dir    string   `json:"dir"`
-	Parent string   `json:"parent,omitempty"`
-	Dirs   []string `json:"dirs"`
-}
-
 var projMu sync.Mutex
 
 func projectsFile() string { return filepath.Join(layout.Home(), "projects.json") }
