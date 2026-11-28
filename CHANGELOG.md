@@ -52,6 +52,8 @@ part above `### Details`.
 
 ### Fixed
 
+- opencode sessions work again with agent.effort set: an agent without an effort flag ignores the setting quietly, a failed turn shows the agent's own error (such as a usage limit) instead of the first stderr line, and the error no longer reads "smithy agent: smithy agent:".
+
 - Images pasted in the web chat are kept under `~/.smithy/pastes` and removed when the daemon stops; folders left by a crash are cleared after a day.
 - The daemon waits for its background loops before it closes its store on shutdown.
 - A secret request the daemon cannot record is denied at once instead of leaving the agent waiting until it times out.
