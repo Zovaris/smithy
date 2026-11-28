@@ -9,12 +9,14 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+- Each session shows its linked work, live: the PRs it opened or works on (state, checks, review, mergeable, +/- lines) and the Linear and GitHub issues named in its branch, PRs or prompts. See them in the TUI's agents panel and `/links` (`/links TK-123` links one), the web's session side panel, and a Work section on the Agents page.
 - New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 
 - An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
 
 ### Details
 
+- Session links (TK-112): daemon `GET/POST /v1/sessions/{id}/links` and `GET /v1/links?dir=`, polled per session with backoff (1m doubling to 10m, reset on change) and pushed as `session_links` events; GitHub through gh or the token API (`ghx.LinkPR`, `LinkIssue`, `BranchPR`), Linear through the stored key (`linear.Lookup`), never an MCP connector. `smithy daemon --demo` links canned work with no network.
 - TUI: the top decision strip is gone; the question card (`overlayAsk`) opens when a decision arrives and the composer is empty, or on enter with an empty composer or `/answer`; 1-9, arrows and enter, space on multi-select, esc for later. The pill reads "waiting on you".
 - daemon: decisions carry `multi` and `other`; `/v1/asks` takes `multi` and accepts free text for every non-guard question; the MCP `ask` tool gains a `multi` flag.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
