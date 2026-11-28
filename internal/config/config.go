@@ -108,6 +108,8 @@ var Known = []Setting{
 	{"linear.states", "unstarted,backlog", "smithy auto", "Linear workflow state types that count as new work"},
 	{"session.agent", "", "smithy daemon", "agent a new session starts with when none is named (a CLI name, acp:<cli> or api:<provider>/<model>); the agent picker (ctrl+l, /agent) sets it; empty = the last used, else the first installed CLI"},
 	{"session.model", "", "smithy daemon", "model a new CLI session passes to its agent (--model); the picker (/model) sets it; empty = the agent's own default"},
+	{"session.goal_max_turns", "10", "smithy daemon", "turns the daemon sends on its own toward a session's /goal before it stops and leaves it to you"},
+	{"session.goal_max_cost", "5", "smithy daemon", "USD of reported agent cost a /goal loop may spend before it stops (unknown cost counts as 0); 0 = no cost cap"},
 	{"kit.mcp", "true", "smithy agent", "false: driven CLIs don't get smithy's own MCP server (smithy mcp); /skills in the TUI and the web Setup screen toggle it"},
 	{"kit.skills", "", "smithy agent", "comma list of installed skills linked into every driven CLI that takes skills (claude, codex, opencode, pi); /skills toggles them"},
 	{"ui.theme", "steel", "smithy, smithy stats, web", "color theme the TUI and web share: steel (graphite, ember accent), frost, plum, moss, dune, dusk or rose, each a full palette; /theme and the web palette pick it"},

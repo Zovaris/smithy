@@ -31,6 +31,7 @@ var slashCommands = []slashCommand{
 	{"web", "", "open the web UI in your browser"},
 	{"remote", "", "reach this daemon from your phone or another machine"},
 	{"stop", "", "stop the open session's turn"},
+	{"goal", "[text|clear]", "pin a goal on the open session: the daemon continues it until met (session.goal_max_*)"},
 	{"mode", "[minimal|expandable|verbose]", "how much of each turn the transcript shows"},
 	{"log", "", "daemon events kept out of the transcript"},
 	{"welcome", "", "walk the first-run steps again: agents, model, API keys, notifications"},

@@ -11,6 +11,7 @@ const HINTS: Record<string, string> = {
   stop: "stop the turn",
   model: "session model",
   effort: "session effort",
+  goal: "session goal",
   skills: "skills and MCP",
   theme: "steel, frost, plum, light or dark",
   mode: "transcript detail",

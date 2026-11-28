@@ -1,7 +1,7 @@
 // The smithy commands the composer and the palette run here, loaded on first use: the TUI's
-// /model, /effort, /theme, /mode, /ask, /answer, /serve, /set, /unset, /key rm, the panels (/help,
+// /model, /effort, /goal, /theme, /mode, /ask, /answer, /serve, /set, /unset, /key rm, the panels (/help,
 // /log, /remote, /tend) and the ones that open Settings.
-import { removeKey, runShell, sampleAsk, setServe, setSessionModel, setSetting, unsetSetting } from "../../lib/actions";
+import { removeKey, runShell, sampleAsk, setServe, setSessionGoal, setSessionModel, setSetting, unsetSetting } from "../../lib/actions";
 import { ACTIONS } from "../../lib/commands";
 import { nextDetail, type Detail } from "../../lib/detail";
 import type { Info } from "../../components/info";
@@ -58,6 +58,18 @@ function effort(arg: string, { s, setPick, setNote, shimmer }: Ctx) {
   else setSetting("agent.effort", lvl).then(() => (setNote("saved agent.effort = " + lvl + ": the next session starts with it"), top()), fail);
 }
 
+const goalLabel = (state?: string): string =>
+  state === "met" ? " met" : state === "asked" ? " paused: the agent asks you" : state === "capped" ? " paused: turn or cost cap reached" : "";
+
+// goal is /goal as the TUI runs it: no text shows the open session's goal, clear drops it, any
+// other text pins it; the daemon then continues the session until it is met or a cap stops it.
+function goal(arg: string, { s, setNote }: Ctx) {
+  if (!s) return setNote("open a session first: /goal pins a goal on the open session");
+  if (!arg) return setNote(s.goal ? "goal" + goalLabel(s.goal_state) + ": " + s.goal : "no goal on this session; /goal <text> pins one");
+  const g = arg === "clear" ? "" : arg;
+  setSessionGoal(s.id, g).then(() => setNote(g ? "goal set: " + g : "goal cleared"), (e) => setNote("error: " + String((e as Error).message ?? e)));
+}
+
 const toSettings = (part: string) => {
   go({ name: "setup" });
   setTimeout(() => document.getElementById("set-" + part)?.scrollIntoView({ block: "start" }), 300);
@@ -72,6 +84,7 @@ export function run(a: string, arg: string, ctx: Ctx): void {
   }
   if (a === "stop" && s) stopSession(s.id).catch(() => {});
   else if (a === "effort") effort(arg, ctx);
+  else if (a === "goal") goal(arg, ctx);
   else if (a === "model") {
     if (s) setPick(true);
     else toSettings("agents");
