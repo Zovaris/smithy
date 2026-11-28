@@ -9,12 +9,14 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+- Scheduled workflows: a cron schedule and steps that run a command, ask an agent, branch on the result and notify you. `smithy workflow`, `/workflows` in the TUI and a Workflows page on the web run one now, turn it on or off, edit it and show each run's steps. `smithy workflow example` adds a daily Dependabot check whose agent tells you whether to merge, and why.
 - New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 
 - An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
 
 ### Details
 
+- workflow: new `internal/workflow` (own cron parser, `run`/`agent`/`if`/`notify` steps, store in `~/.smithy/workflows` with the enable pinned to the file's sha256, runs in `runs/<name>/`, 50 kept); daemon ticks it every minute and serves `GET /v1/workflows[/{name}]`, `PUT /v1/workflows/{name}`, `POST /v1/workflows/{name}/run|enable|disable` (writes local-only); notify steps are `workflow_note` store events sent to connectors as kind `workflow`; docs in `docs/workflows.md`.
 - TUI: the top decision strip is gone; the question card (`overlayAsk`) opens when a decision arrives and the composer is empty, or on enter with an empty composer or `/answer`; 1-9, arrows and enter, space on multi-select, esc for later. The pill reads "waiting on you".
 - daemon: decisions carry `multi` and `other`; `/v1/asks` takes `multi` and accepts free text for every non-guard question; the MCP `ask` tool gains a `multi` flag.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
