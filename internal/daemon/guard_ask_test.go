@@ -36,6 +36,7 @@ func TestGuardAskRoundTrip(t *testing.T) {
 }
 
 func TestGuardSettingsAPI(t *testing.T) {
+	t.Setenv("SMITHY_HOME", t.TempDir())
 	t.Setenv("HOME", t.TempDir())
 	t.Chdir(t.TempDir())
 	_, hs := newTest(t, filepath.Join(t.TempDir(), "s.db"))

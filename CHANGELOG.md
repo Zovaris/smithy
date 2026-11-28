@@ -43,6 +43,16 @@ part above `### Details`.
 
 ### Fixed
 
+- Images pasted in the web chat are kept under `~/.smithy/pastes` and removed when the daemon stops; folders left by a crash are cleared after a day.
+- The daemon waits for its background loops before it closes its store on shutdown.
+- A secret request the daemon cannot record is denied at once instead of leaving the agent waiting until it times out.
+- The TUI no longer crashes when you browse or add a project without a running daemon.
+- A daemon that stops answering no longer freezes the TUI: each call gives up after two minutes, and requests from smithy's API client after five.
+- `smithy serve` waits for its last cycle (up to about 2.5 minutes) and notification sends before it stops, and a Discord button ack stops when the gateway closes.
+- A crash while sending notifications is now reported with its stack instead of hidden.
+- `smithy doctor --fix` reads its answers from one reader per run.
+- `smithy wait` stops on ctrl+c, even during a timer, with exit code 130.
+- Pricing a model no longer blocks other callers for up to 10 seconds while the daily price list downloads.
 - Session tabs work: `ctrl+n` and `ctrl+p` or a click switch tabs, `+` starts a new session, and the open tab is bold and underlined.
 - An answered question stays in the session that asked it; a new session or another one no longer shows it, and a batch's questions stay out of every transcript.
 - The `/` menu floats over the transcript, at most eight rows, instead of pushing it up.

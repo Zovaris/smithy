@@ -3,16 +3,19 @@
 package wait
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/Zovaris/smithy/internal/auto"
@@ -28,15 +31,15 @@ type watcher interface{ poll() ([]string, error) }
 
 // firstPoll polls w up to tries times, waiting delay between tries, so a transient gh or
 // GraphQL error on the first read doesn't end the wait.
-func firstPoll(w watcher, tries int, delay time.Duration) ([]string, error) {
+func firstPoll(ctx context.Context, w watcher, tries int, delay time.Duration) ([]string, error) {
 	var err error
 	for i := 0; i < tries; i++ {
 		var lines []string
 		if lines, err = w.poll(); err == nil {
 			return lines, nil
 		}
-		if i < tries-1 {
-			time.Sleep(delay)
+		if i < tries-1 && !sleep(ctx, delay) {
+			return nil, ctx.Err()
 		}
 	}
 	return nil, err
@@ -812,10 +815,23 @@ func onlyBatches(targets []string) bool {
 	return true
 }
 
-var sleep = time.Sleep
+// sleep waits d and reports false when ctx ends first.
+var sleep = func(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
+
+// cancelled is the exit code of a wait stopped by its caller (ctrl+c).
+const cancelled = 130
 
 // timer handles `smithy wait timer:<minutes>`, which takes no other target.
-func timer(targets []string) (int, bool) {
+func timer(ctx context.Context, targets []string) (int, bool) {
 	for _, t := range targets {
 		arg, ok := strings.CutPrefix(t, "timer:")
 		if !ok {
@@ -826,15 +842,24 @@ func timer(targets []string) (int, bool) {
 			fmt.Fprintf(os.Stderr, "smithy wait: timer takes at least 0.05 minutes and no other target: %s\n", strings.Join(targets, " "))
 			return 2, true
 		}
-		sleep(time.Duration(m * float64(time.Minute)))
+		if !sleep(ctx, time.Duration(m*float64(time.Minute))) {
+			return cancelled, true
+		}
 		fmt.Printf("timer: %gm elapsed\n", m)
 		return 0, true
 	}
 	return 0, false
 }
 
-// Main runs `smithy wait`.
+// Main runs `smithy wait` until ctrl+c or SIGTERM.
 func Main(args []string) int {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return Run(ctx, args)
+}
+
+// Run runs `smithy wait`; it returns 130 when ctx ends first.
+func Run(ctx context.Context, args []string) int {
 	var targets []string
 	var every, max float64 = -1, -1
 	evs := ""
@@ -872,7 +897,7 @@ func Main(args []string) int {
 		fmt.Fprintln(os.Stderr, usage)
 		return 2
 	}
-	if code, ok := timer(targets); ok {
+	if code, ok := timer(ctx, targets); ok {
 		return code
 	}
 	targets, watchMode := expandWatch(targets)
@@ -967,9 +992,12 @@ func Main(args []string) int {
 			var lines []string
 			var err error
 			if first {
-				lines, err = firstPoll(w, 3, 2*time.Second)
+				lines, err = firstPoll(ctx, w, 3, 2*time.Second)
 			} else {
 				lines, err = w.poll()
+			}
+			if ctx.Err() != nil {
+				return cancelled
 			}
 			if err != nil {
 				if first {
@@ -988,7 +1016,9 @@ func Main(args []string) int {
 		if time.Now().Add(step).After(end) {
 			break
 		}
-		time.Sleep(step)
+		if !sleep(ctx, step) {
+			return cancelled
+		}
 	}
 	fmt.Printf("heartbeat: nothing within %gm\n", max)
 	for _, l := range noCILines(ws, max) {

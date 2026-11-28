@@ -199,7 +199,9 @@ type Server struct {
 	hb     Heartbeat
 	mkdr   func(string) (string, error)
 	note   *notify.Notifier
-	capDay string // local day a cap_reached event was last recorded (issue cap or spend cap)
+	// flushes counts notification flushes a cycle started; Run waits for them before it returns.
+	flushes sync.WaitGroup
+	capDay  string // local day a cap_reached event was last recorded (issue cap or spend cap)
 	// limitedAt is the reset time a "limited" event was last recorded for (smithy pool).
 	limitedAt time.Time
 }
@@ -339,6 +341,7 @@ func (sv *Server) logf(format string, a ...any) {
 // Run loops until ctx ends, --once's cycle is done or --max-hours passes, then removes the
 // heartbeat. A running orchestrator is left alone.
 func (sv *Server) Run(ctx context.Context) error {
+	defer sv.flushes.Wait()
 	defer func() {
 		sv.beatMu.Lock()
 		sv.ended = true
@@ -388,13 +391,23 @@ func (sv *Server) Run(ctx context.Context) error {
 // cycleGrace is how long Run waits for a cycle still in flight when it stops.
 var cycleGrace = 30 * time.Second
 
+// cycleCap is how much longer Run waits, after cycleGrace, for a cycle that is still running.
+var cycleCap = 2 * time.Minute
+
 // finishCycle waits for the cycle in flight so Run never returns while it still reads settings
-// or sources; a cycle stuck longer than cycleGrace is left behind and logged.
+// or sources. A cycle still running after cycleGrace is logged and waited for up to cycleCap
+// more; past that Run stops anyway and says so, rather than hang.
 func (sv *Server) finishCycle(res <-chan time.Duration) {
 	select {
 	case <-res:
+		return
 	case <-time.After(cycleGrace):
-		sv.logf("serve: a cycle was still running %s after stop; leaving it", cycleGrace)
+		sv.logf("serve: a cycle was still running %s after stop; waiting up to %s more", cycleGrace, cycleCap)
+	}
+	select {
+	case <-res:
+	case <-time.After(cycleCap):
+		sv.logf("serve: a cycle was still running %s after stop; stopping without it", cycleGrace+cycleCap)
 	}
 }
 
@@ -505,9 +518,13 @@ func (sv *Server) Cycle() time.Duration {
 		}
 	}
 	_ = sv.beat()
-	if sv.note != nil {
-		go sv.note.Flush(now())
+	sv.beatMu.Lock()
+	ended := sv.ended
+	if sv.note != nil && !ended {
+		sv.flushes.Add(1)
+		go func() { defer sv.flushes.Done(); sv.note.Flush(now()) }()
 	}
+	sv.beatMu.Unlock()
 	return time.Duration(s.Every) * time.Second
 }
 

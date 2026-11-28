@@ -3,7 +3,6 @@
 package chat
 
 import (
-	"context"
 	"strconv"
 
 	tea "charm.land/bubbletea/v2"
@@ -72,7 +71,9 @@ func (m *chatView) drain() tea.Cmd {
 		m.queues[id] = q[1:]
 		m.track(id, "working")
 		cmds = append(cmds, func() tea.Msg {
-			if err := api.SendSession(context.Background(), id, text); err != nil {
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			if err := api.SendSession(ctx, id, text); err != nil {
 				return sessionErrMsg{what: "send", err: err}
 			}
 			return nil

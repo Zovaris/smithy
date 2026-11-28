@@ -70,12 +70,16 @@ func (m chatView) send(text string) (chatView, tea.Cmd) {
 	if id == "" {
 		m.status("starting a session…")
 		return m, func() tea.Msg {
-			s, err := api.StartSession(context.Background(), "", dir, text)
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			s, err := api.StartSession(ctx, "", dir, text)
 			return sessionStartedMsg{s: s, err: err}
 		}
 	}
 	return m, func() tea.Msg {
-		if err := api.SendSession(context.Background(), id, text); err != nil {
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		if err := api.SendSession(ctx, id, text); err != nil {
 			return sessionErrMsg{what: "send", err: err}
 		}
 		return nil
@@ -89,7 +93,9 @@ func (m chatView) stopSession() (chatView, tea.Cmd) {
 	}
 	api, id := m.sess, m.current
 	return m, func() tea.Msg {
-		if err := api.StopSession(context.Background(), id); err != nil {
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		if err := api.StopSession(ctx, id); err != nil {
 			return sessionErrMsg{what: "stop", err: err}
 		}
 		return nil

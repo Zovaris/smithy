@@ -38,6 +38,7 @@ const (
 type Server struct {
 	// Connectors builds the chat connectors from the current config (nil: connect.FromConfig).
 	Connectors func() ([]connect.Connector, error)
+	pastes     pastes
 	chatBuf    map[string]string // a chat session's answer so far, sent when its turn ends
 	st         *store.Store
 	token      string

@@ -3,7 +3,6 @@
 package chat
 
 import (
-	"context"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -161,7 +160,9 @@ func (m chatView) loadPopModels() tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		l, _ := api.Models(context.Background(), agent, false)
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		l, _ := api.Models(ctx, agent, false)
 		l.Agent = agent
 		return popModelsMsg{l}
 	}

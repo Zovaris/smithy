@@ -66,7 +66,9 @@ func (m chatView) setSessionModel(id, model, effort string) tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
-		s, err := api.SetSessionModel(context.Background(), id, model, effort)
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		s, err := api.SetSessionModel(ctx, id, model, effort)
 		return sessionModelSetMsg{s: s, err: err}
 	}
 }
@@ -121,9 +123,13 @@ func (m chatView) setDefaultEffort(level string) tea.Cmd {
 	}
 	return func() tea.Msg {
 		if level == "" {
-			return effortDefaultMsg{err: api.UnsetSetting(context.Background(), "agent.effort")}
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			return effortDefaultMsg{err: api.UnsetSetting(ctx, "agent.effort")}
 		}
-		return effortDefaultMsg{level: level, err: api.SetSetting(context.Background(), "agent.effort", level)}
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		return effortDefaultMsg{level: level, err: api.SetSetting(ctx, "agent.effort", level)}
 	}
 }
 

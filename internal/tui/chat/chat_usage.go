@@ -27,7 +27,9 @@ func (m chatView) openUsage() (tea.Model, tea.Cmd) {
 	m.info, m.overlay, m.pal = infoPanel{title: "Usage", lines: []string{"reading token use…"}}, overlayInfo, palette{}
 	id := m.current
 	return m, func() tea.Msg {
-		r, err := api.Usage(context.Background(), id)
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		r, err := api.Usage(ctx, id)
 		if err != nil {
 			return sessionErrMsg{what: "/usage", err: err}
 		}

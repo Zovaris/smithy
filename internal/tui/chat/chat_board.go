@@ -57,7 +57,9 @@ func (m chatView) openBoard(want string) (tea.Model, tea.Cmd) {
 	m.overlay, m.boardSt = overlayBoard, boardView{}
 	api, dir := m.board, m.project()
 	return m, func() tea.Msg {
-		b, err := api.Tasks(context.Background(), dir)
+		ctx, cancel := daemonCtx()
+		defer cancel()
+		b, err := api.Tasks(ctx, dir)
 		return boardMsg{b: b, want: want, err: err}
 	}
 }
@@ -246,7 +248,9 @@ func (m chatView) boardKey(k string) (tea.Model, tea.Cmd) {
 		m.setCardStatus(c.File, to)
 		api := m.board
 		return m, func() tea.Msg {
-			_, err := api.MoveTask(context.Background(), c.File, to)
+			ctx, cancel := daemonCtx()
+			defer cancel()
+			_, err := api.MoveTask(ctx, c.File, to)
 			return boardMovedMsg{file: c.File, from: c.Status, err: err}
 		}
 	case "o":
