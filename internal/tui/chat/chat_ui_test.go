@@ -123,7 +123,7 @@ func TestChatModesCycleWithCtrlO(t *testing.T) {
 		t.Fatalf("starts in %v", m.mode)
 	}
 	out := screen(m)
-	if !strings.Contains(out, "✓  + 1 command, 1 edit, 2 reads") || strings.Contains(out, "134 lines read") || strings.Contains(out, "typed classes") {
+	if !strings.Contains(out, "✓ + 1 command, 1 edit, 2 reads") || strings.Contains(out, "134 lines read") || strings.Contains(out, "typed classes") {
 		t.Fatalf("minimal shows tool details:\n%s", out)
 	}
 	m = chatStep(m, ckey("ctrl+o"))

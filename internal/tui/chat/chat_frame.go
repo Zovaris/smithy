@@ -184,10 +184,12 @@ func (m chatView) statusLine(w int) string {
 	case whereRemote:
 		where = dim.Render(m.url)
 	}
-	if right != "" {
+	if right != "" && where != "" && !m.sideOn() {
 		right += dim.Render("  ")
 	}
-	right += where
+	if !m.sideOn() {
+		right += where
+	}
 	left := ""
 	for i := len(m.noise) - 1; i >= 0; i-- {
 		if n := m.noise[i]; !n.quiet {
@@ -206,6 +208,19 @@ func (m chatView) statusLine(w int) string {
 	}
 	left = ansi.Truncate(left, room, "…")
 	return p + left + strings.Repeat(" ", max(w-2*m.pad()-ansi.StringWidth(left)-ansi.StringWidth(right), 1)) + right + p
+}
+
+// whereNote is where the daemon runs and how it ends, as short lines for the sidebar's foot.
+func (m chatView) whereNote() []string {
+	switch m.where {
+	case whereBackground:
+		return []string{"background daemon", "smithy stop ends it"}
+	case whereStandalone:
+		return []string{"standalone daemon", "stops with this chat"}
+	case whereRemote:
+		return []string{kit.Short(m.url, sideW-4)}
+	}
+	return nil
 }
 
 // noiseShown is how long a daemon line stays in the status area; /log keeps them all.
@@ -538,7 +553,6 @@ func (m chatView) totalCost() float64 {
 // pulse, what the session does now, and on the right the live tok/s and the turn's time.
 func (m chatView) spinRow(w int) string {
 	t := m.th
-	g := m.pulse()
 	what, since := "working", time.Time{}
 	for _, s := range m.sessions {
 		if s.id == m.current {
@@ -556,26 +570,7 @@ func (m chatView) spinRow(w int) string {
 		right = append(right, fmt.Sprintf("%.1fs", time.Since(since).Seconds()))
 	}
 	p := strings.Repeat(" ", m.pad())
-	return spread(p+"  "+g+" "+t.Fg(t.Muted).Render(what), t.Fg(t.Dim).Render(strings.Join(right, "  "))+p+"  ", w)
-}
-
-// pulse is the loader: four small cells with one lit cell drifting across, dim elsewhere.
-func (m chatView) pulse() string {
-	t := m.th
-	on, off := "▪", "·"
-	if !t.G.Unicode {
-		on, off = "*", "."
-	}
-	lit := (m.frame / 3) % 4
-	var b strings.Builder
-	for i := range 4 {
-		if i == lit {
-			b.WriteString(t.Fg(t.Accent).Render(on))
-		} else {
-			b.WriteString(t.Fg(t.Dim).Render(off))
-		}
-	}
-	return b.String()
+	return spread(p+" "+t.Fg(t.Warn).Render(t.Spinner(m.frame))+" "+t.Fg(t.Muted).Render(what), t.Fg(t.Dim).Render(strings.Join(right, "  "))+p, w)
 }
 
 // fill lays s on st's background w cells wide, cut to fit. Unlike Style.Width it keeps the

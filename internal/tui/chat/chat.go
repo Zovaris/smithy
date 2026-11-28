@@ -855,7 +855,10 @@ func eventText(kind, session string, data json.RawMessage) string {
 // line and the gap under it, the composer, the footer and the spinner row while the open
 // session works.
 func (m chatView) rows() int {
-	n := m.height - headRows - 2 - m.input.Height() - 3
+	n := m.height - headRows - 1 - m.input.Height() - 3
+	if strings.TrimSpace(ansi.Strip(m.statusLine(m.tw()))) != "" {
+		n--
+	}
 	if m.working() {
 		n -= 2
 	}
@@ -907,7 +910,7 @@ func (m chatView) textRows(c *chatMsg, w int) []string {
 		edge := gut + fill(row, bw, rail) + gut
 		lines := []string{edge}
 		for n, l := range strings.Split(ansi.Wrap(c.text, max(bw-12, 10), ""), "\n") {
-			text := rail + "   " + t.Fg(t.Strong).Bold(true).Render(l)
+			text := rail + "  " + t.Fg(t.Strong).Bold(true).Render(l)
 			if n == 0 && c.at != "" {
 				text = spread(text, t.Fg(t.Dim).Render(c.at)+"  ", bw)
 			}
@@ -930,7 +933,7 @@ func (m chatView) textRows(c *chatMsg, w int) []string {
 	if c.at != "" {
 		text = c.at + " " + text
 	}
-	lead := gut + "  "
+	lead := gut + "   "
 	if c.who == "agent" {
 		lead = gut + " " + t.Fg(t.Border).Render(agentGutter(t.G.Unicode)) + " "
 	}
@@ -1033,10 +1036,10 @@ func (m chatView) View() tea.View {
 	}
 	body = append(body, vis...)
 	if m.working() {
-		body = append(body, m.spinRow(w), "")
+		body = append(body, m.spinRow(m.tw()), "")
 	}
 	if m.refined() != "" {
-		r, _ := m.refineRow(w)
+		r, _ := m.refineRow(m.tw())
 		body = append(body, r, "")
 	}
 	if items := m.popup(); len(items) > 0 {
@@ -1048,9 +1051,13 @@ func (m chatView) View() tea.View {
 			body[j] = splice(body[j], r, m.pad(), m.tw())
 		}
 	}
+	if st := m.statusLine(m.tw()); strings.TrimSpace(ansi.Strip(st)) != "" {
+		body = append(body, st, "")
+	} else {
+		body = append(body, "")
+	}
+	body = append(body, m.composer(m.tw())...)
 	out = append(out, m.besideSide(body)...)
-	out = append(out, m.statusLine(w), "")
-	out = append(out, m.composer(w)...)
 	out = append(out, m.footer(w))
 	if m.welcome != welcomeOff {
 		out = m.welcomeView(w, m.height)
@@ -1151,9 +1158,9 @@ func (m chatView) composer(w int) []string {
 		if m.shimmer > 0 {
 			l = t.Shimmer(ansi.Strip(l), float64(bw)*float64(shimmerFrames-m.shimmer)/shimmerFrames)
 		}
-		out = append(out, row(" "+l))
+		out = append(out, row(l))
 	}
-	out = append(out, row("   "+m.metaChips()))
+	out = append(out, row("  "+m.metaChips()))
 	for _, r := range m.queueRows(bw) {
 		out = append(out, p+r)
 	}

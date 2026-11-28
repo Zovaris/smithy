@@ -156,7 +156,7 @@ func (t Theme) HeadBar(w, gutter int, project string, pill func(bar lipgloss.Sty
 	if Version != "" {
 		name += bar.Foreground(t.Muted).Render(" " + Version)
 	}
-	left := bar.Render(p[:max(len(p)-1, 0)]) + name
+	left := bar.Render(p) + name
 	if project != "" {
 		left += bar.Foreground(t.Dim).Render(" "+t.G.Dot+" ") + bar.Foreground(t.Muted).Render(project)
 	}

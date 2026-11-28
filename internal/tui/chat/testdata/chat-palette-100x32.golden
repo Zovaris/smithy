@@ -1,31 +1,31 @@
-  ◆ smithy dev                                              ? waiting on you   ⠋ 1 running  09:07   
-   TK-6   ⠋ TK-29   TES-9   + 
+   ◆ smithy dev                                             ? waiting on you   ⠋ 1 running  09:07   
+    TK-6   ⠋ TK-29   TES-9   + 
 
                                                                                               
         › Search actions, sessions, settings                                             esc  
                                                                                               
          Waiting on you                                                                       
       ▌  ?  Merge #142 into release/v0.17?  merge · later                                     
-   ▌                                                                                                
+                                                                                              
    ▌     Actions                                                                                    
    ▌     +  New session  your next message starts it                                    /new        
-         ▸  Agent and model                                                           ctrl+l  
-     ✓   ≡  Skills and MCP  what goes into every session                             /skills        
-         ≡  Verbosity: minimal  minimal · expandable · verbose                        ctrl+o  
-     P   ▪  Agents panel  sessions and waiting items                                     tab  
-     o   ≡  Board  the task files by status                                           /board  
+   ▌     ▸  Agent and model                                                           ctrl+l        
+         ≡  Skills and MCP  what goes into every session                             /skills  
+    ✓    ≡  Verbosity: minimal  minimal · expandable · verbose                        ctrl+o        
+         ▪  Agents panel  sessions and waiting items                                     tab  
+         ≡  Board  the task files by status                                           /board  
          →  Open the web UI  same sessions in the browser                               /web  
-     ✓   →  Connect  http://127.0.0.1:7477                                          /connect  s     
-         ·  Daemon log  0 events                                                        /log  
-    ▏    ↓  Jump to latest                                                               end  
+         →  Connect  http://127.0.0.1:7477                                          /connect  
+    ✓    ·  Daemon log  0 events                                                        /log  .5s   
+         ↓  Jump to latest                                                               end  
     ▏    ✗  Quit                                                                      ctrl+c  
-                                                                                              
-     0   Sessions                                                                             
+    ▏                                                                                         
+    ▏    Sessions                                                                             
          ✓  TK-6  done                                                                        
          ▪  TK-29  running                                                                    477   
          ✗  TES-9  failed                                                                     
    ▌                                                                                                
-   ▌ ›   Settings                                                                                   
+   ▌›    Settings                                                                                   
    ▌     ·  chat.mode  ‹ minimal ›  how much of each turn the transcript shows                      
    ▌     ·  daemon  http://127.0.0.1:7477                                                           
    ▌                                                                                                

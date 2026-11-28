@@ -167,6 +167,13 @@ func (m *chatView) track(id, kind string) {
 					agent, model = m.setupSt.Default.Agent, m.setupSt.Default.Model
 				}
 				foot := turnFooter(agent, model, time.Since(s.turn).Round(100*time.Millisecond), m.tokRate(id), " "+m.th.G.Dot+" ")
+				prev := m.convs[id]
+				if id == m.current {
+					prev = m.msgs
+				}
+				if n := len(prev); n > 0 {
+					prev[n-1].lines = nil
+				}
 				m.into(id, chatMsg{who: "daemon", kind: "foot", text: foot})
 			}
 			s.kind, s.state = kind, state
@@ -478,10 +485,10 @@ func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 				m.open(h.id)
 			}
 		}
-	case m.sideOn() && msg.X >= m.tw() && msg.Y >= head && msg.Y < head+m.rows():
+	case m.sideOn() && msg.X >= m.sideX() && msg.Y >= head && msg.Y < head+m.rows():
 		_, urls := m.sideRows()
 		if r := msg.Y - head - 1; r >= 0 && r < len(urls) && urls[r] != "" {
-			if msg.X >= m.tw()+sideW-3 {
+			if msg.X >= m.sideX()+sideW-4 {
 				return m.removeLink(urls[r])
 			}
 			return m, m.openLink(urls[r])
@@ -758,10 +765,14 @@ func (m chatView) render(i, w int) []string {
 		if (c.kind == "thinking" || c.kind == "turn") && m.mode != modeVerbose {
 			return []string{}
 		}
-		if c.who == "agent" && m.opensAnswer(i) {
-			return append([]string{m.agentHead(w)}, m.textRows(c, w)...)
+		rows := m.textRows(c, w)
+		if c.who == "agent" && i+1 < len(m.msgs) && m.msgs[i+1].kind == "foot" {
+			rows = rows[:len(rows)-1]
 		}
-		return m.textRows(c, w)
+		if c.who == "agent" && m.opensAnswer(i) {
+			return append([]string{m.agentHead(w)}, rows...)
+		}
+		return rows
 	}
 	a, b := m.runOf(i)
 	switch m.mode {
@@ -814,7 +825,7 @@ func (m chatView) summary(a, b, w int) []string {
 		right = dim.Render(fmt.Sprintf("%.1fs", took))
 	}
 	p := strings.Repeat(" ", m.pad())
-	line := spread(p+"  "+t.Fg(col).Render(g)+"  "+dim.Render(activityLabel(tools, thoughts)), right+p+"  ", w)
+	line := spread(p+" "+t.Fg(col).Render(g)+" "+dim.Render(activityLabel(tools, thoughts)), right+p, w)
 	return []string{m.blockRow(a, w, ansi.Truncate(line, w, "…")), ""}
 }
 
@@ -855,7 +866,7 @@ func (m chatView) toolRows(i, w int, open, last bool) []string {
 	if ansi.StringWidth(name) < 5 {
 		name += strings.Repeat(" ", 5-ansi.StringWidth(name))
 	}
-	left := p + "  " + t.Fg(col).Render(g) + " " + t.Fg(col).Bold(true).Render(name) + " " + arg
+	left := p + " " + t.Fg(col).Render(g) + " " + t.Fg(col).Bold(true).Render(name) + " " + arg
 	var right string
 	if m.mode == modeVerbose {
 		var meta []string
@@ -872,7 +883,7 @@ func (m chatView) toolRows(i, w int, open, last bool) []string {
 		}
 		right = mark + t.Fg(t.Muted).Render(tl.Stat) + dim.Render("  "+took)
 	}
-	head := spread(ansi.Truncate(left, w-ansi.StringWidth(right)-m.pad()-4, "…"), right+p+"  ", w)
+	head := spread(ansi.Truncate(left, w-ansi.StringWidth(right)-m.pad()-2, "…"), right+p, w)
 	tier := t.Focus
 	if m.mode == modeVerbose {
 		tier = t.Raised
@@ -882,7 +893,7 @@ func (m chatView) toolRows(i, w int, open, last bool) []string {
 	}
 	rows := []string{m.tierRow(i, w, tier, head)}
 	if open {
-		ind := p + strings.Repeat(" ", 11)
+		ind := p + strings.Repeat(" ", 3)
 		for _, l := range tl.Lines {
 			for _, wl := range strings.Split(ansi.Wrap(kit.Clean(l), max(w-2*m.pad()-14, 10), ""), "\n") {
 				rows = append(rows, m.tierRow(i, w, tier, ind+m.toolLine(wl)))

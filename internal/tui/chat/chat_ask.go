@@ -126,7 +126,8 @@ func (m chatView) askBox(screen []string, w, h int) []string {
 	d := m.pending[0]
 	p := m.pad()
 	gut := strings.Repeat(" ", p)
-	bw := w - 2*p
+	tw := m.tw()
+	bw := tw - 2*p
 	bg, sel := on(t.Raised), on(t.Focus)
 	rail := t.Fg(t.Warn).Render(railGlyph(t.G.Unicode))
 	row := func(st lipgloss.Style, s string) string { return gut + fill(st, bw, rail+s) + gut }
@@ -168,10 +169,16 @@ func (m chatView) askBox(screen []string, w, h int) []string {
 		hint = t.Fg(t.Dim).Render("↑↓ select " + t.G.Dot + " space pick " + t.G.Dot + " enter submit " + t.G.Dot + " esc dismiss")
 	}
 	rows = append(rows, row(bg, ""), row(bg, "  "+hint), row(bg, ""))
-	bottom := len(screen) - 1 - len(m.composer(w))
+	bottom := len(screen) - 1 - len(m.composer(tw))
 	top := max(bottom-len(rows), headRows)
 	rows = rows[len(rows)-(bottom-top):]
 	out := slices.Clone(screen)
-	copy(out[top:bottom], rows)
+	cut := tw
+	if m.sideOn() {
+		cut = m.sideX()
+	}
+	for i, r := range rows {
+		out[top+i] = ansi.Truncate(r, cut, "") + ansi.TruncateLeft(out[top+i], cut, "")
+	}
 	return out
 }

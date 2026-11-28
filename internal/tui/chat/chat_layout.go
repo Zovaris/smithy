@@ -147,10 +147,16 @@ func (m chatView) sideOn() bool { return !m.sideOff && m.width >= sideMin }
 func (m chatView) tw() int {
 	w := max(m.width, 20)
 	if m.sideOn() {
-		w -= sideW
+		w -= sideW + sideGap
 	}
 	return w
 }
+
+// sideGap is the fixed gutter between the transcript's right edge and the sidebar.
+const sideGap = 2
+
+// sideX is the sidebar's first column: it ends on the page's right edge, the gutter before it.
+func (m chatView) sideX() int { return max(m.width, 20) - m.pad() - sideW }
 
 // tabHit is where one tab sits in the tab strip: columns [x0, x1) open session id ("" is the
 // unsent new session).
@@ -164,7 +170,7 @@ type tabHit struct {
 // the + sit for clicks.
 func (m chatView) tabStrip(w int) (string, []tabHit, int) {
 	t := m.th
-	p := strings.Repeat(" ", max(m.pad()-1, 0))
+	p := strings.Repeat(" ", m.pad())
 	type tab struct{ id, text string }
 	var tabs []tab
 	for _, s := range m.listed() {
@@ -277,11 +283,16 @@ func (m chatView) sideRows() (rows, urls []string) {
 	if title == "" {
 		title = "new session"
 	}
-	iw := sideW - 5
+	iw := sideW - 4
 	two := func(l, r string) string { return spread(l, r, iw) }
+	if tt := tabTitle(title); tt != "" {
+		title = tt
+	}
 	rows = []string{t.Fg(t.Strong).Bold(true).Render(kit.Short(title, iw))}
-	if am := m.agentModel(); am != "" {
-		rows = append(rows, dim.Render(kit.Short(am, iw)))
+	for _, l := range strings.Split(ansi.Wordwrap(m.agentModel(), iw, " /"), "\n") {
+		if l != "" {
+			rows = append(rows, dim.Render(kit.Short(strings.TrimSpace(l), iw)))
+		}
 	}
 	rows = append(rows, "")
 	used, win := m.ctx[m.current], ctxWindow(m.curModel())
@@ -311,8 +322,9 @@ func (m chatView) sideRows() (rows, urls []string) {
 
 func (m chatView) sidebar(h int) []string {
 	t := m.th
-	iw := sideW - 5
+	iw := sideW - 4
 	rows, _ := m.sideRows()
+	note := m.whereNote()
 	out := make([]string, h)
 	side := on(t.Raised)
 	for i := range out {
@@ -320,7 +332,10 @@ func (m chatView) sidebar(h int) []string {
 		if i > 0 && i-1 < len(rows) {
 			r = rows[i-1]
 		}
-		out[i] = " " + fill(side, sideW-1, "  "+ansi.Truncate(r, iw, "…"))
+		if k := len(note) - (h - 1 - i); k >= 0 && k < len(note) && i > len(rows) {
+			r = t.Fg(t.Dim).Render(note[k])
+		}
+		out[i] = fill(side, sideW, "  "+ansi.Truncate(r, iw, "…"))
 	}
 	return out
 }
@@ -341,10 +356,11 @@ func (m chatView) besideSide(body []string) []string {
 	if !m.sideOn() {
 		return body
 	}
-	tw, side := m.tw(), m.sidebar(len(body))
+	x, side := m.sideX(), m.sidebar(len(body))
+	p := strings.Repeat(" ", m.pad())
 	for i, r := range body {
-		r = ansi.Truncate(r, tw, "")
-		body[i] = r + strings.Repeat(" ", max(tw-ansi.StringWidth(r), 0)) + side[i]
+		r = ansi.Truncate(r, x, "")
+		body[i] = r + strings.Repeat(" ", max(x-ansi.StringWidth(r), 0)) + side[i] + p
 	}
 	return body
 }
@@ -354,17 +370,18 @@ func (m chatView) qaRows(c *chatMsg, w int) []string {
 	t := m.th
 	g := strings.Repeat(" ", m.pad())
 	bw := max(w-2*m.pad()-6, 10)
-	out := []string{g + "  " + t.Fg(t.Warn).Render("→ ") + t.Fg(t.Muted).Render("Asked 1 question")}
+	out := []string{g + " " + t.Fg(t.Warn).Render("→ ") + t.Fg(t.Muted).Render("Asked 1 question")}
 	for _, l := range strings.Split(ansi.Wrap(c.text, bw, ""), "\n") {
-		out = append(out, g+"    "+t.Fg(t.Text).Render(l))
+		out = append(out, g+"   "+t.Fg(t.Text).Render(l))
 	}
-	out = append(out, g+"    "+t.Fg(t.Accent).Render("→ ")+t.Fg(t.Strong).Bold(true).Render(c.ans))
+	out = append(out, g+"   "+t.Fg(t.Accent).Render("→ ")+t.Fg(t.Strong).Bold(true).Render(c.ans))
 	return append(out, "")
 }
 
 // footRows is the dim turn footer under an agent's answer.
 func (m chatView) footRows(c *chatMsg) []string {
-	return []string{strings.Repeat(" ", m.pad()) + "  " + m.th.Fg(m.th.Dim).Render(c.text), ""}
+	t := m.th
+	return []string{strings.Repeat(" ", m.pad()) + " " + t.Fg(t.Border).Render(agentGutter(t.G.Unicode)) + " " + t.Fg(t.Dim).Render(c.text), ""}
 }
 
 // answered reports whether session id's turn has agent text since your last message and no
@@ -439,7 +456,9 @@ func (m chatView) sideLinks(s chatSession, iw int) (rows, urls []string) {
 			sub(u.URL, u.Title)
 		}
 		if l.Error != "" {
-			rows, urls = append(rows, t.Fg(t.Muted).Render(kit.Short(l.Error, iw))), append(urls, "")
+			for _, e := range strings.Split(ansi.Wordwrap(l.Error, iw, ""), "\n") {
+				rows, urls = append(rows, t.Fg(t.Muted).Render(e)), append(urls, "")
+			}
 		}
 	} else {
 		for _, u := range s.prs {

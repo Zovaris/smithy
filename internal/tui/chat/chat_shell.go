@@ -156,7 +156,7 @@ func (m chatView) shellRows(i, w int) []string {
 	sh := c.sh
 	p := strings.Repeat(" ", m.pad())
 	dim := t.Fg(t.Dim)
-	left := p + m.chip(" $ ", t.Surface, t.Warn, true) + " " + t.Fg(t.Strong).Bold(true).Render(sh.cmd)
+	left := p + m.chip(" $ ", t.Surface, t.Warn, true) + t.Fg(t.Strong).Bold(true).Render(sh.cmd)
 	var meta []string
 	if s, ok := m.session(); ok && s.dir != "" && sh.dir != "" && s.dir != sh.dir {
 		meta = append(meta, dim.Render(sh.dir))
@@ -176,7 +176,7 @@ func (m chatView) shellRows(i, w int) []string {
 		}
 	}
 	right := strings.Join(meta, dim.Render(" "+t.G.Dot+" "))
-	head := spread(ansi.Truncate(left, max(w-ansi.StringWidth(right)-m.pad()-4, 10), "…"), right+p+"  ", w)
+	head := spread(ansi.Truncate(left, max(w-ansi.StringWidth(right)-m.pad()-2, 10), "…"), right+" "+p, w)
 	row := func(s string) string { return m.tierRow(i, w, t.Raised, s) }
 	rows := []string{row(head)}
 	if sh.run == nil {
@@ -190,7 +190,7 @@ func (m chatView) shellRows(i, w int) []string {
 	if !c.open && len(lines) > shellFold {
 		more, lines = len(lines)-shellFold, lines[:shellFold]
 	}
-	rule := p + "     "
+	rule := p + "   "
 	for _, l := range lines {
 		st := t.Fg(t.Muted)
 		if l.Err {
