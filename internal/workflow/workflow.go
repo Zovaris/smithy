@@ -49,14 +49,12 @@ const (
 	MaxParallel       = 8
 )
 
-// Workflow is one workflow file. Schedule is a cron line ("" runs only by hand or webhook);
-// Webhook lets a token-checked POST start it. Inputs are names with default values, Vars the
-// starting variables, Outputs templates filled when the run ends.
+// Workflow is one workflow file: a flow you run by hand (a schedule attaches triggers to it).
+// Inputs are names with default values (the form Run shows), Vars the starting variables,
+// Outputs templates filled when the run ends.
 type Workflow struct {
 	Name        string            `json:"name"`
 	Description string            `json:"description,omitempty"`
-	Schedule    string            `json:"schedule,omitempty"`
-	Webhook     bool              `json:"webhook,omitempty"`
 	Dir         string            `json:"dir,omitempty"`
 	Inputs      map[string]string `json:"inputs,omitempty"`
 	Vars        map[string]string `json:"vars,omitempty"`
@@ -155,6 +153,9 @@ func Parse(b []byte) (Workflow, error) {
 	d := json.NewDecoder(strings.NewReader(string(b)))
 	d.DisallowUnknownFields()
 	if err := d.Decode(&w); err != nil {
+		if strings.Contains(err.Error(), `"schedule"`) || strings.Contains(err.Error(), `"webhook"`) {
+			return w, fmt.Errorf("workflow: schedule and webhook moved to schedules (smithy schedule add <name> --workflow <workflow> --cron …)")
+		}
 		return w, fmt.Errorf("workflow: %w", err)
 	}
 	return w, w.Validate()
@@ -164,11 +165,6 @@ func Parse(b []byte) (Workflow, error) {
 func (w Workflow) Validate() error {
 	if !nameRe.MatchString(w.Name) {
 		return fmt.Errorf("workflow: name %q: use a-z, 0-9 and -", w.Name)
-	}
-	if w.Schedule != "" {
-		if _, err := ParseCron(w.Schedule); err != nil {
-			return fmt.Errorf("workflow %s: %w", w.Name, err)
-		}
 	}
 	if w.MaxMinutes < 0 || w.MaxAgents < 0 || w.MaxCostUSD < 0 {
 		return fmt.Errorf("workflow %s: caps can't be negative", w.Name)

@@ -7,8 +7,7 @@ import "sort"
 var Examples = map[string]string{
 	"dependabot-daily": `{
   "name": "dependabot-daily",
-  "description": "Daily 17:00: open Dependabot alerts; if any, an agent judges whether to merge and you get its yes/no and why.",
-  "schedule": "0 17 * * *",
+  "description": "Open Dependabot alerts; if any, an agent judges whether to merge and you get its yes/no and why.",
   "dir": "",
   "max_minutes": 20,
   "max_agents": 1,
@@ -26,8 +25,7 @@ var Examples = map[string]string{
 `,
 	"repo-health": `{
   "name": "repo-health",
-  "description": "Weekdays 09:00: failed CI runs and open PRs, summarised by an agent, sent to you.",
-  "schedule": "0 9 * * 1-5",
+  "description": "Failed CI runs and open PRs, summarised by an agent, sent to you.",
   "dir": "",
   "max_minutes": 15,
   "max_agents": 1,
@@ -47,8 +45,7 @@ var Examples = map[string]string{
 `,
 	"webhook-reply": `{
   "name": "webhook-reply",
-  "description": "A POST to its webhook with {\"message\": \"...\"} gets an agent's short reply back in the response.",
-  "webhook": true,
+  "description": "An agent's short reply to a message; behind a webhook schedule the reply comes back in the response.",
   "inputs": {"message": ""},
   "outputs": {"reply": "{{steps.reply.output}}"},
   "max_minutes": 5,
@@ -61,6 +58,13 @@ var Examples = map[string]string{
   ]
 }
 `,
+}
+
+// ExampleSchedules attach the examples to their triggers; they are added disabled.
+var ExampleSchedules = map[string]string{
+	"dependabot-daily": `{"name": "dependabot-daily", "workflow": "dependabot-daily", "description": "Every day at 17:00.", "cron": "0 17 * * *"}`,
+	"repo-health":      `{"name": "repo-health", "workflow": "repo-health", "description": "Weekdays at 09:00.", "cron": "0 9 * * 1-5"}`,
+	"webhook-reply":    `{"name": "webhook-reply", "workflow": "webhook-reply", "description": "A POST with {\"message\": \"...\"} gets the reply back.", "webhook": true}`,
 }
 
 // Example is the Dependabot example.

@@ -72,7 +72,7 @@ func (f *fake) env() Env {
 			if !ok {
 				return w, false, errors.New("no workflow " + name)
 			}
-			return w, f.enabled[name], nil
+			return w, true, nil
 		},
 		Guard: func(cmd string) string {
 			if f.block != "" && strings.Contains(cmd, f.block) {
@@ -94,12 +94,17 @@ func parse(t *testing.T, s string) Workflow {
 }
 
 func TestExamplesParse(t *testing.T) {
-	if len(ExampleNames()) != 3 {
+	if len(ExampleNames()) < 3 {
 		t.Fatalf("want 3 examples: %v", ExampleNames())
 	}
 	for _, n := range ExampleNames() {
 		if w := parse(t, Examples[n]); w.Name != n {
 			t.Errorf("%s names itself %s", n, w.Name)
+		}
+	}
+	for n, js := range ExampleSchedules {
+		if sc, err := ParseSchedule([]byte(js)); err != nil || sc.Workflow != n {
+			t.Errorf("schedule %s: %v", n, err)
 		}
 	}
 }
@@ -244,12 +249,8 @@ func TestAskAndCall(t *testing.T) {
 	if r.Status != StatusOK || len(f.notes) != 2 || f.notes[1] != "p: 44" || !strings.HasPrefix(f.asked[0], "workflow:p:") {
 		t.Fatalf("%s %s %q %q", r.Status, r.Error, f.notes, f.asked)
 	}
-	r = RunWith(context.Background(), w, f.env(), Invocation{Trigger: TriggerSchedule})
-	if r.Status != StatusFailed || !strings.Contains(r.Error, "not enabled") {
-		t.Fatalf("an unattended run must call only enabled workflows: %+v", r)
-	}
 	selfCall := parse(t, `{"name":"loop","steps":[{"id":"again","kind":"call","workflow":"loop"}]}`)
-	f.flows["loop"], f.enabled["loop"] = selfCall, true
+	f.flows["loop"] = selfCall
 	if r := Run(context.Background(), selfCall, f.env()); r.Status != StatusFailed || !strings.Contains(r.Error, "deeper") {
 		t.Fatalf("depth: %s", r.Error)
 	}

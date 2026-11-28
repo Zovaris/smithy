@@ -24,12 +24,6 @@ const (
 	StatusSkipped = "skipped"
 )
 
-// Triggers a run records.
-const (
-	TriggerSchedule = "schedule"
-	TriggerWebhook  = "webhook"
-)
-
 // AgentCall is one agent step's request.
 type AgentCall struct {
 	Dir, Prompt, Model, Effort string
@@ -54,8 +48,9 @@ type Env struct {
 
 // Invocation is how a run was started: its trigger and inputs.
 type Invocation struct {
-	Trigger string
-	Inputs  map[string]string
+	Trigger  string
+	Schedule string
+	Inputs   map[string]string
 }
 
 // Record is one run with every step's result. Secrets read through {{env.X}} are replaced by
@@ -63,6 +58,7 @@ type Invocation struct {
 type Record struct {
 	Workflow string            `json:"workflow"`
 	Trigger  string            `json:"trigger,omitempty"`
+	Schedule string            `json:"schedule,omitempty"`
 	Inputs   map[string]string `json:"inputs,omitempty"`
 	Outputs  map[string]string `json:"outputs,omitempty"`
 	Started  time.Time         `json:"started"`
@@ -138,7 +134,7 @@ func RunWith(ctx context.Context, w Workflow, env Env, in Invocation) Record {
 	}
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(w.maxMinutes())*time.Minute)
 	defer cancel()
-	rec := &Record{Workflow: w.Name, Trigger: in.Trigger, Started: env.Now(), Status: StatusRunning}
+	rec := &Record{Workflow: w.Name, Trigger: in.Trigger, Schedule: in.Schedule, Started: env.Now(), Status: StatusRunning}
 	r := &runner{w: w, env: env, lim: &limits{}, secrets: &secrets{vals: map[string]bool{}}, trigger: in.Trigger,
 		runID: rec.Started.UTC().Format("20060102T150405.000"), rec: rec, recMu: &sync.Mutex{}}
 	r.exitOK = exitTested(w.Steps)
@@ -584,8 +580,8 @@ func (r *runner) call(ctx context.Context, s Step, sc *scope, res *StepResult) e
 	if err != nil {
 		return err
 	}
-	if !enabled && r.trigger != "" && r.trigger != "cli" && r.trigger != "tui" && r.trigger != "web" {
-		return fmt.Errorf("workflow %s is not enabled: an unattended run calls only enabled workflows", s.Workflow)
+	if !enabled {
+		return fmt.Errorf("workflow %s can't be called", s.Workflow)
 	}
 	in := map[string]string{}
 	for _, k := range sortedKeys(s.With) {
