@@ -45,6 +45,8 @@ const (
 	overlayInfo    // /connect, /remote, /web, /log
 	overlayProject // which project a new session starts in
 	overlayWelcome
+	overlayAsk   // the question card for the first decision waiting on you
+	overlayBoard // /board: the task files by status
 )
 
 // chatTool is the data of a "tool" event: one tool call of a session's turn.
@@ -85,13 +87,8 @@ type palItem struct {
 	run              func(m *chatView) tea.Cmd
 }
 
-type stripHit struct {
-	x0, x1 int
-	answer string
-}
-
 // event routes one daemon event: session events to their conversation, decisions to the
-// strip, a turn's tools and thinking to the transcript, everything else to the status line.
+// question card, a turn's tools and thinking to the transcript, everything else to the status line.
 func (m *chatView) event(kind, session string, at time.Time, data json.RawMessage) {
 	if strings.HasPrefix(kind, "session_") && session != "" {
 		if m.sessionEvent(kind, session, data) {
@@ -120,6 +117,7 @@ func (m *chatView) event(kind, session string, at time.Time, data json.RawMessag
 		var d daemon.Decision
 		if json.Unmarshal(data, &d) == nil && d.ID != "" {
 			m.setPending(append(m.pending, d))
+			m.offerAsk()
 		}
 	case daemon.KindAnswered:
 		var o daemon.Outcome
@@ -176,6 +174,10 @@ func (m *chatView) unpend(id string) {
 		}
 	}
 	m.pending = out
+	if m.overlay == overlayAsk && id == m.card.id {
+		m.overlay = overlayNone
+		m.offerAsk()
+	}
 }
 
 func (m *chatView) decided(d chatDecidedMsg) {
@@ -276,27 +278,6 @@ func (m *chatView) shortcut(msg tea.KeyPressMsg) (bool, tea.Cmd) {
 	return false, nil
 }
 
-// optionFor is the waiting decision's option whose first letter is t, when t is that letter
-// alone: the letter then enter answers, so a typed message never loses its first letter.
-func (m chatView) optionFor(t string) (string, bool) {
-	if len(m.pending) == 0 || len([]rune(t)) != 1 {
-		return "", false
-	}
-	for _, o := range m.pending[0].Options {
-		if strings.EqualFold(firstRune(o), t) {
-			return o, true
-		}
-	}
-	return "", false
-}
-
-func firstRune(s string) string {
-	for _, r := range s {
-		return string(r)
-	}
-	return ""
-}
-
 // command runs a / command typed in the input.
 func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 	name, arg, _ := strings.Cut(strings.TrimPrefix(line, "/"), " ")
@@ -348,12 +329,14 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m, m.askDemo(arg)
 	case "answer":
 		if arg == "" {
-			m.system("usage: /answer <text>")
+			m.openAsk()
 			return m, nil
 		}
 		return m, m.answer(arg)
 	case "detach":
 		return m.detach()
+	case "board", "tasks":
+		return m.openBoard(arg)
 	case "serve", "set", "unset", "key", "keys", "doctor", "tend", "prompt":
 		return m.settingsCommand(name, arg)
 	case "quit":
@@ -397,33 +380,29 @@ func skillDir(path string) string {
 	return d
 }
 
-// click focuses what is under the pointer: an option on the strip answers, a transcript row
+// click focuses what is under the pointer: a transcript row
 // focuses its message (and opens or closes a tool block), the input row focuses the input.
 func (m chatView) click(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	if msg.Button != tea.MouseLeft {
 		return m, nil
 	}
 	const head = headRows
-	strip := m.stripRows()
 	inputY := m.height - 1 - m.input.Height()
 	switch {
 	case m.overlay != overlayNone:
 		return m, nil
-	case msg.Y == head && strip > 0:
-		_, hits := m.strip(max(m.width, 20))
+	case msg.Y == head+m.rows() && m.refined() != "" && !m.working():
+		_, hits := m.refineRow(max(m.width, 20))
 		for _, h := range hits {
-			if msg.X >= h.x0 && msg.X < h.x1 && len(m.pending) == 0 {
-				return m.refineAct(h.answer)
-			}
 			if msg.X >= h.x0 && msg.X < h.x1 {
-				return m, m.answer(h.answer)
+				return m.refineAct(h.option)
 			}
 		}
 	case msg.Y >= inputY && msg.Y < m.height-1:
 		m.setFocus(-1)
-	case msg.Y >= head+strip && msg.Y < head+strip+m.rows():
+	case msg.Y >= head && msg.Y < head+m.rows():
 		vis, idx := m.visible()
-		j := msg.Y - head - strip - (m.rows() - len(vis))
+		j := msg.Y - head - (m.rows() - len(vis))
 		if j < 0 || j >= len(idx) {
 			return m, nil
 		}
@@ -442,10 +421,14 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch m.overlay {
 	case overlaySetup, overlayPicker, overlaySkills, overlayWelcome:
 		return m.setupKey(msg)
+	case overlayAsk:
+		return m.askKey(msg)
 	case overlayAgents:
 		return m.agentsKey(k)
 	case overlayProject:
 		return m.projectKey(k)
+	case overlayBoard:
+		return m.boardKey(k)
 	case overlayHelp, overlayInfo:
 		if p := m.info.set; p != nil && m.overlay == overlayInfo {
 			switch k {
@@ -465,7 +448,7 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			if k == "q" && m.overlay == overlayHelp {
 				break
 			}
-			m.overlay = overlayNone
+			m.overlay, m.infoBack = m.infoBack, overlayNone
 			return m, nil
 		case "up":
 			m.pal.sel = max(m.pal.sel-1, 0)
@@ -580,6 +563,7 @@ func (m chatView) palItems() []palItem {
 		}},
 		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Verbosity: " + m.mode.String(), hint: "minimal · expandable · verbose", key: "ctrl+o", run: cycle},
 		palItem{group: "ACTIONS", glyph: t.g.on, color: t.muted, label: "Agents panel", hint: "sessions and waiting items", key: "tab", run: agents},
+		palItem{group: "ACTIONS", glyph: "≡", color: t.muted, label: "Board", hint: "the task files by status", key: "/board", run: func(m *chatView) tea.Cmd { n, c := m.openBoard(""); *m = n.(chatView); return c }},
 		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Open the web UI", hint: "same sessions in the browser", key: "/web", run: func(m *chatView) tea.Cmd { _, c := m.openWeb(); return c }},
 		palItem{group: "ACTIONS", glyph: "→", color: t.muted, label: "Connect", hint: strings.TrimPrefix(m.server+" "+t.g.dot+" "+m.url, " "+t.g.dot+" "), key: "/connect", run: func(m *chatView) tea.Cmd { return m.showConnect() }},
 		palItem{group: "ACTIONS", glyph: t.g.dot, color: t.muted, label: "Daemon log", hint: fmt.Sprintf("%d events", len(m.noise)), key: "/log", run: func(m *chatView) tea.Cmd { m.showLog(); return nil }},
@@ -821,59 +805,6 @@ func (m chatView) tierRow(i, w int, c color.Color, s string) string {
 // blockRow lays one row of message i: the focused block sits on the focus tier.
 func (m chatView) blockRow(i, w int, s string) string { return m.tierRow(i, w, nil, s) }
 
-func (m chatView) stripRows() int {
-	if len(m.pending) == 0 && m.refined() == "" {
-		return 0
-	}
-	return 2
-}
-
-// strip is the sticky top row for the first decision waiting on the user, as in the Chat
-// mockups: the ? badge, the question, the first option as the ember button and the rest on the
-// focus tier, what runs on the right; and where each option sits so a click can answer it.
-func (m chatView) strip(w int) (string, []stripHit) {
-	t := m.th
-	d := daemon.Decision{Question: "refined prompt ready", Options: refineOptions}
-	if len(m.pending) > 0 {
-		d = m.pending[0]
-	}
-	row := lipgloss.NewStyle()
-	if t.raised != nil {
-		row = row.Background(t.raised)
-	}
-	bg := func(fg, b color.Color) lipgloss.Style {
-		st := lipgloss.NewStyle()
-		if fg != nil {
-			st = st.Foreground(fg)
-		}
-		if b != nil {
-			st = st.Background(b)
-		}
-		return st
-	}
-	p := strings.Repeat(" ", m.pad())
-	s := p + bg(t.surface, t.warn).Bold(true).Render(" "+t.g.wait+" ") + "  " + t.fg(t.strong).Render(short(d.Question, max(w/2, 20))) + "  "
-	var hits []stripHit
-	for n, o := range d.Options {
-		x := ansi.StringWidth(s)
-		label := " " + firstRune(o) + "  " + o + " "
-		if n == 0 {
-			s += bg(t.surface, t.accent).Bold(true).Render(label)
-		} else {
-			s += bg(t.text, t.focus).Render(label)
-		}
-		hits = append(hits, stripHit{x0: x, x1: ansi.StringWidth(s), answer: o})
-		s += " "
-	}
-	if len(d.Options) == 0 {
-		s += t.fg(t.dim).Render("/answer <text>")
-	}
-	if n := len(m.pending) - 1; n > 0 {
-		s += t.fg(t.dim).Render(fmt.Sprintf(" +%d more", n))
-	}
-	return fill(row, w, s), hits
-}
-
 func spread(left, right string, w int) string {
 	gap := w - ansi.StringWidth(left) - ansi.StringWidth(right)
 	if gap < 1 {
@@ -885,7 +816,7 @@ func spread(left, right string, w int) string {
 	return left + strings.Repeat(" ", gap) + right
 }
 
-// askDemo pins a sample question (or the one typed) on the decision strip through the daemon,
+// askDemo asks a sample question (or the one typed) on the question card through the daemon,
 // the same path an agent's ask tool takes outside warden, so it can be seen and answered.
 func (m *chatView) askDemo(q string) tea.Cmd {
 	if m.ask == nil {
@@ -898,6 +829,6 @@ func (m *chatView) askDemo(q string) tea.Cmd {
 	}
 	b := make([]byte, 4)
 	_, _ = rand.Read(b)
-	m.status("asked: answer it on the strip at the top (click, its first letter then enter, or /answer)")
+	m.status("asked: answer it on the question card (a number, arrows and enter, or your own words)")
 	return m.ask("ask:demo"+hexenc.EncodeToString(b), q, opts)
 }

@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // refineFence opens the block the refine skill ends with; the harness offers it to copy or to
@@ -54,9 +56,40 @@ func (m chatView) refineOption(t string) (string, bool) {
 		return "", false
 	}
 	for _, o := range refineOptions {
-		if strings.EqualFold(firstRune(o), t) {
+		if strings.EqualFold(o[:1], t) {
 			return o, true
 		}
 	}
 	return "", false
+}
+
+// refineHit is where a button sits on the refine row, for a click.
+type refineHit struct {
+	x0, x1 int
+	option string
+}
+
+// refineRow is the row under the transcript while a refined prompt waits: the label, then each
+// button with its key letter, the first on the accent tier as the ask card's pick.
+func (m chatView) refineRow(w int) (string, []refineHit) {
+	t := m.th
+	s := strings.Repeat(" ", m.pad()) + "  " + t.fg(t.strong).Render("refined prompt ready") + "  "
+	var hits []refineHit
+	for n, o := range refineOptions {
+		x := ansi.StringWidth(s)
+		st := lipgloss.NewStyle().Foreground(t.text)
+		if t.focus != nil {
+			st = st.Background(t.focus)
+		}
+		if n == 0 {
+			st = lipgloss.NewStyle().Foreground(t.surface).Bold(true)
+			if t.accent != nil {
+				st = st.Background(t.accent)
+			}
+		}
+		s += st.Render(" " + o[:1] + "  " + o + " ")
+		hits = append(hits, refineHit{x0: x, x1: ansi.StringWidth(s), option: o})
+		s += " "
+	}
+	return spread(s, t.fg(t.dim).Render("letter, then enter")+strings.Repeat(" ", m.pad()+2), w), hits
 }

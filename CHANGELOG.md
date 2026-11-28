@@ -10,9 +10,17 @@ part above `### Details`.
 
 ### New
 - New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
+
+- An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
+
+### Details
+
+- TUI: the top decision strip is gone; the question card (`overlayAsk`) opens when a decision arrives and the composer is empty, or on enter with an empty composer or `/answer`; 1-9, arrows and enter, space on multi-select, esc for later. The pill reads "waiting on you".
+- daemon: decisions carry `multi` and `other`; `/v1/asks` takes `multi` and accepts free text for every non-guard question; the MCP `ask` tool gains a `multi` flag.
 - `/doctor` in the chat opens a modal: problems first, then things worth a look, then what is fine, each problem with its fix.
 - The chat header shows the tend mode and how many PRs it tends.
 - `/tend` and `/serve` change their setting with left/right; enter saves. Theme and effort pickers cycle with left/right too.
+- A vague product idea ("make me a landing page") now starts with a brainstorm, grilling, spec and tasks before any build, and smithy offers the design or frontend skills you have installed.
 
 ### Fixed
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
@@ -20,6 +28,8 @@ part above `### Details`.
 ### Details
 - TUI: `infoPanel.set` holds one setting row cycled with left/right; `doctorPanel` groups `smithy doctor` output; the header reads `GET /v1/tend` once a minute.
 
+- `/board` in the TUI chat shows your task files by status, like the web Board: move a task with
+  left/right, tab through task dirs, enter opens the file, `o` opens its PR, blockers and PRs show on each row.
 - The agents' system prompt lives in an editable file: write `~/.smithy/prompt.md` to replace the default; `/prompt` and the web settings show the path and whether it is active.
 
 - `/effort` works before any session: it sets the effort the next session starts with (`agent.effort`).

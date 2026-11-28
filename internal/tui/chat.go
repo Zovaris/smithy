@@ -31,8 +31,8 @@ const ChatUsage = `usage: smithy chat [url | --server <name|url> | --standalone]
 A fullscreen chat over a smithy daemon: its events stream into the transcript and the input stays
 pinned at the bottom. A lost connection retries and resumes after the last event seen.
 Keys: enter send; pgup/pgdn, wheel or ctrl+u/ctrl+d scroll; home/end top/bottom; click a tool block
-to open it; ctrl+o cycles minimal / expandable / verbose; tab agents; ctrl+k palette; an
-option's first letter alone then enter, or a click on it, answers the decision pinned at the top;
+to open it; ctrl+o cycles minimal / expandable / verbose; tab agents; ctrl+k palette; a
+question waiting on you opens as a card (a number, arrows and enter, or your own words; esc for later);
 / opens every command, /name or $name runs an installed skill, @ a file, ? then enter help; !cmd runs a shell
 command in the session folder; ctrl+v attaches a clipboard image; esc clears the input; ctrl+c quits.
   url           default: the local daemon (token from ~/.smithy/daemon.token), started in the
@@ -99,9 +99,13 @@ type chatView struct {
 	// ask posts a question to /v1/asks (the /ask demo); nil without a daemon.
 	ask func(id, question string, options []string) tea.Cmd
 
-	setup     setupAPI      // the daemon's setup endpoints; nil: none
-	cfg       settingsAPI   // the daemon's settings endpoints; nil: none
-	setupSt   *daemon.Setup // last GET /v1/setup
+	setup     setupAPI           // the daemon's setup endpoints; nil: none
+	cfg       settingsAPI        // the daemon's settings endpoints; nil: none
+	board     boardAPI           // the daemon's task endpoints; nil: none
+	boardSt   boardView          // the open /board
+	opener    func(string) error // opens a URL; nil: the default browser
+	infoBack  chatOverlay        // where esc on the info panel goes back to
+	setupSt   *daemon.Setup      // last GET /v1/setup
 	setupSel  int
 	setupStep setupStep
 	setupNote string // a fix, an error or install output shown in the open overlay
@@ -111,6 +115,7 @@ type chatView struct {
 	modelList *models.List // what the agent reported; nil while it loads
 	modelSess string
 	effortSel int
+	card      askCard
 	themeSel  int
 
 	welcome      welcomeStep
@@ -432,7 +437,8 @@ func runChat(a chatArgs, env string) (int, *chatSwitch) {
 	}
 	m.hold(notes, st.LastSeq)
 	m.setPending(st.Pending)
-	m.setup, m.sess, m.cfg = c, c, c
+	m.offerAsk()
+	m.setup, m.sess, m.cfg, m.board = c, c, c, c
 	m.dir, _ = os.Getwd()
 	m.root, _ = filepath.EvalSymlinks(m.dir)
 	m.branch = gitBranch(m.dir)
@@ -564,6 +570,10 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.projectsLoaded(msg)
 	case dirsMsg:
 		return m.dirsLoaded(msg)
+	case boardMsg:
+		return m.boardLoaded(msg)
+	case boardMovedMsg:
+		return m.boardMoved(msg)
 	case effortDefaultMsg:
 		m.effortDefaultSet(msg)
 		return m, nil
@@ -685,8 +695,9 @@ func (m chatView) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.input.SetValue("")
 			m.popSel = 0
-			if o, ok := m.optionFor(t); ok && len(m.images) == 0 {
-				return m, m.answer(o)
+			if t == "" && len(m.images) == 0 && len(m.pending) > 0 {
+				m.openAsk()
+				return m, nil
 			}
 			if o, ok := m.refineOption(t); ok && len(m.images) == 0 {
 				return m.refineAct(o)
@@ -752,12 +763,15 @@ func eventText(kind, session string, data json.RawMessage) string {
 	return kind
 }
 
-// rows is the transcript height: the screen less the header, the decision strip, the status
+// rows is the transcript height: the screen less the header, the status
 // line and the gap under it, the composer, the footer and the spinner row while the open
 // session works.
 func (m chatView) rows() int {
-	n := m.height - headRows - m.stripRows() - 2 - m.input.Height() - 1
+	n := m.height - headRows - 2 - m.input.Height() - 1
 	if m.working() {
+		n -= 2
+	}
+	if m.refined() != "" {
 		n -= 2
 	}
 	return max(n, 1)
@@ -916,10 +930,6 @@ func (m chatView) View() tea.View {
 	w := max(m.width, 20)
 	out := make([]string, 0, m.height)
 	out = append(out, m.header(w)...)
-	if m.stripRows() > 0 {
-		s, _ := m.strip(w)
-		out = append(out, s, "")
-	}
 	vis, _ := m.visible()
 	body := make([]string, 0, m.rows()+2)
 	for range m.rows() - len(vis) {
@@ -928,6 +938,10 @@ func (m chatView) View() tea.View {
 	body = append(body, vis...)
 	if m.working() {
 		body = append(body, m.spinRow(w), "")
+	}
+	if m.refined() != "" {
+		r, _ := m.refineRow(w)
+		body = append(body, r, "")
 	}
 	if items := m.popup(); len(items) > 0 {
 		pw := min(w-2*m.pad(), 72)
@@ -960,6 +974,10 @@ func (m chatView) View() tea.View {
 		out = m.helpBox(out, w, m.height)
 	case overlayInfo:
 		out = m.infoBox(out, w, m.height)
+	case overlayAsk:
+		out = m.askBox(out, w, m.height)
+	case overlayBoard:
+		out = m.boardBox(out, w, m.height)
 	}
 	if len(out) > m.height {
 		out = out[len(out)-m.height:]

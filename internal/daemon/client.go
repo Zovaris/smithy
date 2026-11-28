@@ -95,7 +95,12 @@ func (c *Client) Decide(ctx context.Context, id, answer string) (Outcome, error)
 
 // Ask records a warden decision (decide:<batch>/<item>/<key>) on the daemon (POST /v1/asks).
 func (c *Client) Ask(ctx context.Context, id, question string, options []string) error {
-	b, _ := json.Marshal(map[string]any{"id": id, "question": question, "options": options})
+	return c.AskMulti(ctx, id, question, options, false)
+}
+
+// AskMulti is Ask for a question whose options may be picked together when multi is true.
+func (c *Client) AskMulti(ctx context.Context, id, question string, options []string, multi bool) error {
+	b, _ := json.Marshal(map[string]any{"id": id, "question": question, "options": options, "multi": multi})
 	r, err := c.req(ctx, "POST", "/v1/asks", b)
 	if err != nil {
 		return err
@@ -324,6 +329,20 @@ func (c *Client) RemoveProject(ctx context.Context, dir string) (ProjectList, er
 	var l ProjectList
 	err := c.call(ctx, "DELETE", "/v1/projects", map[string]string{"dir": dir}, &l)
 	return l, err
+}
+
+// Tasks is GET /v1/tasks: the task lists of the project at dir ("" is the default project).
+func (c *Client) Tasks(ctx context.Context, dir string) (TaskBoard, error) {
+	var b TaskBoard
+	err := c.call(ctx, "GET", "/v1/tasks?project="+url.QueryEscape(dir), nil, &b)
+	return b, err
+}
+
+// MoveTask is PUT /v1/tasks/status: it writes status to the task file's Status line.
+func (c *Client) MoveTask(ctx context.Context, file, status string) (TaskCard, error) {
+	var t TaskCard
+	err := c.call(ctx, "PUT", "/v1/tasks/status", map[string]string{"file": file, "status": status}, &t)
+	return t, err
 }
 
 // ListDirs is GET /v1/fs: the folders inside dir on the daemon's machine ("" is its home).

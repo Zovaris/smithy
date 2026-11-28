@@ -1,6 +1,6 @@
-   ◆ smithy dev                                                                ● 1 running  09:07   
+   ◆ smithy dev                                               ● waiting on you · 1 running  09:07   
 
-    ? ┌──────────────────────────────────────────────────────────────────────────────────────┐      
+      ┌──────────────────────────────────────────────────────────────────────────────────────┐
       │ › Search actions, sessions, settings                                             esc │
       ├──────────────────────────────────────────────────────────────────────────────────────┤
       │                                                                                      │
@@ -13,20 +13,20 @@
       │   ≡  Skills and MCP  what goes into every session                           /skills  │
       │   ≡  Verbosity: minimal  minimal · expandable · verbose                      ctrl+o  │
       │   ●  Agents panel  sessions and waiting items                                   tab  │
+      │   ≡  Board  the task files by status                                         /board  │
       │   →  Open the web UI  same sessions in the browser                             /web  │
-      │   →  Connect  http://127.0.0.1:7477                                        /connect  │
-     ›│   ·  Daemon log  0 events                                                      /log  │      
-      │   ↓  Jump to latest                                                             end  │
-     P│   ✗  Quit                                                                    ctrl+c  │
-     o│                                                                                      │
-      │   SESSIONS                                                                           │
-     ✓│   ✓  TK-6  done                                                                      │s     
-      │   ●  TK-29  running                                                                  │
-     D│   ✗  TES-9  failed                                                                   │
+     ›│   →  Connect  http://127.0.0.1:7477                                        /connect  │      
+      │   ·  Daemon log  0 events                                                      /log  │
+     P│   ↓  Jump to latest                                                             end  │
+     o│   ✗  Quit                                                                    ctrl+c  │
       │                                                                                      │
-      │   SETTINGS                                                                           │477   
-      │   ·  chat.mode  minimal                                                              │
+     ✓│   SESSIONS                                                                           │s     
+      │   ✓  TK-6  done                                                                      │
+     D│   ●  TK-29  running                                                                  │
+      │   ✗  TES-9  failed                                                                   │
+      │                                                                                      │477   
+      │   SETTINGS                                                                           │
      ›│                                                                                      │      
       ├──────────────────────────────────────────────────────────────────────────────────────┤      
-      │  ↑↓ move   enter run   tab next group                                    16 results  │      
+      │  ↑↓ move   enter run   tab next group                                    17 results  │      
    ent└──────────────────────────────────────────────────────────────────────────────────────┘      
