@@ -4,9 +4,12 @@ package chat
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/Zovaris/smithy/internal/tui/kit"
 )
@@ -112,45 +115,63 @@ func (m chatView) askKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// askBox is the question card: the question, its options numbered, then a free-text "Other".
+// askBox is the Questions panel docked above the input: the question, its options numbered with
+// a muted description line under each (text after " — "), then "Type your own answer". The
+// transcript above stays readable; only the rows the panel needs are covered.
 func (m chatView) askBox(screen []string, w, h int) []string {
 	t := m.th
 	if len(m.pending) == 0 {
 		return screen
 	}
 	d := m.pending[0]
-	bw, bh := m.boxSize(w, h)
-	bh = min(bh, len(d.Options)+12)
-	title := "Waiting on you"
-	if more := len(m.pending) - 1; more > 0 {
-		title += fmt.Sprintf(" · %d more after this", more)
+	p := m.pad()
+	gut := strings.Repeat(" ", p)
+	bw := w - 2*p
+	bg, sel := on(t.Raised), on(t.Focus)
+	rail := t.Fg(t.Warn).Render(railGlyph(t.G.Unicode))
+	row := func(st lipgloss.Style, s string) string { return gut + fill(st, bw, rail+s) + gut }
+	title := t.Fg(t.Warn).Bold(true).Render("Questions")
+	count := t.Fg(t.Dim).Render(fmt.Sprintf("1 of %d  ", len(m.pending)))
+	rows := []string{row(bg, ""), row(bg, spread("  "+title, count, bw-1)), row(bg, "")}
+	for _, l := range strings.Split(ansi.Wrap(d.Question, max(bw-8, 10), ""), "\n") {
+		rows = append(rows, row(bg, "  "+t.Fg(t.Strong).Bold(true).Render(l)))
 	}
-	items := []boxItem{{group: kit.Short(d.Question, bw-6)}}
-	if d.Multi {
-		items = append(items, boxItem{glyph: t.G.Dot, color: t.Muted, label: "pick any: space or the number picks, enter sends", static: true})
-	}
-	for i, o := range d.Options {
-		g, c := t.G.Dot, t.Muted
-		if d.Multi {
-			g = "[ ]"
+	rows = append(rows, row(bg, ""))
+	opt := func(i int, label, desc string) {
+		st, num, lab := bg, t.Fg(t.Accent).Render(fmt.Sprintf(" %d ", i+1)), t.Fg(t.Text).Render(label)
+		if i == m.card.sel {
+			st, num, lab = sel, m.chip(fmt.Sprintf(" %d ", i+1), t.Surface, t.Accent, true), t.Fg(t.Strong).Bold(true).Render(label)
+		}
+		mark := ""
+		if d.Multi && i < len(d.Options) {
+			mark = "[ ] "
 			if m.card.picked[i] {
-				g, c = "[x]", t.Accent
+				mark = t.Fg(t.Accent).Render("[x] ")
 			}
 		}
-		items = append(items, boxItem{glyph: g, color: c, label: fmt.Sprintf("%d  %s", i+1, o)})
+		rows = append(rows, row(st, "  "+num+"  "+mark+lab))
+		if desc != "" {
+			rows = append(rows, row(st, "       "+t.Fg(t.Muted).Render(kit.Short(desc, bw-10))))
+		}
 	}
-	other := m.card.other
-	if other == "" {
-		other = t.Fg(t.Dim).Render("type your own answer")
+	for i, o := range d.Options {
+		label, desc, _ := strings.Cut(o, " — ")
+		opt(i, label, desc)
 	}
-	items = append(items, boxItem{glyph: t.G.Dot, color: t.Muted, label: "Other: " + other})
-	sel := m.card.sel
+	other := "Type your own answer"
+	if m.card.other != "" {
+		other = m.card.other + "▏"
+	}
+	opt(len(d.Options), other, "")
+	hint := t.Fg(t.Dim).Render("↑↓ select " + t.G.Dot + " enter submit " + t.G.Dot + " esc dismiss")
 	if d.Multi {
-		sel++
+		hint = t.Fg(t.Dim).Render("↑↓ select " + t.G.Dot + " space pick " + t.G.Dot + " enter submit " + t.G.Dot + " esc dismiss")
 	}
-	foot := "  " + keyHints(t, "↑↓", "move", "1-9", "pick", "enter", "answer", "esc", "later")
-	if d.Multi {
-		foot = "  " + keyHints(t, "↑↓", "move", "space", "pick", "enter", "send", "esc", "later")
-	}
-	return m.overBox(screen, m.floatBox(bw, bh, "", title, items, sel, foot), w)
+	rows = append(rows, row(bg, ""), row(bg, "  "+hint), row(bg, ""))
+	bottom := len(screen) - 1 - len(m.composer(w))
+	top := max(bottom-len(rows), headRows)
+	rows = rows[len(rows)-(bottom-top):]
+	out := slices.Clone(screen)
+	copy(out[top:bottom], rows)
+	return out
 }

@@ -50,6 +50,8 @@ const (
 	overlayAsk       // the question card for the first decision waiting on you
 	overlayBoard     // /board: the task files by status
 	overlayWorkflows // /workflows and /schedules
+	overlayConfig    // /config: every setting, grouped and searchable
+	overlayUsage     // /usage: tokens and spend
 )
 
 // chatTool is the data of a "tool" event: one tool call of a session's turn.
@@ -402,6 +404,8 @@ func (m chatView) command(line string) (tea.Model, tea.Cmd) {
 		return m.settingsCommand(name, arg)
 	case "usage":
 		return m.openUsage()
+	case "config", "settings":
+		return m.openConfig(arg)
 	case "quit":
 		return m.quit()
 	case "help":
@@ -513,6 +517,10 @@ func (m chatView) overlayKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.setupKey(msg)
 	case overlayAsk:
 		return m.askKey(msg)
+	case overlayConfig:
+		return m.configKey(msg)
+	case overlayUsage:
+		return m.usageKey(msg)
 	case overlayAgents:
 		return m.agentsKey(k)
 	case overlayProject:
@@ -749,6 +757,9 @@ func (m chatView) render(i, w int) []string {
 		if (c.kind == "thinking" || c.kind == "turn") && m.mode != modeVerbose {
 			return []string{}
 		}
+		if c.who == "agent" && m.opensAnswer(i) {
+			return append([]string{m.agentHead(w)}, m.textRows(c, w)...)
+		}
 		return m.textRows(c, w)
 	}
 	a, b := m.runOf(i)
@@ -828,13 +839,14 @@ func (m chatView) toolRows(i, w int, open, last bool) []string {
 	tl := m.msgs[i].tool
 	p := strings.Repeat(" ", m.pad())
 	dim := t.Fg(t.Dim)
-	g, col := m.toolGlyph(tl.Status)
+	g, col := t.G.On, t.Info
+	mark := t.Fg(t.Ok).Render(t.G.Pass + " ")
 	arg := t.Fg(t.Text).Render(tl.Arg)
-	if tl.Status == "running" {
-		spin := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-		if t.G.Unicode {
-			g = spin[m.frame%len(spin)]
-		}
+	switch tl.Status {
+	case "failed":
+		col, mark = t.Err, t.Fg(t.Err).Render(t.G.Fail+" ")
+	case "running":
+		g, col, mark = t.Spinner(m.frame), t.Warn, ""
 		n := ansi.StringWidth(tl.Arg)
 		arg = t.Shimmer(tl.Arg, math.Mod(float64(m.frame)*0.6, float64(n+12))-6)
 	}
@@ -842,7 +854,7 @@ func (m chatView) toolRows(i, w int, open, last bool) []string {
 	if ansi.StringWidth(name) < 5 {
 		name += strings.Repeat(" ", 5-ansi.StringWidth(name))
 	}
-	left := p + "  " + t.Fg(col).Render(g) + "  " + t.Fg(t.Strong).Bold(true).Render(name) + " " + arg
+	left := p + "  " + t.Fg(col).Render(g) + " " + t.Fg(col).Bold(true).Render(name) + " " + arg
 	var right string
 	if m.mode == modeVerbose {
 		var meta []string
@@ -851,13 +863,13 @@ func (m chatView) toolRows(i, w int, open, last bool) []string {
 				meta = append(meta, s)
 			}
 		}
-		right = dim.Render(strings.Join(meta, " "+t.G.Dot+" "))
+		right = mark + dim.Render(strings.Join(meta, " "+t.G.Dot+" "))
 	} else {
 		took := tl.Took
 		if n := ansi.StringWidth(took); n < 5 {
 			took = strings.Repeat(" ", 5-n) + took
 		}
-		right = dim.Render(tl.Stat + "  " + took)
+		right = mark + t.Fg(t.Muted).Render(tl.Stat) + dim.Render("  "+took)
 	}
 	head := spread(ansi.Truncate(left, w-ansi.StringWidth(right)-m.pad()-4, "…"), right+p+"  ", w)
 	tier := t.Focus
@@ -931,4 +943,32 @@ func (m *chatView) askDemo(q string) tea.Cmd {
 	_, _ = rand.Read(b)
 	m.status("asked: answer it on the question card (a number, arrows and enter, or your own words)")
 	return m.ask("ask:demo"+hexenc.EncodeToString(b), q, opts)
+}
+
+// agentHead opens an answer: the agent's name in the info colour, its model and effort dim.
+func (m chatView) agentHead(w int) string {
+	t := m.th
+	s, _ := m.session()
+	name, rest := s.agent, nonEmpty(s.model, s.effort)
+	if name == "" {
+		name = m.agentLabel()
+	}
+	head := strings.Repeat(" ", m.pad()) + "  " + t.Fg(t.Info).Bold(true).Render(name)
+	if len(rest) > 0 {
+		head += "  " + t.Fg(t.Dim).Render(strings.Join(rest, " "+t.G.Dot+" "))
+	}
+	return ansi.Truncate(head, w, "…")
+}
+
+// opensAnswer reports whether agent message i is the first agent text since your last message.
+func (m chatView) opensAnswer(i int) bool {
+	for j := i - 1; j >= 0; j-- {
+		switch m.msgs[j].who {
+		case "you":
+			return true
+		case "agent":
+			return false
+		}
+	}
+	return true
 }

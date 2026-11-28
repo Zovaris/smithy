@@ -5,7 +5,6 @@ package chat
 import (
 	"fmt"
 	"image/color"
-	"math"
 	"path/filepath"
 	"strings"
 	"time"
@@ -26,7 +25,7 @@ func frameTick() tea.Cmd {
 
 // animating reports whether anything on screen moves: a session working or a tool running.
 func (m chatView) animating() bool {
-	if m.welcome != welcomeOff || m.shimmer > 0 {
+	if m.welcome != welcomeOff || m.shimmer > 0 || m.mo.moving() || m.vb.moving() {
 		return true
 	}
 	for _, s := range m.sessions {
@@ -128,12 +127,7 @@ func (m chatView) pill(bar lipgloss.Style) string {
 	if n == 0 {
 		return bar.Foreground(t.Dim).Render("idle")
 	}
-	dot := t.Accent
-	if !t.Plain && t.Ramp != nil {
-		ph := float64(m.frame) / (kit.BreathSecs * kit.Fps) * 2 * math.Pi
-		dot = lipgloss.Blend1D(8, t.Dim, t.Accent)[int((1-math.Cos(ph))/2*7+0.5)]
-	}
-	return bar.Foreground(dot).Render(t.G.On) + bar.Foreground(t.Text).Render(fmt.Sprintf(" %d running", n))
+	return bar.Foreground(t.Warn).Render(t.Spinner(m.frame)) + bar.Foreground(t.Text).Render(fmt.Sprintf(" %d running", n))
 }
 
 // kTok is a token count with a k or M suffix past a thousand.
@@ -221,9 +215,11 @@ const noiseShown = 20 * time.Second
 func (m chatView) footer(w int) string {
 	t := m.th
 	dim, key := t.Fg(t.Dim), t.Fg(t.Text)
-	hint := func(k, what string) string { return key.Render(k) + dim.Render(" "+what) }
+	hint := func(k, what string) string {
+		return m.chip(" "+k+" ", t.Strong, t.Overlay, false) + t.Fg(t.Muted).Render(" "+what)
+	}
 	p := strings.Repeat(" ", m.pad())
-	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode: "+m.mode.String()), hint("tab", "agents"), hint("?", "help"), hint("ctrl+n/p", "tabs"), hint("ctrl+s", "select")}
+	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode"), hint("tab", "agents"), hint("/", "commands"), hint("?", "help"), hint("ctrl+n/p", "tabs"), hint("ctrl+s", "select")}
 	if m.busy(m.current) {
 		hints = append([]string{hint("esc", "interrupt")}, hints...)
 	}
@@ -240,8 +236,7 @@ func (m chatView) footer(w int) string {
 	if c, ok := m.cost[m.current]; ok && !m.sideOn() {
 		info = append(info, dim.Render(fmt.Sprintf("$%.2f", c)))
 	}
-	info = append(info, hint("ctrl+k", "palette"))
-	right := strings.Join(info, dim.Render(" "+t.G.Dot+" ")) + p
+	right := strings.Join(info, dim.Render(" "+t.G.Dot+" ")) + " " + m.chip(" "+m.mode.String()+" ", t.Surface, t.Muted, true) + " " + m.chip(" ctrl+k palette ", t.Surface, t.Accent, true) + p
 	left := p + strings.Join(hints, "  ")
 	for len(hints) > 1 && w-ansi.StringWidth(left)-ansi.StringWidth(right) < 1 {
 		hints = hints[:len(hints)-1]
@@ -265,7 +260,7 @@ func (m chatView) dimmed(s string) string {
 	if t.Plain || t.Ramp == nil {
 		return plain
 	}
-	return t.Fg(t.Ramp[len(t.Ramp)-1]).Render(plain)
+	return t.Fg(t.Ramp[min(3, len(t.Ramp)-1)]).Render(plain)
 }
 
 // splice lays box over row at column x, keeping the row's cells on both sides.
@@ -290,59 +285,52 @@ type boxItem struct {
 	static           bool // shown, never selected
 }
 
-// floatBox is the one panel every picker uses: a rounded frame in the border color around a
-// title bar (prompt, query or title on the left, esc on the right), grouped rows with the
-// selected one marked by an accent bar, and a key footer.
+// floatBox is the one panel every picker uses, flat and square: a thin accent edge on top, the
+// query on the focus tier (prompt, query or title on the left, esc on the right), grouped rows on
+// the raised tier with the selected one on the focus tier behind an accent rail, and a key footer
+// on the overlay tier.
 func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem, sel int, foot string) []string {
 	t := m.th
-	bg := lipgloss.NewStyle()
-	if t.Overlay != nil {
-		bg = bg.Background(t.Overlay)
-	}
-	edge := t.Fg(t.Dim)
-	if t.Border != nil && t.Ramp != nil {
-		edge = t.Fg(t.Ramp[len(t.Ramp)-1])
-	}
-	if t.Overlay != nil {
-		edge = edge.Background(t.Overlay)
-	}
-	in := max(w-2, 1)
-	g := frameGlyphs(t.Uni)
-	line := func(l, r string) string { return edge.Render(l + strings.Repeat(g.h, in) + r) }
-	row := func(s string) string { return edge.Render(g.v) + fill(bg, in, s) + edge.Render(g.v) }
+	bg, focus, foot0 := on(t.Raised), on(t.Focus), on(t.Overlay)
+	row := func(s string) string { return fill(bg, w, s) }
 	dim := t.Fg(t.Dim)
 	q := t.Fg(t.Strong).Render(query)
 	if query == "" {
-		q = t.Fg(t.Text).Render(placeholder)
+		q = t.Fg(t.Muted).Render(placeholder)
 	}
-	out := []string{line(g.tl, g.tr), row(spread(" "+t.Fg(t.Accent).Render(t.G.Prompt)+" "+q, dim.Render("esc")+" ", in)), line(g.lt, g.rt)}
-	body := max(h-8, 1)
+	top := t.Fg(t.Accent).Inherit(bg).Render(strings.Repeat("▄", w))
+	if t.Plain || !t.G.Unicode {
+		top = row("")
+	}
+	out := []string{top, fill(focus, w, spread("  "+t.Fg(t.Accent).Bold(true).Render(t.G.Prompt)+" "+q, dim.Render("esc")+"  ", w))}
+	body := max(h-6, 1)
 	rows := make([]string, 0, len(items))
 	selRow := 0
 	n := 0
+	rail := t.Fg(t.Accent).Render(railGlyph(t.G.Unicode))
 	for _, it := range items {
 		if it.label == "" {
 			if len(rows) > 0 {
 				rows = append(rows, row(""))
 			}
-			for _, l := range strings.Split(ansi.Wordwrap(it.group, max(in-4, 1), ""), "\n") {
-				rows = append(rows, row("   "+t.Fg(t.Muted).Bold(true).Render(ansi.Truncate(l, max(in-4, 1), "…"))))
+			for _, l := range strings.Split(ansi.Wordwrap(groupName(it.group), max(w-6, 1), ""), "\n") {
+				rows = append(rows, row("   "+t.Fg(t.Accent).Bold(true).Render(ansi.Truncate(l, max(w-6, 1), "…"))))
 			}
 			continue
 		}
-		mark, label := "  ", t.Fg(t.Text)
+		mark, label, st := " ", t.Fg(t.Text), bg
 		if it.static {
 			label = t.Fg(t.Muted)
 		} else if n == sel {
-			mark, label, selRow = t.Fg(t.Accent).Render(g.sel)+" ", t.Fg(t.Strong).Bold(true), len(rows)
+			mark, label, st, selRow = rail, t.Fg(t.Strong).Bold(true), focus, len(rows)
 		}
-		left := " " + mark + t.Fg(it.color).Render(it.glyph) + "  " + label.Render(it.label)
+		left := mark + "  " + t.Fg(it.color).Render(it.glyph) + "  " + label.Render(it.label)
 		if it.hint != "" {
 			left += "  " + dim.Render(it.hint)
 		}
 		key := t.Fg(t.Muted).Render(it.key) + "  "
-		left = ansi.Truncate(left, max(in-ansi.StringWidth(key)-1, 1), "…")
-		rows = append(rows, row(spread(left, key, in)))
+		left = ansi.Truncate(left, max(w-ansi.StringWidth(key)-1, 1), "…")
+		rows = append(rows, fill(st, w, spread(left, key, w)))
 		if !it.static {
 			n++
 		}
@@ -355,8 +343,20 @@ func (m chatView) floatBox(w, h int, query, placeholder string, items []boxItem,
 	for i := start; i < len(rows) && i < start+body; i++ {
 		out = append(out, rows[i])
 	}
-	out = append(out, row(""), line(g.lt, g.rt), row(ansi.Truncate(foot, in, "…")), line(g.bl, g.br))
+	out = append(out, row(""), fill(foot0, w, ansi.Truncate(foot, w, "…")))
 	return out
+}
+
+// groupName is a group heading in sentence case: "KEYS" reads "Keys".
+func groupName(g string) string {
+	head, rest, _ := strings.Cut(g, " ")
+	if head == strings.ToUpper(head) && len(head) > 1 {
+		head = head[:1] + strings.ToLower(head[1:])
+	}
+	if rest != "" {
+		return head + " " + rest
+	}
+	return head
 }
 
 type boxFrame struct{ tl, tr, bl, br, lt, rt, h, v, sel string }
@@ -368,9 +368,11 @@ func frameGlyphs(uni bool) boxFrame {
 	return boxFrame{"+", "+", "+", "+", "+", "+", "-", "|", ">"}
 }
 
-// overBox centers box over the dimmed screen rows, 15% from the top as in the mockup, or higher
-// when a tall box would otherwise run past the last row.
+// overBox lays box over the dimmed screen, 15% from the top as in the mockup (higher when a tall
+// box would run past the last row), with a shade one cell right and half a row down for depth.
+// While it opens it rises into place on the spring.
 func (m chatView) overBox(screen []string, box []string, w int) []string {
+	t := m.th
 	out := make([]string, len(screen))
 	for i, r := range screen {
 		out[i] = r
@@ -382,11 +384,20 @@ func (m chatView) overBox(screen []string, box []string, w int) []string {
 	if len(box) > 0 {
 		bw = ansi.StringWidth(box[0])
 	}
-	x, y := (w-bw)/2, max(min(len(screen)*120/800, len(screen)-len(box)), 1)
+	x, y := (w-bw)/2, max(min(len(screen)*120/800, len(screen)-len(box)-1), 1)
+	y += m.mo.lift()
+	sh := t.Shade()
 	for i, b := range box {
-		if y+i < len(out) {
-			out[y+i] = splice(out[y+i], b, x, w)
+		if y+i >= len(out) {
+			break
 		}
+		if sh != nil && i > 0 {
+			b += on(sh).Render(" ")
+		}
+		out[y+i] = splice(out[y+i], b, x, w)
+	}
+	if sh != nil && y+len(box) < len(out) && t.G.Unicode {
+		out[y+len(box)] = splice(out[y+len(box)], t.Fg(sh).Render(strings.Repeat("▀", bw)), x+1, w)
 	}
 	return out
 }

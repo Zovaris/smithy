@@ -154,14 +154,14 @@ func (m chatView) shellRows(i, w int) []string {
 	sh := c.sh
 	p := strings.Repeat(" ", m.pad())
 	dim := t.Fg(t.Dim)
-	left := p + "  " + t.Fg(t.Accent).Render("$") + " " + t.Fg(t.Strong).Bold(true).Render(sh.cmd)
+	left := p + m.chip(" $ ", t.Surface, t.Warn, true) + " " + t.Fg(t.Strong).Bold(true).Render(sh.cmd)
 	var meta []string
 	if s, ok := m.session(); ok && s.dir != "" && sh.dir != "" && s.dir != sh.dir {
 		meta = append(meta, dim.Render(sh.dir))
 	}
 	switch r := sh.run; {
 	case r == nil:
-		meta = append(meta, t.Fg(t.Warn).Render("running"))
+		meta = append(meta, t.Fg(t.Warn).Render(t.Spinner(m.frame)+" running"))
 	default:
 		meta = append(meta, dim.Render(shellTook(time.Duration(r.TookMS)*time.Millisecond)))
 		switch {
@@ -170,12 +170,13 @@ func (m chatView) shellRows(i, w int) []string {
 		case r.Code != 0:
 			meta = append(meta, t.Fg(t.Err).Render(fmt.Sprintf("exit %d", r.Code)))
 		default:
-			meta = append(meta, t.Fg(t.Ok).Render("ok"))
+			meta = append(meta, t.Fg(t.Ok).Render(t.G.Pass+" exit 0"))
 		}
 	}
 	right := strings.Join(meta, dim.Render(" "+t.G.Dot+" "))
 	head := spread(ansi.Truncate(left, max(w-ansi.StringWidth(right)-m.pad()-4, 10), "…"), right+p+"  ", w)
-	rows := []string{m.blockRow(i, w, head)}
+	row := func(s string) string { return m.tierRow(i, w, t.Raised, s) }
+	rows := []string{row(head)}
 	if sh.run == nil {
 		return append(rows, "")
 	}
@@ -187,18 +188,18 @@ func (m chatView) shellRows(i, w int) []string {
 	if !c.open && len(lines) > shellFold {
 		more, lines = len(lines)-shellFold, lines[:shellFold]
 	}
-	rule := p + "  " + dim.Render(t.G.Pipe) + " "
+	rule := p + "     "
 	for _, l := range lines {
 		st := t.Fg(t.Muted)
 		if l.Err {
 			st = t.Fg(t.Err)
 		}
 		for _, wl := range strings.Split(ansi.Wrap(strings.ReplaceAll(l.Text, "\t", "    "), max(w-2*m.pad()-6, 10), ""), "\n") {
-			rows = append(rows, m.blockRow(i, w, rule+st.Render(wl)))
+			rows = append(rows, row(rule+st.Render(wl)))
 		}
 	}
 	if more > 0 {
-		rows = append(rows, m.blockRow(i, w, rule+dim.Render(fmt.Sprintf("… %d more %s · click or enter to open", more, "line"+plural(more)))))
+		rows = append(rows, row(rule+dim.Render(fmt.Sprintf("… %d more %s · click or enter to open", more, "line"+plural(more)))))
 	}
 	return append(rows, "")
 }

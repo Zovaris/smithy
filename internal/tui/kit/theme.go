@@ -112,14 +112,15 @@ type glyphs struct {
 	Sel, open, On, Half, Off, Pass, Fail, Wait, Dot, Tee, Elbow, Pipe, bar, Prompt string
 	Shades                                                                         []string // light → full
 	Ticks                                                                          []rune   // sparkline levels
+	Spin                                                                           []string // spinner frames, one per tick
 	Unicode                                                                        bool
 }
 
-var UniGlyphs = glyphs{Sel: "▸", open: "▾", On: "●", Half: "◐", Off: "○", Pass: "✓", Fail: "✗", Wait: "?", Dot: "·", Tee: "├─", Elbow: "└─",
-	Pipe: "│", bar: "━", Prompt: "›", Shades: []string{"░", "▒", "▓", "█"}, Ticks: []rune("▁▂▃▄▅▆▇█"), Unicode: true}
+var UniGlyphs = glyphs{Sel: "▸", open: "▾", On: "▪", Half: "▪", Off: "▫", Pass: "✓", Fail: "✗", Wait: "?", Dot: "·", Tee: "├─", Elbow: "└─",
+	Pipe: "│", bar: "━", Prompt: "›", Shades: []string{"░", "▒", "▓", "█"}, Ticks: []rune("▁▂▃▄▅▆▇█"), Spin: []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}, Unicode: true}
 
 var AsciiGlyphs = glyphs{Sel: ">", open: "v", On: "*", Half: "~", Off: "o", Pass: "+", Fail: "x", Wait: "?", Dot: "-", Tee: "|-", Elbow: "`-",
-	Pipe: "|", bar: "=", Prompt: ">", Shades: []string{".", "-", "=", "#"}, Ticks: []rune("_.-=+*#@")}
+	Pipe: "|", bar: "=", Prompt: ">", Shades: []string{".", "-", "=", "#"}, Ticks: []rune("_.-=+*#@"), Spin: []string{"|", "/", "-", "\\"}}
 
 // utf8Locale reports whether the locale can draw box and block glyphs.
 func Utf8Locale() bool {
@@ -178,4 +179,15 @@ func (t Theme) Fg(c color.Color) lipgloss.Style {
 		return lipgloss.NewStyle()
 	}
 	return lipgloss.NewStyle().Foreground(c)
+}
+
+// Spinner is the running mark at frame n: a braille spinner, or |/-\ without unicode.
+func (t Theme) Spinner(n int) string { return t.G.Spin[(n/2)%len(t.G.Spin)] }
+
+// Shade is the colour under a panel's offset shadow: a step darker than the surface.
+func (t Theme) Shade() color.Color {
+	if t.Plain || t.Surface == nil {
+		return nil
+	}
+	return lipgloss.Darken(t.Surface, 0.45)
 }

@@ -148,11 +148,15 @@ func (t Theme) HeadBar(w, gutter int, project string, pill func(bar lipgloss.Sty
 	if t.G.Unicode {
 		diamond = "◆"
 	}
-	name := bar.Foreground(t.Strong).Bold(true).Render("smithy")
-	if Version != "" {
-		name += bar.Foreground(t.Dim).Render(" " + Version)
+	block := bar.Foreground(t.Accent).Render(diamond+" ") + bar.Foreground(t.Strong).Bold(true).Render("smithy")
+	if !t.Plain && t.Accent != nil {
+		block = lipgloss.NewStyle().Background(t.Accent).Foreground(t.Surface).Bold(true).Render(" " + diamond + " smithy ")
 	}
-	left := bar.Render(p) + bar.Foreground(t.Accent).Render(diamond+" ") + name
+	name := block
+	if Version != "" {
+		name += bar.Foreground(t.Muted).Render(" " + Version)
+	}
+	left := bar.Render(p[:max(len(p)-1, 0)]) + name
 	if project != "" {
 		left += bar.Foreground(t.Dim).Render(" "+t.G.Dot+" ") + bar.Foreground(t.Muted).Render(project)
 	}

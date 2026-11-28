@@ -34,3 +34,23 @@ func TestTallySplitsPeriodsAgentsAndModels(t *testing.T) {
 		t.Fatalf("no session id still tallied: %+v", r.Session)
 	}
 }
+
+func TestTallyKeepsThirtyDaysForTheChart(t *testing.T) {
+	now := time.Date(2026, 11, 27, 15, 0, 0, 0, time.Local)
+	c := 0.25
+	es := []Event{
+		{T: now.Add(-time.Hour), Kind: "usage", Usage: &usage.Usage{Output: 5, CostUSD: &c}},
+		{T: now.AddDate(0, 0, -2), Kind: "usage", Usage: &usage.Usage{Input: 7}},
+		{T: now.AddDate(0, 0, -40), Kind: "usage", Usage: &usage.Usage{Input: 9}},
+	}
+	r := Tally(es, now, "")
+	if len(r.Days) != DaysShown || r.Days[DaysShown-1].Day != "2026-11-27" || r.Days[0].Day != "2026-10-29" {
+		t.Fatalf("days: %d %+v", len(r.Days), r.Days[DaysShown-1])
+	}
+	if d := r.Days[DaysShown-1]; d.Runs != 1 || d.Tokens != 5 || d.Cost != 0.25 {
+		t.Fatalf("today: %+v", d)
+	}
+	if d := r.Days[DaysShown-3]; d.Tokens != 7 || r.Month.Runs != 2 || r.All.Runs != 3 {
+		t.Fatalf("two days ago %+v, month %d, all %d", d, r.Month.Runs, r.All.Runs)
+	}
+}
