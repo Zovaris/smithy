@@ -172,7 +172,7 @@ func (m chatView) detach() (tea.Model, tea.Cmd) {
 		m.system("standalone: the daemon runs in this process and ends with it; /quit to leave, or start it with smithy daemon to detach")
 		return m, nil
 	}
-	return m, tea.Quit
+	return m.quit()
 }
 
 // settingsCommand runs /serve, /set, /unset, /key, /keys, /doctor, /tend and /channels through the daemon.

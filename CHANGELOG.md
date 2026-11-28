@@ -20,15 +20,18 @@ part above `### Details`.
 
 - New `refine` skill: type `/refine <rough prompt>` and it asks the few questions that matter, looks up the facts and hands back a structured prompt; the TUI and web then offer copy or a new session with it.
 - An agent's question opens as a card in the TUI and the web: numbered options, your own answer under Other, several picks when the agent asks for them, and the header says it waits on you. Typing is never taken by it.
+- The chat survives a terminal restart where the terminal supports it (OSC 7577): it reopens on the same server and session. `smithy chat --session <id>` opens a session directly.
 - A question that takes several picks asks for them in Slack (a multi-select menu), Discord (a select menu) and Telegram (☐/☑ toggles and Done); single-pick questions keep one button per option.
 - Dependabot keeps Go modules, the web packages and the GitHub Actions current: one weekly PR per ecosystem for minor and patch updates, a separate PR for each major.
 
 ### Fixed
+- The agents' system prompt is shorter and direct: answer first, short replies, the user's language, and it no longer names the CLI underneath (agents kept bringing up Claude Code).
 
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
 - ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
 
 ### Details
+- Charm libraries: bubbletea v2.2.0; the chat view sets `ProgramResume` (exe, `chat`, its url, `--server` or `--standalone`, `--session <id>`, cwd) and drops it when quitting.
 
 - ci: actions/checkout v7, setup-go v7, setup-node v7, cache v6, upload-artifact v7, attest-build-provenance v4, golangci-lint-action v9 (useblacksmith/checkout v1, setup-bun v2 and golangci-lint v2.15.0 were already latest).
 - deps(web): preact 11.2.0, typescript 7.0.2, vite 8.4.0, vitest 5.1.2, playwright 1.65.1; vite.config imports `defineConfig` from `vitest/config`, and the settings text/number input splits in two for the preact 11 input types. First load 29.8 KB gzip (budget 31 KB).
@@ -48,6 +51,7 @@ part above `### Details`.
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
 
 ### Details
+- CI: `check` runs as `go` (lint, both test builds, integration) and `web` on 2 vCPU runners; a pull request touching only Markdown or `docs/` skips the Go tests, `web` runs only when `web/` changes, drafts run nothing, and `build` (one job, every target), `demo` and `windows-launcher` run only for pull requests into `main` and pushes to `main`. `check` stays the one gate.
 - Session bus: `Session.parent`, `session_mail` events, `POST /v1/bus/start|send`, `GET /v1/bus/inbox` and `GET /v1/sessions/{id}/mail`, keyed per session by `SMITHY_SESSION_KEY` (memory only); `smithy mcp` adds `send`, `inbox` and `start_session` when the key is set. Bus messages reach the agent framed as data.
 - TUI: `infoPanel.set` holds one setting row cycled with left/right; `doctorPanel` groups `smithy doctor` output; the header reads `GET /v1/tend` once a minute.
 - `/board` in the TUI chat shows your task files by status, like the web Board: move a task with
