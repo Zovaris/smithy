@@ -46,10 +46,9 @@ func cpress(m chatView, msg tea.Msg) chatView {
 func TestSlashPopupListsEveryCommandWithItsDescription(t *testing.T) {
 	m := newChatTest(0)
 	m.width, m.height = 160, 48
-	m = typeIn(m, "/")
-	out := screen(m)
 	for _, c := range []string{"/new", "/sessions", "/agent", "/model", "/skills", "/connect", "/web", "/remote", "/stop", "/mode", "/help", "/quit"} {
-		if !strings.Contains(out, c) {
+		m.input.SetValue(c[:3])
+		if out := screen(m); !strings.Contains(out, c) {
 			t.Errorf("popup lacks %s:\n%s", c, out)
 		}
 	}
@@ -58,8 +57,9 @@ func TestSlashPopupListsEveryCommandWithItsDescription(t *testing.T) {
 			t.Errorf("%s has no description", c.name)
 		}
 	}
-	m = typeIn(m, "mo")
-	out = screen(m)
+	m.input.SetValue("")
+	m = typeIn(m, "/mo")
+	out := screen(m)
 	if !strings.Contains(out, "/mode") || !strings.Contains(out, "/model") || strings.Contains(out, "/quit") {
 		t.Fatalf("filter /mo:\n%s", out)
 	}
