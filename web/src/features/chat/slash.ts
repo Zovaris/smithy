@@ -11,7 +11,7 @@ import { decide, stopSession } from "../../lib/live";
 import { effortLevels, effortMax, effortOptions } from "../../lib/parity";
 import { go } from "../../lib/router";
 import type { Dec, Sess } from "../../lib/store";
-import { current, saveAccent, toggleTheme, type ThemeName } from "../../lib/theme";
+import { current, saveAccent, THEMES, toggleTheme, type ThemeName } from "../../lib/theme";
 
 type Ctx = {
   s?: Sess; pend: Dec[]; log: string[]; detail: Detail;
@@ -92,9 +92,10 @@ export function run(a: string, arg: string, ctx: Ctx): void {
   } else if (a === "theme" && (arg === "light" || arg === "dark" || arg === "toggle")) {
     if (arg !== current()) toggleTheme();
     setNote(current() + " mode");
-  } else if (a === "theme" && (arg === "steel" || arg === "frost" || arg === "plum")) {
-    setAccent(arg);
-    say(saveAccent(api, arg), "theme " + arg);
+  } else if (a === "theme" && THEMES.some((t) => t.name === arg)) {
+    const t = arg as ThemeName;
+    setAccent(t);
+    say(saveAccent(api, t), "theme " + t);
   } else if (a === "theme") toSettings("theme");
   else if (a === "mode") {
     const d = nextDetail(detail, arg);

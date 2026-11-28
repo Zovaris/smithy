@@ -87,6 +87,7 @@ command, ok or exit N, how long it took and the output, folded after 20 lines.
 | `/welcome` | walk the first-run steps again |
 | `/setup` | every agent, ready or missing, with its fix |
 | `/help` | keys and commands |
+| `/agents`, `/decisions`, `/bench`, `/settings` | web only: open that page of the web UI |
 | `/detach` | quit and leave the daemon running |
 | `/quit` | leave; a background daemon keeps running |
 
