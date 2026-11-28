@@ -82,7 +82,8 @@ func (m chatView) header(w int) []string {
 			return bar.Foreground(m.th.dim).Render(tag) + bar.Render("  ") + m.pill(bar)
 		}
 	}
-	return []string{m.th.headBar(w, m.pad(), project, pill, m.clockNow().Format("15:04")), ""}
+	tabs, _ := m.tabStrip(w)
+	return []string{m.th.headBar(w, m.pad(), project, pill, m.clockNow().Format("15:04")), tabs}
 }
 
 // clockMsg redraws the header clock; it fires on each minute, nothing else runs while idle.
@@ -220,23 +221,21 @@ func (m chatView) footer(w int) string {
 	dim, key := t.fg(t.dim), t.fg(t.text)
 	hint := func(k, what string) string { return key.Render(k) + dim.Render(" "+what) }
 	p := strings.Repeat(" ", m.pad())
-	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode: "+m.mode.String()), hint("tab", "agents"), hint("ctrl+k", "palette"), hint("?", "help")}
+	hints := []string{hint("enter", "send"), hint("shift+enter", "newline"), hint("ctrl+o", "mode: "+m.mode.String()), hint("tab", "agents"), hint("?", "help")}
 	var info []string
-	if a := m.agentLabel(); a != "" {
-		info = append(info, a)
-	}
 	if m.branch != "" {
-		info = append(info, m.branch)
+		info = append(info, dim.Render(m.branch))
 	}
-	if n, ok := m.toks[m.current]; ok {
-		info = append(info, kTok(n)+" tok")
+	if c := m.ctxNow(); c != "" {
+		info = append(info, key.Render(c))
 	}
-	if c, ok := m.cost[m.current]; ok {
-		info = append(info, fmt.Sprintf("$%.2f", c))
+	if c, ok := m.cost[m.current]; ok && !m.sideOn() {
+		info = append(info, dim.Render(fmt.Sprintf("$%.2f", c)))
 	}
-	right := dim.Render(strings.Join(info, " "+t.g.dot+" ")) + p
+	info = append(info, hint("ctrl+k", "palette"))
+	right := strings.Join(info, dim.Render(" "+t.g.dot+" ")) + p
 	left := p + strings.Join(hints, "  ")
-	for len(hints) > 2 && w-ansi.StringWidth(left)-ansi.StringWidth(right) < 1 {
+	for len(hints) > 1 && w-ansi.StringWidth(left)-ansi.StringWidth(right) < 1 {
 		hints = hints[:len(hints)-1]
 		left = p + strings.Join(hints, "  ")
 	}

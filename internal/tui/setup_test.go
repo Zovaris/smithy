@@ -147,8 +147,8 @@ func TestAgentPickerAndModel(t *testing.T) {
 	if f.set[len(f.set)-1] != "claude|opus" {
 		t.Fatalf("/model opus keeps the agent: %v", f.set)
 	}
-	if !strings.Contains(m.footer(160), "claude") || !strings.Contains(m.footer(160), "opus") {
-		t.Fatalf("the footer names the agent and model: %s", m.footer(160))
+	if c := strings.Join(m.composer(160), "\n"); !strings.Contains(c, "claude") || !strings.Contains(c, "opus") {
+		t.Fatalf("the composer names the agent and model: %s", c)
 	}
 	m = sendKey(typeIn(m, "/model"), ckey("enter"))
 	if m.overlay != overlayPicker || m.setupStep != stepModel || !strings.Contains(screen(m), "Model for claude") {

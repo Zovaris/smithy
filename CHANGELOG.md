@@ -9,6 +9,7 @@ part above `### Details`.
 ## Unreleased
 
 ### New
+- The chat layout gains a tab strip of this folder's sessions with `+` for a new one, a right sidebar on wide terminals (`/sidebar` toggles it) with the title, context used and its share of the model's window, spend and linked PRs, tool calls and thoughts folded into one line such as "+ 2 commands, 1 thought" that opens on enter or a click, a dim agent · model · time · tok/s line under each answer, answered questions kept as a compact Q → A, and the composer with an accent bar and agent · model inside while the footer shows the context and the palette key.
 - Each session shows its linked work, live: the PRs it opened or works on (state, checks, review, mergeable, +/- lines) and the Linear and GitHub issues named in its branch, PRs or prompts. See them in the TUI's agents panel and `/links` (`/links TK-123` links one), the web's session side panel, and a Work section on the Agents page.
 - Scheduled workflows: a cron schedule and steps that run a command, ask an agent, branch on the result and notify you. `smithy workflow`, `/workflows` in the TUI and a Workflows page on the web run one now, turn it on or off, edit it and show each run's steps. `smithy workflow example` adds a daily Dependabot check whose agent tells you whether to merge, and why.
 - Daemon sessions can message each other: a session can start a child, and parent, children and siblings in one project send notes with the `send` tool. A note wakes an idle session or waits for a busy one; the TUI and web show the tree and the notes.
