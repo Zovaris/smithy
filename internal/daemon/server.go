@@ -23,6 +23,7 @@ import (
 	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/store"
 	"github.com/Zovaris/smithy/internal/web"
+	"github.com/Zovaris/smithy/internal/workflow"
 )
 
 const (
@@ -69,6 +70,8 @@ type Server struct {
 	started time.Time
 	// Tend, when set, is the PR tender GET /v1/tend reports.
 	Tend *Tender
+	// Workflows, when set, is the scheduler behind /v1/workflows.
+	Workflows *workflow.Scheduler
 	// ServeState, when set, fills State.Serve (the auto loop's heartbeat).
 	ServeState func() any
 	// Route, when set, sends a won answer back to its asker (RouteBack); an error leaves it for Resume.
@@ -342,6 +345,11 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("PUT /v1/serve", sv.putServe)
 	mux.HandleFunc("GET /v1/doctor", sv.doctor)
 	mux.HandleFunc("GET /v1/tend", sv.tendView)
+	mux.HandleFunc("GET /v1/workflows", sv.listWorkflows)
+	mux.HandleFunc("GET /v1/workflows/{name}", sv.getWorkflow)
+	mux.HandleFunc("PUT /v1/workflows/{name}", sv.saveWorkflow)
+	mux.HandleFunc("POST /v1/workflows/{name}/run", sv.runWorkflow)
+	mux.HandleFunc("POST /v1/workflows/{name}/{op}", sv.enableWorkflow)
 	mux.HandleFunc("GET /v1/bench/compare", sv.benchCompare)
 	mux.HandleFunc("POST /v1/bench/run", sv.benchStart)
 	mux.HandleFunc("GET /v1/bench/status", sv.benchStatus)

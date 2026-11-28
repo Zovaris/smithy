@@ -17,6 +17,7 @@ import (
 
 	"github.com/Zovaris/smithy/internal/models"
 	"github.com/Zovaris/smithy/internal/store"
+	"github.com/Zovaris/smithy/internal/workflow"
 )
 
 // Client talks to a daemon's API. Token may be empty behind tailscale serve.
@@ -384,4 +385,34 @@ func (c *Client) Doctor(ctx context.Context) ([]string, error) {
 	var out struct{ Lines []string }
 	err := c.call(ctx, "GET", "/v1/doctor", nil, &out)
 	return out.Lines, err
+}
+
+// Workflows is GET /v1/workflows.
+func (c *Client) Workflows(ctx context.Context) (WorkflowList, error) {
+	var l WorkflowList
+	err := c.call(ctx, "GET", "/v1/workflows", nil, &l)
+	return l, err
+}
+
+// Workflow is GET /v1/workflows/{name}: the file, its source and newest runs.
+func (c *Client) Workflow(ctx context.Context, name string) (WorkflowDetail, error) {
+	var d WorkflowDetail
+	err := c.call(ctx, "GET", "/v1/workflows/"+url.PathEscape(name), nil, &d)
+	return d, err
+}
+
+// RunWorkflow is POST /v1/workflows/{name}/run; via names the client (tui, cli).
+func (c *Client) RunWorkflow(ctx context.Context, name, via string) error {
+	return c.call(ctx, "POST", "/v1/workflows/"+url.PathEscape(name)+"/run?via="+url.QueryEscape(via), map[string]string{}, nil)
+}
+
+// SetWorkflow is POST /v1/workflows/{name}/enable or /disable.
+func (c *Client) SetWorkflow(ctx context.Context, name string, on bool) (workflow.Info, error) {
+	op := "disable"
+	if on {
+		op = "enable"
+	}
+	var in workflow.Info
+	err := c.call(ctx, "POST", "/v1/workflows/"+url.PathEscape(name)+"/"+op, map[string]string{}, &in)
+	return in, err
 }

@@ -42,6 +42,8 @@ func session(id string) string {
 // decision the daemon asks for it (with buttons), never twice.
 func NoteOf(e store.Event) (connect.Note, bool) {
 	switch e.Kind {
+	case KindWorkflowNote:
+		return workflowNoteOf(e)
 	case KindAsked:
 		var d Decision
 		if json.Unmarshal(e.Data, &d) != nil || d.ID == "" {
