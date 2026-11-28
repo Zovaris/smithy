@@ -206,16 +206,7 @@ func (t *Telegram) Send(ctx context.Context, thread string, n Note, buttons []Bu
 		form.Set("message_thread_id", thread)
 	}
 	if len(buttons) > 0 {
-		type kb struct {
-			Text string `json:"text"`
-			Data string `json:"callback_data"`
-		}
-		var rows [][]kb
-		for _, b := range buttons {
-			rows = append(rows, []kb{{Text: clip(text.Clean(b.Label), 60), Data: b.Data}})
-		}
-		mk, _ := json.Marshal(map[string]any{"inline_keyboard": rows})
-		form.Set("reply_markup", string(mk))
+		form.Set("reply_markup", tgKeyboard(buttons))
 	}
 	var r struct {
 		ID int64 `json:"message_id"`
@@ -224,6 +215,25 @@ func (t *Telegram) Send(ctx context.Context, thread string, n Note, buttons []Bu
 		return "", err
 	}
 	return strconv.FormatInt(r.ID, 10), nil
+}
+
+// tgKeyboard is an inline keyboard with one button per row.
+func tgKeyboard(buttons []Button) string {
+	type kb struct {
+		Text string `json:"text"`
+		Data string `json:"callback_data"`
+	}
+	var rows [][]kb
+	for _, b := range buttons {
+		rows = append(rows, []kb{{Text: clip(text.Clean(b.Label), 60), Data: b.Data}})
+	}
+	mk, _ := json.Marshal(map[string]any{"inline_keyboard": rows})
+	return string(mk)
+}
+
+// Buttons replaces message ref's buttons (Telegram has no multi-select: the hub toggles ☐/☑).
+func (t *Telegram) Buttons(ctx context.Context, ref string, buttons []Button) error {
+	return t.call(ctx, "editMessageReplyMarkup", url.Values{"chat_id": {t.Chat}, "message_id": {ref}, "reply_markup": {tgKeyboard(buttons)}}, nil)
 }
 
 // Update replaces the text of message ref and removes its buttons.
