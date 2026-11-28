@@ -397,3 +397,17 @@ func (c *Client) Doctor(ctx context.Context) ([]string, error) {
 	err := c.call(ctx, "GET", "/v1/doctor", nil, &out)
 	return out.Lines, err
 }
+
+// SessionLinks is GET /v1/sessions/{id}/links.
+func (c *Client) SessionLinks(ctx context.Context, id string) (SessionLinks, error) {
+	var l SessionLinks
+	err := c.call(ctx, "GET", "/v1/sessions/"+url.PathEscape(id)+"/links", nil, &l)
+	return l, err
+}
+
+// AddLink is POST /v1/sessions/{id}/links: ref is a Linear id, #<n> or a GitHub PR URL.
+func (c *Client) AddLink(ctx context.Context, id, ref string) (SessionLinks, error) {
+	var l SessionLinks
+	err := c.call(ctx, "POST", "/v1/sessions/"+url.PathEscape(id)+"/links", map[string]string{"ref": ref}, &l)
+	return l, err
+}

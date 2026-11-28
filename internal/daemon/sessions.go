@@ -71,6 +71,7 @@ type Session struct {
 	Updated time.Time    `json:"updated"`
 	Usage   *usage.Usage `json:"usage,omitempty"`
 	PRs     []string     `json:"prs,omitempty"`
+	Links   []string     `json:"links,omitempty"`
 }
 
 // ToolEvent is one finished tool call of a session.
@@ -113,6 +114,7 @@ type live struct {
 	asks     int
 	stopped  bool
 	lastDiff string
+	links    *SessionLinks
 }
 
 var (
@@ -196,6 +198,8 @@ func (sv *Server) applySession(e store.Event) {
 		if json.Unmarshal(e.Data, &t) == nil {
 			sv.notePRsLocked(e.Session, t)
 		}
+	case KindSessionLink, KindSessionLinks:
+		sv.applyLinks(e)
 	case KindSessionUsage:
 		var u usage.Usage
 		if l := sv.sessions[e.Session]; l != nil && json.Unmarshal(e.Data, &u) == nil {

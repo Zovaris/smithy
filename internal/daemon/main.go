@@ -257,6 +257,8 @@ func foreground(o runOpts) int {
 	api.Tend = NewTender()
 	api.Tend.Sources = func() []TendRef { return mergeRefs(TendSources(), api.SessionTendRefs()) }
 	go api.Tend.Run(tctx, 2*time.Minute)
+	api.Links = NewLinker()
+	go api.Links.Run(tctx, api, 15*time.Second)
 	conns, cerr := connect.FromConfig()
 	if cerr != nil {
 		fmt.Fprintf(os.Stderr, "%s: chat connectors: %s\n", name, text.Clean(cerr.Error()))
