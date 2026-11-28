@@ -79,6 +79,8 @@ func ckey(s string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyEnter}
 	case "down":
 		return tea.KeyPressMsg{Code: tea.KeyDown}
+	case "up":
+		return tea.KeyPressMsg{Code: tea.KeyUp}
 	case "left":
 		return tea.KeyPressMsg{Code: tea.KeyLeft}
 	case "right":

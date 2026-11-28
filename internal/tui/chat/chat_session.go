@@ -53,6 +53,11 @@ func (m chatView) send(text string) (chatView, tea.Cmd) {
 		m.push(chatMsg{who: "you", text: text})
 		return m, nil
 	}
+	if m.current != "" && (m.busy(m.current) || len(m.queues[m.current]) > 0) {
+		m.enqueue(m.current, text)
+		return m, nil
+	}
+	m.qEdit = false
 	api, dir, id := m.sess, m.dir, m.current
 	if id == "" && m.proj.dir == "" {
 		if pa, ok := api.(projectAPI); ok {
@@ -142,6 +147,9 @@ func (m *chatView) sessionEvent(kind, id string, data json.RawMessage) bool {
 		if json.Unmarshal(data, &l) == nil {
 			for i := range m.sessions {
 				if m.sessions[i].id == id {
+					for _, n := range linkChanges(m.sessions[i].links, l) {
+						m.into(id, chatMsg{who: "daemon", kind: "system", text: m.th.G.Dot + " " + n})
+					}
 					m.sessions[i].links = &l
 				}
 			}

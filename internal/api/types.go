@@ -41,6 +41,7 @@ type Decision struct {
 	Multi    bool      `json:"multi,omitempty"` // several options may be picked; the answer joins them with ", "
 	Other    bool      `json:"other,omitempty"` // a free-text answer is taken besides the options
 	Asked    time.Time `json:"asked"`
+	Session  string    `json:"session,omitempty"` // the session that asked; "" for a warden or workflow question
 	Outcome  *Outcome  `json:"outcome,omitempty"`
 }
 
@@ -153,8 +154,17 @@ type SessionLinks struct {
 	Session string       `json:"session"`
 	PRs     []ghx.PRLink `json:"prs"`
 	Issues  []LinkIssue  `json:"issues"`
+	URLs    []LinkURL    `json:"urls,omitempty"`
 	Error   string       `json:"error,omitempty"`
 	Checked time.Time    `json:"checked"`
+}
+
+// LinkURL is a linked URL that is neither a GitHub PR or issue nor a Linear issue: its host
+// and path are what the sidebar shows.
+type LinkURL struct {
+	URL   string `json:"url"`
+	Host  string `json:"host"`
+	Title string `json:"title"`
 }
 
 // SessionList is GET /v1/sessions.

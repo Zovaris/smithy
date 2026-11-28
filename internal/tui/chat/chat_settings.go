@@ -25,6 +25,7 @@ type settingsAPI interface {
 	ConnectTest(ctx context.Context) (api.ConnectTestResult, error)
 	SessionLinks(ctx context.Context, id string) (api.SessionLinks, error)
 	AddLink(ctx context.Context, id, ref string) (api.SessionLinks, error)
+	RemoveLink(ctx context.Context, id, ref string) (api.SessionLinks, error)
 }
 
 // settingsDoneMsg is a settings command's result: lines for the transcript, or a panel to open.

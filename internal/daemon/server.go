@@ -145,7 +145,7 @@ func (sv *Server) apply(e store.Event) {
 		}
 	case KindIntake:
 		sv.applyIntake(e.Data)
-	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool, KindSessionMail, KindSessionGoal, KindSessionLink, KindSessionLinks:
+	case KindSessionStarted, KindSessionStatus, KindSessionMessage, KindSessionUsage, KindSessionModel, KindSessionTool, KindSessionMail, KindSessionGoal, KindSessionLink, KindSessionLinks, KindSessionUnlink:
 		sv.applySession(e)
 	case KindRouted:
 		var r struct{ ID string }
@@ -194,7 +194,7 @@ func (sv *Server) askDecision(d Decision) error {
 		return nil
 	}
 	d.Asked = time.Now().UTC()
-	if _, err := sv.appendLocked(KindAsked, "", d); err != nil {
+	if _, err := sv.appendLocked(KindAsked, d.Session, d); err != nil {
 		return err
 	}
 	sv.decisions[id] = &d
@@ -321,6 +321,7 @@ func (sv *Server) apiMux() *http.ServeMux {
 	mux.HandleFunc("PUT /v1/sessions/{id}/model", sv.setSessionModel)
 	mux.HandleFunc("GET /v1/sessions/{id}/links", sv.getLinks)
 	mux.HandleFunc("POST /v1/sessions/{id}/links", sv.addLink)
+	mux.HandleFunc("DELETE /v1/sessions/{id}/links", sv.removeLink)
 	mux.HandleFunc("GET /v1/links", sv.projectWork)
 	mux.HandleFunc("GET /v1/sessions/{id}/mail", sv.sessionMail)
 	mux.HandleFunc("POST /v1/bus/send", sv.busSend)
@@ -568,6 +569,7 @@ func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
 		Question string   `json:"question"`
 		Options  []string `json:"options"`
 		Multi    bool     `json:"multi"`
+		Session  string   `json:"session"`
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&req); err != nil || req.Question == "" || len(req.Options) > 6 {
 		writeJSON(w, 400, map[string]string{"error": "body must be {\"id\":…,\"question\":…,\"options\":[…]}"})
@@ -585,6 +587,9 @@ func (sv *Server) ask(w http.ResponseWriter, r *http.Request) {
 		opts = append(opts, line1(o, 200))
 	}
 	d := Decision{ID: req.ID, Question: line1(req.Question, 500), Options: opts, Multi: req.Multi && len(opts) > 1, Other: !guardID}
+	if strings.HasPrefix(req.Session, sessionIDPrefix) && cardID(req.Session) {
+		d.Session = req.Session
+	}
 	if err := sv.askDecision(d); err != nil {
 		writeJSON(w, 500, map[string]string{"error": "store failed"})
 		return

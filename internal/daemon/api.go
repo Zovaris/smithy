@@ -14,6 +14,7 @@ type (
 	KeyRow            = api.KeyRow
 	KitChoice         = api.KitChoice
 	LinkIssue         = api.LinkIssue
+	LinkURL           = api.LinkURL
 	Mail              = api.Mail
 	Outcome           = api.Outcome
 	Project           = api.Project
