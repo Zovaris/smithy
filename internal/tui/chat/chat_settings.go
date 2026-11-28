@@ -3,6 +3,7 @@
 package chat
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"strconv"
@@ -365,7 +366,7 @@ func (m *chatView) openPalette(query string) tea.Cmd {
 // enum or bool value and save it.
 func (m chatView) settingItem(r api.SettingRow) palItem {
 	t := m.th
-	val := r.Value
+	val := cmp.Or(r.Value, r.Default)
 	if r.Secret {
 		val = "****"
 	}
@@ -379,7 +380,7 @@ func (m chatView) settingItem(r api.SettingRow) palItem {
 		it.hint = "‹ " + val + " ›  " + r.Meaning
 		key, opts := r.Key, r.Options
 		it.cycle = func(m *chatView, dir int) tea.Cmd {
-			i := slices.Index(opts, r.Value)
+			i := slices.Index(opts, val)
 			v := opts[((i+dir)%len(opts)+len(opts))%len(opts)]
 			if i < 0 && dir < 0 {
 				v = opts[len(opts)-1]
