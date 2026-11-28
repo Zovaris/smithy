@@ -26,6 +26,8 @@ type Client struct {
 	Token string
 	HTTP  *http.Client
 	Retry time.Duration // first reconnect wait (default 1s), doubling to 30s
+	// Header is added to every request (the bus key of a BusClient).
+	Header map[string]string
 }
 
 // ClientMsg is one thing Follow reports: an event, a (re)connect, or a lost stream.
@@ -52,6 +54,9 @@ func (c *Client) req(ctx context.Context, method, path string, body []byte) (*ht
 	}
 	if c.Token != "" {
 		r.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+	for k, v := range c.Header {
+		r.Header.Set(k, v)
 	}
 	return r, nil
 }
@@ -434,4 +439,44 @@ func (c *Client) SetWorkflow(ctx context.Context, name string, on bool) (workflo
 	var in workflow.Info
 	err := c.call(ctx, "POST", "/v1/workflows/"+url.PathEscape(name)+"/"+op, map[string]string{}, &in)
 	return in, err
+}
+
+// BusClient speaks on the session bus for the session whose key it holds.
+type BusClient struct {
+	C   *Client
+	Key string
+}
+
+func (b *BusClient) call(ctx context.Context, method, path string, body, out any) error {
+	c := *b.C
+	c.Header = map[string]string{busKeyHeader: b.Key}
+	return c.call(ctx, method, path, body, out)
+}
+
+// Send is POST /v1/bus/send: text to session to ("parent" for the parent).
+func (b *BusClient) Send(ctx context.Context, to, text string) (Mail, error) {
+	var m Mail
+	err := b.call(ctx, "POST", "/v1/bus/send", map[string]string{"to": to, "text": text}, &m)
+	return m, err
+}
+
+// Inbox is GET /v1/bus/inbox: the messages received after N since.
+func (b *BusClient) Inbox(ctx context.Context, since int64) ([]Mail, error) {
+	var ms []Mail
+	err := b.call(ctx, "GET", "/v1/bus/inbox?since="+strconv.FormatInt(since, 10), nil, &ms)
+	return ms, err
+}
+
+// Start is POST /v1/bus/start: a child session in this session's project.
+func (b *BusClient) Start(ctx context.Context, req BusStartReq) (Session, error) {
+	var s Session
+	err := b.call(ctx, "POST", "/v1/bus/start", req, &s)
+	return s, err
+}
+
+// Mail is GET /v1/sessions/{id}/mail.
+func (c *Client) Mail(ctx context.Context, id string) ([]Mail, error) {
+	var ms []Mail
+	err := c.call(ctx, "GET", "/v1/sessions/"+url.PathEscape(id)+"/mail", nil, &ms)
+	return ms, err
 }

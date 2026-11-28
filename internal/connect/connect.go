@@ -25,24 +25,27 @@ import (
 )
 
 // Note is one notification. Key makes it unique (sent once per connector); Session groups it in
-// a thread ("" is the main chat). Decision and Options make it answerable.
+// a thread ("" is the main chat). Decision and Options make it answerable; Multi lets several
+// options be picked together (the answer joins them with ", ").
 type Note struct {
 	Key, Kind, Session, Title, Text, URL string
 	Decision                             string
 	Options                              []string
+	Multi                                bool
 }
 
 // Button is one decision option; Data is opaque to the connector and comes back in Inbound.Button.
 type Button struct{ Label, Data string }
 
-// Inbound is what a connector received: a button press (Button, on the message Ref) or a text
+// Inbound is what a connector received: a button press (Button, on the message Ref), a
+// multi-select submit (Picks: the picked buttons' Data, comma-separated, on Ref) or a text
 // message (Thread, Text; Thread "" is the channel itself, Ref the message). Chat marks a message
 // in the chat channel; ReplyTo is the ref of the message it replies to, if any. By is the
 // sender's id on that connector.
 type Inbound struct {
-	Thread, Text, Button, Ref, By string
-	ReplyTo                       string
-	Chat                          bool
+	Thread, Text, Button, Picks, Ref, By string
+	ReplyTo                              string
+	Chat                                 bool
 }
 
 // ChatRoot is the thread value that means the chat channel itself (not a thread in it).
@@ -55,6 +58,16 @@ const KindChat = "chat"
 // started by a top-level message (in.Ref); it returns the thread, as Receive reports it.
 type ChatStarter interface {
 	StartChat(ctx context.Context, in Inbound, title string) (string, error)
+}
+
+// MultiSelect is a Connector with a native multi-select (it renders a Note with Multi as one
+// menu and reports the submit as Inbound.Picks).
+type MultiSelect interface{ MultiSelect() bool }
+
+// Rebuttoner is a Connector that can replace a sent message's buttons; without a native
+// multi-select it gets one toggle button per option (☐/☑) and a Done button.
+type Rebuttoner interface {
+	Buttons(ctx context.Context, ref string, buttons []Button) error
 }
 
 // Connector is one chat service. Thread makes a thread for a session; Send posts a note (with
@@ -71,6 +84,8 @@ type decision struct {
 	ID      string            `json:"id"`
 	Options []string          `json:"options,omitempty"`
 	Refs    map[string]string `json:"refs,omitempty"`
+	Multi   bool              `json:"multi,omitempty"`
+	Picked  map[string][]int  `json:"picked,omitempty"` // toggled options per connector
 	Note    Note              `json:"note"`
 	At      time.Time         `json:"at"`
 }
@@ -277,8 +292,12 @@ func (h *Hub) send(ctx context.Context, c Connector, n Note) error {
 	hd := ""
 	if n.Decision != "" {
 		hd = handle(n.Decision)
-		for i, o := range n.Options {
-			buttons = append(buttons, Button{Label: o, Data: hd + ":" + strconv.Itoa(i)})
+		if toggled(c, n) {
+			buttons = toggles(hd, n.Options, nil)
+		} else {
+			for i, o := range n.Options {
+				buttons = append(buttons, Button{Label: o, Data: hd + ":" + strconv.Itoa(i)})
+			}
 		}
 		if len(n.Options) > 0 && h.Free != nil && h.Free(n.Decision) {
 			n.Text = strings.TrimSpace(n.Text + "\nOr reply to this message to answer in your own words.")
@@ -308,13 +327,49 @@ func (h *Hub) send(ctx context.Context, c Connector, n Note) error {
 		if hd != "" {
 			d := st.Decisions[hd]
 			if d == nil {
-				d = &decision{ID: n.Decision, Options: n.Options, Note: n, At: time.Now(), Refs: map[string]string{}}
+				d = &decision{ID: n.Decision, Options: n.Options, Note: n, At: time.Now(), Refs: map[string]string{}, Multi: n.Multi}
 				st.Decisions[hd] = d
 			}
 			d.Refs[name] = ref
 		}
 	}
 	return nil
+}
+
+// toggled reports whether c shows multi-select note n as toggle buttons plus Done.
+func toggled(c Connector, n Note) bool {
+	if !n.Multi || len(n.Options) < 2 {
+		return false
+	}
+	if m, ok := c.(MultiSelect); ok && m.MultiSelect() {
+		return false
+	}
+	_, ok := c.(Rebuttoner)
+	return ok
+}
+
+// toggles is one ☐/☑ button per option (picked are checked) and a Done button.
+func toggles(hd string, options []string, picked []int) []Button {
+	var bs []Button
+	for i, o := range options {
+		box := "☐ "
+		if slices.Contains(picked, i) {
+			box = "☑ "
+		}
+		bs = append(bs, Button{Label: box + o, Data: hd + ":" + strconv.Itoa(i)})
+	}
+	return append(bs, Button{Label: "Done", Data: hd + ":done"})
+}
+
+// joinPicks is d's picked options in option order, joined with ", "; "" when none.
+func joinPicks(d *decision, picked []int) string {
+	var out []string
+	for i, o := range d.Options {
+		if slices.Contains(picked, i) {
+			out = append(out, o)
+		}
+	}
+	return strings.Join(out, ", ")
 }
 
 // Resolve edits every message that asked decision id to show its answer and drops its buttons.
@@ -351,11 +406,49 @@ func (h *Hub) Handle(ctx context.Context, c Connector, in Inbound) {
 	by := name + ":" + in.By
 	var id, answer, session, idea, start string
 	switch {
+	case in.Picks != "":
+		var d *decision
+		var picked []int
+		for _, p := range strings.Split(in.Picks, ",") {
+			hd, idx, _ := strings.Cut(p, ":")
+			i, err := strconv.Atoi(idx)
+			pd := st.Decisions[hd]
+			if pd == nil || err != nil || i < 0 || i >= len(pd.Options) || (d != nil && pd != d) {
+				d = nil
+				break
+			}
+			d, picked = pd, append(picked, i)
+		}
+		if d != nil && d.Multi && d.Refs[name] == in.Ref {
+			id, answer = d.ID, joinPicks(d, picked)
+		}
 	case in.Button != "":
 		hd, idx, _ := strings.Cut(in.Button, ":")
 		i, err := strconv.Atoi(idx)
-		if d := st.Decisions[hd]; d != nil && err == nil && i >= 0 && i < len(d.Options) && d.Refs[name] == in.Ref {
+		d := st.Decisions[hd]
+		switch {
+		case d == nil || d.Refs[name] != in.Ref:
+		case d.Multi && idx == "done":
+			id, answer = d.ID, joinPicks(d, d.Picked[name])
+		case err != nil || i < 0 || i >= len(d.Options):
+		case d.Multi && toggled(c, d.Note):
+			if d.Picked == nil {
+				d.Picked = map[string][]int{}
+			}
+			p := d.Picked[name]
+			if j := slices.Index(p, i); j >= 0 {
+				p = slices.Delete(p, j, j+1)
+			} else {
+				p = append(p, i)
+			}
+			d.Picked[name] = p
+			h.save()
+			h.logOnce(name, c.(Rebuttoner).Buttons(ctx, in.Ref, toggles(hd, d.Options, p)))
+		default:
 			id, answer = d.ID, d.Options[i]
+		}
+		if answer == "" {
+			id = ""
 		}
 	case strings.TrimSpace(in.Text) == "":
 	case h.freeReply(name, cmp.Or(in.ReplyTo, in.Thread)) != "":

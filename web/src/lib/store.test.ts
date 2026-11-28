@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Ev } from "./model";
-import { agentName, ago, argLine, blank, fold, initials, kindOf, open, picks, primary, seed, sessionOf, sessions, setNames, type Store } from "./store";
+import { agentName, ago, argLine, blank, fold, initials, kindOf, open, picks, primary, seed, sessionOf, sessions, setNames, tree, type Store } from "./store";
 import { parse, totals, withComments } from "./diff";
 
 let seq = 0;
@@ -9,6 +9,15 @@ const run = (...es: Ev[]): Store => es.reduce(fold, blank());
 const started = (id = "s-1", title = "Add retry") => ev("session_started", { id, agent: "claude", model: "sonnet", dir: "/r", title, status: "done" }, id);
 
 describe("fold", () => {
+  it("records a child's parent and orders children under their parent", () => {
+    const s = run(started("s-a", "parent"), started("s-z", "other"), ev("session_started", { id: "s-b", agent: "claude", dir: "/r", title: "child", parent: "s-a" }, "s-b"));
+    expect(s.sessions["s-b"].parent).toBe("s-a");
+    expect(tree(sessions(s)).map((x) => x.id)).toEqual(["s-z", "s-a", "s-b"]);
+  });
+  it("shows a bus message where the receiver got it", () => {
+    const s = run(started("s-a"), ev("session_message", { role: "user", by: "session:s-b", text: "Message from session s-b: done" }, "s-a"));
+    expect(s.convo["s-a"]).toMatchObject([{ kind: "you", text: "Message from session s-b: done" }]);
+  });
   it("keeps the daemon's log lines for /log, newest last and at most 200", () => {
     const lines = Array.from({ length: 205 }, (_, i) => ev("log", { line: "daemon: " + i }, ""));
     const s = run(...lines);

@@ -7,7 +7,7 @@ export type Status = "working" | "needs_you" | "done" | "failed";
 export type Usage = { input_tokens?: number; output_tokens?: number; cost_usd?: number };
 export type Sess = {
   id: string; agent: string; model?: string; effort?: string; dir: string; title: string;
-  status: Status; detail?: string; created: string; updated: string; usage?: Usage;
+  status: Status; detail?: string; created: string; updated: string; usage?: Usage; parent?: string;
   goal?: string; goal_state?: string;
 };
 export type Tool = { id?: string; name: string; args?: unknown; output?: string; is_error?: boolean };
@@ -196,6 +196,9 @@ export function seed(s: Store, pending: { id: string; question: string; options?
 }
 
 export const open = (s: Store) => s.decisions.filter((d) => d.answer == null);
+export const tree = (l: Sess[], up?: string): Sess[] =>
+  l.filter((s) => s.parent == up || (!up && !l.some((p) => p.id == s.parent))).flatMap((s) => [s, ...tree(l, s.id)]);
+
 export const sessions = (s: Store) => s.order.map((id) => s.sessions[id]).filter(Boolean);
 
 export const STATUS_WORD: Record<Status, string> = { working: "working", needs_you: "needs you", done: "done", failed: "failed" };
