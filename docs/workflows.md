@@ -7,7 +7,7 @@ files: workflows in `~/.smithy/workflows/`, schedules in `~/.smithy/workflows/sc
 YAML). Each run is kept with every step's input, output, duration and status.
 
 ```bash
-smithy workflow example                  # dependabot-daily, repo-health, webhook-reply + their schedules (off)
+smithy workflow example                  # all five examples; dependabot-daily, repo-health and webhook-reply also get a schedule (off)
 smithy workflow run webhook-reply --input message="lunch at 1?"
 smithy workflow history repo-health
 smithy schedule add nightly --workflow repo-health --cron "0 9 * * 1-5"

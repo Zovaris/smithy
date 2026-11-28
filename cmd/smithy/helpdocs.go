@@ -31,7 +31,7 @@ var harnessSummary = map[string]string{
 	"pair":     "one-time code another machine trades for a device token",
 	"servers":  "the daemons this machine talks to: list, add, use, discover",
 	"mcp":      "MCP server (stdio) for driven CLIs: board, ask, secret calls, search",
-	"workflow": "workflows: flows of steps you run: list, show, run, history, validate",
+	"workflow": "workflows: flows of steps you run: list, show, add, example, run, history, validate",
 	"schedule": "start workflows on a cron, webhook, GitHub event or file change",
 }
 
