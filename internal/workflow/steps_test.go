@@ -50,7 +50,10 @@ func TestShipAFix(t *testing.T) {
 	}
 	f2 := &fake{answers: []string{"a", `{"score":0.2,"why":"no test"}`}, reply: "no"}
 	env2 := f2.env()
-	env2.Exec = func(context.Context, string, []string) (string, int, error) { t.Fatal("no PR without a yes"); return "", 0, nil }
+	env2.Exec = func(context.Context, string, []string) (string, int, error) {
+		t.Fatal("no PR without a yes")
+		return "", 0, nil
+	}
 	if r := RunWith(context.Background(), w, env2, Invocation{Inputs: map[string]string{"bug": "x"}}); r.Status != StatusOK {
 		t.Fatalf("%s %s", r.Status, r.Error)
 	}
