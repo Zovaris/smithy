@@ -22,6 +22,12 @@ describe("/usage", () => {
     expect(i.lines).toContain("model haiku\tin 12.0k · out 3.4k · cache 56.0k · $1.25");
     expect(i.lines.indexOf("agent claude\tin 12.0k · out 3.4k · cache 56.0k · $1.25")).toBeLessThan(i.lines.findIndex((l) => l.startsWith("agent codex")));
   });
+  it("names runs logged before agents and models were recorded", () => {
+    const old = { total: u, agents: { unknown: u }, models: { unknown: u }, runs: 1 };
+    const i = usageInfo({ session: none, today: old, week: old, all: old });
+    expect(i.lines).toContain("earlier runs, agent not recorded\tin 12.0k · out 3.4k · cache 56.0k · $1.25");
+    expect(i.lines.join("\n")).not.toMatch(/unknown/);
+  });
   it("says when nothing was recorded", () => {
     expect(usageInfo({ session: none, today: none, week: none, all: none }).lines[0]).toMatch(/no token use recorded/);
   });

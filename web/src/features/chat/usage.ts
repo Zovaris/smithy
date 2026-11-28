@@ -15,7 +15,7 @@ export const line = (u: U) =>
   `in ${kilo(u.input_tokens)} · out ${kilo(u.output_tokens)} · cache ${kilo(u.cache_read_tokens + u.cache_write_tokens)}` + (u.cost_usd != null ? ` · $${u.cost_usd.toFixed(2)}` : "");
 
 const rows = (kind: string, m: Record<string, U> | null) =>
-  Object.entries(m ?? {}).sort(([a, x], [b, y]) => sum(y) - sum(x) || a.localeCompare(b)).map(([k, u]) => kind + " " + k + "\t" + line(u));
+  Object.entries(m ?? {}).sort(([a, x], [b, y]) => sum(y) - sum(x) || a.localeCompare(b)).map(([k, u]) => (k === "unknown" || k === "" ? `earlier runs, ${kind} not recorded` : kind + " " + k) + "\t" + line(u));
 
 // usageInfo lays the report out by period, each with its total, then per agent and per model.
 export function usageInfo(r: Report): Info {
