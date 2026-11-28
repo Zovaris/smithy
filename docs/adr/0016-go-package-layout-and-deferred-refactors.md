@@ -23,7 +23,7 @@ v0.25 lands the mechanical part, with no behaviour change:
 - `internal/agents/catalog` is the one agent CLI table (name, binary, install hint, takes effort,
   takes skills, consult fallback, tier harness, ACP command, model list command, pool login and
   config env). It imports nothing from smithy, so `pool` can read it; `agents.KnownCLIs` re-exports
-  it (`agents.Known` already names the repo's skills). `CLIs`, `EffortFlags`, `ACPCLIs`,
+  it (`skills.Known` names the repo's skills). `CLIs`, `EffortFlags`, `ACPCLIs`,
   `InstallHint`, `pool.Harnesses` and the warden and consult lists derive from it.
 - Effort has one rule: `agents.Efforts`, `MaxEffort` and `ClampEffort`. `daemon.ValidEffort` uses
   `ClampEffort`, and `GET /v1/setup` reports `effort` (`agents`, `levels`, `max`) so clients stop
@@ -36,12 +36,15 @@ Target layout for later releases, each in its own PR:
   daemon aliases them; the TUI still imports the daemon for event kinds, the shell and token files.
 - `internal/tui` split into `kit` (widgets, theme), `stats` (dashboard panels) and `chat`.
 - `internal/agents` split into `sandbox` (native and API sandboxes, guard) and `skills` (find,
-  install, inventory).
+  install, inventory). Done in v0.26: `internal/agents/sandbox` and `internal/agents/skills`
+  import nothing from `agents`; the guard and native settings that read a run's `Options` stay
+  in `agents`.
 - One shared `httpx` client (timeouts, user agent, size limits) for the HTTP callers.
 - Break up `chatView` (158 methods) and `daemon.Server` (96 methods) along those lines.
 - Shorten the longest functions: `warden.Brief`, `plan.Stack`, `agents.Run`, `warden.Doctor`,
   `chatView.update`, `Model.key`.
-- v0.26 drops the `smithy tui` alias of `smithy`.
+- v0.26 drops the `smithy tui` alias of `smithy stats`. Done, with the `tui` settings group:
+  `tui.reduce_motion` is `ui.reduce_motion`, and the old key is still read.
 
 ## Consequences
 

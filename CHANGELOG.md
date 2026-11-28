@@ -31,10 +31,12 @@ part above `### Details`.
 
 - A settings command's usage line names only that command, and enter on `/set` (or any command that needs arguments) fills it in instead of running it bare.
 - ctrl+k and ctrl+l redraw the whole TUI, so WezTerm's cmd+k (clear, then ctrl+l) no longer leaves a dimmed screen with the composer on the top row.
+- `smithy tui` is gone: it was the old name of `smithy stats`; run `smithy stats`. The `tui.reduce_motion` setting is now `ui.reduce_motion` under the ui group; a saved `tui.reduce_motion` still works.
 
 ### Details
 - Charm libraries: bubbletea v2.2.0; the chat view sets `ProgramResume` (exe, `chat`, its url, `--server` or `--standalone`, `--session <id>`, cwd) and drops it when quitting.
 - `internal/api` holds the daemon's wire types (state, sessions, settings, setup, projects, tasks, workflows, tend, bus) and its `Client`; the TUI, `smithy mcp` and warden use them from there, and the daemon keeps type aliases (ADR 0016). No behaviour change.
+- `internal/agents` split in three (ADR 0016): `agents` runs the CLIs, `agents/sandbox` holds the native and API sandboxes and the secret guard, `agents/skills` finds, installs and inventories skills. `catalog.Kind` names a CLI for both. No behaviour change.
 
 - ci: actions/checkout v7, setup-go v7, setup-node v7, cache v6, upload-artifact v7, attest-build-provenance v4, golangci-lint-action v9 (useblacksmith/checkout v1, setup-bun v2 and golangci-lint v2.15.0 were already latest).
 - deps(web): preact 11.2.0, typescript 7.0.2, vite 8.4.0, vitest 5.1.2, playwright 1.65.1; vite.config imports `defineConfig` from `vitest/config`, and the settings text/number input splits in two for the preact 11 input types. First load 29.8 KB gzip (budget 31 KB).
