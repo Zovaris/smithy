@@ -100,7 +100,12 @@ func (c *Client) Decide(ctx context.Context, id, answer string) (Outcome, error)
 
 // Ask records a warden decision (decide:<batch>/<item>/<key>) on the daemon (POST /v1/asks).
 func (c *Client) Ask(ctx context.Context, id, question string, options []string) error {
-	b, _ := json.Marshal(map[string]any{"id": id, "question": question, "options": options})
+	return c.AskMulti(ctx, id, question, options, false)
+}
+
+// AskMulti is Ask for a question whose options may be picked together when multi is true.
+func (c *Client) AskMulti(ctx context.Context, id, question string, options []string, multi bool) error {
+	b, _ := json.Marshal(map[string]any{"id": id, "question": question, "options": options, "multi": multi})
 	r, err := c.req(ctx, "POST", "/v1/asks", b)
 	if err != nil {
 		return err

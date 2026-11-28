@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Ev } from "./model";
-import { agentName, ago, argLine, blank, fold, initials, kindOf, open, primary, seed, sessionOf, sessions, setNames, tree, type Store } from "./store";
+import { agentName, ago, argLine, blank, fold, initials, kindOf, open, picks, primary, seed, sessionOf, sessions, setNames, tree, type Store } from "./store";
 import { parse, totals, withComments } from "./diff";
 
 let seq = 0;
@@ -84,6 +84,14 @@ describe("fold", () => {
     const s = run(started(), ev("session_usage", { input_tokens: 1, output_tokens: 1 }));
     expect(s.sessions["s-1"].usage?.cost_usd).toBeUndefined();
   });
+  it("keeps multi-select and free-text flags of a question", () => {
+    const s = run(started(), ev("decision_asked", { id: "ask:q1", question: "Which checks?", options: ["lint", "test"], multi: true, other: true }));
+    expect(s.decisions[0]).toMatchObject({ multi: true, other: true });
+    const t = seed(blank(), [{ id: "ask:q2", question: "Db?", options: ["a"], other: true }]);
+    expect(t.decisions[0]).toMatchObject({ multi: false, other: true });
+    expect(picks(["lint", "test", "e2e"], new Set([2, 0]))).toBe("lint, e2e");
+  });
+
   it("seeds pending decisions once", () => {
     const s = seed(seed(blank(), [{ id: "guard:ab", question: "Run x?" }]), [{ id: "guard:ab", question: "Run x?" }]);
     expect(s.decisions).toHaveLength(1);

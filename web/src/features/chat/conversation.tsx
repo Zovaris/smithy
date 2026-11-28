@@ -1,11 +1,16 @@
 import type { ComponentChildren } from "preact";
+import { lazy, Suspense } from "preact/compat";
 import { useLayoutEffect, useRef } from "preact/hooks";
 import { I, toolIcon } from "../../components/icons";
 import { prose, agentName, argLine, initials, type Dec, type Item, type Sess, type Tool } from "../../lib/store";
 import { href } from "../../lib/router";
 import { Md } from "../../components/md";
-import { Decision, St } from "../../components/ui";
+import { St } from "../../components/ui";
 import type { Detail } from "../../lib/detail";
+
+// The question card loads on the first question, off the first-load budget (ADR 0011).
+const Card = lazy(() => import("../../components/decision"));
+const Decision = ({ d }: { d: Dec }) => <Suspense fallback={null}><Card d={d} /></Suspense>;
 
 const cost = (s: Sess) => (s.usage?.cost_usd != null ? " · $" + s.usage.cost_usd.toFixed(2) : "");
 
