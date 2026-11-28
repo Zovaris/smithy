@@ -39,7 +39,7 @@ func (m chatView) linksCommand(arg string) (tea.Model, tea.Cmd) {
 }
 
 func prLine(p ghx.PRLink) string {
-	parts := []string{p.State}
+	parts := []string{p.State, "+" + strconv.Itoa(p.Additions) + " −" + strconv.Itoa(p.Deletions)}
 	if p.Draft {
 		parts = append(parts, "draft")
 	}
@@ -52,7 +52,6 @@ func prLine(p ghx.PRLink) string {
 	if p.Mergeable != "" {
 		parts = append(parts, strings.ToLower(p.Mergeable))
 	}
-	parts = append(parts, "+"+strconv.Itoa(p.Additions)+" −"+strconv.Itoa(p.Deletions))
 	return strings.Join(parts, " · ")
 }
 
