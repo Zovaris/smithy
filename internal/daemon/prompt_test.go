@@ -97,3 +97,9 @@ func TestSystemPromptNeverNamesTheUnderlyingCLI(t *testing.T) {
 		}
 	}
 }
+
+func TestSystemPromptRepliesInTheLatestMessagesLanguage(t *testing.T) {
+	if !strings.Contains(SystemPrompt("claude", false), "Reply in the language of the user's latest message.") {
+		t.Fatal("the language rule follows the user's latest message")
+	}
+}

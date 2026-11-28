@@ -114,9 +114,9 @@ func TestBoardMovesFiltersAndOpens(t *testing.T) {
 		t.Fatalf("enter opens the task file:\n%s", screen(m))
 	}
 	_ = f1
-	m = cpress(m, ckey("esc"))
+	m = cpress(m, ckey("backspace"))
 	if m.overlay != overlayBoard {
-		t.Fatal("esc on the file goes back to the board")
+		t.Fatal("backspace on the file goes back to the board")
 	}
 
 	m = cpress(m, ckey("tab"))

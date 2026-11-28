@@ -82,7 +82,7 @@ func TestWorkflowsModal(t *testing.T) {
 	if out = screen(m); m.overlay != overlayInfo || !strings.Contains(out, "judge") || !strings.Contains(out, "patch bump") || !strings.Contains(out, "STEPS") || !strings.Contains(out, `stale`) || !strings.Contains(out, `[{"number":7}]`) {
 		t.Fatalf("enter shows steps and runs:\n%s", out)
 	}
-	m = cpress(m, ckey("esc"))
+	m = cpress(m, ckey("backspace"))
 	m = cpress(m, ckey("tab"))
 	if out = screen(m); !strings.Contains(out, "0 17 * * * → dependabot-daily") || !strings.Contains(out, "off") {
 		t.Fatalf("schedules tab:\n%s", out)

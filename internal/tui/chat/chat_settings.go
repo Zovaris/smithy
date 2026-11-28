@@ -3,6 +3,7 @@
 package chat
 
 import (
+	"cmp"
 	"context"
 	"slices"
 	"strconv"
@@ -190,6 +191,8 @@ func (m chatView) settingsCommand(name, arg string) (tea.Model, tea.Cmd) {
 		run = func(ctx context.Context) ([]string, error) {
 			return []string{"serve " + f[0] + map[bool]string{true: ": serve launches new work again", false: ": serve launches nothing new (auto.paused)"}[on]}, api.SetServe(ctx, on)
 		}
+	case name == "set" && len(f) == 0:
+		return m, m.openPalette("settings")
 	case name == "set" && len(f) >= 2:
 		k, v := f[0], strings.TrimSpace(strings.TrimPrefix(arg, f[0]))
 		run = func(ctx context.Context) ([]string, error) {
@@ -338,4 +341,57 @@ func tendPanel(l api.TendList) *infoPanel {
 		lines = append(lines, "none: no warden batch or chat session has an open PR to tend")
 	}
 	return &infoPanel{title: "Tend", lines: lines, scroll: true, set: &panelSetting{key: "tend.daemon", opts: modes, sel: sel}}
+}
+
+// paletteSettingsMsg is the daemon's settings, for the palette's SETTINGS rows.
+type paletteSettingsMsg struct{ rows []api.SettingRow }
+
+// openPalette opens the palette with query typed and loads the daemon's settings into it.
+func (m *chatView) openPalette(query string) tea.Cmd {
+	m.overlay, m.pal, m.picker = overlayPalette, palette{query: query}, nil
+	api := m.cfg
+	if api == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		s, err := api.Settings(context.Background())
+		if err != nil {
+			return nil
+		}
+		return paletteSettingsMsg{s.Settings}
+	}
+}
+
+// settingItem is one daemon setting as a palette row: enter fills /set, left/right step an
+// enum or bool value and save it.
+func (m chatView) settingItem(r api.SettingRow) palItem {
+	t := m.th
+	val := cmp.Or(r.Value, r.Default)
+	if r.Secret {
+		val = "****"
+	}
+	it := palItem{group: "SETTINGS", glyph: t.G.Dot, color: t.Muted, label: r.Key, hint: val + "  " + r.Meaning,
+		run: func(m *chatView) tea.Cmd {
+			m.input.SetValue("/set " + r.Key + " ")
+			m.input.CursorEnd()
+			return nil
+		}}
+	if (r.Kind == "enum" || r.Kind == "bool") && len(r.Options) > 0 {
+		it.hint = "‹ " + val + " ›  " + r.Meaning
+		key, opts := r.Key, r.Options
+		it.cycle = func(m *chatView, dir int) tea.Cmd {
+			i := slices.Index(opts, val)
+			v := opts[((i+dir)%len(opts)+len(opts))%len(opts)]
+			if i < 0 && dir < 0 {
+				v = opts[len(opts)-1]
+			}
+			for j := range m.palSet {
+				if m.palSet[j].Key == key {
+					m.palSet[j].Value = v
+				}
+			}
+			return m.saveSetting(panelSetting{key: key, opts: []string{v}})
+		}
+	}
+	return it
 }

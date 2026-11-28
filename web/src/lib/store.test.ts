@@ -191,6 +191,7 @@ describe("guard questions", () => {
 import { prose } from "./store";
 describe("prose", () => {
   it("drops stream-json lines a CLI log leaks and keeps the words", () => {
+    expect(prose("all green\nGOAL MET: go test ok")).toBe("all green");
     expect(prose('{"type":"system"}\nDone: retry added.\n{"result":"x","n":1}\n{not json}')).toBe("Done: retry added.\n{not json}");
   });
 });

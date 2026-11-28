@@ -131,3 +131,15 @@ func TestSuggest(t *testing.T) {
 		}
 	}
 }
+
+func TestWrapLineKeepsTheUsageTableColumn(t *testing.T) {
+	got := wrapLine("  run       run it now (through the daemon when one runs, else here; ask steps need the daemon);")
+	if len(got) != 2 || !strings.HasPrefix(got[0], "  run       run it now") || !strings.HasPrefix(got[1], strings.Repeat(" ", 12)) || got[1][12] == ' ' {
+		t.Fatalf("table row lost its column:\n%s", strings.Join(got, "\n"))
+	}
+	for _, l := range got {
+		if len([]rune(l)) > width {
+			t.Fatalf("too wide: %q", l)
+		}
+	}
+}

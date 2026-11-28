@@ -21,7 +21,9 @@ type fakeSettings struct {
 }
 
 func (f *fakeSettings) Settings(context.Context) (api.Settings, error) {
-	return api.Settings{Serve: true, Prompt: api.PromptState{Path: "/home/dev/.smithy/prompt.md", Active: true}, Keys: []api.KeyRow{{Service: "linear", Masked: "****wxyz"}}}, nil
+	return api.Settings{Serve: true, Prompt: api.PromptState{Path: "/home/dev/.smithy/prompt.md", Active: true}, Keys: []api.KeyRow{{Service: "linear", Masked: "****wxyz"}},
+		Settings: []api.SettingRow{{Key: "ui.theme", Value: "steel", Kind: "enum", Options: []string{"steel", "frost", "plum"}, Meaning: "the color theme"},
+			{Key: "auto.paused", Value: "false", Kind: "bool", Options: []string{"true", "false"}, Meaning: "serve launches nothing new"}}}, nil
 }
 func (f *fakeSettings) SetSetting(_ context.Context, k, v string) error {
 	f.set = append(f.set, [2]string{k, v})
